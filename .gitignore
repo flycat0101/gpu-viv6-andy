@@ -1,0 +1,32 @@
+#QNX binaries ignore
+driver/build_qnx/**/*.a
+driver/build_qnx/**/*.so
+driver/build_qnx/**/*.pinfo
+driver/build_qnx/**/*.3d
+driver/build_qnx/**/*.2d
+
+#ignored dir
+#for Yocto
+driver/build/
+test/build/
+*bin_r_v1_cl/
+*bin_r_cl/
+*bin_r_cm/
+*bin_r/
+#for Android
+driver/.tmp_versions/
+driver/hal/driver/
+
+#igonored files
+#for Yocto
+driver/linux_build.log
+test/linux_build.log
+*.Prerequisites_r
+*.Prerequisites_cl_r
+*.Prerequisites_cm_r
+*.Prerequisites_v1_cl_r
+#for Android
+driver/Module.symvers
+driver/modules.order
+*.o.cmd
+*.o
