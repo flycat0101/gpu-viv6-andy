@@ -2923,6 +2923,40 @@ static gceSTATUS
 #endif
 
 gceSTATUS
+gcoVG_DrawImageFilter(
+    IN gcoVG Vg,
+    IN gcoSURF Source,
+    IN gcsVG_RECT_PTR SrcRect,
+    IN gcsVG_RECT_PTR TrgRect,
+    IN gctBOOL PremultiplySource,
+    IN gctBOOL PremultiplyTarget,
+    IN gceIMAGE_FILTER Filter
+    )
+{
+    gceSTATUS status;
+    gcmHEADER_ARG("Vg=0x%x Source=0x%x SrcRect=0x%x, TrgRect=0x%x, PremultiplySource=%d, PremultiplyTarget=%d Filter=%d",
+                  Vg, Source, SrcRect, TrgRect, PremultiplySource, PremultiplyTarget, Filter
+                  );
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Vg, gcvOBJ_VG);
+
+    /* Call gcoVGHARDWARE to enable premultiply. */
+    status = gcoVGHARDWARE_EnablePremultiply(Vg->hw, PremultiplySource, PremultiplyTarget);
+
+    /*
+    * gcoSURF_SetOrientation() doesn't work in 6x driver,
+    * so it need set the orientation of source surface before draw image.
+    */
+    Source->orientation = gcvORIENTATION_BOTTOM_TOP;
+
+    /* Call gcoVGHARDWARE to draw image with filter mode. */
+    status = gcoVGHARDWARE_DrawImage(Vg->hw, Source, SrcRect, TrgRect, Filter, gcvFALSE, gcvFALSE);
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
 gcoVG_TesselateImage(
     IN gcoVG Vg,
 #if gcdGC355_PROFILER

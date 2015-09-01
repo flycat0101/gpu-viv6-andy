@@ -234,6 +234,11 @@ struct _gcoVGHARDWARE
 
         /* TS buffer semaphore states. */
         gctUINT                     stallSkipCount;
+
+        /* Premultiply flag. */
+        gctBOOL                     premultiplyEnable;
+        gctBOOL                     premultiplySource;
+        gctBOOL                     premultiplyTarget;
     }
     vg;
 };

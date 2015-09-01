@@ -2682,6 +2682,20 @@ gcoSURF_SetBuffer(
     IN gctUINT32 Physical
     );
 
+/* for FSL use only */
+/* Set the underlying video buffer for the surface wrapper. */
+gceSTATUS
+gcoSURF_SetVideoBuffer(
+    IN gcoSURF Surface,
+    IN gceSURF_TYPE Type,
+    IN gceSURF_FORMAT Format,
+    IN gctUINT Width,
+    IN gctUINT Height,
+    IN gctUINT Stride,
+    IN gctPOINTER *LogicalPlane1,
+    IN gctUINT32 *PhysicalPlane1
+    );
+
 /* Set the size of the surface in pixels and map the underlying buffer. */
 gceSTATUS
 gcoSURF_SetWindow(
@@ -3689,7 +3703,11 @@ gcoOS_SysTraceEnd(
 #endif
 
 #ifndef gcdEMPTY_HEADER_FOOTER
+#if gcmIS_DEBUG(gcdDEBUG_TRACE)
 #define gcdEMPTY_HEADER_FOOTER 0
+#else
+#define gcdEMPTY_HEADER_FOOTER 1
+#endif
 #endif
 
 #if gcdENABLE_PROFILING

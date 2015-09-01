@@ -1083,6 +1083,18 @@ gcoVG_DrawImage(
     IN gctBOOL isDrawImage
     );
 
+/*for FSL use only */
+gceSTATUS
+gcoVG_DrawImageFilter(
+    IN gcoVG Vg,
+    IN gcoSURF Source,
+    IN gcsVG_RECT_PTR SrcRect,
+    IN gcsVG_RECT_PTR TrgRect,
+    IN gctBOOL PremultiplySource,
+    IN gctBOOL PremultiplyTarget,
+    IN gceIMAGE_FILTER Filter
+    );
+
 gceSTATUS
 gcoVG_TesselateImage(
     IN gcoVG Vg,

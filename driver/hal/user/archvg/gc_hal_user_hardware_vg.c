@@ -619,6 +619,27 @@ _SetSampler(
             gcoSURF_Unlock(Image,NULL);
         }
 #endif
+        if(Image->node.physical2 != ~0U)
+        {
+            gcmERR_BREAK(gcoVGHARDWARE_SetState(
+                    Hardware,
+                    (0x02940 >> 2) + Sampler,
+                    (pool == gcvPOOL_VIRTUAL) ?
+                    Image->node.physical2 : gcmFIXADDRESS(Image->node.physical2),
+                    gcvFALSE
+                    ));
+        }
+
+        if(Image->node.physical3 != ~0U)
+        {
+            gcmERR_BREAK(gcoVGHARDWARE_SetState(
+                    Hardware,
+                    (0x02948 >> 2) + Sampler,
+                    (pool == gcvPOOL_VIRTUAL) ?
+                    Image->node.physical3 : gcmFIXADDRESS(Image->node.physical3),
+                    gcvFALSE
+                    ));
+        }
 
         gcmERR_BREAK(gcoVGHARDWARE_SetState(
             Hardware,
@@ -1962,6 +1983,12 @@ gcoVGHARDWARE_DrawImage(
             Hardware->vg.targetPremultiply = 0x1;
         }
 
+        if(Hardware->vg.premultiplyEnable)
+        {
+            Hardware->vg.colorPremultiply = Hardware->vg.premultiplySource ? 0x0 : 0x1;
+            Hardware->vg.targetPremultiply = Hardware->vg.premultiplyTarget ? 0x0 : 0x1;
+            Hardware->vg.premultiplyEnable = gcvFALSE;
+        }
 
         /***********************************************************************
         ** Draw image.
@@ -6313,6 +6340,27 @@ gcoVGHARDWARE_EnableDither(
     return status;
 }
 
+gceSTATUS
+gcoVGHARDWARE_EnablePremultiply(
+    IN gcoVGHARDWARE Hardware,
+    IN gctBOOL PremultiplySource,
+    IN gctBOOL PremultiplyTarget
+    )
+{
+    gcmHEADER_ARG("Hardware=0x%x", Hardware);
+
+    gcmGETVGHARDWARE(Hardware);
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
+
+    Hardware->vg.premultiplySource = PremultiplySource;
+    Hardware->vg.premultiplyTarget = PremultiplyTarget;
+    Hardware->vg.premultiplyEnable = gcvTRUE;
+
+    gcmFOOTER_NO();
+    /* Success. */
+    return gcvSTATUS_OK;
+}
 
 /******************************************************************************\
 ****************************** gcoVGHARDWARE API code *****************************
@@ -11902,6 +11950,18 @@ gceSTATUS gcoVGHARDWARE_ConvertFormat(
         /* 12-bpp planar YUV formats. */
         bitsPerPixel  = 12;
         bytesPerTile  = (12 * 4 * 4) / 8;
+        break;
+
+    case gcvSURF_NV12:
+        /* 12-bpp planar YUV formats. */
+        bitsPerPixel  = 12;
+        bytesPerTile  = (12 * 4 * 4) / 8;
+        break;
+
+    case gcvSURF_NV16:
+        /* 16-bpp planar YUV formats. */
+        bitsPerPixel  = 16;
+        bytesPerTile  = (16 * 4 * 4) / 8;
         break;
 
     /* 4444 variations. */

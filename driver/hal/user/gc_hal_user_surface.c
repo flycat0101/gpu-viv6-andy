@@ -10417,11 +10417,17 @@ gcoSURF_NODE_CPUCacheOperation(
     )
 {
 
-    gceSTATUS status;
+    gceSTATUS status = gcvSTATUS_OK;
     gctPOINTER memory;
     gctBOOL locked = gcvFALSE;
 
     gcmHEADER_ARG("Node=0x%x, Type=%u, Offset=%zu, Length=%zu, Operation=%d", Node, Type, Offset, Length, Operation);
+
+    if (Node->u.normal.cacheable == gcvFALSE)
+    {
+        gcmFOOTER();
+        return gcvSTATUS_OK;
+    }
 
     /* Lock the node. */
     gcmONERROR(gcoHARDWARE_Lock(Node, gcvNULL, &memory));
@@ -10517,6 +10523,12 @@ gcoSURF_CPUCacheOperation(
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
+
+    if (Surface->node.u.normal.cacheable == gcvFALSE)
+    {
+        gcmFOOTER();
+        return gcvSTATUS_OK;
+    }
 
     /* Lock the surfaces. */
     gcmONERROR(gcoSURF_Lock(Surface, gcvNULL, source));
@@ -11772,6 +11784,9 @@ OnError:
 **      gceSURF_FORMAT Format
 **          Format of surface to create.
 **
+**      gctINT Width, Height
+**          Size of the surface in pixels.
+**
 **      gctINT Stride
 **          Surface stride. Is set to ~0 the stride will be autocomputed.
 **
@@ -11787,6 +11802,154 @@ OnError:
 **
 **      Nothing.
 */
+gceSTATUS
+gcoSURF_SetVideoBuffer(
+    IN gcoSURF Surface,
+    IN gceSURF_TYPE Type,
+    IN gceSURF_FORMAT Format,
+    IN gctUINT Width,
+    IN gctUINT Height,
+    IN gctUINT Stride,
+    IN gctPOINTER *LogicalPlane1,
+    IN gctUINT32 *PhysicalPlane1
+    )
+{
+    gceSTATUS status;
+#if gcdENABLE_VG
+    gceHARDWARE_TYPE currentType;
+    gceHARDWARE_TYPE currentHW;
+#endif
+
+    gcmHEADER_ARG("Surface=0x%x Type=%d Format=%d Width=%d Height=%d Stride=%d LogicalPlane1=0x%x PhysicalPlane1=0x%x",
+		  Surface, Type, Format, Width, Height, Stride, LogicalPlane1, PhysicalPlane1);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
+
+    /* Has to be user-allocated surface. */
+    if (Surface->node.pool != gcvPOOL_USER)
+    {
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+
+    /* Physical address is necesssary */
+    if(PhysicalPlane1 == gcvNULL)
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ADDRESS);
+    }
+
+    /* Cancel existed wrapping. */
+    gcmONERROR(_UnwrapUserMemory(Surface));
+
+    /* Set surface parameters. */
+    Surface->type	 = Type;
+    Surface->format = Format;
+    Surface->stride = Stride;
+
+    Surface->node.logical  = LogicalPlane1 ? (gctUINT8_PTR) LogicalPlane1[0] : gcvNULL;
+    Surface->node.u.wrapped.physical = PhysicalPlane1[0] ? PhysicalPlane1[0] : ~0U;
+
+#if gcdENABLE_VG
+    gcmGETCURRENTHARDWARE(currentType);
+    if (currentType == gcvHARDWARE_VG)
+    {
+        /* Compute bits per pixel. */
+        gcmONERROR(gcoVGHARDWARE_ConvertFormat(gcvNULL,
+                                               Format,
+                                               (gctUINT32_PTR)&Surface->bitsPerPixel,
+                                               gcvNULL));
+    }
+    else
+#endif
+    {
+        /* Compute bits per pixel. */
+        gcmONERROR(gcoHARDWARE_ConvertFormat(Format,
+                                             (gctUINT32_PTR)&Surface->bitsPerPixel,
+                                              gcvNULL));
+    }
+
+    /* Set initial aligned width and height. */
+    Surface->requestW = Width;
+    Surface->requestH = Height;
+    Surface->requestD = 1;
+    Surface->allocedW = Width;
+    Surface->allocedH = Height;
+    Surface->alignedW = Width;
+    Surface->alignedH = Height;
+
+    /* Stride is the same as the width? */
+    if (Surface->stride == ~0U)
+    {
+        /* Compute the stride. */
+        Surface->stride = Width * Surface->bitsPerPixel / 8;
+    }
+    else
+    {
+#if gcdENABLE_VG
+        gcmGETCURRENTHARDWARE(currentHW);
+
+        if (currentHW == gcvHARDWARE_VG)
+        {
+            gcmONERROR(
+                gcoVGHARDWARE_AlignToTile(gcvNULL,
+                                          Surface->type,
+                                          &Surface->alignedW,
+                                          &Surface->alignedH));
+        }
+        else
+#endif
+        {
+            /* Align the surface size. */
+#if gcdENABLE_3D
+            gcmONERROR(
+                gcoHARDWARE_AlignToTileCompatible(gcvNULL,
+                                                  Surface->type,
+                                                  0,
+                                                  Surface->format,
+                                                  &Surface->alignedW,
+                                                  &Surface->alignedH,
+                                                  Surface->requestD,
+                                                  &Surface->tiling,
+                                                  &Surface->superTiled,
+                                                  &Surface->hAlignment));
+#else
+            gcmONERROR(
+                gcoHARDWARE_AlignToTileCompatible(gcvNULL,
+                                                  Surface->type,
+                                                  0,
+                                                  Surface->format,
+                                                  &Surface->alignedW,
+                                                  &Surface->alignedH,
+                                                  Surface->requestD,
+                                                  &Surface->tiling,
+                                                  gcvNULL,
+                                                  gcvNULL));
+#endif /* gcdENABLE_3D */
+        }
+    }
+
+    /* Compute the surface size. */
+    Surface->size
+        = Surface->stride
+        * Surface->alignedH;
+
+    gcsSURF_NODE_SetHardwareAddress(&Surface->node, PhysicalPlane1[0] ? PhysicalPlane1[0] : ~0U);
+    Surface->node.u.wrapped.physical = PhysicalPlane1[0] ? PhysicalPlane1[0] : ~0U;
+    Surface->node.physical2 = PhysicalPlane1[1] ? PhysicalPlane1[1] : ~0U;
+    Surface->node.physical3 = PhysicalPlane1[2] ? PhysicalPlane1[2] : ~0U;
+
+    /* Validate the node. */
+    Surface->node.valid     = gcvTRUE;
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
 
 /*******************************************************************************
 **
