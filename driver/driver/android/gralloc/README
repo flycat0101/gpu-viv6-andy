@@ -1,0 +1,87 @@
+Vivante Gralloc Module
+
+Vivante Corporation
+May, 2015
+
+
+Overview
+
+    Vivante Gralloc provides a gpu buffer allocator, an ion reference allocator,
+    reference framebuffer management and some helper functions to wrap buffers
+    (allocated from non-vivante gpu allocator) to Vivante HAL.
+
+
+Files
+
+    gralloc.cpp:
+        Gralloc function entries. Please redirect to your allocator according
+        to buffer usage in this file.
+
+    gralloc_priv.h:
+        Gralloc buffer handle definition. This is initially copied from Google's
+        gralloc modudle reference. Please insert 'int viv_priv[24];' (or
+        uint64_t viv_priv[12];' to your own 'gralloc_priv.h' and your own.
+
+    gc_gralloc.h, gc_gralloc.cpp, gc_gralloc_priv.h:
+        Vivante gpu buffer allocator. Vivante private, please DO NOT change.
+
+    gc_gralloc_format_xlate.h:
+        Android pixel format to Vivante HAL format translation table. Please
+        insert your formats to this file.
+
+    gc_gralloc_helper.h, gc_gralloc_helper.cpp:
+        Vivante gralloc helper functions. Vivante private, please DO NOT change.
+
+    ion_gralloc.h, ion_gralloc.cpp:
+        ion buffer allocator reference. Use it as reference.
+
+    gralloc_fb.h, framebuffer.cpp:
+        framebuffer management reference. Use it as reference.
+
+    Again, please do NOT modify any code for Vivante gpu allocator
+    (gc_gralloc.{h,cpp}) and Vivante gralloc helper (gc_gralloc_helper.{h,cpp}).
+
+
+Integration Guide
+
+    1. Buffer handle type integration
+       Please add 'int viv_priv[24];' (or 'uint64_t viv_priv[12];') to
+       'struct private_handle_t' in your 'gralloc_priv.h' and overwrite it
+       with your 'gralloc_priv.h'. Vivante gralloc allocator, helper will
+       only access the 'viv_priv' field in graphic buffer accessing.
+
+    2. Android pixel format integration
+       Please add your own android pixel formats to 'gc_gralloc_format_xlate.h'.
+
+    3. Framebuffer integration
+       Please set correct framebuffer format and buffer count in framebuffer.cpp,
+       or please use your framebuffer allocator. Beside, some framebuffer
+       requires specific wait-for-vsync ioctl command, buffer memory mapping,
+       etc, plesae also add those information into framebuffer.cpp.
+
+       NOTICE:
+       For jellybean-4.2 (code JELLY_BEAN_MR1, Api level 17), please set correct
+       'NUM_FRAMEBUFFER_SURFACE_BUFFERS' in BoardConfig file or product
+       configuration files. Please reference 'frameworks/native/services/
+       surfaceflinger/DisplayHardware/FramebufferSurface.cpp' for framebuffer
+       surface buffer count.
+
+    4. Use your own buffer allocator
+       Please be aware that Vivante allocator CAN ONLY allocate buffers for gpu
+       usages includes HW_RENDER, HW_TEXTURE, HW_COMPOSER.
+
+       Vivante allocator CAN NOT allocate buffers for CAMERA, VIDEO hardwares,
+       ie, please DO NOT use Vivante allocator for HW_CAMERA_xxx, HW_VIDEO_xxx.
+       Instead, please use your own allocator for such buffers.
+
+       For software buffer usages includes SW_READ_xxx, SW_WRITE_xxx, you can
+       use either Vivante allocator or your own allocator.
+
+
+Other Issues
+
+    1. Please see 'gc_gralloc_helper.h' for helper funtion usage.
+
+    2. Vivante gralloc allocator requires 4 usage bits for internal use, which
+       are defined in 'gc_gralloc_priv.h'. Please make sure these usage bits
+       not conflict with other usage bits.

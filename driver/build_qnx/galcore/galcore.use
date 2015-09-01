@@ -1,0 +1,8 @@
+usage: galcore [options]
+
+  options:
+    -start         starts an instance of the galcore gpu manager
+    -stop          send a request to the galcore gpu manager to stop itself
+
+  notes:
+    o Repeated starts will fail to start multiple galcore gpu managers.

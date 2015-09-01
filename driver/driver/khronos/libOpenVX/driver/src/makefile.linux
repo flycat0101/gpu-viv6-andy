@@ -1,0 +1,147 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# Driver part of OpenVX.
+#
+
+#############################################################################
+# Include common definitions.
+
+include $(AQROOT)/makefile.linux.def
+include ../../makefile.linux.def
+INCLUDE += -I$(AQROOT)/hal/inc
+INCLUDE += -I$(AQROOT)/hal/user
+INCLUDE += -I$(AQROOT)/hal/os/linux/user
+INCLUDE += -I$(AQROOT)/sdk/inc
+INCLUDE += -I$(AQROOT)/compiler/libVSC/include
+
+INCLUDE += -I../../../backend
+
+INCLUDE += -I../include
+
+INCLUDE += -I../../inc
+
+ifeq ($(gcdSTATIC_LINK), 1)
+STATIC=1
+TARGET_NAME = libOpenVX.a
+else
+DYNAMIC = 1
+TARGET_NAME = libOpenVX.so
+endif
+
+#############################################################################
+# Objects.
+
+# Core
+OBJECTS         =  \
+                    $(OBJ_DIR)/gc_vx_target.o \
+                    $(OBJ_DIR)/gc_vx_context.o \
+                    $(OBJ_DIR)/gc_vx_array.o \
+                    $(OBJ_DIR)/gc_vx_convolution.o \
+                    $(OBJ_DIR)/gc_vx_delay.o   \
+                    $(OBJ_DIR)/gc_vx_distribution.o    \
+                    $(OBJ_DIR)/gc_vx_error.o   \
+                    $(OBJ_DIR)/gc_vx_graph.o \
+                    $(OBJ_DIR)/gc_vx_image.o   \
+                    $(OBJ_DIR)/gc_vx_kernel.o  \
+                    $(OBJ_DIR)/gc_vx_log.o \
+                    $(OBJ_DIR)/gc_vx_lut.o \
+                    $(OBJ_DIR)/gc_vx_matrix.o  \
+                    $(OBJ_DIR)/gc_vx_memory.o  \
+                    $(OBJ_DIR)/gc_vx_meta_format.o \
+                    $(OBJ_DIR)/gc_vx_node.o    \
+                    $(OBJ_DIR)/gc_vx_node_api.o \
+                    $(OBJ_DIR)/gc_vx_runtime.o    \
+                    $(OBJ_DIR)/gc_vx_parameter.o   \
+                    $(OBJ_DIR)/gc_vx_pyramid.o \
+                    $(OBJ_DIR)/gc_vx_reference.o   \
+                    $(OBJ_DIR)/gc_vx_remap.o   \
+                    $(OBJ_DIR)/gc_vx_scalar.o  \
+                    $(OBJ_DIR)/gc_vx_threshold.o   \
+                    $(OBJ_DIR)/gc_vx_program.o  \
+
+# API
+OBJECTS         +=    \
+                    $(OBJ_DIR)/gc_vx_interface.o \
+                    $(OBJ_DIR)/gc_vx_internal_node_api.o \
+
+# Kernels
+OBJECTS         +=  \
+                    $(OBJ_DIR)/gc_vxk_absdiff.o \
+                    $(OBJ_DIR)/gc_vxk_accumulate.o \
+                    $(OBJ_DIR)/gc_vxk_addsub.o \
+                    $(OBJ_DIR)/gc_vxk_bitwise.o \
+                    $(OBJ_DIR)/gc_vxk_channel.o \
+                    $(OBJ_DIR)/gc_vxk_convertcolor.o \
+                    $(OBJ_DIR)/gc_vxk_convertdepth.o \
+                    $(OBJ_DIR)/gc_vxk_convolve.o \
+                    $(OBJ_DIR)/gc_vxk_fast9.o \
+                    $(OBJ_DIR)/gc_vxk_filter.o \
+                    $(OBJ_DIR)/gc_vxk_harris.o \
+                    $(OBJ_DIR)/gc_vxk_histogram.o \
+                    $(OBJ_DIR)/gc_vxk_integralimage.o \
+                    $(OBJ_DIR)/gc_vxk_lut.o \
+                    $(OBJ_DIR)/gc_vxk_magnitude.o \
+                    $(OBJ_DIR)/gc_vxk_common.o \
+                    $(OBJ_DIR)/gc_vxk_morphology.o \
+                    $(OBJ_DIR)/gc_vxk_multiply.o \
+                    $(OBJ_DIR)/gc_vxk_norm.o \
+                    $(OBJ_DIR)/gc_vxk_nonmax.o \
+                    $(OBJ_DIR)/gc_vxk_optpyrlk.o \
+                    $(OBJ_DIR)/gc_vxk_phase.o \
+                    $(OBJ_DIR)/gc_vxk_remap.o \
+                    $(OBJ_DIR)/gc_vxk_scale.o \
+                    $(OBJ_DIR)/gc_vxk_sobel3x3.o \
+                    $(OBJ_DIR)/gc_vxk_statistics.o \
+                    $(OBJ_DIR)/gc_vxk_threshold.o \
+                    $(OBJ_DIR)/gc_vxk_warp.o \
+
+
+LIBS += -l GAL
+
+INCLUDE += -I../../kernels
+
+VPATH = ../../backend:../include:../../kernels
+
+CFLAGS += $(INCLUDE)
+
+################################################################################
+# Add extra library path.
+LIBS += -L $(AQROOT)/build/sdk/drivers
+LIBS += -L $(AQROOT)/hal/user/$(OBJ_DIR)
+
+LIBS += -l dl -l pthread -lm
+
+################################################################################
+# Add extra include path.
+
+################################################################################
+# Define the macros used in common makefile.
+
+# installation directory
+INSTALL_DIR := $(SDK_DIR)/drivers
+
+################################################################################
+# Include the common makefile.
+
+include $(AQROOT)/common.target
+
+################################################################################
+# Extra installation.
+install: $(TARGET_OUTPUT) extra_install
+
+.PHONY: extra_install
+extra_install: $(TARGET_OUTPUT)
+	@mkdir -p $(SDK_DIR)/include
+	@-cp -rf $(AQROOT)/sdk/inc/VX $(SDK_DIR)/include

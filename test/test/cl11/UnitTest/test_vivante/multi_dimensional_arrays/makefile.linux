@@ -1,0 +1,157 @@
+##############################################################################
+#
+#    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+#    All Rights Reserved.
+#
+#    Permission is hereby granted, free of charge, to any person obtaining
+#    a copy of this software and associated documentation files (the
+#    'Software'), to deal in the Software without restriction, including
+#    without limitation the rights to use, copy, modify, merge, publish,
+#    distribute, sub license, and/or sell copies of the Software, and to
+#    permit persons to whom the Software is furnished to do so, subject
+#    to the following conditions:
+#
+#    The above copyright notice and this permission notice (including the
+#    next paragraph) shall be included in all copies or substantial
+#    portions of the Software.
+#
+#    THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+#    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+#    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
+#    IN NO EVENT SHALL VIVANTE AND/OR ITS SUPPLIERS BE LIABLE FOR ANY
+#    CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+#    TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+#    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+##############################################################################
+
+
+######################################################
+# Include common definitions.
+
+include  ../makefile.linux.def
+
+######################################################
+# Define the program.
+
+PROGRAM			:= 1
+TARGET_NAME		:= multi_dimensional_arrays
+
+######################################################
+# Describe object files.
+
+OBJECTS			:=	$(OBJ_DIR)/main.o \
+				$(OBJ_DIR)/kernelgenerator.o                  \
+				$(OBJ_DIR)/kernelloader.o                     \
+				$(OBJ_DIR)/roundingmode.o                     \
+				$(OBJ_DIR)/multidimensioanlarraystest.o       \
+				$(OBJ_DIR)/multidimensionalarraystest2D.o     \
+				$(OBJ_DIR)/multidimensionalarraystest3D.o     \
+				$(OBJ_DIR)/multidimensionalarraystestrunner.o \
+				$(OBJ_DIR)/randnumgenerator.o                 \
+				$(OBJ_DIR)/resultchecker.o                    \
+				$(OBJ_DIR)/test2dchar16.o                     \
+				$(OBJ_DIR)/test2dchar2.o                      \
+				$(OBJ_DIR)/test2dchar3.o                      \
+				$(OBJ_DIR)/test2dchar4.o                      \
+				$(OBJ_DIR)/test2dchar8.o                      \
+				$(OBJ_DIR)/test2dchar.o                       \
+				$(OBJ_DIR)/test2dfloat16.o                    \
+				$(OBJ_DIR)/test2dfloat2.o                     \
+				$(OBJ_DIR)/test2dfloat3.o                     \
+				$(OBJ_DIR)/test2dfloat4.o                     \
+				$(OBJ_DIR)/test2dfloat8.o                     \
+				$(OBJ_DIR)/test2dfloat.o                      \
+				$(OBJ_DIR)/test2dint16.o                      \
+				$(OBJ_DIR)/test2dint2.o                       \
+				$(OBJ_DIR)/test2dint3.o                       \
+				$(OBJ_DIR)/test2dint4.o     \
+				$(OBJ_DIR)/test2dint8.o     \
+				$(OBJ_DIR)/test2dint.o      \
+				$(OBJ_DIR)/test2dshort16.o  \
+				$(OBJ_DIR)/test2dshort2.o   \
+				$(OBJ_DIR)/test2dshort3.o   \
+				$(OBJ_DIR)/test2dshort4.o   \
+				$(OBJ_DIR)/test2dshort8.o   \
+				$(OBJ_DIR)/test2dshort.o    \
+				$(OBJ_DIR)/test2duchar16.o  \
+				$(OBJ_DIR)/test2duchar2.o   \
+				$(OBJ_DIR)/test2duchar3.o   \
+				$(OBJ_DIR)/test2duchar4.o   \
+				$(OBJ_DIR)/test2duchar8.o   \
+				$(OBJ_DIR)/test2duchar.o    \
+				$(OBJ_DIR)/test2duint16.o   \
+				$(OBJ_DIR)/test2duint2.o    \
+				$(OBJ_DIR)/test2duint3.o    \
+				$(OBJ_DIR)/test2duint4.o    \
+				$(OBJ_DIR)/test2duint8.o    \
+				$(OBJ_DIR)/test2duint.o     \
+				$(OBJ_DIR)/test2dushort16.o \
+				$(OBJ_DIR)/test2dushort2.o  \
+				$(OBJ_DIR)/test2dushort3.o  \
+				$(OBJ_DIR)/test2dushort4.o \
+				$(OBJ_DIR)/test2dushort8.o \
+				$(OBJ_DIR)/test2dushort.o  \
+				$(OBJ_DIR)/test3dchar16.o  \
+				$(OBJ_DIR)/test3dchar2.o   \
+				$(OBJ_DIR)/test3dchar3.o   \
+				$(OBJ_DIR)/test3dchar4.o   \
+				$(OBJ_DIR)/test3dchar8.o   \
+				$(OBJ_DIR)/test3dchar.o    \
+				$(OBJ_DIR)/test3dfloat16.o \
+				$(OBJ_DIR)/test3dfloat2.o  \
+				$(OBJ_DIR)/test3dfloat3.o  \
+				$(OBJ_DIR)/test3dfloat4.o  \
+				$(OBJ_DIR)/test3dfloat8.o  \
+				$(OBJ_DIR)/test3dfloat.o   \
+				$(OBJ_DIR)/test3dint16.o   \
+				$(OBJ_DIR)/test3dint2.o    \
+				$(OBJ_DIR)/test3dint3.o    \
+				$(OBJ_DIR)/test3dint4.o    \
+				$(OBJ_DIR)/test3dint8.o    \
+				$(OBJ_DIR)/test3dint.o     \
+				$(OBJ_DIR)/test3dshort16.o \
+				$(OBJ_DIR)/test3dshort2.o \
+				$(OBJ_DIR)/test3dshort3.o \
+				$(OBJ_DIR)/test3dshort4.o \
+				$(OBJ_DIR)/test3dshort8.o \
+				$(OBJ_DIR)/test3dshort.o \
+				$(OBJ_DIR)/test3duchar16.o \
+				$(OBJ_DIR)/test3duchar2.o \
+				$(OBJ_DIR)/test3duchar3.o \
+				$(OBJ_DIR)/test3duchar4.o \
+				$(OBJ_DIR)/test3duchar8.o \
+				$(OBJ_DIR)/test3duchar.o \
+				$(OBJ_DIR)/test3duint16.o \
+				$(OBJ_DIR)/test3duint2.o \
+				$(OBJ_DIR)/test3duint3.o \
+				$(OBJ_DIR)/test3duint4.o \
+				$(OBJ_DIR)/test3duint8.o \
+				$(OBJ_DIR)/test3duint.o \
+				$(OBJ_DIR)/test3dushort16.o \
+				$(OBJ_DIR)/test3dushort2.o \
+				$(OBJ_DIR)/test3dushort3.o \
+				$(OBJ_DIR)/test3dushort4.o \
+				$(OBJ_DIR)/test3dushort8.o \
+				$(OBJ_DIR)/test3dushort.o \
+
+######################################################
+# Describe installation directory
+#
+INSTALL_DIR		:= $(SDK_DIR)/samples/cl11/UnitTest/test_vivante
+
+######################################################
+# Include the common makefile.
+
+include $(AQROOT)/common.target
+
+######################################################
+# Extra installation.
+
+install: extra_install
+
+.PHONY: extra_install
+
+extra_install:
+	@mkdir -p $(INSTALL_DIR)
+

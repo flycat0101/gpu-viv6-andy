@@ -1,0 +1,52 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+!IF "$(VIVANTE_ENABLE_3D)" != "1"
+SKIPBUILD=1
+!ENDIF
+
+!IF "$(USE_OPENCL)" == "0"
+SKIPBUILD=1
+!ENDIF
+
+DOSYSGEN=1
+SYNCHRONIZE_DRAIN=1
+TARGETNAME=libCLC_LLVMSystem
+TARGETTYPE=LIBRARY
+INCLUDES= \
+  $(INCLUDES); \
+  $(AQROOT)\compiler\libVSC\include; \
+  $(AQROOT)\compiler\libCLC\inc; \
+  $(AQROOT)\compiler\libCLC\llvm\include; \
+
+SOURCES= \
+    Memory.cpp \
+    TimeValue.cpp \
+    DynamicLibrary.cpp \
+    Threading.cpp \
+    ThreadLocal.cpp \
+    Program.cpp \
+    Host.cpp \
+    RWMutex.cpp \
+    Errno.cpp \
+    Process.cpp \
+    Path.cpp \
+    Mutex.cpp \
+    Alarm.cpp \
+    IncludeFile.cpp \
+    Signals.cpp \
+    SearchForAddressOfSpecialSymbol.cpp \
+    Valgrind.cpp \
+    Atomic.cpp \
+
+EXCEPTION_CPP=NO_SEH_NO_C_THROW

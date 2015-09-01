@@ -1,0 +1,206 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# Linux build file for libEGL library.
+#
+
+################################################################################
+# Include common definitions.
+
+include $(AQROOT)/makefile.linux.def
+
+################################################################################
+# Define target module name.
+
+ifeq ($(gcdSTATIC_LINK),1)
+  STATIC           := 1
+  TARGET_MODULE    := $(OBJ_DIR)/libEGL.a
+else
+  DYNAMIC          := 1
+  TARGET_MODULE    := $(OBJ_DIR)/libEGL.so
+  TARGET_SONAME    := libEGL.so
+endif
+
+################################################################################
+# Installation directory.
+
+INSTALL_DIR         := $(SDK_DIR)/drivers
+
+################################################################################
+# Supply additional include directories.
+
+INCLUDE := \
+    -I$(AQROOT)/hal/inc \
+    -I$(AQROOT)/hal/user/ \
+    -I$(AQROOT)/hal/os/linux/user \
+    -I$(AQROOT)/compiler/libVSC/include \
+    -I$(AQROOT)/sdk/inc \
+    -I$(AQROOT)/driver/khronos/libEGL/os \
+    -I$(AQROOT)/driver/khronos/libEGL/source \
+    -I$(AQROOT)/driver/khronos/libEGL/api \
+    -I$(AQROOT)/driver/khronos/libEGL/inc
+
+ifeq ($(EGL_API_DFB),1)
+  INCLUDE += -I$(DFB_DIR)/usr/include
+  INCLUDE += -I$(DFB_DIR)/include
+  INCLUDE += -I$(DFB_DIR)/include/directfb-internal
+  INCLUDE += -I$(DFB_DIR)/include/directfb
+endif
+
+ifeq ($(EGL_API_DRI),1)
+  INCLUDE += -I$(X11_ARM_DIR)/include
+endif
+
+ifeq ($(EGL_API_X),1)
+  INCLUDE += -I$(X11_ARM_DIR)/include
+endif
+
+ifeq ($(EGL_API_WL),1)
+  INCLUDE += -I$(WAYLAND_DIR)/include
+endif
+
+CFLAGS  += $(INCLUDE)
+
+################################################################################
+# Add extra flags for object files.
+
+ifneq ($(USE_ARMCC),1)
+  ifeq ($(EGL_API_DFB),1)
+    CFLAGS  += -pipe -fPIC
+  else
+    ifeq ($(EGL_API_WL),1)
+      CFLAGS += -Werror
+    else
+      CFLAGS += -Werror -ansi
+    endif
+  endif
+endif
+
+ifeq ($(EGL_API_DFB),1)
+  CFLAGS  += -DPIC
+endif
+
+ifeq ($(EGL_API_DRI),1)
+  CFLAGS += -DX11
+endif
+
+ifeq ($(EGL_API_X),1)
+  CFLAGS += -DX11
+endif
+
+ifneq ($(USE_ARMCC),1)
+  CFLAGS += -fPIC
+endif
+
+ifeq ($(CUSTOM_PIXMAP),1)
+  CFLAGS += -DCUSTOM_PIXMAP
+endif
+
+ifeq ($(gcdDUMP_FRAME_TGA),1)
+  CFLAGS += -DgcdDUMP_FRAME_TGA=1
+endif
+
+################################################################################
+# Define flags for the linker.
+
+ifneq ($(USE_ARMCC),1)
+  ifeq ($(EGL_APPENDIX),)
+    LFLAGS += -Wl,--version-script=source/libEGL.map
+  endif
+endif
+
+ifeq ($(USE_ARMCC),1)
+  LFLAGS += --shared -L--soname=,$(TARGET_SONAME)
+else
+  LFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
+endif
+
+################################################################################
+# Supply dependent libraries.
+
+LIBS := -L$(SDK_DIR)/drivers -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL
+
+ifeq ($(EGL_API_WL), 1)
+  LIBS += -lwayland-server -lwayland-client
+endif
+
+
+################################################################################
+# Describe object files.
+
+OBJECTS := \
+    $(OBJ_DIR)/gc_egl_platform.o \
+    $(OBJ_DIR)/gc_egl_query.o \
+    $(OBJ_DIR)/gc_egl_config.o \
+    $(OBJ_DIR)/gc_egl_context.o \
+    $(OBJ_DIR)/gc_egl_init.o \
+    $(OBJ_DIR)/gc_egl_surface.o \
+    $(OBJ_DIR)/gc_egl_swap.o \
+    $(OBJ_DIR)/gc_egl_sync.o \
+    $(OBJ_DIR)/gc_egl_image.o \
+    $(OBJ_DIR)/gc_egl.o
+
+################################################################################
+# Define targets.
+
+.PHONY: all clean install
+
+all: $(TARGET_MODULE)
+
+clean:
+	@rm -rf $(OBJ_DIR)
+
+install: all
+	@mkdir -p $(INSTALL_DIR)
+	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
+	@mkdir -p $(SDK_DIR)/include/EGL
+	@-cp -f $(AQROOT)/sdk/inc/EGL/*.h $(SDK_DIR)/include/EGL
+	@mkdir -p $(SDK_DIR)/include/KHR
+	@-cp -f $(AQROOT)/sdk/inc/KHR/*.h $(SDK_DIR)/include/KHR
+
+################################################################################
+# Module rules.
+
+ifeq ($(STATIC),1)
+$(TARGET_MODULE): $(OBJECTS)
+	$(AR) -r -c $@ $(OBJECTS)
+ifneq ($(USE_ARMCC),1)
+	$(RANLIB) $@
+endif
+endif
+
+ifeq ($(DYNAMIC),1)
+
+# module dependencies
+$(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so \
+                             $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.a)
+
+$(TARGET_MODULE): $(OBJECTS)
+	$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LIBS)
+endif
+
+################################################################################
+# Object rules.
+
+vpath
+vpath %.c api
+vpath %.c source
+
+$(OBJ_DIR)/%.o: %.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -MMD -o $@ $<
+
+# object dependencies.
+-include $(OBJECTS:.o=.d)
+

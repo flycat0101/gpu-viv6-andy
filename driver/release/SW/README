@@ -1,0 +1,64 @@
+
+Files layout
+============
+<AQROOT>/
+    |
+    +---arch/XAQ2                    : Hardware specific driver code
+    |
+    +---driver
+    |    |
+    |    +---dfb                     : DirectFB accelerator
+    |    |
+    |    +---khronos
+    |    |    |
+    |    |    +---libEGL             : EGL driver
+    |    |    |
+    |    |    +---libGLESv11         : OpenGL ES1.1 driver
+    |    |    |
+    |    |    +---libGLESv3          : OpenGL ES3.0 driver
+    |    |    |
+    |    |    +---libOpenVG          : OpenVG driver for 2D VG
+    |    |    |
+    |    |    \---libOpenVG_3D       : OpenVG driver for 3D VG
+    |    |
+    |    \---windows
+    |            |
+    |            \---gdi             : OpenVG 1.1 driver
+    |
+    +----compiler
+    |    |
+    |    +---libVSC                  : compiler backend
+    |    |
+    |    \---libGLSLC                : compiler frontend
+    |
+    +---hal
+    |    |
+    |    +---inc                     : HAL header files
+    |    |
+    |    +---os                      : OS layer HAL driver
+    |    |
+    |    +---user                    : User mode HAL driver
+    |    |    |
+    |    |    +---archvg             : Hardware specific driver code for GC350
+    |    |    |
+    |    |    \---arch               : Hardware specific driver code
+    |    |
+    |    \---kernel                  : Kernel mode HAL driver
+    |         |
+    |         +---archvg             : Hardware specific driver code for GC350
+    |         |
+    |         \---arch               : Hardware specific driver code
+    |
+    |
+    +---release/SW                   : SDK release ReadMe files
+    |
+    \---sdk
+        |
+        +---inc                      : SDK/Driver header files
+        |
+        \---vdk                      : VDK source code
+
+How to build
+============
+1. Build steps for Linux: $(AQROOT)/release/SW/ReadMe_Linux.txt
+2. Build steps for WinCE: $(AQROOT)/release/SW/ReadMe_WinCE.txt

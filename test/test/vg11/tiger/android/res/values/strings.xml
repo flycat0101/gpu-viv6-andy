@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="hello">Hello World, tiger!</string>
+    <string name="startup">Welcome </string>
+    <string name="all">Run All</string>
+    <string name="one">Select  Case</string>
+    <string name="app_name">Tiger2DVG</string>
+</resources>

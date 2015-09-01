@@ -1,0 +1,30 @@
+Frame 9715: 6 layer(s)
+  layer[0]: BLITTER
+    source=<f9715_l0_h0x40002e18_p43346710_s1920x1128.bmp>, stride=3840
+    rotation=0 DEG mirror=0,0 alpha blending=0
+    ANDROID srcRect=[0, 0, 1920, 1128] dstRect=[0, 0, 1920, 1128]
+    GC srcRect=[0, 0, 1920, 1128] dstRect=[0, 0, 1920, 1128]
+  layer[1]: DIM
+    color32=0x99000000
+  region[0]: [0, 0, 1920, 1128]
+  layer[2]: BLITTER
+    source=<f9715_l2_h0x457c8d48_pb31bc000_s870x927.bmp>, stride=3520
+    rotation=0 DEG mirror=0,0 alpha blending=1
+    ANDROID srcRect=[0, 0, 870, 927] dstRect=[525, 100, 1395, 1027]
+    GC srcRect=[0, 0, 870, 927] dstRect=[525, 100, 1395, 1027]
+  layer[3]: BLITTER
+    source=<f9715_l3_h0x40004c20_pba2d7000_s691x120.bmp>, stride=2816
+    rotation=0 DEG mirror=0,0 alpha blending=1
+    ANDROID srcRect=[0, 0, 691, 120] dstRect=[614, 120, 1305, 240]
+    GC srcRect=[0, 0, 691, 120] dstRect=[614, 120, 1305, 240]
+  layer[4]: BLITTER
+    source=<f9715_l4_h0x456eeaa0_pb67a8000_s1920x72.bmp>, stride=3840
+    rotation=0 DEG mirror=0,0 alpha blending=0
+    ANDROID srcRect=[0, 0, 1920, 72] dstRect=[0, 1128, 1920, 1200]
+    GC srcRect=[0, 0, 1920, 72] dstRect=[0, 1128, 1920, 1200]
+  layer[5]: BLITTER
+    source=<f9715_l5_h0x457c68b0_p94c0c000_s768x1200.bmp>, stride=3072
+    rotation=0 DEG mirror=0,0 alpha blending=1
+    ANDROID srcRect=[0, 0, 768, 1200] dstRect=[1152, 0, 1920, 1200]
+    GC srcRect=[0, 0, 768, 1200] dstRect=[1152, 0, 1920, 1200]
+  Result=<f9715_fb.bmp>

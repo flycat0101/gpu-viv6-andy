@@ -1,0 +1,176 @@
+;#############################################################################
+;#
+;#   Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+;#   All Rights Reserved.
+;#
+;#   Permission is hereby granted, free of charge, to any person obtaining
+;#   a copy of this software and associated documentation files (the
+;#   'Software'), to deal in the Software without restriction, including
+;#   without limitation the rights to use, copy, modify, merge, publish,
+;#   distribute, sub license, and/or sell copies of the Software, and to
+;#   permit persons to whom the Software is furnished to do so, subject
+;#   to the following conditions:
+;#
+;#   The above copyright notice and this permission notice (including the
+;#   next paragraph) shall be included in all copies or substantial
+;#   portions of the Software.
+;#
+;#   THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+;#   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+;#   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
+;#   IN NO EVENT SHALL VIVANTE AND/OR ITS SUPPLIERS BE LIABLE FOR ANY
+;#   CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+;#   TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+;#   SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+;#
+;#############################################################################
+
+
+[HKEY_LOCAL_MACHINE\Drivers\BuiltIn\GCHAL\]
+    "Dll"="libGALCore.dll"
+    "Prefix"="GPU"
+
+IF _TGTPLAT = Mustang
+    ; Marvell Mustang
+    "MemBase"=dword:80000000
+    "SysIntr"=dword:1C
+    "Irq"=dword:17
+    "BaseAddress"=dword:0
+    "physSize"=dword:10000000
+    "ContiguousSize"=dword:1A00000
+    "PowerManagement"=dword:0
+    "GpuProfiler"=dword:0
+ENDIF
+
+IF _TGTPLAT = ARMEB
+    ; ARM EB
+    "MemBase"=dword:80000000
+    "SysIntr"=dword:13
+    "Irq"=dword:48
+    "ContiguousSize"=dword:400000
+    "PowerManagement"=dword:1
+    "GpuProfiler"=dword:0
+ENDIF
+
+IF _TGTPLAT = Aspenite
+    ; Marvell Aspenite
+    "MemBase"=dword:C0400000
+    "Irq"=dword:8
+    "ContiguousSize"=dword:1000000
+	"order"=dword:6
+    "PowerManagement"=dword:1
+    "GpuProfiler"=dword:0
+ENDIF
+
+IF _TGTPLAT = Dove
+	"MemBase"=dword:d0840000
+    "Irq"=dword:30
+    "ContiguousSize"=dword:4000000
+    "PowerManagement"=dword:1
+    "GpuProfiler"=dword:0
+ENDIF
+
+IF _TGTPLAT = sy7800
+    "MemBase"=dword:20f00000
+    "SysIntr"=dword:32
+    "Irq"=dword:36
+    "ContiguousSize"=dword:4000000
+    "PowerManagement"=dword:1
+    "GpuProfiler"=dword:0
+ENDIF
+
+IF _TGTPLAT = iMX6Q_SABREAuto
+    "ContiguousBase"=dword:50000000
+    "ContiguousSize"=dword:20000000
+
+    ; GC2000
+    "MemBase"=dword:00130000
+    "Irq"=dword:29
+
+    ; GC320
+    "MemBase2D"=dword:00134000
+    "Irq2D"=dword:2A
+
+    ;GC350
+    "MemBaseVG"=dword:02204000
+    "IrqVG"=dword:2B
+
+    "PowerManagement"=dword:1
+    "GpuProfiler"=dword:0
+ENDIF
+
+IF _TGTPLAT = TI_SDP44XX
+    ; GC320
+    "MemBase"=dword:59000000
+    "Irq"=dword:9d
+
+    "BaseAddress"=dword:0
+    "physSize"=dword:C0000000
+    "ContiguousSize"=dword:4000000
+
+    "PowerManagement"=dword:1
+    "GpuProfiler"=dword:0
+ENDIF
+
+IF _TGTPLAT = iMX6Q_SABRE_SDB
+    "ContiguousSize"=dword:A000000
+
+    ; GC2000
+    "MemBase"=dword:00130000
+    "Irq"=dword:29
+
+    ; GC320
+    "MemBase2D"=dword:00134000
+    "Irq2D"=dword:2A
+
+    ;GC350
+    "MemBaseVG"=dword:02204000
+    "IrqVG"=dword:2B
+
+    "PowerManagement"=dword:1
+    "GpuProfiler"=dword:0
+ENDIF
+
+IF _TGTPLAT = qseven_mmp3
+    "ContiguousSize"=dword:A000000
+
+    ; GC2000W
+    "MemBase"=dword:D420D000
+    "Irq"=dword:82
+
+    ; GC300W
+    "MemBase2D"=dword:D420F000
+    "Irq2D"=dword:83
+    ;"MemBase"=dword:D420F000
+    ;"Irq"=dword:83
+
+    "PowerManagement"=dword:0
+    "GpuProfiler"=dword:0
+ENDIF
+
+    ; ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+    ; These regsitry settings are needed for Vivante GDI/DD accelerator:
+    ;    GC2DAcceleratorEnable: enable different feature
+    ;         Bit0: set 1 to enable BLTPREPARE
+    ;         Bit1: set 1 to enable ALPHABLEND
+    ;         Bit2: set 1 to enable TRANSPARENT
+    ;         Bit3: set 1 to enable STRETCH
+    ;         Bit4: set 1 to enable MASK
+    ;
+    ;    GC2DAcceleratorSyncMode: set different sync mode
+    ;            0: force mode
+    ;            1: async mode
+    ;            2: full async mode
+    ;
+    ; The following settings balance CPU and GPU capibility.
+    ;    GC2DAcceleratorMinSize: set the min pixel number for hardware to render
+    ;    GC2DAcceleratorMinPixelForSimpleSrcCopy: set the min pixel number for simple src copy
+    ;    GC2DAcceleratorMinPixelForSimpleSolidFill: set the min pixel number for simple solid fill
+    ;    GC2DAcceleratorMinPixelForMask: set the min pixel number for masked blit
+    ; ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        "GC2DAcceleratorEnable"=dword:0000001F
+        "GC2DAcceleratorSyncMode"=dword:1
+        "GC2DAcceleratorMinSize"=dword:200
+        "GC2DAcceleratorMinPixelForSimpleSrcCopy"=dword:4000
+        "GC2DAcceleratorMinPixelForSimpleSolidFill"=dword:19000
+        "GC2DAcceleratorMinPixelForMask"=dword:4000

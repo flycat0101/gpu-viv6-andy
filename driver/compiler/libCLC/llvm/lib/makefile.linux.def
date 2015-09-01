@@ -1,0 +1,28 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# Default definitions for CLClibrary.
+#
+
+################################################################################
+# Include the global difinitions.
+
+include $(AQROOT)/makefile.linux.def
+
+################################################################################
+# Supply additional include directories.
+
+INCLUDE +=	-I$(CLC_DIR)/llvm/include -I$(AQROOT)/hal/inc
+
+CDEFS	:=	-D_LIB -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS

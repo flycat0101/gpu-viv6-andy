@@ -1,0 +1,12 @@
+001:	mirror-h
+002:	mirror-v
+003:	mirror-h-v
+004:	r90-blit
+005:	r270-blit
+006:	mirror-h-stretch
+007:	mirror-v-stretch
+008:	mirror-v-h-stretch
+009:	r90-stretchblit
+010:	r270-stretchblit
+013:	back-to-back blit with source and destination rotation.
+

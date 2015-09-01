@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+
+-->
+
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.vivantecorp.graphics.sample6">
+    <application
+			android:icon="@drawable/icon"
+            android:label="@string/gl2sample6_activity">
+        <activity android:name="GL2Sample6Activity"
+                android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+            	android:launchMode="singleTask"
+            	android:configChanges="orientation|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+</manifest>

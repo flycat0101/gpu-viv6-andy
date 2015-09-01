@@ -1,0 +1,121 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+################################################################################
+# Define a shortcut for the main target.
+
+TARGET_OUTPUT1 = $(OBJ_DIR)/$(TARGET_NAME1)
+
+ifeq ($(OBJ_DIR),)
+ifeq ($(DEBUG), 1)
+OBJ_DIR	?= bin_d
+else
+OBJ_DIR	?= bin_r
+endif
+endif
+
+################################################################################
+# Specify targets.
+
+all: $(TARGET_OUTPUT1)
+
+clean:
+	@rm -f $(PREREQUISITES)
+	@rm -rf $(OBJ_DIR)/* $(OBJ_DIR)
+	@rm -rf $(CLEAN_EXTRA)
+
+install: $(TARGET_OUTPUT1)
+ifneq ($(INSTALL_DIR),)
+	@mkdir -p $(INSTALL_DIR)
+	@-cp $(TARGET_OUTPUT1) $(INSTALL_DIR)
+endif
+
+ifeq ($(COMMON_LITE), 1)
+ifeq ($(gcdES11_CORE_WITH_EGL), 1)
+  PREREQUISITES	:= .Prerequisites_cl
+else
+  PREREQUISITES	:= .Prerequisites_v1_cl
+endif
+else
+ifeq ($(gcdES11_CORE_WITH_EGL), 1)
+  PREREQUISITES	:= .Prerequisites_cm
+else
+  PREREQUISITES	:= .Prerequisites
+endif
+endif
+
+ifeq ($(DEBUG), 1)
+  PREREQUISITES	:= $(PREREQUISITES)_d
+else
+  PREREQUISITES	:= $(PREREQUISITES)_r
+endif
+
+MAKEFILE_NAME	= makefile.linux
+
+ifeq ($(gcdSTATIC1_LINK),1)
+ifneq ($(USE_ARMCC), 1)
+  PFLAGS += -static
+else
+  PFLAGS += -L--no_search_dynamic_libraries
+endif
+else
+ifneq ($(QNX), 1)
+LIBS += -lrt
+endif
+PFLAGS += -Wl,-rpath $(SDK_DIR)/drivers
+endif
+
+ifeq ($(PROGRAM1), 1)
+$(TARGET_OUTPUT1): $(PREREQUISITES) $(OBJECTS1)
+ifeq ($(SRC_CXX),)
+	$(CC) $(PFLAGS) $(OBJECTS1) -o $(TARGET_OUTPUT1) $(LIBS)
+else
+	$(CXX) $(PFLAGS) $(OBJECTS1) -o $(TARGET_OUTPUT1) $(LIBS)
+endif
+
+ifneq ($(USE_ARMCC), 1)
+ifneq ($(DEBUG), 1)
+	$(STRIP) $(TARGET_OUTPUT1)
+endif
+endif
+endif
+
+ifeq ($(DYNAMIC1), 1)
+ifeq ($(USE_ARMCC), 1)
+LFLAGS += --shared -L--soname=,$(TARGET_NAME)
+else
+LFLAGS += -Wall -shared -Wl,-soname,$(TARGET_NAME) -Wl,-z,defs
+endif
+$(TARGET_OUTPUT1): $(PREREQUISITES) $(OBJECTS1)
+	$(CC) $(LFLAGS) $(OBJECTS1) -o $(TARGET_OUTPUT1) $(LIBS)
+endif
+
+ifeq ($(STATIC1), 1)
+$(TARGET_OUTPUT1): $(PREREQUISITES) $(OBJECTS1)
+	$(AR) -r -c $(TARGET_OUTPUT1) $(OBJECTS1)
+ifneq ($(USE_ARMCC), 1)
+	$(RANLIB) $(TARGET_OUTPUT1)
+endif
+endif
+
+$(PREREQUISITES): $(MAKEFILE_NAME)
+	@-mkdir -p $(OBJ_DIR)
+	@-touch $(PREREQUISITES)
+
+$(OBJ_DIR)/%.o: %.c $(PREREQUISITES)
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -o $@ $<
+
+$(OBJ_DIR)/%.o: %.cpp $(PREREQUISITES)
+	@mkdir -p $(OBJ_DIR)
+	$(CXX) -c $(CFLAGS) -o $@ $<

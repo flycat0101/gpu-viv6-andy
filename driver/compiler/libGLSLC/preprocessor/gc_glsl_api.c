@@ -1,0 +1,146 @@
+/****************************************************************************
+*
+*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*
+*    The material in this file is confidential and contains trade secrets
+*    of Vivante Corporation. This is proprietary information owned by
+*    Vivante Corporation. No part of this work may be disclosed,
+*    reproduced, copied, transmitted, or used in any way for any purpose,
+*    without the express written permission of Vivante Corporation.
+*
+*****************************************************************************/
+
+
+#include "gc_glsl_preprocessor_int.h"
+
+gceSTATUS
+sloPREPROCESSOR_Construct(
+    IN  sloCOMPILER     Compiler,
+    OUT sloPREPROCESSOR *Preprocessor
+    )
+{
+    gceSTATUS status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    /* Verify the arguments. */
+
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    gcmASSERT(Preprocessor);
+
+    status = ppoPREPROCESSOR_Construct(Compiler, (ppoPREPROCESSOR*)Preprocessor);
+
+    if (gcmIS_SUCCESS(status))
+    {
+        gcmFOOTER_ARG("*Preprocessor=0x%x", Preprocessor);
+    }
+    else
+    {
+        gcmFOOTER();
+    }
+    return status;
+
+}
+
+gceSTATUS
+sloPREPROCESSOR_Destroy(
+    IN sloCOMPILER Compiler,
+    IN sloPREPROCESSOR Preprocessor
+    )
+{
+    gceSTATUS status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+    ppoPREPROCESSOR PP = Preprocessor;
+
+    gcmHEADER_ARG("Compiler=0x%x Preprocessor=0x%x", Compiler, Preprocessor);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    gcmVERIFY_ARGUMENT(PP && PP->base.type == ppvOBJ_PREPROCESSOR);
+
+    status = ppoPREPROCESSOR_Destroy(PP);
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloPREPROCESSOR_SetSourceStrings(
+    IN sloPREPROCESSOR Preprocessor,
+    IN gctUINT StringCount,
+    IN gctCONST_STRING Strings[]
+    )
+{
+    gceSTATUS           status  = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+    ppoPREPROCESSOR     PP      = (ppoPREPROCESSOR)Preprocessor;
+
+    gcmHEADER_ARG("Preprocessor=0x%x StringCount=%u Strings=0x%x",
+                  Preprocessor, StringCount, Strings);
+
+    /* Verify the arguments. */
+    gcmVERIFY_ARGUMENT(PP && PP->base.type == ppvOBJ_PREPROCESSOR);
+    gcmVERIFY_ARGUMENT(StringCount > 0);
+    gcmVERIFY_ARGUMENT(Strings);
+
+    status = ppoPREPROCESSOR_SetSourceStrings(PP,
+                                              Strings,
+                                              gcvNULL,
+                                              StringCount);
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloPREPROCESSOR_Parse(
+    IN      sloPREPROCESSOR     Preprocessor,
+    IN      gctINT              MaxSize,
+    OUT     gctSTRING           Buffer,
+    OUT     gctINT              *ActualSize
+    )
+{
+    gceSTATUS status;
+
+    ppoPREPROCESSOR PP = Preprocessor;
+
+    gcmHEADER_ARG("Preprocessor=0x%x MaxSize=%u Buffer=0x%x",
+                  Preprocessor, MaxSize, Buffer);
+
+    /* Verify the arguments. */
+    gcmVERIFY_ARGUMENT(PP);
+    gcmVERIFY_ARGUMENT(Buffer);
+    gcmVERIFY_ARGUMENT(ActualSize);
+
+    MaxSize--;/*for the trail white space.*/
+
+    MaxSize--;/*for the trail \0*/
+
+    if (MaxSize < ppvMAX_PPTOKEN_CHAR_NUMBER)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Report(
+            PP->compiler,
+            1,
+            0,
+            slvREPORT_INTERNAL_ERROR,
+            "sloPREPROCESSOR_Parse : The output buffer is too small."
+            "please set to more than %d",
+            ppvMAX_PPTOKEN_CHAR_NUMBER + 2
+            ));
+
+        status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+        gcmFOOTER();
+        return status;
+    }
+
+    status = ppoPREPROCESSOR_Parse(PP, Buffer, MaxSize, ActualSize);
+
+    if(status != gcvSTATUS_OK)
+    {
+        gcmFOOTER();
+        return status;
+    }
+
+    gcmFOOTER_ARG("*ActualSize=%u", *ActualSize);
+    return gcvSTATUS_OK;
+}
+

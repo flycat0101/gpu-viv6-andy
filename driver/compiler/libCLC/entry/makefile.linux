@@ -1,0 +1,101 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+
+#
+# Linux build file for CLC library.
+#
+
+################################################################################
+# Include common definitions.
+
+include ../makefile.linux.def
+
+################################################################################
+# Supply additional include directories.
+
+CFLAGS	+=	$(INCLUDE)
+
+################################################################################
+# Add extra flags for object files.
+
+ifneq ($(USE_ARMCC), 1)
+CFLAGS += -fPIC
+LFLAGS += -Wl,--version-script=libCLC.map
+endif
+
+################################################################################
+# Describe object files.
+
+OBJECTS :=	gc_cl_entry.o
+
+OBJS	:=	$(addprefix $(OBJ_DIR)/,$(OBJECTS))
+OBJECTS	:=	$(OBJS)
+
+################################################################################
+# Additinal libraries.
+
+A		:=	$(CLC_DIR)/compiler/$(OBJ_DIR)/libclCompiler.a
+A		+=	$(CLC_DIR)/preprocessor/$(OBJ_DIR)/libclPreprocessor.a
+A		+=	$(CLC_DIR)/common/$(OBJ_DIR)/libclCommon.a
+#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/FrontendTool/$(OBJ_DIR)/libclangFrontendTool.a
+#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/Frontend/$(OBJ_DIR)/libclangFrontend.a
+#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/Basic/$(OBJ_DIR)/libclangBasic.a
+#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/Driver/$(OBJ_DIR)/libclangDriver.a
+#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/Lex/$(OBJ_DIR)/libclangLex.a
+#A		+=	$(CLC_DIR)/llvm/lib/Support/$(OBJ_DIR)/libllvmSupport.a
+#A		+=	$(CLC_DIR)/llvm/lib/System/$(OBJ_DIR)/libllvmSystem.a
+#A		+=	$(CLC_DIR)/llvm/lib/VMCore/$(OBJ_DIR)/libllvmVMCore.a
+#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/FrontendTool/$(OBJ_DIR)/libclangFrontendTool.a
+#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/Frontend/$(OBJ_DIR)/libclangFrontend.a
+#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/Basic/$(OBJ_DIR)/libclangBasic.a
+#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/Driver/$(OBJ_DIR)/libclangDriver.a
+#A		+=	$(CLC_DIR)/llvm/tools/clang/lib/Lex/$(OBJ_DIR)/libclangLex.a
+#A		+=	$(CLC_DIR)/llvm/lib/Support/$(OBJ_DIR)/libllvmSupport.a
+#A		+=	$(CLC_DIR)/llvm/lib/System/$(OBJ_DIR)/libllvmSystem.a
+#A		+=	$(CLC_DIR)/llvm/lib/VMCore/$(OBJ_DIR)/libllvmVMCore.a
+
+LIBS	+=	$(A)
+
+LIBS	+=	-L$(CLC_DIR)/../libVSC/$(OBJ_DIR) -lVSC
+LIBS	+=	-L$(GAL_DIR)/user/$(OBJ_DIR) -lGAL
+LIBS    +=	-L$(CLC_DIR)/llvm/$(OBJ_DIR) -lLLVM_viv
+
+LIBS	+=	-lm -lpthread -lstdc++ -ldl
+
+################################################################################
+# Define a shortcut for the main target.
+
+ifeq ($(gcdSTATIC_LINK), 1)
+    STATIC = 1
+else
+    DYNAMIC = 1
+endif
+
+ifeq ($(STATIC), 1)
+    TARGET_NAME = libCLC.a
+else
+    TARGET_NAME = libCLC.so
+endif
+
+$(TARGET_OUTPUT): $(A)
+
+################################################################################
+# Define the macros used in common makefile.
+
+INSTALL_DIR	:= $(SDK_DIR)/drivers
+
+################################################################################
+# Include the common makefile.
+
+include $(AQROOT)/common.target

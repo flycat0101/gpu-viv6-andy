@@ -1,0 +1,79 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+!IF "$(VIVANTE_ENABLE_3D)" != "1"
+SKIPBUILD=1
+!ENDIF
+
+!IF "$(USE_OPENCL)" == "0"
+SKIPBUILD=1
+!ENDIF
+
+DOSYSGEN=1
+SYNCHRONIZE_DRAIN=1
+TARGETTYPE=DYNLINK
+DLLENTRY=DllMain
+
+!IF "$(BUILD_OPENCL_ICD)" == "1"
+TARGETNAME=libVivanteOpenCL
+!ELSE
+TARGETNAME=libOpenCL
+!ENDIF
+
+SOURCES= \
+    ../gc_cl.c \
+    ../gc_cl_command.c \
+    ../gc_cl_context.c \
+    ../gc_cl_device.c \
+    ../gc_cl_enqueue.c \
+    ../gc_cl_event.c \
+    ../gc_cl_kernel.c \
+    ../gc_cl_mem.c \
+    ../gc_cl_platform.c \
+    ../gc_cl_profiler.c \
+    ../gc_cl_program.c \
+    ../gc_cl_sampler.c \
+    ../gc_cl_extension.c \
+    ../gc_cl_icd.c \
+    ../gc_cl_enqueue.c \
+    ../gc_cl_gl.c \
+
+INCLUDES= \
+  $(AQROOT)\sdk\inc; \
+  $(AQROOT)\compiler\libVSC\include; \
+  $(AQROOT)\hal\inc; \
+  $(AQROOT)\hal\user; \
+  $(AQROOT)\hal\os\ce\user; \
+
+CDEFINES=$(CDEFINES) -D_DLL_EXPORTS
+!IF "$(BUILD_OPENCL_ICD)" == "1"
+CDEFINES=$(CDEFINES) -DCL_USE_DEPRECATED_OPENCL_1_0_APIS -DCL_USE_DEPRECATED_OPENCL_1_1_APIS -DBUILD_OPENCL_12=1 -DBUILD_OPENCL_ICD=1
+DEFFILE = libVivanteOpenCL12.def
+!ELSE
+CDEFINES=$(CDEFINES) -DCL_USE_DEPRECATED_OPENCL_1_0_APIS -DCL_USE_DEPRECATED_OPENCL_1_1_APIS -DBUILD_OPENCL_12=1
+DEFFILE = libOpenCL12.def
+!ENDIF
+
+!IF "$(BUILD_OPENCL_FP)" == "1"
+CDEFINES=$(CDEFINES) -DBUILD_OPENCL_FP=1
+!ENDIF
+
+
+TARGETLIBS= \
+  $(_SYSGENSDKROOT)\lib\$(_CPUINDPATH)\coredll.lib \
+  $(GCLIB_PATH)\libVSC.lib \
+  $(GCLIB_PATH)\libCLC.lib \
+  $(GCLIB_PATH)\libGAL.lib \
+  $(GCLIB_PATH)\libGLESv2.lib \
+
+LIBDEFINES=$(LIBDEFINES) -ignore:4197

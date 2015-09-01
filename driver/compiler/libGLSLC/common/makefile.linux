@@ -1,0 +1,105 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+
+#
+# Linux build file for GLESv2SC library.
+#
+
+################################################################################
+# Include common definitions.
+
+include ../makefile.linux.def
+
+STATIC              := 1
+TARGET_NAME         := libglslCommon.a
+
+################################################################################
+# Installation directory.
+
+INSTALL_DIR         := $(SDK_DIR)/drivers
+
+ifndef FIXED_ARCH_TYPE
+
+TARGET_MODULE := $(OBJ_DIR)/$(TARGET_NAME)
+
+################################################################################
+# Add extra flags for object files.
+
+ifneq ($(USE_ARMCC), 1)
+  CFLAGS += -fPIC
+endif
+
+################################################################################
+# Describe object files.
+
+OBJECTS := $(OBJ_DIR)/gc_glsl_common.o
+
+################################################################################
+# Define targets.
+
+.PHONY: all clean install
+
+all: $(TARGET_MODULE)
+
+clean:
+	@rm -rf $(OBJ_DIR)
+
+install: all
+
+ifeq ($(gcdSTATIC_LINK), 1)
+install:
+	@mkdir -p $(INSTALL_DIR)
+	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
+endif
+
+################################################################################
+# Module rules.
+
+$(TARGET_MODULE): $(OBJECTS)
+	$(AR) -r -c $@ $(OBJECTS)
+ifneq ($(USE_ARMCC), 1)
+	$(RANLIB) $@
+endif
+
+################################################################################
+# Object rules.
+
+$(OBJ_DIR)/%.o: %.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -MMD -o $@ $<
+
+# object dependencies.
+-include $(OBJECTS:.o=.d)
+
+else # FIXED_ARCH_TYPE
+
+OBJECTS :=
+
+clean: rmfile
+
+install: cpfile
+
+.PHONY: cpfile rmfile
+cpfile:
+ifeq ($(gcdSTATIC_LINK), 1)
+	@-cp -f $(FIXED_ARCH_TYPE)/$(TARGET_NAME) $(INSTALL_DIR)/
+endif
+
+rmfile:
+ifeq ($(gcdSTATIC_LINK), 1)
+	@-rm -f $(INSTALL_DIR)/$(TARGET_NAME)
+endif
+
+endif
+

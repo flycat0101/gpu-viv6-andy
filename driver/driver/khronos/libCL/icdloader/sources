@@ -1,0 +1,49 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+!IF "$(VIVANTE_ENABLE_3D)" != "1"
+SKIPBUILD=1
+!ENDIF
+
+!IF "$(USE_OPENCL)" == "0"
+SKIPBUILD=1
+!ENDIF
+
+!IF "$(BUILD_OPENCL_ICD)" == "0"
+SKIPBUILD=1
+!ENDIF
+
+DOSYSGEN=1
+SYNCHRONIZE_DRAIN=1
+TARGETTYPE=DYNLINK
+DLLENTRY=DllMain
+
+TARGETNAME=libOpenCL
+
+SOURCES= \
+    icd.c \
+    icd_windows.c \
+    icd_dispatch.c
+
+INCLUDES= \
+  $(AQROOT)\sdk\inc; \
+  $(AQROOT)\hal\inc; \
+
+DEFFILE = OpenCL.def
+
+CDEFINES=$(CDEFINES) -D_DLL_EXPORTS
+CDEFINES=$(CDEFINES) -DBUILD_OPENCL_ICD=1
+
+TARGETLIBS= \
+    $(LIBSYS) \
+    $(_SYSGENSDKROOT)\lib\$(_CPUINDPATH)\coredll.lib \

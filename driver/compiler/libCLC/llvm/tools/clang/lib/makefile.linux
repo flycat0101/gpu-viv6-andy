@@ -1,0 +1,44 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+######################################################
+# Include global difinitions.
+
+include ./makefile.linux.def
+
+######################################################
+# Components of the project.
+
+CLANG_BASIC			:= Basic
+CLANG_DRIVER		:= Driver
+CLANG_FRONTEND		:= Frontend
+CLANG_FRONTENDTOOL	:= FrontendTool
+CLANG_LEX			:= Lex
+
+CLANG_LIBS	:= $(CLANG_BASIC) $(CLANG_DRIVER) $(CLANG_FRONTEND) $(CLANG_FRONTENDTOOL) $(CLANG_LEX)
+
+######################################################
+# Define the macros used in the common file.
+
+MODULES		:= $(CLANG_LIBS)
+MAIN_MODULE := $(CLANG_FRONTENDTOOL)
+
+######################################################
+# Include the common makefile.
+
+include $(AQROOT)/common.node
+
+######################################################
+# Define the denpendencies.
+
+$(CLANG_FRONTENDTOOL):	$(CLANG_BASIC) $(CLANG_DRIVER) $(CLANG_FRONTEND) $(CLANG_LEX)

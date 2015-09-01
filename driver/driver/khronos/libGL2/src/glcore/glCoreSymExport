@@ -1,0 +1,8 @@
+VERSION {
+    global:
+        __driCreateScreen;
+        __driCreateNewScreen;
+
+    local: *;
+};
+

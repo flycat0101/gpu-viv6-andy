@@ -1,0 +1,24 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#Enable Hardware Kernels
+VX_KENRELS_HW     := 1
+
+CFLAGS  += -D_LITTLE_ENDIAN_ \
+           -DOPENVX_USE_LIST \
+           -DOPENVX_USE_NODE_MEMORY \
+           -DOPENVX_USE_TILING \
+           -DOPENVX_USE_DOT  \
+           -DOPENVX_USE_TARGET   \
+           -fPIC
+

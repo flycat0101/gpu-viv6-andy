@@ -1,0 +1,40 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+######################################################
+# Components of the project.
+
+SC2X_COMMON			:= common
+SC2X_COMPILER		:= compiler
+SC2X_PREPROCESSOR	:= preprocessor
+SC2X_ENTRY			:= entry
+
+
+MODULES		        := $(SC2X_COMMON) $(SC2X_COMPILER) $(SC2X_PREPROCESSOR) $(SC2X_ENTRY)
+MAIN_MODULE	        := $(SC2X_ENTRY)
+
+$(SC2X_ENTRY):      $(SC2X_COMMON) $(SC2X_COMPILER) $(SC2X_PREPROCESSOR)
+
+.PHONY: all clean install $(MODULES)
+
+all: $(MAIN_MODULE)
+
+clean:   all
+clean:   V_TARGET := clean
+
+install: all
+install: V_TARGET := install
+
+$(MODULES):
+	@test ! -d $@ || $(MAKE) -f makefile.linux -C $@ $(V_TARGET) gcdSTATIC_LINK=$(gcdSTATIC_LINK)
+

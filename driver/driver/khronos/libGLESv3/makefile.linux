@@ -1,0 +1,216 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# Driver part of GLES 3.x.
+#
+
+#############################################################################
+# Include common definitions.
+
+include $(AQROOT)/makefile.linux.def
+
+################################################################################
+# Define target module name.
+
+ifeq ($(gcdSTATIC_LINK),1)
+  STATIC            := 1
+  TARGET_MODULE     := $(OBJ_DIR)/libGLESv2.a
+else
+  DYNAMIC           := 1
+  TARGET_MODULE     := $(OBJ_DIR)/libGLESv2.so
+  TARGET_SONAME     := libGLESv2.so
+endif
+
+################################################################################
+# Installation directory.
+
+INSTALL_DIR         := $(SDK_DIR)/drivers
+
+################################################################################
+# Supply additional include directories.
+
+INCLUDE := -I$(AQROOT)/hal/inc \
+           -I$(AQROOT)/hal/os/linux/user \
+           -I$(AQROOT)/sdk/inc \
+           -I$(AQROOT)/compiler/libVSC/include
+
+ifeq ($(EGL_API_DFB), 1)
+  INCLUDE += -I$(DFB_DIR)/usr/include
+  INCLUDE += -I$(DFB_DIR)/include
+  INCLUDE += -I$(DFB_DIR)/include/directfb-internal
+  INCLUDE += -I$(DFB_DIR)/include/directfb
+endif
+
+ifeq ($(EGL_API_DRI), 1)
+  INCLUDE += -I$(X11_ARM_DIR)/include
+endif
+
+ifeq ($(EGL_API_X), 1)
+  INCLUDE += -I$(X11_ARM_DIR)/include
+endif
+
+CFLAGS += $(INCLUDE)
+
+CFLAGS += -I./include/glcore \
+          -I./include/chip \
+          -I./src/glcore \
+          -I$(AQROOT)/hal/user \
+          -I$(AQROOT)/driver/khronos/libEGL/inc \
+          -I$(AQROOT)/driver/khronos/libEGL/source \
+
+################################################################################
+# Add extra flags for object files.
+
+ifneq ($(USE_ARMCC), 1)
+  ifeq ($(EGL_API_DFB), 1)
+    CFLAGS  += -pipe -fPIC
+  else
+    #CFLAGS += -Werror -ansi
+    CFLAGS += -Werror
+  endif
+endif
+
+ifeq ($(EGL_API_DFB), 1)
+  CFLAGS  += -DPIC
+endif
+
+ifneq ($(USE_ARMCC), 1)
+  CFLAGS += -fPIC
+endif
+
+CFLAGS += -D_LINUX_ -DGL_GLEXT_PROTOTYPES
+
+################################################################################
+# Define flags for the linker.
+
+ifneq ($(USE_ARMCC), 1)
+  ifeq (,$(GL_3_APPENDIX))
+    LFLAGS += -Wl,--version-script=libGLESv3.map
+  endif
+endif
+
+ifeq ($(USE_ARMCC),1)
+  LFLAGS += --shared -L--soname=,$(TARGET_SONAME)
+else
+  LFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
+endif
+
+################################################################################
+# Supply dependent libraries.
+
+LIBS := -L$(SDK_DIR)/drivers \
+        -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL \
+        -L$(AQROOT)/compiler/libVSC/$(OBJ_DIR) -lVSC \
+        -L$(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR) -lEGL -lm
+
+################################################################################
+# Describe object files.
+
+OBJECTS := $(OBJ_DIR)/gc_es_api.o \
+           $(OBJ_DIR)/gc_es_api_profiler.o \
+           $(OBJ_DIR)/gc_es_bufobj.o \
+           $(OBJ_DIR)/gc_es_context.o \
+           $(OBJ_DIR)/gc_es_dispatch.o \
+           $(OBJ_DIR)/gc_es_draw.o \
+           $(OBJ_DIR)/gc_es_egl.o \
+           $(OBJ_DIR)/gc_es_extensions.o \
+           $(OBJ_DIR)/gc_es_fbo.o \
+           $(OBJ_DIR)/gc_es_formats.o \
+           $(OBJ_DIR)/gc_es_fragop.o \
+           $(OBJ_DIR)/gc_es_misc.o \
+           $(OBJ_DIR)/gc_es_names.o \
+           $(OBJ_DIR)/gc_es_pixelop.o \
+           $(OBJ_DIR)/gc_es_query.o \
+           $(OBJ_DIR)/gc_es_raster.o \
+           $(OBJ_DIR)/gc_es_shader.o \
+           $(OBJ_DIR)/gc_es_teximage.o \
+           $(OBJ_DIR)/gc_es_texstate.o \
+           $(OBJ_DIR)/gc_es_varray.o \
+           $(OBJ_DIR)/gc_es_profiler.o \
+           $(OBJ_DIR)/gc_chip_basic_types.o \
+           $(OBJ_DIR)/gc_chip_buffer.o \
+           $(OBJ_DIR)/gc_chip_clear.o \
+           $(OBJ_DIR)/gc_chip_codec.o \
+           $(OBJ_DIR)/gc_chip_context.o \
+           $(OBJ_DIR)/gc_chip_depth.o \
+           $(OBJ_DIR)/gc_chip_device.o \
+           $(OBJ_DIR)/gc_chip_draw.o \
+           $(OBJ_DIR)/gc_chip_drawable.o \
+           $(OBJ_DIR)/gc_chip_fbo.o \
+           $(OBJ_DIR)/gc_chip_misc.o \
+           $(OBJ_DIR)/gc_chip_patch.o \
+           $(OBJ_DIR)/gc_chip_pixel.o \
+           $(OBJ_DIR)/gc_chip_profiler.o \
+           $(OBJ_DIR)/gc_chip_shader.o \
+           $(OBJ_DIR)/gc_chip_state.o \
+           $(OBJ_DIR)/gc_chip_texture.o \
+           $(OBJ_DIR)/gc_chip_utils.o
+
+################################################################################
+# Define targets.
+
+.PHONY: all clean install
+
+all: $(TARGET_MODULE)
+
+clean:
+	@rm -rf $(OBJ_DIR)
+
+install: all
+	@mkdir -p $(INSTALL_DIR)
+	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
+	@mkdir -p $(SDK_DIR)/include/GLES2
+	@-cp -f $(AQROOT)/sdk/inc/GLES2/*.h $(SDK_DIR)/include/GLES2
+	@mkdir -p $(SDK_DIR)/include/GLES3
+	@-cp -f $(AQROOT)/sdk/inc/GLES3/*.h $(SDK_DIR)/include/GLES3
+
+################################################################################
+# Module rules.
+
+ifeq ($(STATIC),1)
+$(TARGET_MODULE): $(OBJECTS)
+	$(AR) -r -c $@ $(OBJECTS)
+ifneq ($(USE_ARMCC), 1)
+	$(RANLIB) $@
+endif
+endif
+
+ifeq ($(DYNAMIC),1)
+
+# module dependencies
+$(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so \
+                             $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.a) \
+                  $(wildcard $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.so \
+                             $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.a) \
+                  $(wildcard $(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)/libEGL.so \
+                             $(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)/libEGL.a)
+
+$(TARGET_MODULE): $(OBJECTS)
+	$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LIBS)
+endif
+
+################################################################################
+# Object rules.
+
+vpath
+vpath %.c src/glcore
+vpath %.c src/chip
+
+$(OBJ_DIR)/%.o: %.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -MMD -o $@ $<
+
+# object dependencies.
+-include $(OBJECTS:.o=.d)
+

@@ -1,0 +1,71 @@
+Vivante HWComposer Module
+
+Vivante Corporation
+May, 2015
+
+
+Overview
+
+    HWComposer is used by surfaceflinger to enhance composition from android
+    honeycomb and later. Vivante HWComposer can use 2D blit, multi-source blit
+    for that purpose.
+
+    Vivante HWComposer can support plane alpha (global alpha) and dim layer. To
+    enable plane alpha and dim, please patch hwcomposer.h/surfaceflinger.
+
+    Please reference 'README' file in hwcomposer_android_patch patckage for more
+    information.
+
+
+Get render buffer from EGL
+
+    Please implement 'eglGetRenderBufferv0VIV' function for non-Vivante EGL.
+    HWC requires the function to obtain window back buffer (framebuffer) to
+    render into.
+
+
+OVERLAY Integration
+
+    1. Some overlay devices can only display areas which are cleared as
+       transparet in framebuffer. If your device is like that, please make sure
+       'CLEAR_FB_FOR_OVERLAY' is set to '1' in 'gc_hwc.h'.
+
+    2. Please add your own code in 'hwcOverlay' function (gc_hwc_overlay.cpp) to
+       do actual overlay functionalities.
+
+
+VSYNC Integration
+
+    Hardware vsync is supported in hwcomposer after JellyBean. Each hardware
+    vsync varies. It is VENDOR's responsibility to implement hardware vsync in
+    hwc.
+
+    Currently a reference vsync handler is already implemented. The 'fake' vsync
+    does not handle hardware vsyncs, but only sleep for a specific time for
+    vsync simulation.
+
+    Please add your hardware vsync handler in 'gc_hwc_vsync.cpp'.
+      1. Initialize vysnc in 'hwcVsyncSetup'.
+      2. Handle vsync events in 'vsyncThread'.
+
+
+Prepare and Build
+    1. Patch android system to support EGL_ANDROID_get_render_buffer extension.
+    2. Patch android system to support dim/plane alpha.
+    3. Please set proper optimization switch in 'gc_hwc.h' if needed.
+
+    Build HWComposer like a normal android project (type 'mm' to build).
+
+
+Debug features
+
+    Use following command to dump composition information:
+        setprop hwc.debug.dump_compose 1
+
+    Use following command to dump layer input and framebuffer out to bitmaps:
+        setprop hwc.debug.dump_bitmap 1
+
+Known Issues
+
+    1. 2D PE 1.x is not supported.
+    2. COVERAGE alpha blending is not exactly correct in alpha channel.

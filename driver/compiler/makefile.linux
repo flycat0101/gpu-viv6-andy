@@ -1,0 +1,43 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+######################################################
+# Include global difinitions.
+
+include $(AQROOT)/makefile.linux.def
+
+######################################################
+# Components of the project.
+
+VSC_LIB     := libVSC
+GLSLC_LIB	:= libGLSLC
+CLC_LIB     := libCLC
+
+COMPILER_LIBS = $(VSC_LIB) $(GLSLC_LIB)
+$(GLSLC_LIB): $(VSC_LIB)
+
+ifeq ($(USE_OPENCL), 1)
+COMPILER_LIBS += $(CLC_LIB)
+endif
+
+######################################################
+# Define the macros used in the common file.
+
+MODULES		:= $(COMPILER_LIBS)
+MAIN_MODULE := $(COMPILER_LIBS)
+
+######################################################
+# Include the common makefile.
+
+include $(AQROOT)/common.node
+

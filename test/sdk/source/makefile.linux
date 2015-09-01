@@ -1,0 +1,81 @@
+##############################################################################
+#
+#    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+#    All Rights Reserved.
+#
+#    Permission is hereby granted, free of charge, to any person obtaining
+#    a copy of this software and associated documentation files (the
+#    'Software'), to deal in the Software without restriction, including
+#    without limitation the rights to use, copy, modify, merge, publish,
+#    distribute, sub license, and/or sell copies of the Software, and to
+#    permit persons to whom the Software is furnished to do so, subject
+#    to the following conditions:
+#
+#    The above copyright notice and this permission notice (including the
+#    next paragraph) shall be included in all copies or substantial
+#    portions of the Software.
+#
+#    THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+#    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+#    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
+#    IN NO EVENT SHALL VIVANTE AND/OR ITS SUPPLIERS BE LIABLE FOR ANY
+#    CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+#    TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+#    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+##############################################################################
+
+
+#
+# This file is a part of Vivante software stack build environment for Linux.
+# It defines the rules necessary to build Vivante SDK.
+#
+
+################################################################################
+# Include common definitions.
+
+include $(AQROOT)/makefile.linux.def
+
+################################################################################
+# Supply additional include directories.
+ifeq ($(EGL_API_FB), 0)
+ifeq ($(EGL_API_DFB), 1)
+CFLAGS += $(INCLUDE) -DFBDriver
+else
+CFLAGS += $(INCLUDE) -DX11
+endif
+else
+CFLAGS += $(INCLUDE) -DFBDriver
+endif
+
+INCLUDE += -I$(VIVANTE_SDK_INC)
+INCLUDE += -I$(VIVANTE_SDK_INC)/HAL -I$(AQROOT)/sdk/inc
+
+ifeq ($(EGL_API_FB), 0)
+INCLUDE += -I$(X11_ARM_DIR)/include
+endif
+
+CFLAGS += $(INCLUDE)
+################################################################################
+# Describe object files.
+
+OBJECTS = $(OBJ_DIR)/gc_sdk_startup_linux.o \
+          $(OBJ_DIR)/gc_sdk_thread_linux.o \
+          $(OBJ_DIR)/gc_sdk_misc_linux.o \
+          $(OBJ_DIR)/gc_sdk_visual_x.o \
+          $(OBJ_DIR)/gc_sdk_visual_fbdev.o \
+          $(OBJ_DIR)/gc_sdk_visual.o
+
+################################################################################
+# Define a shortcut for the main target.
+
+STATIC		:= 1
+TARGET_NAME	:= libVivanteDK.a
+
+################################################################################
+# Define the macros used in common makefile.
+
+################################################################################
+# Include the common makefile.
+
+include $(AQROOT)/common.target

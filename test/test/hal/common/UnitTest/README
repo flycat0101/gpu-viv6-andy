@@ -1,0 +1,46 @@
+Build
+=====
+
+export AQROOT=<project dir>
+export UNIT_ROOT=$AQROOT/test/hal/common/UnitTest
+
+cd $UNIT_ROOT
+make -f Makefile.linux
+
+Run test case
+=============
+
+For example:
+mkdir <TARGET_DIR>
+mkdir <TARGET_DIR>/lib
+mkdir <TARGET_DIR>/TestCases
+
+cd $UNIT_ROOT
+cp galRunTest/bin/galRunTest <TARGET_DIR>
+cp galUtil/bin/libgalUtil.so <TARGET_DIR>/lib
+
+cp units/gal2D/brush/Color/001/bin/libgal2DColorBrush001.so <TARGET_DIR>/TestCases
+
+export LD_LIBRARY_PATH=<TARGET_DIR>/lib:<TARGET_DIR>/TestCases:$LD_LIBRARY_PATH
+
+cd <TARGET_DIR>
+./galRunTest libgal2DColorBrush001.so -c galTestCommon.cfg
+
+The result will be saved in result directory.
+
+
+Run test case automatically
+===========================
+After building, run install.sh on the host. Then copy the directory TestCases to the target.
+On the target:
+cd <TARGET_DIR>/TestCases
+./runtest.sh
+
+The result will be saved in result directory.
+
+
+Comments for some special HAL unit test
+===========================
+   1). gal2DUserMemoryBuffer00x/gal2DMemoryAligned00x were used to test the user memory as the video memory, which need to flush cache for the user space.
+       If you wants to use this function, please add the cache flush function first.
+   2). gal2DPerformance00x were used to test hardware performance including the driver cost.It will generate random bmp,please just check log/rlt.

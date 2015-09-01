@@ -1,0 +1,87 @@
+##############################################################################
+#
+#    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+#    All Rights Reserved.
+#
+#    Permission is hereby granted, free of charge, to any person obtaining
+#    a copy of this software and associated documentation files (the
+#    'Software'), to deal in the Software without restriction, including
+#    without limitation the rights to use, copy, modify, merge, publish,
+#    distribute, sub license, and/or sell copies of the Software, and to
+#    permit persons to whom the Software is furnished to do so, subject
+#    to the following conditions:
+#
+#    The above copyright notice and this permission notice (including the
+#    next paragraph) shall be included in all copies or substantial
+#    portions of the Software.
+#
+#    THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+#    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+#    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
+#    IN NO EVENT SHALL VIVANTE AND/OR ITS SUPPLIERS BE LIABLE FOR ANY
+#    CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+#    TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+#    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+##############################################################################
+
+
+##############################################
+# Include the global difinitions.
+
+include $(AQROOT)/makefile.linux.def
+
+ifeq ($(EGL_API_FB), 0)
+ifeq ($(EGL_API_DFB), 1)
+CFLAGS += $(INCLUDE) -DFBDriver
+else
+CFLAGS += $(INCLUDE) -DX11
+endif
+else
+CFLAGS += $(INCLUDE) -DFBDriver
+endif
+
+ifeq ($(VIVANTE_NO_3D),1)
+CFLAGS += -DVIVANTE_NO_3D
+endif
+
+################################################################################
+# Supply additional include directories.
+
+INCLUDE += -I$(AQROOT)/sdk/inc -I$(VIVANTE_SDK_INC)
+INCLUDE += -I$(VIVANTE_SDK_INC)/HAL -I$(AQROOT)/sdk/inc
+
+################################################################################
+# Supply necessary libraries.
+
+ifeq ($(gcdSTATIC_LINK), 1)
+LIBS += $(VIVANTE_SDK_LIB)/libhalarchuser.a
+LIBS += $(VIVANTE_SDK_LIB)/libhalosuser.a
+LIBS += $(VIVANTE_SDK_LIB)/libGAL.a
+LIBS += $(VIVANTE_SDK_LIB)/libhalarchuser.a
+LIBS += $(VIVANTE_SDK_LIB)/libhalosuser.a
+LIBS += $(VIVANTE_SDK_LIB)/libGAL.a
+LIBS += $(AQROOT)/sdk/source/$(OBJ_DIR)/libVivanteDK.a
+LIBS += $(LIB_DIR)/libm.a
+LIBS += $(LIB_DIR)/libpthread.a
+LIBS += $(LIB_DIR)/libc.a
+LIBS += $(LIB_DIR)/libdl.a
+LIBS += $(LIB_DIR)/librt.a
+else
+
+ifeq ($(EGL_API_FB), 0)
+ifeq ($(EGL_API_DFB), 1)
+INCLUDE += -I$(DFB_DIR)/include/directfb
+LIBS += -Wl,-rpath $(DFB_DIR)/lib
+else
+INCLUDE += -I$(X11_ARM_DIR)/include
+LIBS += -L$(X11_ARM_DIR)/lib -lX11 -lXau -lXdmcp
+endif
+endif
+
+
+LIBS += -L$(VIVANTE_SDK_LIB) -l GAL
+LIBS += -lm -lpthread -ldl -lrt
+endif
+
+

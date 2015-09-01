@@ -1,0 +1,105 @@
+{
+	global:
+		eglGetError;
+		eglGetDisplay;
+		eglInitialize;
+		eglTerminate;
+		eglQueryString;
+		eglGetConfigs;
+		eglChooseConfig;
+		eglGetConfigAttrib;
+		eglCreateWindowSurface;
+		eglCreatePbufferSurface;
+		eglCreatePixmapSurface;
+		eglDestroySurface;
+		eglQuerySurface;
+		eglBindAPI;
+		eglQueryAPI;
+		eglWaitClient;
+		eglReleaseThread;
+		eglCreatePbufferFromClientBuffer;
+		eglSurfaceAttrib;
+		eglBindTexImage;
+		eglReleaseTexImage;
+		eglSwapInterval;
+		eglCreateContext;
+		eglDestroyContext;
+		eglMakeCurrent;
+		eglGetCurrentContext;
+		eglGetCurrentSurface;
+		eglGetCurrentDisplay;
+		eglQueryContext;
+		eglWaitGL;
+		eglWaitNative;
+		eglSwapBuffers;
+		eglCopyBuffers;
+		eglGetProcAddress;
+
+		eglCreateSync;
+		eglDestroySync;
+		eglClientWaitSync;
+		eglGetSyncAttrib;
+		eglCreateImage;
+		eglDestroyImage;
+		eglGetPlatformDisplay;
+		eglCreatePlatformWindowSurface;
+		eglCreatePlatformPixmapSurface;
+		eglWaitSync;
+
+		eglLockSurfaceKHR;
+		eglUnlockSurfaceKHR;
+
+		eglCreateImageKHR;
+		eglDestroyImageKHR;
+
+		eglCreateSyncKHR;
+		eglDestroySyncKHR;
+		eglClientWaitSyncKHR;
+		eglGetSyncAttribKHR;
+
+		eglSignalSyncKHR;
+
+		eglWaitSyncKHR;
+
+		eglSwapBuffersRegionEXT;
+
+		eglSetBlobCacheFuncsANDROID;
+
+		eglSetSwapRectangleVIV;
+		eglGetRenderBufferv0VIV;
+		eglGetRenderBufferVIV;
+		eglPostBufferVIV;
+
+		fbGetDisplay;
+		fbGetDisplayByIndex;
+		fbGetDisplayGeometry;
+		fbGetDisplayInfo;
+		fbDestroyDisplay;
+		fbCreateWindow;
+		fbGetWindowGeometry;
+		fbGetWindowInfo;
+		fbDestroyWindow;
+		fbCreatePixmap;
+		fbGetPixmapGeometry;
+		fbGetPixmapInfo;
+		fbDestroyPixmap;
+		fbCreatePixmapWithBpp;
+
+		wl_egl_window_create;
+		wl_egl_window_destroy;
+		eglBindWaylandDisplayWL;
+		eglUnbindWaylandDisplayWL;
+		eglQueryWaylandBufferWL;
+
+		dfbGetDisplay;
+		dfbDestroyDisplay;
+		dfbCreateWindow;
+		dfbDestroyWindow;
+		dfbCreatePixmap;
+		dfbCreatePixmapWithBpp;
+		dfbGetPixmapInfo;
+		dfbDestroyPixmap;
+
+	local:
+		*;
+};

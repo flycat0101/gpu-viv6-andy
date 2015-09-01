@@ -1,0 +1,4839 @@
+/****************************************************************************
+*
+*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*
+*    The material in this file is confidential and contains trade secrets
+*    of Vivante Corporation. This is proprietary information owned by
+*    Vivante Corporation. No part of this work may be disclosed,
+*    reproduced, copied, transmitted, or used in any way for any purpose,
+*    without the express written permission of Vivante Corporation.
+*
+*****************************************************************************/
+
+
+#include "gc_glsl_compiler.h"
+#include "gc_hal_user.h"
+#include "gc_glsl_preprocessor.h"
+#include "gc_glsl_parser.h"
+#include "gc_glsl_ast_walk.h"
+#include "gc_glsl_emit_code.h"
+
+static gctUINT32 _slCompilerVersion[2] = { sldDefaultLanguageType,
+                                           sldDefaultLanguageVersion };
+
+/* sloCOMPILER object. */
+struct _sloCOMPILER
+{
+    slsOBJECT                   object;
+    gcoHAL                      hal;
+    gcePATCH_ID                 patchId;
+    gctUINT                     langVersion;
+    gceAPI                      clientApiVersion;
+    sleSHADER_TYPE              shaderType;
+    gcSHADER                    binary;
+    gctSTRING                   log;
+    gctUINT                     logBufSize;
+    slsDLINK_LIST               memoryPool;
+    gctBOOL                     createDefaultUBO;
+    struct
+    {
+        gctUINT16               errorCount;
+        gctUINT16               warnCount;
+        slsHASH_TABLE           stringPool;
+        sltOPTIMIZATION_OPTIONS optimizationOptions;
+        sltEXTENSIONS           extensions;
+        sltDUMP_OPTIONS         dumpOptions;
+        sleSCANNER_STATE        scannerState;
+        slsSLINK_LIST           switchScope;
+        gctUINT                 stringCount;
+        gctCONST_STRING *       strings;
+        gctUINT                 currentLineNo;
+        gctUINT                 currentStringNo;
+        gctUINT                 currentCharNo;
+        slsDLINK_LIST           dataTypes;
+        slsNAME_SPACE *         unnamedSpace;
+        slsNAME_SPACE *         builtinSpace;
+        slsNAME_SPACE *         globalSpace;
+        slsNAME_SPACE *         auxGlobalSpace;
+        slsNAME_SPACE *         currentSpace;
+        slsLAYOUT_QUALIFIER     uniformDefaultLayout;
+        slsLAYOUT_QUALIFIER     bufferDefaultLayout;
+        slsLAYOUT_QUALIFIER     outDefaultLayout;
+        slsLAYOUT_QUALIFIER     inDefaultLayout;
+        sloIR_SET               rootSet;
+        gctUINT                 tempRegCount;
+        gctUINT                 labelCount;
+        gctBOOL                 loadingBuiltIns;
+        gctBOOL                 mainDefined;
+        gctBOOL                 debug;
+        gctBOOL                 optimize;
+        gctBOOL                 outputInvariant;
+        gctUINT32               inputLocationSettings;
+        gctUINT32               outputLocationSettings;
+        gctUINT32               uniformLocationMaxLength;
+        gctUINT32*              uniformLocationSettings;
+        slsSLINK_LIST           layoutOffset;
+        gctINT                  currentIterationCount;
+        struct {
+           slsDLINK_LIST        typeFloat[sldMAX_VECTOR_COMPONENT];
+           slsDLINK_LIST        typeInt[sldMAX_VECTOR_COMPONENT];
+           slsDLINK_LIST        typeUInt[sldMAX_VECTOR_COMPONENT];
+           slsDLINK_LIST        typeBool[sldMAX_VECTOR_COMPONENT];
+        } vecConstants;
+        slsSLINK_LIST           sharedVariables;
+        gceSTATUS               hasNotStagesRelatedLinkError;
+        sleCOMPILER_FLAGS       compilerFlags;
+    }
+    context;
+
+    sloPREPROCESSOR             preprocessor;
+    sloCODE_EMITTER             codeEmitter;
+    sloCODE_GENERATOR           codeGenerator;
+};
+
+typedef struct _slsPOOL_STRING_NODE
+{
+    slsDLINK_NODE       node;
+
+    gctUINT             crc32Value;
+
+    sltPOOL_STRING      string;
+}
+slsPOOL_STRING_NODE;
+
+extern gctPOINTER   CompilerLock;
+
+extern gctINT
+_convertShaderType(
+    IN gctINT ShaderType
+    );
+
+gceSTATUS
+sloCOMPILER_Construct(
+    IN gcoHAL Hal,
+    IN sleSHADER_TYPE ShaderType,
+    IN gceAPI ClientApiVersion,
+    OUT sloCOMPILER * Compiler
+    )
+{
+    gceSTATUS status;
+    sloCOMPILER compiler = gcvNULL;
+    gctUINT i;
+
+    gcmHEADER_ARG("Hal=0x%x ShaderType=%d", Hal, ShaderType);
+
+    /* Verify the arguments. */
+    gcmVERIFY_ARGUMENT(Compiler);
+
+    do
+    {
+        gctPOINTER pointer = gcvNULL;
+        gctINT     sz;
+        /* Allocate memory for sloCOMPILER object */
+        status = gcoOS_Allocate(
+                                gcvNULL,
+                                sizeof(struct _sloCOMPILER),
+                                &pointer
+                                );
+
+        if (gcmIS_ERROR(status))
+        {
+            compiler = gcvNULL;
+            break;
+        }
+
+        compiler = pointer;
+
+        gcoOS_ZeroMemory(compiler, sizeof(struct _sloCOMPILER));
+
+        /* Initialize members */
+        compiler->object.type               = slvOBJ_COMPILER;
+        compiler->hal                       = Hal;
+        gcoHAL_GetPatchID(gcvNULL, &compiler->patchId);
+        compiler->langVersion               = sldDefaultLanguageVersion;
+        compiler->shaderType                = (sleSHADER_TYPE)_convertShaderType(ShaderType);
+        compiler->binary                    = gcvNULL;
+        compiler->log                       = gcvNULL;
+        compiler->logBufSize                = 0;
+
+        if (ShaderType == slvSHADER_TYPE_VERTEX_DEFAULT_UBO ||
+            ShaderType == slvSHADER_TYPE_FRAGMENT_DEFAULT_UBO)
+        {
+            compiler->createDefaultUBO      = gcvTRUE;
+        }
+        else
+        {
+            compiler->createDefaultUBO      = gcvFALSE;
+        }
+
+        compiler->clientApiVersion          = ClientApiVersion;
+
+        slsDLINK_LIST_Initialize(&compiler->memoryPool);
+
+        compiler->context.errorCount        = 0;
+        compiler->context.warnCount         = 0;
+
+        compiler->context.tempRegCount      = 0;
+        compiler->context.labelCount        = 0;
+
+        compiler->context.loadingBuiltIns   = gcvFALSE;
+        compiler->context.mainDefined       = gcvFALSE;
+
+        slsHASH_TABLE_Initialize(&compiler->context.stringPool);
+
+        compiler->context.stringCount       = 0;
+        compiler->context.strings           = gcvNULL;
+
+        slsDLINK_LIST_Initialize(&compiler->context.dataTypes);
+        slsSLINK_LIST_Initialize(&compiler->context.switchScope);
+
+        slsSLINK_LIST_Initialize(&compiler->context.layoutOffset);
+
+        slsSLINK_LIST_Initialize(&compiler->context.sharedVariables);
+
+        for(i = 0; i < sldMAX_VECTOR_COMPONENT; i++) {
+           slsDLINK_LIST_Initialize(&compiler->context.vecConstants.typeFloat[i]);
+           slsDLINK_LIST_Initialize(&compiler->context.vecConstants.typeInt[i]);
+           slsDLINK_LIST_Initialize(&compiler->context.vecConstants.typeUInt[i]);
+           slsDLINK_LIST_Initialize(&compiler->context.vecConstants.typeBool[i]);
+        }
+
+        /* Create unnamed space */
+        status = slsNAME_SPACE_Construct(
+                                        compiler,
+                                        gcvNULL,
+                                        &compiler->context.unnamedSpace);
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmASSERT(compiler->context.unnamedSpace == gcvNULL);
+            break;
+        }
+
+        /* Create built-in name space */
+        status = slsNAME_SPACE_Construct(
+                                        compiler,
+                                        gcvNULL,
+                                        &compiler->context.builtinSpace);
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmASSERT(compiler->context.builtinSpace == gcvNULL);
+            break;
+        }
+
+        compiler->context.currentSpace = compiler->context.builtinSpace;
+
+        /* Create global name space */
+        status = slsNAME_SPACE_Construct(
+                                        compiler,
+                                        compiler->context.builtinSpace,
+                                        &compiler->context.globalSpace);
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmASSERT(compiler->context.globalSpace == gcvNULL);
+            break;
+        }
+
+        compiler->context.auxGlobalSpace = gcvNULL;
+
+        /* Init all default layout. */
+        gcoOS_ZeroMemory(&compiler->context.uniformDefaultLayout, gcmSIZEOF(slsLAYOUT_QUALIFIER));
+        gcoOS_ZeroMemory(&compiler->context.bufferDefaultLayout, gcmSIZEOF(slsLAYOUT_QUALIFIER));
+        gcoOS_ZeroMemory(&compiler->context.outDefaultLayout, gcmSIZEOF(slsLAYOUT_QUALIFIER));
+        gcoOS_ZeroMemory(&compiler->context.inDefaultLayout, gcmSIZEOF(slsLAYOUT_QUALIFIER));
+
+        compiler->context.uniformDefaultLayout.id = slvLAYOUT_SHARED | slvLAYOUT_COLUMN_MAJOR;
+        compiler->context.bufferDefaultLayout.id = slvLAYOUT_SHARED | slvLAYOUT_COLUMN_MAJOR;
+        /* Init input layout. */
+        compiler->context.inDefaultLayout.tesPrimitiveMode = slvTES_PRIMITIVE_MODE_NONE;
+        compiler->context.inDefaultLayout.tesVertexSpacing = slvTES_VERTEX_SPACING_EQUAL_SPACING;
+        compiler->context.inDefaultLayout.tesOrdering = slvTES_ORDERING_CCW;
+        compiler->context.inDefaultLayout.tesPointMode = slvTES_POINT_MODE_NONE;
+        compiler->context.inDefaultLayout.gsPrimitive = slvGS_PRIMITIVE_NONE;
+        compiler->context.inDefaultLayout.gsInvocationTime = -1;
+        compiler->context.inDefaultLayout.maxVerticesNumber = (gctINT)GetGLMaxTessPatchVertices();
+        /* Init output layout. */
+        compiler->context.outDefaultLayout.gsPrimitive = slvGS_PRIMITIVE_NONE;
+        compiler->context.outDefaultLayout.maxVerticesNumber = (gctINT)GetGLMaxTessPatchVertices();
+        compiler->context.outDefaultLayout.maxGSVerticesNumber = -1;
+        compiler->context.outDefaultLayout.verticesNumber = -1;
+
+        compiler->context.uniformLocationMaxLength = GetGLMaxUniformLocations();
+        /* make sure it is multiple of 4 bytes  */
+        sz = ((compiler->context.uniformLocationMaxLength + (sizeof(gctINT) * 8 - 1)) / (sizeof(gctINT) * 8)) * sizeof(gctINT);
+        status = sloCOMPILER_Allocate(compiler,
+                                      sz,
+                                      &pointer);
+
+        if (gcmIS_ERROR(status)) break;
+        gcoOS_ZeroMemory(pointer, sz);
+
+        compiler->context.uniformLocationSettings = pointer;
+
+        compiler->context.currentIterationCount = 1;
+
+        /* Create IR root */
+        status = sloIR_SET_Construct(
+                                    compiler,
+                                    1,
+                                    0,
+                                    slvDECL_SET,
+                                    &compiler->context.rootSet);
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmASSERT(compiler->context.rootSet == gcvNULL);
+            break;
+        }
+
+        compiler->context.compilerFlags = 0;
+        compiler->context.hasNotStagesRelatedLinkError = gcvSTATUS_OK;
+
+#ifndef SL_SCAN_NO_PREPROCESSOR
+        /* Create the preprocessor */
+        status = sloPREPROCESSOR_Construct(
+                                        compiler,
+                                        &compiler->preprocessor);
+
+        if (gcmIS_ERROR(status)) break;
+#endif
+
+        /* Create the code emitter */
+        status = sloCODE_EMITTER_Construct(
+                                        compiler,
+                                        &compiler->codeEmitter);
+
+        if (gcmIS_ERROR(status)) break;
+
+        *Compiler = compiler;
+
+        gcmFOOTER_ARG("*Compiler=0x%x", *Compiler);
+        return gcvSTATUS_OK;
+    }
+    while (gcvFALSE);
+
+    if (compiler != gcvNULL) sloCOMPILER_Destroy(compiler);
+
+    *Compiler = gcvNULL;
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_Destroy(
+    IN sloCOMPILER Compiler
+    )
+{
+    slsDATA_TYPE *          dataType;
+    slsDLINK_LIST *         poolStringBucket;
+    slsPOOL_STRING_NODE *   poolStringNode;
+    gctINT i;
+
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    if (Compiler->codeEmitter != gcvNULL)
+    {
+        gcmVERIFY_OK(sloCODE_EMITTER_Destroy(Compiler, Compiler->codeEmitter));
+    }
+
+#ifndef SL_SCAN_NO_PREPROCESSOR
+    if (Compiler->preprocessor != gcvNULL)
+    {
+        gcmVERIFY_OK(sloPREPROCESSOR_Destroy(Compiler, Compiler->preprocessor));
+    }
+#endif
+
+    if (Compiler->binary != gcvNULL)
+    {
+        gcmVERIFY_OK(gcSHADER_Destroy(Compiler->binary));
+    }
+
+    if (Compiler->log != gcvNULL)
+    {
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Compiler->log));
+    }
+
+    /* Destory the whole IR tree */
+    if (Compiler->context.rootSet != gcvNULL)
+    {
+        gcmVERIFY_OK(sloIR_OBJECT_Destroy(Compiler, &Compiler->context.rootSet->base));
+    }
+
+    /* Destroy unnamed name space */
+    if (Compiler->context.unnamedSpace != gcvNULL)
+    {
+        gcmVERIFY_OK(slsNAME_SPACE_Destory(Compiler, Compiler->context.unnamedSpace));
+    }
+
+    /* Destroy allcated uniformLocationSettings*/
+    gcmVERIFY_OK(sloCOMPILER_Free(Compiler, Compiler->context.uniformLocationSettings));
+
+    /* Destroy vec constant list */
+    for(i = 0; i < sldMAX_VECTOR_COMPONENT; i++)
+    {
+        while (!slsDLINK_LIST_IsEmpty(&Compiler->context.vecConstants.typeFloat[i]))
+        {
+            slsNAME *constVar;
+
+            slsDLINK_LIST_DetachFirst(&Compiler->context.vecConstants.typeFloat[i], slsNAME, &constVar);
+            gcmASSERT(constVar->u.variableInfo.constant);
+            gcmVERIFY_OK(sloIR_CONSTANT_Destroy(Compiler, &constVar->u.variableInfo.constant->exprBase.base));
+            constVar->u.variableInfo.constant = gcvNULL;
+            gcmVERIFY_OK(slsNAME_Destory(Compiler, constVar));
+        }
+        while (!slsDLINK_LIST_IsEmpty(&Compiler->context.vecConstants.typeInt[i]))
+        {
+            slsNAME *constVar;
+
+            slsDLINK_LIST_DetachFirst(&Compiler->context.vecConstants.typeInt[i], slsNAME, &constVar);
+            gcmASSERT(constVar->u.variableInfo.constant);
+            gcmVERIFY_OK(sloIR_CONSTANT_Destroy(Compiler, &constVar->u.variableInfo.constant->exprBase.base));
+            constVar->u.variableInfo.constant = gcvNULL;
+            gcmVERIFY_OK(slsNAME_Destory(Compiler, constVar));
+        }
+        while (!slsDLINK_LIST_IsEmpty(&Compiler->context.vecConstants.typeUInt[i]))
+        {
+            slsNAME *constVar;
+
+            slsDLINK_LIST_DetachFirst(&Compiler->context.vecConstants.typeUInt[i], slsNAME, &constVar);
+            gcmASSERT(constVar->u.variableInfo.constant);
+            gcmVERIFY_OK(sloIR_CONSTANT_Destroy(Compiler, &constVar->u.variableInfo.constant->exprBase.base));
+            constVar->u.variableInfo.constant = gcvNULL;
+            gcmVERIFY_OK(slsNAME_Destory(Compiler, constVar));
+        }
+        while (!slsDLINK_LIST_IsEmpty(&Compiler->context.vecConstants.typeBool[i]))
+        {
+            slsNAME *constVar;
+
+            slsDLINK_LIST_DetachFirst(&Compiler->context.vecConstants.typeBool[i], slsNAME, &constVar);
+            gcmASSERT(constVar->u.variableInfo.constant);
+            gcmVERIFY_OK(sloIR_CONSTANT_Destroy(Compiler, &constVar->u.variableInfo.constant->exprBase.base));
+            constVar->u.variableInfo.constant = gcvNULL;
+            gcmVERIFY_OK(slsNAME_Destory(Compiler, constVar));
+        }
+    }
+
+    /* Destroy built-in name space */
+    if (Compiler->context.builtinSpace != gcvNULL)
+    {
+        gcmVERIFY_OK(slsNAME_SPACE_Destory(Compiler, Compiler->context.builtinSpace));
+    }
+
+    /* Destroy data types */
+    while (!slsDLINK_LIST_IsEmpty(&Compiler->context.dataTypes))
+    {
+        slsDLINK_LIST_DetachFirst(&Compiler->context.dataTypes, slsDATA_TYPE, &dataType);
+
+        gcmVERIFY_OK(slsDATA_TYPE_Destory(Compiler, dataType));
+    }
+
+    /* Destroy switch scope */
+    while (!slsSLINK_LIST_IsEmpty(&Compiler->context.switchScope)) {
+    slsSWITCH_SCOPE *scope;
+    slsSLINK_LIST_DetachFirst(&Compiler->context.switchScope, slsSWITCH_SCOPE, &scope);
+    gcmVERIFY_OK(sloCOMPILER_Free(Compiler, scope));
+    }
+
+    /* Destroy layoutOffset */
+    while (!slsSLINK_LIST_IsEmpty(&Compiler->context.layoutOffset)) {
+        slsLAYOUT_OFFSET *layoutOffset;
+        slsSLINK_LIST_DetachFirst(&Compiler->context.layoutOffset, slsLAYOUT_OFFSET, &layoutOffset);
+
+        while (!slsSLINK_LIST_IsEmpty(&layoutOffset->offset_list)) {
+            slsBINDING_OFFSET_LIST *layoutOffsetList;
+            slsSLINK_LIST_DetachFirst(&layoutOffset->offset_list, slsBINDING_OFFSET_LIST, &layoutOffsetList);
+            gcmVERIFY_OK(sloCOMPILER_Free(Compiler, layoutOffsetList));
+        }
+
+        gcmVERIFY_OK(sloCOMPILER_Free(Compiler, layoutOffset));
+    }
+
+    /* Destroy sharedVariables list */
+    while (!slsSLINK_LIST_IsEmpty(&Compiler->context.sharedVariables)) {
+        slsSHARED_VARIABLE *sharedVariable;
+        slsSLINK_LIST_DetachFirst(&Compiler->context.sharedVariables, slsSHARED_VARIABLE, &sharedVariable);
+        gcmVERIFY_OK(sloCOMPILER_Free(Compiler, sharedVariable));
+    }
+
+    /* Destory string pool */
+    FOR_EACH_HASH_BUCKET(&Compiler->context.stringPool, poolStringBucket)
+    {
+        while (!slsDLINK_LIST_IsEmpty(poolStringBucket))
+        {
+            slsDLINK_LIST_DetachFirst(poolStringBucket, slsPOOL_STRING_NODE, &poolStringNode);
+
+            gcmVERIFY_OK(sloCOMPILER_Free(Compiler, poolStringNode));
+        }
+    }
+
+    /* Empty the memory pool only if errors occur. */
+    /*if (Compiler->context.errorCount > 0)*/
+    {
+        gcmVERIFY_OK(sloCOMPILER_EmptyMemoryPool(Compiler));
+    }
+
+    /* Free compiler struct */
+    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Compiler));
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_GetShaderType(
+    IN sloCOMPILER Compiler,
+    OUT sleSHADER_TYPE * ShaderType
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    gcmASSERT(ShaderType);
+
+    *ShaderType = Compiler->shaderType;
+
+    gcmFOOTER_ARG("*ShaderType=%d", *ShaderType);
+    return gcvSTATUS_OK;
+}
+
+/* If this shader use default UBO. */
+gceSTATUS
+sloCOMPILER_IsCreateDefaultUBO(
+    IN sloCOMPILER Compiler,
+    OUT gctBOOL * IsCreateDefaultUBO
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    gcmASSERT(IsCreateDefaultUBO);
+
+    *IsCreateDefaultUBO = Compiler->createDefaultUBO;
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_GetBinary(
+    IN sloCOMPILER Compiler,
+    OUT gcSHADER * Binary
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    gcmASSERT(Binary);
+
+    *Binary = Compiler->binary;
+
+    if (Compiler->binary == gcvNULL)
+    {
+        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+        gcmFOOTER();
+        return status;
+    }
+    else
+    {
+        gcmFOOTER_ARG("*Binary=0x%x", *Binary);
+        return gcvSTATUS_OK;
+    }
+}
+
+gceSTATUS
+sloCOMPILER_GetHAL(
+    IN sloCOMPILER Compiler,
+    OUT gcoHAL * Hal
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    gcmASSERT(Hal != gcvNULL);
+
+    *Hal = Compiler->hal;
+
+    gcmFOOTER_ARG("*Hal=0x%x", *Hal);
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_LoadingBuiltIns(
+    IN sloCOMPILER Compiler,
+    IN gctBOOL LoadingBuiltIns
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x LoadingBuiltIns=%d",
+                  Compiler, LoadingBuiltIns);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    Compiler->context.loadingBuiltIns = LoadingBuiltIns;
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_MainDefined(
+    IN sloCOMPILER Compiler
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    if (Compiler->context.mainDefined)
+    {
+        status = gcvSTATUS_INVALID_REQUEST;
+        gcmFOOTER();
+        return status;
+    }
+
+    Compiler->context.mainDefined = gcvTRUE;
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+#define LOG_BUF_RESERVED_SIZE   1024
+
+gceSTATUS
+sloCOMPILER_AddLog(
+    IN sloCOMPILER Compiler,
+    IN gctCONST_STRING Log
+    )
+{
+    gceSTATUS       status;
+    gctUINT         length = 0;
+    gctUINT         requiredLogBufSize;
+    gctSTRING       newLog;
+
+    gcmHEADER_ARG("Compiler=0x%x Log=0x%x",
+                  Compiler, Log);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    gcmASSERT(Log);
+
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, Log);
+
+    length = (gctUINT)gcoOS_StrLen(Log, gcvNULL);
+
+    requiredLogBufSize = length + 1;
+
+    if (Compiler->logBufSize > 0)
+    {
+        length = (gctUINT)gcoOS_StrLen(Compiler->log, gcvNULL);
+
+        requiredLogBufSize += length;
+    }
+
+    if (requiredLogBufSize > Compiler->logBufSize)
+    {
+        gctPOINTER pointer = gcvNULL;
+
+        requiredLogBufSize += LOG_BUF_RESERVED_SIZE;
+
+        status = gcoOS_Allocate(
+                                gcvNULL,
+                                (gctSIZE_T)requiredLogBufSize,
+                                &pointer);
+        if (gcmIS_ERROR(status))
+        {
+            gcmFOOTER();
+            return status;
+        }
+
+        newLog = pointer;
+
+        if (Compiler->logBufSize > 0)
+        {
+            gcmVERIFY_OK(gcoOS_StrCopySafe(newLog, requiredLogBufSize, Compiler->log));
+            gcmVERIFY_OK(gcoOS_StrCatSafe(newLog, requiredLogBufSize, Log));
+
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Compiler->log));
+        }
+        else
+        {
+            gcmASSERT(Compiler->log == gcvNULL);
+
+            gcmVERIFY_OK(gcoOS_StrCopySafe(newLog, requiredLogBufSize, Log));
+        }
+
+        Compiler->log           = newLog;
+        Compiler->logBufSize    = requiredLogBufSize;
+    }
+    else
+    {
+        gcmVERIFY_OK(gcoOS_StrCatSafe(Compiler->log, Compiler->logBufSize, Log));
+    }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_VOutputLog(
+    IN sloCOMPILER Compiler,
+    IN gctCONST_STRING Message,
+    IN gctARGUMENTS Arguments
+    )
+{
+    char *buffer;
+    gctUINT offset = 0;
+    gceSTATUS status;
+    gctSIZE_T bytes;
+
+    gcmHEADER_ARG("Compiler=0x%x Message=0x%x Arguments=0x%x",
+                  Compiler, Message, Arguments);
+
+    bytes = (MAX_SINGLE_LOG_LENGTH + 1) * gcmSIZEOF(char);
+
+    gcmONERROR(gcoOS_Allocate(gcvNULL, bytes, (gctPOINTER*) &buffer));
+
+    gcmVERIFY_OK(gcoOS_PrintStrVSafe(buffer, bytes,
+                                     &offset,
+                                     Message,
+                                     Arguments));
+
+    buffer[bytes - 1] = '\0';
+
+    status = sloCOMPILER_AddLog(Compiler, buffer);
+
+    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, buffer));
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_OutputLog(
+    IN sloCOMPILER Compiler,
+    IN gctCONST_STRING Message,
+    IN ...
+    )
+{
+    gceSTATUS    status;
+    gctARGUMENTS arguments;
+
+    gcmHEADER_ARG("Compiler=0x%x Message=0x%x ...",
+                  Compiler, Message);
+
+    gcmARGUMENTS_START(arguments, Message);
+    status = sloCOMPILER_VOutputLog(Compiler,
+                                    Message,
+                                    arguments);
+    gcmARGUMENTS_END(arguments);
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_GenCode(
+    IN sloCOMPILER Compiler
+    )
+{
+    gceSTATUS               status;
+    sloCODE_GENERATOR       codeGenerator = gcvNULL;
+    sloOBJECT_COUNTER       objectCounter = gcvNULL;
+    slsGEN_CODE_PARAMETERS  parameters;
+    gctINT                  i;
+
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    if (Compiler->context.rootSet == gcvNULL)
+    {
+        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+        gcmFOOTER();
+        return status;
+    }
+
+    gcmONERROR(sloCODE_GENERATOR_Construct(Compiler, &codeGenerator));
+    Compiler->codeGenerator = codeGenerator;
+
+    /* Count the objects */
+    gcmONERROR(sloOBJECT_COUNTER_Construct(Compiler, &objectCounter));
+
+    /* save a pointer of CodeGenerator. */
+    objectCounter->codeGenerator = codeGenerator;
+
+    gcmONERROR(sloIR_OBJECT_Accept(Compiler,
+                                   &Compiler->context.rootSet->base,
+                                   &objectCounter->visitor,
+                                   &parameters));
+
+    codeGenerator->attributeCount= objectCounter->attributeCount;
+    codeGenerator->uniformCount  = objectCounter->uniformCount;
+    codeGenerator->variableCount = objectCounter->variableCount;
+    codeGenerator->outputCount   = objectCounter->outputCount;
+    codeGenerator->functionCount = objectCounter->functionCount;
+
+    for (i = 0; i < slvOPCODE_MAXOPCODE; i++)
+    {
+        codeGenerator->opcodeCount[i] = objectCounter->opcodeCount[i];
+    }
+
+    gcmVERIFY_OK(sloOBJECT_COUNTER_Destroy(Compiler, objectCounter));
+    objectCounter = gcvNULL;
+
+    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                  slvDUMP_CODE_GENERATOR,
+                                  "<PROGRAM>\n"
+                  "<OBJECT COUNT: attributes = \"%d\" "
+                  "uniforms = \"%d\" variables = \"%d\" "
+                  "outputs = \"%d\" functions = \"%d\" />",
+                  codeGenerator->attributeCount,
+                  codeGenerator->uniformCount,
+                  codeGenerator->variableCount,
+                  codeGenerator->outputCount,
+                  codeGenerator->functionCount));
+
+    gcmONERROR(sloIR_AllocObjectPointerArrays(Compiler,
+                                              codeGenerator));
+
+    slsGEN_CODE_PARAMETERS_Initialize(&parameters, gcvFALSE, gcvFALSE);
+
+    gcmONERROR(sloIR_OBJECT_Accept(
+                                Compiler,
+                                &Compiler->context.rootSet->base,
+                                &codeGenerator->visitor,
+                                &parameters));
+
+    gcmONERROR(sloCOMPILER_BackPatch(Compiler, codeGenerator));
+
+    gcmONERROR(sloCOMPILER_PackUniformsWithSharedOrStd140(Compiler));
+
+    gcmONERROR(sloCOMPILER_PackSSBOWithSharedOrStd140OrStd430(Compiler));
+
+    gcmONERROR(sloCOMPILER_CheckAssignmentForGlFragData(Compiler));
+
+    slsGEN_CODE_PARAMETERS_Finalize(&parameters);
+
+    gcmVERIFY_OK(sloCODE_GENERATOR_Destroy(Compiler, codeGenerator));
+    codeGenerator = gcvNULL;
+
+    gcmONERROR(sloCOMPILER_Dump(
+                                Compiler,
+                                slvDUMP_CODE_GENERATOR,
+                                "</PROGRAM>"));
+
+    /* Check if 'main' function defined */
+    if (!Compiler->context.mainDefined)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Report(
+                                        Compiler,
+                                        0,
+                                        0,
+                                        slvREPORT_ERROR,
+                                        "'main' function undefined"));
+
+        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+        gcmFOOTER();
+        return status;
+    }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    if (objectCounter != gcvNULL)
+    {
+        gcmVERIFY_OK(sloOBJECT_COUNTER_Destroy(Compiler, objectCounter));
+        objectCounter = gcvNULL;
+    }
+    if (codeGenerator != gcvNULL)
+    {
+        gcmVERIFY_OK(sloCODE_GENERATOR_Destroy(Compiler, codeGenerator));
+        codeGenerator = gcvNULL;
+    }
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_Compile(
+    IN sloCOMPILER Compiler,
+    IN sltOPTIMIZATION_OPTIONS OptimizationOptions,
+    IN sltDUMP_OPTIONS DumpOptions,
+    IN gctUINT StringCount,
+    IN gctCONST_STRING Strings[],
+    OUT gcSHADER * Binary,
+    OUT gctSTRING * Log
+    )
+{
+    gceSTATUS   status;
+    gctBOOL  isCreateDefaultUBO;
+
+    gcmHEADER_ARG("Compiler=0x%x OptimizationOptions=%u DumpOptions=%u "
+                  "StringCount=%u Strings=0x%x Binary=0x%x Log=0x%x",
+                  Compiler, OptimizationOptions, DumpOptions,
+                  StringCount, Strings, Binary, Log);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    gcmASSERT(Binary != gcvNULL);
+
+    *Binary = gcvNULL;
+
+    Compiler->context.optimizationOptions   = OptimizationOptions;
+    Compiler->context.extensions            = slvEXTENSION_NON_HALTI;
+    Compiler->context.dumpOptions           = DumpOptions;
+    Compiler->context.scannerState          = slvSCANNER_NORMAL;
+
+    do
+    {
+        /* Load the built-ins */
+        status = sloCOMPILER_LoadBuiltIns(Compiler);
+
+        if (gcmIS_ERROR(status)) break;
+
+
+        /* Set the global scope as current */
+        Compiler->context.currentSpace = Compiler->context.globalSpace;
+
+        /* Parse the source string */
+        status = sloCOMPILER_Parse(
+                                    Compiler,
+                                    StringCount,
+                                    Strings);
+
+        if (gcmIS_ERROR(status)) break;
+
+        gcmVERIFY_OK(sloCOMPILER_DumpIR(Compiler));
+
+        if (Compiler->context.errorCount > 0)
+        {
+            status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+            break;
+        }
+
+        /* Construct the binary */
+        status = gcSHADER_Construct(Compiler->hal,
+                                    Compiler->shaderType,
+                                    &Compiler->binary);
+        if (gcmIS_ERROR(status)) break;
+
+        /* Set enable default UBO or not. */
+        status = sloCOMPILER_IsCreateDefaultUBO(Compiler, &isCreateDefaultUBO);
+        if (gcmIS_ERROR(status)) break;
+
+        status = gcSHADER_SetDefaultUBO(Compiler->binary, (isCreateDefaultUBO && (gcmOPT_CreateDefaultUBO() != 0)) || gcmOPT_CreateDefaultUBO() );
+        if (gcmIS_ERROR(status)) break;
+
+        /* Set shader version. */
+        status = gcSHADER_SetCompilerVersion(Compiler->binary,
+                         sloCOMPILER_GetVersion(Compiler, Compiler->shaderType));
+
+        if (gcmIS_ERROR(status)) break;
+
+        /* Set earlyFragTest. */
+        status = gcSHADER_SetEarlyFragTest(Compiler->binary,
+                         slsCOMPILER_HasEarlyFragText(Compiler->context.compilerFlags));
+
+        if (gcmIS_ERROR(status)) break;
+
+        /* Set the client api version for the shader binary. */
+        status = gcSHADER_SetClientApiVersion(Compiler->binary, Compiler->clientApiVersion);
+
+        if (gcmIS_ERROR(status)) break;
+
+        /* Set patch for centroid varying. */
+        SetShaderNeedPatchForCentroid(Compiler->binary,
+                                      slsCOMPILER_HasPatchForCentroidVarying(Compiler->context.compilerFlags));
+
+        /* Generate the code */
+        status = sloCOMPILER_GenCode(Compiler);
+
+        if (gcmIS_ERROR(status)) break;
+
+        if (Compiler->context.errorCount > 0)
+        {
+            status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+            break;
+        }
+
+        /* Set the layout. */
+        status = sloCOMPILER_SetLayout(Compiler);
+
+        if (gcmIS_ERROR(status)) break;
+
+        /* expand all arrays of arrays. */
+        status = gcSHADER_ExpandArraysOfArrays(Compiler->binary);
+
+        if (gcmIS_ERROR(status)) break;
+
+        /* save NotStagesRelatedLinkError. */
+        status = sloCOMPILER_GetNotStagesRelatedLinkError(Compiler);
+        gcSHADER_SetNotStagesRelatedLinkError(Compiler->binary, status);
+
+        /* Pack the binary */
+        status = gcSHADER_Pack(Compiler->binary);
+
+        if (gcmIS_ERROR(status)) break;
+
+        /* Analyze functions. */
+        status = gcSHADER_AnalyzeFunctions(Compiler->binary);
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(
+                                Compiler,
+                                0,
+                                0,
+                                slvREPORT_ERROR,
+                                "Static and dynamic recursion is not allowed."));
+            break;
+        }
+
+        /* Return */
+        *Binary             = Compiler->binary;
+        Compiler->binary    = gcvNULL;
+
+        /* copy the source code to shader binary */
+        if (StringCount == 1)
+        {
+            (*Binary)->sourceLength = (gctUINT)gcoOS_StrLen(Strings[0], gcvNULL) + 1;
+            gcoOS_StrDup(gcvNULL, Strings[0], &(*Binary)->source);
+        }
+
+        if (Log != gcvNULL)
+        {
+            *Log                = Compiler->log;
+            Compiler->log       = gcvNULL;
+        }
+
+        gcmFOOTER_ARG("*Binary=%lu *Log=0x%x",
+                      *Binary, gcmOPT_POINTER(Log));
+        return gcvSTATUS_OK;
+    }
+    while (gcvFALSE);
+
+    if (Log != gcvNULL)
+    {
+        *Log                = Compiler->log;
+        Compiler->log       = gcvNULL;
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+#define BUFFER_SIZE     1024
+
+gceSTATUS
+sloCOMPILER_Preprocess(
+    IN sloCOMPILER Compiler,
+    IN sltOPTIMIZATION_OPTIONS OptimizationOptions,
+    IN sltDUMP_OPTIONS DumpOptions,
+    IN gctUINT StringCount,
+    IN gctCONST_STRING Strings[],
+    OUT gctSTRING * Log
+    )
+{
+    gceSTATUS   status;
+    gctBOOL     locked = gcvFALSE;
+#ifndef SL_SCAN_NO_PREPROCESSOR
+    gctCHAR     buffer[BUFFER_SIZE];
+    gctINT      actualSize;
+#endif
+
+    gcmHEADER_ARG("Compiler=0x%x OptimizationOptions=%u DumpOptions=%u "
+                  "StringCount=%u Strings=0x%x Log=0x%x",
+                  Compiler, OptimizationOptions, DumpOptions,
+                  StringCount, Strings, Log);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    Compiler->context.optimizationOptions   = OptimizationOptions;
+    Compiler->context.dumpOptions           = DumpOptions;
+
+    do
+    {
+        status = sloCOMPILER_Lock(Compiler);
+        locked = gcvTRUE;
+
+        if (gcmIS_ERROR(status)) break;
+
+        status = sloCOMPILER_MakeCurrent(Compiler, StringCount, Strings);
+
+        if (gcmIS_ERROR(status)) break;
+
+ #ifndef SL_SCAN_NO_PREPROCESSOR
+        /* Preprocess the source string */
+        while (gcvTRUE)
+        {
+            status = sloPREPROCESSOR_Parse(
+                                        sloCOMPILER_GetPreprocessor(Compiler),
+                                        BUFFER_SIZE,
+                                        buffer,
+                                        &actualSize);
+
+            if (gcmIS_ERROR(status)) break;
+
+            if (actualSize == 0) break;
+
+            gcmVERIFY_OK(sloCOMPILER_OutputLog(
+                                            Compiler,
+                                            "<PP_TOKEN line=\"%d\" string=\"%d\" text=\"%s\" />",
+                                            sloCOMPILER_GetCurrentLineNo(Compiler),
+                                            sloCOMPILER_GetCurrentStringNo(Compiler),
+                                            buffer));
+        }
+#endif
+
+        locked = gcvFALSE;
+        gcmVERIFY_OK(sloCOMPILER_Unlock(Compiler));
+
+        /* Return */
+        if (Log != gcvNULL)
+        {
+            *Log                = Compiler->log;
+            Compiler->log       = gcvNULL;
+        }
+
+        gcmFOOTER_ARG("*Log=0x%x", gcmOPT_POINTER(Log));
+        return gcvSTATUS_OK;
+    }
+    while (gcvFALSE);
+
+    if (locked)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Unlock(Compiler));
+    }
+
+    if (Log != gcvNULL)
+    {
+        *Log                = Compiler->log;
+        Compiler->log       = gcvNULL;
+    }
+
+
+    gcmFOOTER();
+    return status;
+}
+
+/* Dump IR data */
+gceSTATUS
+sloCOMPILER_DumpIR(
+    IN sloCOMPILER Compiler
+    )
+{
+    slsDATA_TYPE *          dataType;
+
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    if (!(Compiler->context.dumpOptions & slvDUMP_IR))
+    {
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+
+    gcmVERIFY_OK(sloCOMPILER_Dump(
+                                Compiler,
+                                slvDUMP_IR,
+                                "<IR>"));
+
+    /* Dump all data types */
+    FOR_EACH_DLINK_NODE(&Compiler->context.dataTypes, slsDATA_TYPE, dataType)
+    {
+        gcmVERIFY_OK(slsDATA_TYPE_Dump(Compiler, dataType));
+    }
+
+    /* Dump all name spaces and names */
+    if (Compiler->context.globalSpace != gcvNULL)
+    {
+        gcmVERIFY_OK(slsNAME_SPACE_Dump(Compiler, Compiler->context.globalSpace));
+    }
+
+    /* Dump syntax tree */
+    if (Compiler->context.rootSet != gcvNULL)
+    {
+        gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &Compiler->context.rootSet->base));
+    }
+
+    gcmVERIFY_OK(sloCOMPILER_Dump(
+                                Compiler,
+                                slvDUMP_IR,
+                                "</IR>"));
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_Lock(
+    IN sloCOMPILER Compiler
+    )
+{
+    gceSTATUS status;
+
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    /* Verify the arguments. */
+    slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    if (CompilerLock == gcvNULL)
+    {
+        status = gcvSTATUS_INVALID_OBJECT;
+        gcmFOOTER();
+        return status;
+    }
+
+    status = gcoOS_AcquireMutex(gcvNULL, CompilerLock, gcvINFINITE);
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_Unlock(
+    IN sloCOMPILER Compiler
+    )
+{
+    gceSTATUS status;
+
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    /* Verify the arguments. */
+    slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    if (CompilerLock == gcvNULL)
+    {
+        status = gcvSTATUS_INVALID_OBJECT;
+        gcmFOOTER();
+        return status;
+    }
+
+    status = gcoOS_ReleaseMutex(gcvNULL, CompilerLock);
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_SetScannerState(
+    IN sloCOMPILER Compiler,
+    IN sleSCANNER_STATE State
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x State=%d", Compiler, State);
+
+    /* Verify the arguments. */
+    slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    Compiler->context.scannerState = State;
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+sleSCANNER_STATE
+sloCOMPILER_GetScannerState(
+    IN sloCOMPILER Compiler
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    /* Verify the arguments. */
+    slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    gcmFOOTER_ARG("<return>=%d", Compiler->context.scannerState);
+    return Compiler->context.scannerState;
+}
+
+gceSTATUS
+sloCOMPILER_PushSwitchScope(
+IN sloCOMPILER Compiler,
+IN sloIR_LABEL Cases
+)
+{
+    gceSTATUS status;
+    slsSWITCH_SCOPE *switchScope;
+    gctPOINTER pointer;
+
+    gcmHEADER_ARG("Compiler=0x%x Cases=0x%x", Compiler, Cases);
+
+    /* Verify the arguments. */
+    slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
+    status = sloCOMPILER_Allocate(Compiler,
+                                  (gctSIZE_T)sizeof(slsSWITCH_SCOPE),
+                  (gctPOINTER *) &pointer);
+    if (gcmIS_ERROR(status)) {
+        gcmFOOTER_NO();
+        return gcvSTATUS_OUT_OF_MEMORY;
+    }
+
+    switchScope = pointer;
+    switchScope->cases = Cases;
+    slsSLINK_LIST_InsertFirst(&Compiler->context.switchScope, &switchScope->node);
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+
+gceSTATUS
+sloCOMPILER_PopSwitchScope(
+IN sloCOMPILER Compiler
+)
+{
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+    if( !slsSLINK_LIST_IsEmpty(&Compiler->context.switchScope) ) {
+         slsSWITCH_SCOPE *oldScope;
+         slsSLINK_LIST_DetachFirst(&Compiler->context.switchScope, slsSWITCH_SCOPE, &oldScope);
+         gcmVERIFY_OK(sloCOMPILER_Free(Compiler, oldScope));
+    }
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+slsSWITCH_SCOPE *
+sloCOMPILER_GetSwitchScope(
+IN sloCOMPILER Compiler
+)
+{
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+    /* Verify the arguments. */
+    slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    if( !slsSLINK_LIST_IsEmpty(&Compiler->context.switchScope) ) {
+         gcmFOOTER_ARG("<return>=0x%x", slsSLINK_LIST_First(&Compiler->context.switchScope, slsSWITCH_SCOPE));
+
+         return  slsSLINK_LIST_First(&Compiler->context.switchScope, slsSWITCH_SCOPE);
+    }
+
+    gcmFOOTER_ARG("<return>=%s", "<nil>");
+    return gcvNULL;
+}
+
+gceSTATUS
+sloCOMPILER_SetSwitchScope(
+IN sloCOMPILER Compiler,
+IN sloIR_LABEL Cases
+)
+{
+    gceSTATUS status;
+    gcmHEADER_ARG("Compiler=0x%x Cases=0x%x", Compiler, Cases);
+
+    if( !slsSLINK_LIST_IsEmpty(&Compiler->context.switchScope) ) {
+        slsSWITCH_SCOPE *switchScope;
+        switchScope = slsSLINK_LIST_First(&Compiler->context.switchScope, slsSWITCH_SCOPE);
+        switchScope->cases = Cases;
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+    else {
+        status =  sloCOMPILER_PushSwitchScope(Compiler, Cases);
+        gcmFOOTER();
+        return status;
+    }
+}
+
+gceSTATUS
+sloCOMPILER_SearchLayoutOffset(
+    IN  sloCOMPILER        Compiler,
+    IN  gctUINT            Binding,
+    OUT slsLAYOUT_OFFSET **LayoutOffset
+    )
+{
+    gceSTATUS         status       = gcvSTATUS_OK;
+    slsLAYOUT_OFFSET *layoutOffset = gcvNULL;
+
+    gcmHEADER_ARG("Compiler=0x%x Binding=0x%x LayoutOffset=0x%x",
+                  Compiler, Binding, LayoutOffset);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    *LayoutOffset   = gcvNULL;
+
+    FOR_EACH_SLINK_NODE(&Compiler->context.layoutOffset, slsLAYOUT_OFFSET, layoutOffset)
+    {
+        if (Binding == layoutOffset->binding)
+        {
+            *LayoutOffset      = layoutOffset;
+            break;
+        }
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_ConstructLayoutOffsetInBinding(
+    IN  sloCOMPILER        Compiler,
+    IN  gctUINT            Offset,
+    IN  slsLAYOUT_OFFSET  *LayoutOffset
+    )
+{
+    gceSTATUS               status;
+    gctPOINTER              pointer = gcvNULL;
+    slsBINDING_OFFSET_LIST *newNode = gcvNULL;
+
+    status = sloCOMPILER_Allocate(Compiler, sizeof(slsBINDING_OFFSET_LIST), &pointer);
+
+    gcoOS_ZeroMemory(pointer, sizeof(slsBINDING_OFFSET_LIST));
+
+    newNode = (slsBINDING_OFFSET_LIST *)pointer;
+
+    slsSLINK_LIST_InsertFirst(&LayoutOffset->offset_list, &newNode->node);
+
+    newNode->offset     = Offset;
+
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_FindLayoutOffsetInBinding(
+    IN  sloCOMPILER        Compiler,
+    IN  slsLAYOUT_OFFSET  *LayoutOffset,
+    IN  gctUINT            Offset,
+    IN  gctUINT            DataTypeSize,
+    IN  gctBOOL            HasIdentifier,
+    OUT gctBOOL           *OverLaps
+)
+{
+    gceSTATUS               status            = gcvSTATUS_OK;
+    slsBINDING_OFFSET_LIST *bindingOffsetList = gcvNULL;
+
+    gcmHEADER_ARG("Compiler=0x%x LayoutOffset=0x%x",
+                  Compiler,  LayoutOffset);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    *OverLaps = gcvFALSE;
+    FOR_EACH_SLINK_NODE(&LayoutOffset->offset_list, slsBINDING_OFFSET_LIST, bindingOffsetList)
+    {
+        if (((Offset + DataTypeSize * 4) > bindingOffsetList->offset &&
+            Offset < bindingOffsetList->offset) ||
+            Offset == bindingOffsetList->offset)
+        {
+            *OverLaps = gcvTRUE;
+            break;
+        }
+    }
+
+    if(!(*OverLaps) && HasIdentifier)
+    {
+        sloCOMPILER_ConstructLayoutOffsetInBinding(Compiler, Offset, LayoutOffset);
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_ConstructLayoutOffset(
+    IN  sloCOMPILER        Compiler,
+    IN  gctUINT            Binding,
+    OUT slsLAYOUT_OFFSET **LayoutOffset
+    )
+{
+    gceSTATUS         status;
+    gctPOINTER        pointer = gcvNULL;
+    slsLAYOUT_OFFSET *newNode = gcvNULL;
+
+    gcmHEADER_ARG("Compiler=0x%x Binding=%u",
+                  Compiler, Binding);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    status = sloCOMPILER_Allocate(Compiler, sizeof(slsLAYOUT_OFFSET), &pointer);
+
+    gcoOS_ZeroMemory(pointer, sizeof(slsLAYOUT_OFFSET));
+
+    newNode = (slsLAYOUT_OFFSET *)pointer;
+
+    slsSLINK_LIST_InsertFirst(&Compiler->context.layoutOffset, &newNode->node);
+
+    newNode->binding     = Binding;
+    slsSLINK_LIST_Initialize(&newNode->offset_list);
+
+    *LayoutOffset = newNode;
+
+    gcmFOOTER();
+    return status;
+}
+
+sloPREPROCESSOR
+sloCOMPILER_GetPreprocessor(
+    IN sloCOMPILER Compiler
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    /* Verify the arguments. */
+    slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    gcmFOOTER_ARG("<return>=0x%x", Compiler->preprocessor);
+    return Compiler->preprocessor;
+}
+
+sloCODE_EMITTER
+sloCOMPILER_GetCodeEmitter(
+    IN sloCOMPILER Compiler
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    /* Verify the arguments. */
+    slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    gcmFOOTER_ARG("<return>=0x%x", Compiler->codeEmitter);
+    return Compiler->codeEmitter;
+}
+
+sloCODE_GENERATOR
+sloCOMPILER_GetCodeGenerator(
+    IN sloCOMPILER Compiler
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    /* Verify the arguments. */
+    slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    gcmFOOTER_ARG("<return>=0x%x", Compiler->codeGenerator);
+    return Compiler->codeGenerator;
+}
+
+gctBOOL
+sloCOMPILER_OptimizationEnabled(
+    IN sloCOMPILER Compiler,
+    IN sleOPTIMIZATION_OPTION OptimizationOption
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x OptimizationOption=%d",
+                  Compiler, OptimizationOption);
+
+    /* Verify the arguments. */
+    slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    gcmFOOTER_ARG("<return>=%d", Compiler->context.optimizationOptions & OptimizationOption);
+    return (Compiler->context.optimizationOptions & OptimizationOption);
+}
+
+gctBOOL
+sloCOMPILER_ExtensionEnabled(
+    IN sloCOMPILER Compiler,
+    IN sleEXTENSION Extension
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x Extension=%d",
+                  Compiler, Extension);
+
+    /* Verify the arguments. */
+    slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    gcmFOOTER_ARG("<return>=%d", Compiler->context.extensions & Extension);
+    return (Compiler->context.extensions & Extension);
+}
+
+/* Enable extension */
+gceSTATUS
+sloCOMPILER_EnableExtension(
+    IN sloCOMPILER Compiler,
+    IN sleEXTENSION Extension,
+    IN gctBOOL Enable
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x Extension=%d Enable=%d",
+                  Compiler, Extension, Enable);
+
+    /* Verify the arguments. */
+    slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    if (Enable)
+    {
+        Compiler->context.extensions |= Extension;
+    }
+    else
+    {
+        Compiler->context.extensions &= ~Extension;
+    }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+#define MAX_ERROR   100
+
+gceSTATUS
+sloCOMPILER_VReport(
+    IN sloCOMPILER Compiler,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
+    IN sleREPORT_TYPE Type,
+    IN gctCONST_STRING Message,
+    IN gctARGUMENTS Arguments
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x LineNo=%d StringNo=%d "
+                  "Type=%d Message=0x%x Arguments=0x%x",
+                  Compiler, LineNo, StringNo,
+                  Type, Message, Arguments);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    switch (Type)
+    {
+    case slvREPORT_FATAL_ERROR:
+    case slvREPORT_INTERNAL_ERROR:
+    case slvREPORT_ERROR:
+        if (Compiler->context.errorCount >= MAX_ERROR)
+        {
+            gcmFOOTER_NO();
+            return gcvSTATUS_OK;
+        }
+        break;
+    default: break;
+    }
+
+    if (LineNo > 0)
+    {
+        sloCOMPILER_OutputLog(Compiler, "(%d:%d) : ", LineNo, StringNo);
+    }
+
+    switch (Type)
+    {
+    case slvREPORT_FATAL_ERROR:
+        Compiler->context.errorCount = MAX_ERROR;
+        sloCOMPILER_OutputLog(Compiler, "fatal error : ");
+        break;
+
+    case slvREPORT_INTERNAL_ERROR:
+        Compiler->context.errorCount++;
+        sloCOMPILER_OutputLog(Compiler, "internal error : ");
+        break;
+
+    case slvREPORT_ERROR:
+        Compiler->context.errorCount++;
+        sloCOMPILER_OutputLog(Compiler, "error : ");
+        break;
+
+    case slvREPORT_WARN:
+        Compiler->context.warnCount++;
+        sloCOMPILER_OutputLog(Compiler, "warning : ");
+        break;
+
+    default:
+        gcmASSERT(0);
+    }
+
+    sloCOMPILER_VOutputLog(Compiler, Message, Arguments);
+
+    sloCOMPILER_OutputLog(Compiler, "\n");
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_CheckErrorLog(
+    IN sloCOMPILER Compiler,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo
+    )
+{
+    gceSTATUS status = gcvSTATUS_FALSE;
+
+    gcmHEADER_ARG("Compiler=0x%x LineNo=%d StringNo=%d ",
+                  Compiler, LineNo, StringNo);
+
+    if (Compiler->log != gcvNULL)
+        status = gcvSTATUS_TRUE;
+
+    gcmFOOTER_NO();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_Report(
+    IN sloCOMPILER Compiler,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
+    IN sleREPORT_TYPE Type,
+    IN gctCONST_STRING Message,
+    IN ...
+    )
+{
+    gceSTATUS    status;
+    gctARGUMENTS arguments;
+
+    gcmHEADER_ARG("Compiler=0x%x LineNo=%d StringNo=%d "
+                  "Type=%d Message=0x%x ...",
+                  Compiler, LineNo, StringNo,
+                  Type, Message);
+
+    gcmARGUMENTS_START(arguments, Message);
+    status = sloCOMPILER_VReport(Compiler,
+                                 LineNo,
+                                 StringNo,
+                                 Type,
+                                 Message,
+                                 arguments);
+    gcmARGUMENTS_END(arguments);
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_Dump(
+    IN sloCOMPILER Compiler,
+    IN sleDUMP_OPTION DumpOption,
+    IN gctCONST_STRING Message,
+    IN ...
+    )
+{
+    gceSTATUS    status;
+    gctARGUMENTS arguments;
+
+    gcmHEADER_ARG("Compiler=0x%x DumpOption=%d Message=0x%x ...",
+                  Compiler, DumpOption, Message);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    if (!(Compiler->context.dumpOptions & DumpOption))
+    {
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+
+    gcmARGUMENTS_START(arguments, Message);
+    status = sloCOMPILER_VOutputLog(Compiler, Message, arguments);
+    gcmARGUMENTS_END(arguments);
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_Allocate(
+    IN sloCOMPILER Compiler,
+    IN gctSIZE_T Bytes,
+    OUT gctPOINTER * Memory
+    )
+{
+    gceSTATUS       status;
+    gctSIZE_T       bytes;
+    slsDLINK_NODE * node;
+    gctPOINTER pointer = gcvNULL;
+
+    gcmHEADER_ARG("Compiler=0x%x Bytes=%lu", Compiler, Bytes);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    bytes = Bytes + sizeof(slsDLINK_NODE);
+
+    status = gcoOS_Allocate(
+                        gcvNULL,
+                        bytes,
+                        &pointer);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmVERIFY_OK(sloCOMPILER_Report(
+                                        Compiler,
+                                        0,
+                                        0,
+                                        slvREPORT_FATAL_ERROR,
+                                        "not enough memory"));
+
+        gcmFOOTER();
+        return status;
+    }
+
+    node = pointer;
+
+    /* Add node into the memory pool */
+    slsDLINK_LIST_InsertLast(&Compiler->memoryPool, node);
+
+    *Memory = (gctPOINTER)(node + 1);
+
+    gcmFOOTER_ARG("status=%d *Memory=0x%x", status, *Memory);
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_Free(
+    IN sloCOMPILER Compiler,
+    IN gctPOINTER Memory
+    )
+{
+    slsDLINK_NODE * node;
+    gceSTATUS status;
+
+    gcmHEADER_ARG("Compiler=0x%x Memory=0x%x", Compiler, Memory);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    node = (slsDLINK_NODE *)Memory - 1;
+
+    /* Detach node from the memory pool */
+    slsDLINK_NODE_Detach(node);
+
+    status = gcmOS_SAFE_FREE(gcvNULL, node);
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_InsertWClipList(
+    IN sloCOMPILER Compiler,
+    IN gctINT Index,
+    IN gctINT Data0,
+    IN gctINT Data1
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    gcmONERROR(gcSHADER_InsertList(Compiler->binary, &Compiler->binary->wClipTempIndexList, Index, Data0, Data1));
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_InsertWClipForUniformList(
+    IN sloCOMPILER Compiler,
+    IN gctINT Index,
+    IN gctINT Data0,
+    IN gctINT Data1
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    gcmONERROR(gcSHADER_InsertList(Compiler->binary, &Compiler->binary->wClipUniformIndexList, Index, Data0, Data1));
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_FindWClipForUniformList(
+    IN sloCOMPILER Compiler,
+    IN gctINT Index,
+    IN gctINT * UniformIndex1,
+    IN gctINT * UniformIndex2
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcSHADER_LIST list = gcvNULL;
+
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    status = gcSHADER_FindList(Compiler->binary, Compiler->binary->wClipUniformIndexList, Index, &list);
+
+    if (status == gcvSTATUS_TRUE)
+    {
+        if (UniformIndex1)
+        {
+            *UniformIndex1 = list->data0;
+        }
+        if (UniformIndex2)
+        {
+            *UniformIndex2 = list->data1;
+        }
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+
+gceSTATUS
+sloCOMPILER_GetUniformIndex(
+    IN sloCOMPILER Compiler,
+    IN gcUNIFORM Uniform,
+    IN gctUINT16 * Index
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    gcmONERROR(gcUNIFORM_GetIndex(Uniform, Index));
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_GetAttributeIndex(
+    IN sloCOMPILER Compiler,
+    IN gcATTRIBUTE Attribute,
+    IN gctUINT16 * Index
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    gcmONERROR(gcATTRIBUTE_GetIndex(Attribute, Index));
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_EmptyMemoryPool(
+    IN sloCOMPILER Compiler
+    )
+{
+    slsDLINK_NODE * node;
+
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    /* Free all unfreed memory block in the pool */
+    while (!slsDLINK_LIST_IsEmpty(&Compiler->memoryPool))
+    {
+        slsDLINK_LIST_DetachFirst(&Compiler->memoryPool, slsDLINK_NODE, &node);
+
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, node));
+    }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_AllocatePoolString(
+    IN sloCOMPILER Compiler,
+    IN gctCONST_STRING String,
+    OUT sltPOOL_STRING * PoolString
+    )
+{
+    gceSTATUS               status;
+    slsDLINK_NODE *         bucket;
+    gctSIZE_T               length;
+    slsPOOL_STRING_NODE *   node;
+    gctPOINTER              pointer = gcvNULL;
+    gctUINT                 crc32Value = gcEvaluateCRC32ForShaderString(String,
+                                                                        (gctUINT)gcoOS_StrLen(String, gcvNULL));
+
+    gcmHEADER_ARG("Compiler=0x%x String=0x%x",
+                  Compiler, String);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    bucket = slsHASH_TABLE_Bucket(&Compiler->context.stringPool,
+                                  slmBUCKET_INDEX(slHashString(String)));
+
+    FOR_EACH_DLINK_NODE(bucket, slsPOOL_STRING_NODE, node)
+    {
+        if (node->crc32Value == crc32Value)
+        {
+            *PoolString = node->string;
+
+            gcmFOOTER_ARG("*PoolString=0x%x", *PoolString);
+            return gcvSTATUS_OK;
+        }
+    }
+
+    length = gcoOS_StrLen(String, gcvNULL);
+
+    status = sloCOMPILER_Allocate(Compiler,
+                                  (gctSIZE_T)sizeof(slsPOOL_STRING_NODE) + length + 1,
+                                  &pointer);
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER();
+        return status;
+    }
+
+    node = (slsPOOL_STRING_NODE*)pointer;
+
+    node->crc32Value = crc32Value;
+
+    node->string = (sltPOOL_STRING)((gctINT8 *)node + sizeof(slsPOOL_STRING_NODE));
+
+    gcmVERIFY_OK(gcoOS_StrCopySafe(node->string, length + 1, String));
+
+    slsDLINK_LIST_InsertFirst(bucket, &node->node);
+
+    *PoolString = node->string;
+
+    gcmFOOTER_ARG("*PoolString=0x%x", *PoolString);
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_GetChar(
+    IN sloCOMPILER Compiler,
+    OUT gctINT_PTR Char
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x Char=0x%x",
+                  Compiler, Char);
+
+    gcmASSERT(Compiler);
+    gcmASSERT(Compiler->context.strings);
+
+    if (Compiler->context.strings[Compiler->context.currentStringNo][Compiler->context.currentCharNo] != '\0')
+    {
+        *Char = Compiler->context.strings[Compiler->context.currentStringNo][Compiler->context.currentCharNo++];
+    }
+    else if (Compiler->context.currentStringNo == Compiler->context.stringCount)
+    {
+        *Char = T_EOF;
+    }
+    else
+    {
+        gcmASSERT(Compiler->context.currentStringNo < Compiler->context.stringCount);
+
+        Compiler->context.currentStringNo++;
+        Compiler->context.currentCharNo = 0;
+
+        while (Compiler->context.currentStringNo < Compiler->context.stringCount)
+        {
+            if (Compiler->context.strings[Compiler->context.currentStringNo][0] != '\0')
+            {
+                break;
+            }
+
+            Compiler->context.currentStringNo++;
+        }
+
+        if (Compiler->context.currentStringNo == Compiler->context.stringCount)
+        {
+            *Char = T_EOF;
+        }
+        else
+        {
+            gcmASSERT(Compiler->context.currentStringNo < Compiler->context.stringCount);
+            *Char = Compiler->context.strings[Compiler->context.currentStringNo][Compiler->context.currentCharNo++];
+        }
+    }
+
+    gcmVERIFY_OK(sloCOMPILER_SetCurrentStringNo(
+                                                Compiler,
+                                                Compiler->context.currentStringNo));
+
+    gcmVERIFY_OK(sloCOMPILER_SetCurrentLineNo(
+                                            Compiler,
+                                            Compiler->context.currentLineNo));
+
+    if (*Char == '\n')
+    {
+        Compiler->context.currentLineNo++;
+    }
+
+    gcmFOOTER_ARG("*Char=0x%x", *Char);
+    return gcvSTATUS_OK;
+}
+
+static sloCOMPILER CurrentCompiler  = gcvNULL;
+
+gceSTATUS
+sloCOMPILER_MakeCurrent(
+    IN sloCOMPILER Compiler,
+    IN gctUINT StringCount,
+    IN gctCONST_STRING Strings[]
+    )
+{
+#ifndef SL_SCAN_NO_PREPROCESSOR
+    gceSTATUS   status;
+#endif
+
+    gcmHEADER_ARG("Compiler=0x%x StringCount=%d Strings=0x%x",
+                  Compiler, StringCount, Strings);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    Compiler->context.stringCount       = StringCount;
+    Compiler->context.strings           = Strings;
+    Compiler->context.currentLineNo     = 1;
+    Compiler->context.currentStringNo   = 0;
+    Compiler->context.currentCharNo     = 0;
+
+    CurrentCompiler                     = Compiler;
+
+#ifndef SL_SCAN_NO_PREPROCESSOR
+    status = sloPREPROCESSOR_SetSourceStrings(
+                                            Compiler->preprocessor,
+                                            StringCount,
+                                            Strings);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER();
+        return status;
+    }
+#endif
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gctINT
+slInput(
+    IN gctINT MaxSize,
+    OUT gctSTRING Buffer
+    )
+{
+#ifdef SL_SCAN_NO_PREPROCESSOR
+
+    gctINT ch;
+
+    gcmHEADER_ARG("MaxSize=0x%x Buffer=0x%x",
+                  MaxSize, Buffer);
+
+    gcmASSERT(CurrentCompiler);
+
+    gcmVERIFY_OK(sloCOMPILER_GetChar(CurrentCompiler, &ch));
+
+    if (ch == T_EOF)
+    {
+        gcmFOOTER_ARG("<return>=%d", 0);
+        return 0;
+    }
+
+    Buffer[0] = (gctCHAR)ch;
+
+    gcmFOOTER_ARG("<return>=%d", 1);
+    return 1;
+
+#else
+
+    gceSTATUS   status;
+    gctINT      actualSize;
+
+    gcmHEADER_ARG("MaxSize=0x%x Buffer=0x%x",
+                  MaxSize, Buffer);
+
+    status = sloPREPROCESSOR_Parse(
+                                sloCOMPILER_GetPreprocessor(CurrentCompiler),
+                                MaxSize,
+                                Buffer,
+                                &actualSize);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER_ARG("<return>=%d", 0);
+        return 0;
+    }
+
+    gcmFOOTER_ARG("<return>=%d", actualSize);
+    return actualSize;
+
+#endif
+}
+
+gctPOINTER
+slMalloc(
+    IN gctSIZE_T Bytes
+    )
+{
+    gceSTATUS status;
+    gctSIZE_T_PTR memory;
+    gctPOINTER pointer = gcvNULL;
+
+    gcmHEADER_ARG("Bytes=%u", Bytes);
+
+    status = sloCOMPILER_Allocate(CurrentCompiler,
+                                  Bytes + gcmSIZEOF(gctSIZE_T_PTR),
+                                  &pointer);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER();
+        return gcvNULL;
+    }
+
+    memory    = pointer;
+    memory[0] = Bytes;
+
+    gcmFOOTER_ARG("<return>=%d", &memory[1]);
+    return &memory[1];
+}
+
+gctPOINTER
+slRealloc(
+    IN gctPOINTER Memory,
+    IN gctSIZE_T NewBytes
+    )
+{
+    gceSTATUS status;
+    gctSIZE_T_PTR memory = gcvNULL;
+    gctPOINTER pointer = gcvNULL;
+    gcmHEADER_ARG("Memory=0x%x NewBytes=%u",
+                  Memory, NewBytes);
+
+    do
+    {
+        gcmERR_BREAK(
+            sloCOMPILER_Allocate(CurrentCompiler,
+                                 NewBytes + gcmSIZEOF(gctSIZE_T_PTR),
+                                 &pointer));
+
+        memory    = pointer;
+        memory[0] = NewBytes;
+
+        gcoOS_MemCopy(memory + 1,
+                      Memory,
+                      ((gctSIZE_T_PTR) Memory)[-1]);
+
+        gcmERR_BREAK(
+            sloCOMPILER_Free(CurrentCompiler,
+                             &((gctSIZE_T_PTR) Memory)[-1]));
+
+        gcmFOOTER_ARG("<return>=%d", &memory[1]);
+        return &memory[1];
+    }
+    while (gcvFALSE);
+
+    if (memory != gcvNULL)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Free(CurrentCompiler, memory));
+    }
+
+    gcmFOOTER_ARG("<return>=%d", gcvNULL);
+    return gcvNULL;
+}
+
+void
+slFree(
+    IN gctPOINTER Memory
+    )
+{
+    gcmHEADER_ARG("Memory=0x%x", Memory);
+
+    if (Memory != gcvNULL)
+    {
+        gcmVERIFY_OK(
+            sloCOMPILER_Free(CurrentCompiler,
+                             &((gctSIZE_T_PTR) Memory)[-1]));
+    }
+
+    gcmFOOTER_NO();
+}
+
+void
+slReport(
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
+    IN sleREPORT_TYPE Type,
+    IN gctSTRING Message,
+    IN ...
+    )
+{
+    gctARGUMENTS arguments;
+
+    gcmHEADER_ARG("LineNo=%d StringNo=%d Type=%d Message=0x%x ...",
+                  LineNo, StringNo, Type, Message);
+
+    /* TODO: ... */
+    gcmASSERT(CurrentCompiler);
+
+    gcmARGUMENTS_START(arguments, Message);
+    gcmVERIFY_OK(sloCOMPILER_VReport(CurrentCompiler,
+                                     LineNo,
+                                     StringNo,
+                                     Type,
+                                     Message,
+                                     arguments));
+    gcmARGUMENTS_END(arguments);
+    gcmFOOTER_NO();
+}
+
+gceSTATUS
+sloCOMPILER_CreateDataType(
+    IN sloCOMPILER Compiler,
+    IN gctINT TokenType,
+    IN slsNAME_SPACE * FieldSpace,
+    OUT slsDATA_TYPE ** DataType
+    )
+{
+    gceSTATUS       status;
+    slsDATA_TYPE *  dataType;
+
+    gcmHEADER_ARG("Compiler=0x%x TokenType=%d FieldSpace=0x%x",
+               Compiler, TokenType, FieldSpace);
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    status = slsDATA_TYPE_Construct(
+                                    Compiler,
+                                    TokenType,
+                                    FieldSpace,
+                                    &dataType);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER();
+        return status;
+    }
+
+    slsDLINK_LIST_InsertLast(&Compiler->context.dataTypes, &dataType->node);
+
+    *DataType = dataType;
+
+    gcmFOOTER_ARG("*DataType=0x%x", *DataType);
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_CreateArrayDataType(
+    IN sloCOMPILER Compiler,
+    IN slsDATA_TYPE * ElementDataType,
+    IN gctINT ArrayLength,
+    OUT slsDATA_TYPE ** DataType
+    )
+{
+    gceSTATUS       status;
+    slsDATA_TYPE *  dataType;
+
+    gcmHEADER_ARG("Compiler=0x%x ElementDataType=0x%x ArrayLength=%d",
+                  Compiler, ElementDataType, ArrayLength);
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    status = slsDATA_TYPE_ConstructArray(
+                                    Compiler,
+                                    ElementDataType,
+                                    ArrayLength,
+                                    &dataType);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER();
+        return status;
+    }
+
+    slsDLINK_LIST_InsertLast(&Compiler->context.dataTypes, &dataType->node);
+
+    *DataType = dataType;
+
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_CreateArraysOfArraysDataType(
+    IN sloCOMPILER Compiler,
+    IN slsDATA_TYPE * ElementDataType,
+    IN gctINT ArrayLengthCount,
+    IN gctINT * ArrayLengthList,
+    IN gctBOOL IsAppend,
+    OUT slsDATA_TYPE ** DataType
+    )
+{
+    gceSTATUS       status;
+    slsDATA_TYPE *  dataType;
+
+    gcmHEADER_ARG("Compiler=0x%x ElementDataType=0x%x ArrayLengthCount=%d",
+                  Compiler, ElementDataType, ArrayLengthCount);
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    status = slsDATA_TYPE_ConstructArraysOfArrays(
+                                    Compiler,
+                                    ElementDataType,
+                                    ArrayLengthCount,
+                                    ArrayLengthList,
+                                    IsAppend,
+                                    &dataType);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER();
+        return status;
+    }
+
+    slsDLINK_LIST_InsertLast(&Compiler->context.dataTypes, &dataType->node);
+
+    *DataType = dataType;
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_CreateElementDataType(
+    IN sloCOMPILER Compiler,
+    IN slsDATA_TYPE * CompoundDataType,
+    OUT slsDATA_TYPE ** DataType
+    )
+{
+    gceSTATUS       status;
+    slsDATA_TYPE *  dataType;
+
+    gcmHEADER_ARG("Compiler=0x%x CompoundDataType=0x%x",
+                  Compiler, CompoundDataType);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    status = slsDATA_TYPE_ConstructElement(
+                                    Compiler,
+                                    CompoundDataType,
+                                    &dataType);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER();
+        return status;
+    }
+
+    slsDLINK_LIST_InsertLast(&Compiler->context.dataTypes, &dataType->node);
+
+    *DataType = dataType;
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_CloneDataType(
+    IN sloCOMPILER Compiler,
+    IN sltSTORAGE_QUALIFIER Qualifier,
+    IN sltPRECISION_QUALIFIER Precision,
+    IN slsDATA_TYPE * Source,
+    OUT slsDATA_TYPE ** DataType
+    )
+{
+    gceSTATUS       status;
+    slsDATA_TYPE *  dataType;
+
+    gcmHEADER_ARG("Compiler=0x%x Qualifier=%d Source=0x%x",
+                  Compiler, Qualifier, Source);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    status = slsDATA_TYPE_Clone(Compiler,
+                                Qualifier,
+                                Precision,
+                                Source,
+                                &dataType);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER();
+        return status;
+    }
+
+    slsDLINK_LIST_InsertLast(&Compiler->context.dataTypes, &dataType->node);
+
+    *DataType = dataType;
+
+    gcmFOOTER_ARG("*DataType=0x%x", *DataType);
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_DuplicateFieldSpaceForDataType(
+    IN sloCOMPILER Compiler,
+    IN OUT slsDATA_TYPE * DataType
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    slsNAME_SPACE *currentNameSpace = gcvNULL;
+    slsNAME *orgFieldName = gcvNULL, *newFieldName = gcvNULL;
+    slsDATA_TYPE *newDataType;
+
+    gcmHEADER_ARG("Compiler=0x%x DataType=0x%x", Compiler, DataType);
+
+    gcmASSERT(DataType->elementType == slvTYPE_STRUCT);
+
+    /* Create a new name space. */
+    gcmONERROR(sloCOMPILER_CreateNameSpace(Compiler,
+                                           &currentNameSpace));
+    /* Duplicate field list. */
+    FOR_EACH_DLINK_NODE(&DataType->fieldSpace->names, slsNAME, orgFieldName)
+    {
+        orgFieldName = orgFieldName;
+        /* Create a new name. */
+        gcmONERROR(sloCOMPILER_CreateName(Compiler,
+                                          orgFieldName->lineNo,
+                                          orgFieldName->stringNo,
+                                          slvFIELD_NAME,
+                                          gcvNULL,
+                                          orgFieldName->symbol,
+                                          slvEXTENSION_NONE,
+                                          gcvFALSE,
+                                          &newFieldName));
+        /* Create a new datatype. */
+        gcmONERROR(sloCOMPILER_CloneDataType(Compiler,
+                                             orgFieldName->dataType->qualifiers.storage,
+                                             orgFieldName->dataType->qualifiers.precision,
+                                             orgFieldName->dataType,
+                                             &newDataType));
+
+        /* If this field is a struct too, duplicate it. */
+        if (newDataType->elementType == slvTYPE_STRUCT)
+        {
+            gcmONERROR(sloCOMPILER_DuplicateFieldSpaceForDataType(Compiler,
+                                                                  newDataType));
+        }
+        newFieldName->dataType = newDataType;
+    }
+
+    DataType->fieldSpace = currentNameSpace;
+
+    /* Reset the name space. */
+    gcmONERROR(sloCOMPILER_PopCurrentNameSpace(Compiler, &currentNameSpace));
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_InsertArrayForDataType(
+    IN sloCOMPILER Compiler,
+    IN slsDATA_TYPE * SourceDataType,
+    IN gctINT ArrayLength,
+    OUT slsDATA_TYPE ** DataType
+    )
+{
+    gceSTATUS       status;
+    slsDATA_TYPE *  dataType;
+
+    gcmHEADER_ARG("Compiler=0x%x SourceDataType=0x%x ArrayLength=%d DataType = 0x%x",
+                  Compiler, SourceDataType, ArrayLength, DataType);
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    status = sloCOMPILER_CreateArraysOfArraysDataType(Compiler,
+                                       SourceDataType,
+                                       1,
+                                       &ArrayLength,
+                                       gcvFALSE,
+                                       &dataType);
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER();
+        return status;
+    }
+
+    *DataType = dataType;
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_CreateName(
+    IN sloCOMPILER Compiler,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
+    IN sleNAME_TYPE Type,
+    IN slsDATA_TYPE * DataType,
+    IN sltPOOL_STRING Symbol,
+    IN sleEXTENSION Extension,
+    IN gctBOOL CheckExistedName,
+    OUT slsNAME ** Name
+    )
+{
+    gceSTATUS status;
+    gctSIZE_T length = 0;
+
+    gcmHEADER_ARG("Compiler=0x%x LineNo=%d StringNo=%d "
+                  "Type=%d DataType=0x%x Symbol=0x%x "
+                  "Extension=%d Name=0x%x",
+                  Compiler, LineNo, StringNo,
+                  Type, DataType, Symbol,
+                  Extension, Name);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    if (!Compiler->context.loadingBuiltIns)
+    {
+        length = gcoOS_StrLen(Symbol, gcvNULL);
+        if (length >= 3 &&
+            Symbol[0] == 'g' && Symbol[1] == 'l' && Symbol[2] == '_')
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            LineNo,
+                                            StringNo,
+                                            slvREPORT_ERROR,
+                                            "The identifier: '%s' starting with 'gl_' is reserved",
+                                            Symbol));
+
+            status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+            gcmFOOTER();
+            return status;
+        }
+    }
+
+    status = slsNAME_SPACE_CreateName(Compiler,
+                                      Compiler->context.currentSpace,
+                                      LineNo,
+                                      StringNo,
+                                      Type,
+                                      DataType,
+                                      Symbol,
+                                      Compiler->context.loadingBuiltIns,
+                                      Extension,
+                                      CheckExistedName,
+                                      Name);
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_SetCheckFunctionForBuiltInFunction(
+    IN sloCOMPILER Compiler,
+    IN slsBuiltInFuncCheck Function,
+    IN slsNAME * FuncName
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Compiler=0x%x Function=0x%x FuncName=0x%x ",
+                  Compiler, Function, FuncName);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    gcmASSERT(Function);
+    gcmASSERT(FuncName);
+    gcmASSERT(FuncName->type == slvFUNC_NAME);
+
+    FuncName->u.funcInfo.function = Function;
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_CreateAuxiliaryName(
+    IN sloCOMPILER Compiler,
+    IN slsNAME* refName,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
+    IN slsDATA_TYPE * DataType,
+    OUT slsNAME ** Name
+    )
+{
+    gceSTATUS                   status = gcvSTATUS_OK;
+    sltPOOL_STRING              auxiArraySymbol, tempSymbol;
+    gctPOINTER                  pointer = gcvNULL;
+    slsNAME*                    name = gcvNULL;
+
+    gcmHEADER_ARG("Compiler=0x%x refName=0x%x LineNo=%u StringNo=%u "
+                  "DataType=0x%x Name=0x%x",
+                  Compiler, refName, LineNo, StringNo,
+                  DataType, Name);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    if (refName)
+    {
+        gctSIZE_T   symbolSize = 0;
+
+        symbolSize = gcoOS_StrLen(refName->symbol, gcvNULL);
+        status = gcoOS_Allocate(
+                                gcvNULL,
+                                symbolSize+16,
+                                &pointer);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        tempSymbol = pointer;
+
+        gcoOS_StrCopySafe(tempSymbol, symbolSize+1, refName->symbol);
+        gcoOS_StrCatSafe(tempSymbol, symbolSize+16, "_scalarArray");
+
+        status = sloCOMPILER_AllocatePoolString(Compiler,
+                                                tempSymbol,
+                                                &auxiArraySymbol);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        status = slsNAME_SPACE_Search(Compiler,
+                                      refName->mySpace,
+                                      auxiArraySymbol,
+                                      gcvFALSE,
+                                      gcvFALSE,
+                                      &name);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        if (name == gcvNULL)
+        {
+            status = slsNAME_SPACE_CreateName(Compiler,
+                                             refName->mySpace,
+                                             refName->lineNo,
+                                             refName->stringNo,
+                                             slvVARIABLE_NAME, /* We can not use other types since it is auxiliary
+                                                                  variable, so DONOT use refName->type here */
+                                             DataType,
+                                             auxiArraySymbol,
+                                             gcvFALSE,
+                                             refName->extension,
+                                             gcvFALSE,
+                                             &name);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        }
+
+        gcoOS_Free(gcvNULL, pointer);
+        pointer= gcvNULL;
+    }
+    else
+    {
+        gctUINT      offset = 0;
+        gctUINT64   curTime;
+
+        status = gcoOS_Allocate(
+                                gcvNULL,
+                                (gctSIZE_T)256,
+                                &pointer);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        tempSymbol = pointer;
+
+        gcoOS_GetTime(&curTime);
+        gcoOS_PrintStrSafe(tempSymbol, 256, &offset, "%u_scalarArray", curTime);
+
+        status = sloCOMPILER_AllocatePoolString(
+                                            Compiler,
+                                            tempSymbol,
+                                            &auxiArraySymbol);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        status = slsNAME_SPACE_Search(Compiler,
+                                      Compiler->context.currentSpace,
+                                      auxiArraySymbol,
+                                      gcvFALSE,
+                                      gcvFALSE,
+                                      &name);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        if (name == gcvNULL)
+        {
+            status = slsNAME_SPACE_CreateName(Compiler,
+                                             Compiler->context.currentSpace,
+                                             LineNo,
+                                             StringNo,
+                                             slvVARIABLE_NAME,
+                                             DataType,
+                                             auxiArraySymbol,
+                                             gcvFALSE,
+                                             slvEXTENSION_NONE,
+                                             gcvFALSE,
+                                             &name);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        }
+
+        gcoOS_Free(gcvNULL, pointer);
+        pointer= gcvNULL;
+    }
+
+    if (Name != gcvNULL) *Name = name;
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_SearchName(
+    IN sloCOMPILER Compiler,
+    IN sltPOOL_STRING Symbol,
+    IN gctBOOL Recursive,
+    OUT slsNAME ** Name
+    )
+{
+    gceSTATUS status;
+    gctSIZE_T length;
+    gctBOOL isBuiltInSpace = gcvFALSE;
+
+    gcmHEADER_ARG("Compiler=0x%x Symbol=0x%x "
+                  "Recursive=%d Name=0x%x",
+                  Compiler, Symbol, Recursive, Name);
+
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "Symbol=%s", gcmOPT_STRING(Symbol));
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "Name=%x", gcmOPT_POINTER(Name));
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    length = gcoOS_StrLen(Symbol, gcvNULL);
+
+    if (length >= 3 &&
+        Symbol[0] == 'g' && Symbol[1] == 'l' && Symbol[2] == '_')
+    {
+        isBuiltInSpace = gcvTRUE;
+    }
+
+    status = slsNAME_SPACE_Search(Compiler,
+                                  isBuiltInSpace?
+                                  Compiler->context.builtinSpace : Compiler->context.currentSpace,
+                                  Symbol,
+                                  Recursive,
+                                  gcvFALSE,
+                                  Name);
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_SearchBuiltinName(
+    IN sloCOMPILER Compiler,
+    IN gctSTRING Symbol,
+    OUT slsNAME ** Name
+    )
+{
+    gceSTATUS status;
+    sltPOOL_STRING symbolInPool;
+
+    gcmHEADER_ARG("Compiler=0x%x Symbol=0x%x Name=0x%x",
+                  Compiler, Symbol, Name);
+
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "Symbol=%s", gcmOPT_STRING(Symbol));
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "Name=%x", gcmOPT_POINTER(Name));
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    status = sloCOMPILER_AllocatePoolString(Compiler,
+                                            Symbol,
+                                            &symbolInPool);
+
+    if (gcmIS_ERROR(status)) return status;
+
+    status = slsNAME_SPACE_Search(Compiler,
+                                  Compiler->context.builtinSpace,
+                                  symbolInPool,
+                                  gcvFALSE,
+                                  gcvFALSE,
+                                  Name);
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_SearchIntrinsicBuiltinName(
+    IN sloCOMPILER Compiler,
+    IN gctSTRING Symbol,
+    OUT slsNAME ** Name
+    )
+{
+    gceSTATUS status;
+    sltPOOL_STRING symbolInPool;
+
+    gcmHEADER_ARG("Compiler=0x%x Symbol=0x%x Name=0x%x",
+                  Compiler, Symbol, Name);
+
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "Symbol=%s", gcmOPT_STRING(Symbol));
+    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "Name=%x", gcmOPT_POINTER(Name));
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    status = sloCOMPILER_AllocatePoolString(Compiler,
+                                            Symbol,
+                                            &symbolInPool);
+
+    if (gcmIS_ERROR(status)) return status;
+
+    status = slsNAME_SPACE_Search(Compiler,
+                                  Compiler->context.builtinSpace,
+                                  symbolInPool,
+                                  gcvFALSE,
+                                  gcvTRUE,
+                                  Name);
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_CheckNewFuncName(
+    IN sloCOMPILER Compiler,
+    IN slsNAME * FuncName,
+    OUT slsNAME ** FirstFuncName
+    )
+{
+    gceSTATUS status;
+
+    gcmHEADER_ARG("Compiler=0x%x FuncName=0x%x FirstFuncName=0x%x",
+                  Compiler, FuncName, FirstFuncName);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    gcmASSERT(FuncName);
+
+    /* check built-in space. */
+    status = slsNAME_SPACE_CheckNewFuncName(
+                                        Compiler,
+                                        Compiler->context.builtinSpace,
+                                        FuncName,
+                                        FirstFuncName);
+
+    if (gcmIS_ERROR(status))
+    {
+        return status;
+    }
+
+    status = slsNAME_SPACE_CheckNewFuncName(
+                                        Compiler,
+                                        Compiler->context.globalSpace,
+                                        FuncName,
+                                        FirstFuncName);
+
+    gcmFOOTER();
+    return status;
+}
+
+/*
+** Functions can only be declared within the global name space.
+*/
+gceSTATUS
+slsNAME_SPACE_CheckFuncInGlobalNamespace(
+    IN sloCOMPILER Compiler,
+    IN slsNAME * FuncName
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Compiler=0x%x FuncName=0x%x ",
+                  Compiler, FuncName);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    gcmASSERT(FuncName);
+
+    if(FuncName->mySpace != Compiler->context.globalSpace)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Report(
+                                        Compiler,
+                                        FuncName->lineNo,
+                                        FuncName->stringNo,
+                                        slvREPORT_ERROR,
+                                        "require a constant expression"));
+        gcmFOOTER_ARG("<return>=%s", "<nil>");
+        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_CreateNameSpace(
+    IN sloCOMPILER Compiler,
+    OUT slsNAME_SPACE ** NameSpace
+    )
+{
+    gceSTATUS       status;
+    slsNAME_SPACE * nameSpace;
+
+    gcmHEADER_ARG("Compiler=0x%x NameSpace=0x%x",
+                  Compiler, NameSpace);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    gcmASSERT(NameSpace);
+
+    status = slsNAME_SPACE_Construct(Compiler,
+                                     Compiler->context.currentSpace,
+                                     &nameSpace);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER();
+        return status;
+    }
+
+    Compiler->context.currentSpace = nameSpace;
+
+    *NameSpace = nameSpace;
+
+    gcmFOOTER_ARG("*NameSpace=0x%x", *NameSpace);
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_CreateAuxGlobalNameSpace(
+    IN sloCOMPILER Compiler,
+    OUT slsNAME_SPACE ** NameSpace
+    )
+{
+    gceSTATUS       status;
+
+    gcmHEADER_ARG("Compiler=0x%x NameSpace=0x%x",
+                  Compiler, NameSpace);
+
+    status = sloCOMPILER_CreateNameSpace(Compiler,
+                                         NameSpace);
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER();
+        return status;
+    }
+
+    Compiler->context.auxGlobalSpace = *NameSpace;
+
+    gcmFOOTER_ARG("*NameSpace=0x%x", *NameSpace);
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_PopCurrentNameSpace(
+    IN sloCOMPILER Compiler,
+    OUT slsNAME_SPACE ** PrevNameSpace
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("Compiler=0x%x PrevNameSpace=0x%x",
+                  Compiler, PrevNameSpace);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    if (Compiler->context.currentSpace == gcvNULL ||
+        Compiler->context.currentSpace->parent == gcvNULL)
+    {
+        status = gcvSTATUS_INTERFACE_ERROR;
+        gcmFOOTER();
+        return status;
+    }
+
+    if (PrevNameSpace != gcvNULL)
+    {
+        *PrevNameSpace = Compiler->context.currentSpace;
+    }
+
+    Compiler->context.currentSpace = Compiler->context.currentSpace->parent;
+
+    gcmFOOTER_ARG("*PrevNameSpace=0x%x", gcmOPT_POINTER(PrevNameSpace));
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_PushUnnamedSpace(
+IN sloCOMPILER Compiler,
+OUT slsNAME_SPACE ** UnnamedSpace
+)
+{
+   gcmHEADER_ARG("Compiler=0x%x UnnamedSpace=0x%x",
+                 Compiler, UnnamedSpace);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    gcmASSERT(UnnamedSpace);
+
+    if (Compiler->context.unnamedSpace == gcvNULL) {
+        gcmFOOTER_NO();
+        return gcvSTATUS_INTERFACE_ERROR;
+    }
+    *UnnamedSpace = Compiler->context.unnamedSpace;
+    Compiler->context.unnamedSpace->parent = Compiler->context.currentSpace;
+    Compiler->context.currentSpace = Compiler->context.unnamedSpace;
+
+    gcmFOOTER_ARG("*UnnamedSpace=0x%x", *UnnamedSpace);
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_AtGlobalNameSpace(
+    IN sloCOMPILER Compiler,
+    OUT gctBOOL * AtGlobalNameSpace
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x AtGlobalNameSpace=0x%x",
+                  Compiler, AtGlobalNameSpace);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    gcmASSERT(AtGlobalNameSpace);
+    gcmASSERT(Compiler->context.currentSpace);
+    gcmASSERT(Compiler->context.globalSpace);
+
+    *AtGlobalNameSpace = (Compiler->context.globalSpace == Compiler->context.currentSpace) ||
+    (Compiler->context.auxGlobalSpace == Compiler->context.currentSpace);
+
+    gcmFOOTER_ARG("*AtGlobalNameSpace=%d", *AtGlobalNameSpace);
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloIR_SET_IsRoot(
+    IN sloCOMPILER Compiler,
+    IN sloIR_SET Set,
+    OUT gctBOOL * IsRoot
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x Set=0x%x",
+                  Compiler, Set);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    slmVERIFY_IR_OBJECT(Set, slvIR_SET);
+    gcmASSERT(IsRoot);
+
+    *IsRoot = (Set == Compiler->context.rootSet);
+
+    gcmFOOTER_ARG("*IsRoot=%d", *IsRoot);
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_AddExternalDecl(
+    IN sloCOMPILER Compiler,
+    IN sloIR_BASE ExternalDecl
+    )
+{
+    gceSTATUS   status;
+
+    gcmHEADER_ARG("Compiler=0x%x ExternalDecl=0x%x",
+                  Compiler, ExternalDecl);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    status = sloIR_SET_AddMember(
+                            Compiler,
+                            Compiler->context.rootSet,
+                            ExternalDecl);
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloIR_BASE_UseAsTextureCoord(
+    IN sloCOMPILER Compiler,
+    IN sloIR_BASE Base
+    )
+{
+    gceSTATUS               status;
+    sloIR_SET               set             = gcvNULL;
+    sloIR_UNARY_EXPR        unaryExpr       = gcvNULL;
+    sloIR_BINARY_EXPR       binaryExpr      = gcvNULL;
+    sloIR_SELECTION         selection       = gcvNULL;
+    sloIR_POLYNARY_EXPR     polynaryExpr    = gcvNULL;
+    sloIR_BASE              member;
+
+    gcmHEADER_ARG("Compiler=0x%x Base=0x%x",
+                  Compiler, Base);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    gcmASSERT(Base);
+
+    switch (sloIR_OBJECT_GetType(Base))
+    {
+    case slvIR_SET:
+        set = (sloIR_SET)Base;
+
+        FOR_EACH_DLINK_NODE(&set->members, struct _sloIR_BASE, member)
+        {
+            /* Setup all members */
+            status = sloIR_BASE_UseAsTextureCoord(
+                                                Compiler,
+                                                member);
+
+            if (gcmIS_ERROR(status))
+            {
+                gcmFOOTER();
+                return status;
+            }
+        }
+
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+
+    case slvIR_VARIABLE:
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+
+    case slvIR_UNARY_EXPR:
+        unaryExpr = (sloIR_UNARY_EXPR)Base;
+        gcmASSERT(unaryExpr->operand);
+
+        switch (unaryExpr->type)
+        {
+        case slvUNARY_COMPONENT_SELECTION:
+            /* Setup the operand */
+            status = sloIR_BASE_UseAsTextureCoord(
+                                                Compiler,
+                                                &unaryExpr->operand->base);
+
+            if (gcmIS_ERROR(status))
+            {
+                gcmFOOTER();
+                return status;
+            }
+
+            break;
+        default: break;
+        }
+
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+
+    case slvIR_BINARY_EXPR:
+        binaryExpr = (sloIR_BINARY_EXPR)Base;
+        gcmASSERT(binaryExpr->leftOperand);
+        gcmASSERT(binaryExpr->rightOperand);
+
+        switch (binaryExpr->type)
+        {
+        case slvBINARY_SUBSCRIPT:
+            /* Setup the left operand */
+            status = sloIR_BASE_UseAsTextureCoord(
+                                                Compiler,
+                                                &binaryExpr->leftOperand->base);
+
+            if (gcmIS_ERROR(status))
+            {
+                gcmFOOTER();
+                return status;
+            }
+
+            break;
+        default: break;
+        }
+
+        switch (binaryExpr->type)
+        {
+        case slvBINARY_SEQUENCE:
+            /* Setup the right operand */
+            status = sloIR_BASE_UseAsTextureCoord(
+                                                Compiler,
+                                                &binaryExpr->rightOperand->base);
+
+            if (gcmIS_ERROR(status))
+            {
+                gcmFOOTER();
+                return status;
+            }
+
+            gcmFOOTER_NO();
+            return gcvSTATUS_OK;
+
+        default:
+            break;
+        }
+
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+
+    case slvIR_SELECTION:
+        selection = (sloIR_SELECTION)Base;
+        gcmASSERT(selection->condExpr);
+
+        /* Setup the true operand */
+        if (selection->trueOperand != gcvNULL)
+        {
+            status = sloIR_BASE_UseAsTextureCoord(
+                                                Compiler,
+                                                selection->trueOperand);
+
+            if (gcmIS_ERROR(status))
+            {
+                gcmFOOTER();
+                return status;
+            }
+        }
+
+        /* Setup the false operand */
+        if (selection->falseOperand != gcvNULL)
+        {
+            status = sloIR_BASE_UseAsTextureCoord(
+                                                Compiler,
+                                                selection->falseOperand);
+
+            if (gcmIS_ERROR(status))
+            {
+                gcmFOOTER();
+                return status;
+            }
+        }
+
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+
+    case slvIR_POLYNARY_EXPR:
+        polynaryExpr = (sloIR_POLYNARY_EXPR)Base;
+
+        if (polynaryExpr->type != slvPOLYNARY_FUNC_CALL
+            && polynaryExpr->operands != gcvNULL)
+        {
+            /* Setup all operands */
+            status = sloIR_BASE_UseAsTextureCoord(
+                                                Compiler,
+                                                &polynaryExpr->operands->base);
+
+            if (gcmIS_ERROR(status))
+            {
+                gcmFOOTER();
+                return status;
+            }
+        }
+
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+
+    default:
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+}
+
+gceSTATUS
+sloCOMPILER_BindFuncCall(
+    IN sloCOMPILER Compiler,
+    IN OUT sloIR_POLYNARY_EXPR PolynaryExpr
+    )
+{
+    gceSTATUS   status;
+    sloIR_BASE  argument;
+
+    gcmHEADER_ARG("Compiler=0x%x PolynaryExpr=0x%x",
+                  Compiler, PolynaryExpr);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    slmVERIFY_IR_OBJECT(PolynaryExpr, slvIR_POLYNARY_EXPR);
+    gcmASSERT(PolynaryExpr->type == slvPOLYNARY_FUNC_CALL);
+
+    /* Bind the function name */
+    status = slsNAME_SPACE_BindFuncName(
+                                        Compiler,
+                                        Compiler->context.globalSpace,
+                                        PolynaryExpr);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER();
+        return status;
+    }
+
+    /* Setup the texture coordinate */
+    if (PolynaryExpr->type == slvPOLYNARY_FUNC_CALL
+        && PolynaryExpr->funcName->isBuiltIn
+        && slIsTextureLookupFunction(PolynaryExpr->funcSymbol))
+    {
+        gctINT i = 0;
+        gcmASSERT(PolynaryExpr->operands);
+
+        FOR_EACH_DLINK_NODE(&PolynaryExpr->operands->members, struct _sloIR_BASE, argument)
+        {
+            if(i == 0)
+            {
+                sloIR_VARIABLE sampler = (sloIR_VARIABLE)argument;
+                PolynaryExpr->exprBase.dataType->qualifiers.precision = sampler->exprBase.dataType->qualifiers.precision;
+            }
+            /* check the second function argument */
+            if(i == 1)
+            {
+                status = sloIR_BASE_UseAsTextureCoord(Compiler, argument);
+                if (gcmIS_ERROR(status))
+                {
+                    gcmFOOTER();
+                    return status;
+                }
+            }
+            i++;
+        }
+    }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gctREG_INDEX
+slNewTempRegs(
+    IN sloCOMPILER Compiler,
+    IN gctUINT RegCount
+    )
+{
+    gctREG_INDEX    regIndex;
+
+    gcmHEADER_ARG("Compiler=0x%x RegCount=%u",
+                  Compiler, RegCount);
+
+    slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    /* TODO: need to pass correct temp register type */
+    regIndex = (gctREG_INDEX)  gcSHADER_NewTempRegs(Compiler->binary, RegCount, gcSHADER_FLOAT_X1);
+    gcmFOOTER_ARG("<return>=%u", regIndex);
+    return regIndex;
+}
+
+
+/*******************************************************************************
+*/
+
+gceSTATUS
+sloCOMPILER_SetDebug(
+    sloCOMPILER Compiler,
+    gctBOOL     Debug
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x Debug=%d",
+                  Compiler, Debug);
+
+    Compiler->context.debug = Debug;
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_SetOptimize(
+    sloCOMPILER Compiler,
+    gctBOOL     Optimize
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x Optimize=%d",
+                  Compiler, Optimize);
+
+    Compiler->context.optimize = Optimize;
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_SetOutputInvariant(
+    IN sloCOMPILER Compiler,
+    IN gctBOOL Invariant
+)
+{
+   gcmHEADER_ARG("Compiler=0x%x Flag=%d",
+                 Compiler, Invariant);
+
+   Compiler->context.outputInvariant = Invariant;
+   gcmFOOTER_NO();
+   return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_SetLanguageVersion(
+    IN sloCOMPILER Compiler,
+    IN gctUINT32 LangVersion
+)
+{
+   gcmHEADER_ARG("Compiler=0x%x LangVersion=%u",
+                 Compiler, LangVersion);
+
+   switch (LangVersion)
+   {
+   case 300:
+      Compiler->langVersion = sldHaltiLanguageVersion;
+      Compiler->context.extensions &= ~(slvEXTENSION_NON_HALTI | slvEXTENSION_ES_31);
+      Compiler->context.extensions |= slvEXTENSION_HALTI;
+      Compiler->clientApiVersion = gcvAPI_OPENGL_ES30;
+      break;
+
+   case 310:
+      Compiler->langVersion = sldES_31_LanguageVersion;
+      Compiler->context.extensions &= ~slvEXTENSION_NON_HALTI;
+      Compiler->context.extensions |= (slvEXTENSION_HALTI | slvEXTENSION_ES_31);
+      Compiler->clientApiVersion = gcvAPI_OPENGL_ES31;
+      break;
+
+   case 100:
+      Compiler->langVersion = sldDefaultLanguageVersion;
+      Compiler->context.extensions &= ~slvEXTENSION_ES_30_AND_ABOVE;
+      Compiler->context.extensions |= slvEXTENSION_NON_HALTI;
+      Compiler->clientApiVersion = gcvAPI_OPENGL_ES20;
+      break;
+
+   default:
+      gcmASSERT(0);
+      Compiler->langVersion = sldDefaultLanguageVersion;
+      Compiler->context.extensions &= ~slvEXTENSION_HALTI;
+      Compiler->context.extensions |= slvEXTENSION_NON_HALTI;
+      gcmFOOTER_NO();
+      return gcvSTATUS_INVALID_DATA;
+   }
+
+   gcmFOOTER_NO();
+   return gcvSTATUS_OK;
+}
+
+gctUINT32
+sloCOMPILER_GetLanguageVersion(
+    IN sloCOMPILER Compiler
+)
+{
+  return Compiler ? Compiler->langVersion : sldDefaultLanguageVersion;
+}
+
+gctUINT32 *
+sloCOMPILER_GetVersion(
+    IN sloCOMPILER Compiler,
+    IN sleSHADER_TYPE ShaderType
+)
+{
+  gctUINT32 version = sldDefaultLanguageVersion;
+  if(Compiler) {
+     version = Compiler->langVersion;
+  }
+  _slCompilerVersion[0] = sldDefaultLanguageType | (ShaderType << 16);
+  _slCompilerVersion[1] = version;
+  return _slCompilerVersion;
+}
+
+gceAPI
+sloCOMPILER_GetClientApiVersion(
+    IN sloCOMPILER Compiler
+)
+{
+    return Compiler->clientApiVersion;
+}
+
+gctBOOL
+sloCOMPILER_IsHaltiVersion(
+    IN sloCOMPILER Compiler
+)
+{
+   return sloCOMPILER_GetLanguageVersion(Compiler) >= sldHaltiLanguageVersion;
+}
+
+gctBOOL
+sloCOMPILER_IsES30Version(
+    IN sloCOMPILER Compiler
+)
+{
+   return sloCOMPILER_GetLanguageVersion(Compiler) == sldHaltiLanguageVersion;
+}
+
+gctBOOL
+sloCOMPILER_IsES31VersionOrAbove(
+    IN sloCOMPILER Compiler
+)
+{
+   return sloCOMPILER_GetLanguageVersion(Compiler) >= sldES_31_LanguageVersion;
+}
+
+gctLABEL
+slNewLabel(
+    IN sloCOMPILER Compiler
+    )
+{
+    gctLABEL    label;
+
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    label = 1 + Compiler->context.labelCount;
+
+    Compiler->context.labelCount++;
+
+    gcmFOOTER_ARG("<return>=%u", label);
+    return label;
+}
+
+gceSTATUS
+sloCOMPILER_BackPatch(
+    IN sloCOMPILER Compiler,
+    IN sloCODE_GENERATOR CodeGenerator
+    )
+{
+    gcmHEADER();
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    /* Issue on dEQP test dEQP-GLES2.functional.shaders.linkage.varying_4:
+    ** Per GLSL spec, VS can declare varying output but not written within
+    ** shader, then fragment shader can use this varying input from VS with
+    ** undefined value. So we need add this type of varying output of VS in
+    ** output table. We defer determination of whether this type of output of
+    ** VS needs really to be removed to linkage time of BE. */
+    if (Compiler->shaderType != slvSHADER_TYPE_COMPUTE &&
+        Compiler->shaderType != slvSHADER_TYPE_FRAGMENT)
+    {
+        slsNAME_SPACE* globalNameSpace = Compiler->context.globalSpace;
+        slAddUnusedOutputPatch(Compiler, CodeGenerator, globalNameSpace);
+    }
+
+    if (Compiler->shaderType != slvSHADER_TYPE_COMPUTE &&
+        Compiler->shaderType != slvSHADER_TYPE_VERTEX)
+    {
+        slsNAME_SPACE* globalNameSpace = Compiler->context.globalSpace;
+        slAddUnusedInputPatch(Compiler, CodeGenerator, globalNameSpace);
+    }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_PackUniformsWithSharedOrStd140(
+    IN sloCOMPILER Compiler
+    )
+{
+    gceSTATUS status;
+    gctUINT32 ubCount, i;
+    gcSHADER shader = Compiler->binary;
+
+    gcmHEADER();
+
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    /* Pass 1: make uniform blocks active. */
+    gcmONERROR(gcSHADER_GetUniformBlockCount(shader, &ubCount));
+    for (i = 0; i < ubCount; i++)
+    {
+        gcsUNIFORM_BLOCK uniformBlock;
+        gcUNIFORM ubUniform;
+
+        gcmVERIFY_OK(gcSHADER_GetUniformBlock(shader, i, &uniformBlock));
+
+        if (!uniformBlock) continue;
+
+        if (GetUBMemoryLayout(uniformBlock) == gcvINTERFACE_BLOCK_SHARED ||
+            GetUBMemoryLayout(uniformBlock) == gcvINTERFACE_BLOCK_STD140)
+        {
+            gcSHADER_GetUniform(shader, GetUBIndex(uniformBlock), &ubUniform);
+
+            /* Set active flag. */
+            ResetUniformFlag(ubUniform, gcvUNIFORM_FLAG_IS_INACTIVE);
+
+            SetUniformFlag(ubUniform, gcvUNIFORM_FLAG_STD140_SHARED);
+        }
+    }
+
+    /* Pass 2: make members of uniform block active. */
+    for (i = 0; i < shader->uniformCount; i++)
+    {
+        gcUNIFORM uniform = shader->uniforms[i];
+        gcsUNIFORM_BLOCK uniformBlock;
+
+        if (!uniform || !isUniformBlockMember(uniform)) continue;
+
+        gcmVERIFY_OK(gcSHADER_GetUniformBlock(shader, uniform->blockIndex, &uniformBlock));
+
+        if (!uniformBlock) continue;
+
+        if (GetUBMemoryLayout(uniformBlock) == gcvINTERFACE_BLOCK_SHARED ||
+            GetUBMemoryLayout(uniformBlock) == gcvINTERFACE_BLOCK_STD140)
+        {
+            /* Set active flag. */
+            ResetUniformFlag(uniform, gcvUNIFORM_FLAG_IS_INACTIVE);
+
+            SetUniformFlag(uniform, gcvUNIFORM_FLAG_STD140_SHARED);
+        }
+    }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_CheckAssignmentForGlFragData(
+    IN sloCOMPILER Compiler
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcSHADER shader = Compiler->binary;
+    slsNAME* name;
+    gctBOOL useFragData = gcvFALSE;
+    gctUINT16 regIndex = 0;
+    gctINT i;
+    gctUINT lastInst = shader->lastInstruction;
+
+    gcmHEADER();
+
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    if (shader->type != gcSHADER_TYPE_FRAGMENT ||
+        shader->outputCount == 0 ||
+        sloCOMPILER_IsHaltiVersion(Compiler))
+    {
+        gcmFOOTER_NO();
+        return status;
+    }
+
+    /* Check if shader use gl_FragData. */
+    FOR_EACH_DLINK_NODE(&sloCOMPILER_GetBuiltInSpace(Compiler)->names, slsNAME, name)
+    {
+        if (name->dataType->qualifiers.storage == slvSTORAGE_QUALIFIER_FRAGMENT_OUT &&
+            name->type == slvVARIABLE_NAME &&
+            name->u.variableInfo.isReferenced &&
+            gcmIS_SUCCESS(gcoOS_StrCmp(name->symbol, "gl_FragData")))
+        {
+            useFragData = gcvTRUE;
+            regIndex = (gctUINT16)name->context.logicalRegs->regIndex;
+            break;
+        }
+    }
+
+    if (!useFragData)
+    {
+        gcmFOOTER_NO();
+        return status;
+    }
+
+    /* Check if there is dynamically used for gl_FrgaData. */
+    for(i = lastInst; i >= 0; i--)
+    {
+        gcSL_INSTRUCTION code = &shader->code[i];
+        gcSL_OPCODE opcode = gcmSL_OPCODE_GET(code->opcode, Opcode);
+        gcSL_INDEXED indexed = gcmSL_TARGET_GET(code->temp, Indexed);
+        gcSL_SWIZZLE swizzle;
+        gctUINT16 tempIndex = code->tempIndexed;
+        gctUINT label;
+        gctFLOAT constZero = 0.0;
+
+        /* Skip call and jmp. */
+        if (opcode == gcSL_CALL || opcode == gcSL_JMP)
+        {
+            continue;
+        }
+
+        /* Skip non-indexed usage. */
+        if (code->tempIndex != regIndex || indexed == gcSL_NOT_INDEXED)
+        {
+            continue;
+        }
+
+        tempIndex = tempIndex;
+        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(shader, i, 1));
+        shader->lastInstruction = i;
+        shader->instrIndex = gcSHADER_OPCODE;
+
+        /* Only allow APP to change RT:0. */
+        switch(indexed)
+        {
+        case gcSL_INDEXED_X:
+            swizzle = gcSL_SWIZZLE_XXXX;
+            break;
+
+        case gcSL_INDEXED_Y:
+            swizzle = gcSL_SWIZZLE_YYYY;
+            break;
+
+        case gcSL_INDEXED_Z:
+            swizzle = gcSL_SWIZZLE_ZZZZ;
+            break;
+
+        default:
+            swizzle = gcSL_SWIZZLE_WWWW;
+            break;
+        }
+        label = gcSHADER_FindNextUsedLabelId(shader);
+
+        gcmONERROR(gcSHADER_AddOpcodeConditional(shader, gcSL_JMP, gcSL_NOT_EQUAL, label));
+        gcmONERROR(gcSHADER_AddSource(shader, gcSL_TEMP, tempIndex, swizzle, gcSL_FLOAT, gcSHADER_PRECISION_ANY));
+        gcmONERROR(gcSHADER_AddSourceConstantFormatted(shader, &constZero, gcSL_FLOAT));
+
+        shader->lastInstruction = i + 2;
+        gcmONERROR(gcSHADER_AddLabel(shader, label));
+
+        lastInst++;
+        shader->lastInstruction = lastInst;
+    }
+
+    gcmFOOTER_NO();
+    return status;
+
+OnError:
+    gcmFOOTER_NO();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_PackSSBOWithSharedOrStd140OrStd430(
+    IN sloCOMPILER Compiler
+    )
+{
+    gceSTATUS status;
+    gctUINT32 ssboCount, i;
+    gcSHADER shader = Compiler->binary;
+
+    gcmHEADER();
+
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    /* Pass 1: add all ssbo with layout std140/std430/shared to shader binary. */
+    gcmONERROR(slPackSSBOWithSharedOrStd140OrStd430(Compiler, Compiler->context.globalSpace));
+
+    /* Pass 2: make uniform blocks active. */
+    gcmONERROR(gcSHADER_GetStorageBlockCount(shader, &ssboCount));
+    for (i = 0; i < ssboCount; i++)
+    {
+        gcsSTORAGE_BLOCK ssbo;
+        gcUNIFORM ssboUniform;
+
+        gcmVERIFY_OK(gcSHADER_GetStorageBlock(shader, i, &ssbo));
+
+        if (!ssbo) continue;
+
+        if (GetSBMemoryLayout(ssbo) == gcvINTERFACE_BLOCK_SHARED ||
+            GetSBMemoryLayout(ssbo) == gcvINTERFACE_BLOCK_STD140 ||
+            GetSBMemoryLayout(ssbo) == gcvINTERFACE_BLOCK_STD430)
+        {
+            gcSHADER_GetUniform(shader, GetSBIndex(ssbo), &ssboUniform);
+
+            /* Set active flag. */
+            ResetUniformFlag(ssboUniform, gcvUNIFORM_FLAG_IS_INACTIVE);
+
+            SetUniformFlag(ssboUniform, gcvUNIFORM_FLAG_STD140_SHARED);
+        }
+    }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_SetDefaultPrecision(
+    IN sloCOMPILER Compiler,
+    IN sltELEMENT_TYPE TypeToSet,
+    IN sltPRECISION_QUALIFIER Precision
+    )
+{
+    gceSTATUS   status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Compiler=0x%x TypeToSet=0x%x Precision=0x%x",
+                  Compiler, TypeToSet, Precision);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    Compiler->context.currentSpace->defaultPrecision[TypeToSet] = Precision;
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_GetDefaultPrecision(
+    IN sloCOMPILER Compiler,
+    IN sltELEMENT_TYPE TypeToGet,
+    OUT sltPRECISION_QUALIFIER *Precision
+    )
+{
+    gceSTATUS   status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Compiler=0x%x TypeToSet=0x%x Precision=0x%x",
+                  Compiler, TypeToGet, Precision);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    if (slmIsElementTypeInteger(TypeToGet) &&
+        !slmIsElementTypeBoolean(TypeToGet))
+    {
+        *Precision = Compiler->context.currentSpace->defaultPrecision[slvTYPE_INT];
+    }
+    else
+    {
+        *Precision = Compiler->context.currentSpace->defaultPrecision[TypeToGet];
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+gctBOOL
+slNameIsLocal(
+IN sloCOMPILER Compiler,
+IN slsNAME * Name
+)
+{
+    gctBOOL isLocal = (Name->mySpace != gcvNULL) &&
+                      (Name->mySpace->parent != gcvNULL) &&
+                      (Name->mySpace != Compiler->context.globalSpace);
+    gcmHEADER_ARG("Name=0x%x", Name);
+
+    gcmFOOTER_ARG("<return>=%d", isLocal);
+
+    return isLocal;
+}
+
+slsNAME_SPACE *
+sloCOMPILER_GetCurrentSpace(
+IN sloCOMPILER Compiler
+)
+{
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    gcmFOOTER_ARG("<return>=0x%x", Compiler->context.currentSpace);
+
+    return Compiler->context.currentSpace;
+}
+
+slsNAME_SPACE *
+sloCOMPILER_GetGlobalSpace(
+IN sloCOMPILER Compiler
+)
+{
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    gcmFOOTER_ARG("<return>=0x%x", Compiler->context.globalSpace);
+
+    return Compiler->context.globalSpace;
+}
+
+slsNAME_SPACE *
+sloCOMPILER_GetBuiltInSpace(
+IN sloCOMPILER Compiler
+)
+{
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    gcmFOOTER_ARG("<return>=0x%x", Compiler->context.builtinSpace);
+
+    return Compiler->context.builtinSpace;
+}
+
+slsNAME_SPACE *
+sloCOMPILER_GetUnnamedSpace(
+IN sloCOMPILER Compiler
+)
+{
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    gcmFOOTER_ARG("<return>=0x%x", Compiler->context.unnamedSpace);
+
+    return Compiler->context.unnamedSpace;
+}
+
+gceSTATUS
+sloCOMPILER_MergeLayoutId(
+IN sloCOMPILER Compiler,
+IN slsLAYOUT_QUALIFIER *DefaultLayout,
+IN OUT slsLAYOUT_QUALIFIER *Layout
+)
+{
+    gcmHEADER_ARG("Compiler=0x%x, DefaultLayout=0x%x Layout=0x%x",
+                  Compiler, DefaultLayout, Layout);
+
+    gcmASSERT(DefaultLayout && Layout);
+
+    Layout->maxVerticesNumber = DefaultLayout->maxVerticesNumber;
+
+    if(!(Layout->id & slvLAYOUT_LOCATION)) {
+       Layout->location = DefaultLayout->location;
+    }
+
+    if(!(Layout->id & sldLAYOUT_MEMORY_BIT_FIELDS)) {
+       Layout->id |= DefaultLayout->id & sldLAYOUT_MEMORY_BIT_FIELDS;
+    }
+
+    if(!(Layout->id & sldLAYOUT_MATRIX_BIT_FIELDS)) {
+       Layout->id |= DefaultLayout->id & sldLAYOUT_MATRIX_BIT_FIELDS;
+    }
+
+    if(!(Layout->id & sldLAYOUT_BLEND_SUPPORT_BIT_FIELDS )) {
+       Layout->id |= DefaultLayout->id & sldLAYOUT_BLEND_SUPPORT_BIT_FIELDS;
+    }
+
+    if(!(Layout->id & slvLAYOUT_WORK_GROUP_SIZE_X)) {
+       Layout->id |= DefaultLayout->id & slvLAYOUT_WORK_GROUP_SIZE_X;
+       Layout->workGroupSize[0] = DefaultLayout->workGroupSize[0];
+    }
+
+    if(!(Layout->id & slvLAYOUT_WORK_GROUP_SIZE_Y)) {
+       Layout->id |= DefaultLayout->id & slvLAYOUT_WORK_GROUP_SIZE_Y;
+       Layout->workGroupSize[1] = DefaultLayout->workGroupSize[1];
+    }
+
+    if(!(Layout->id & slvLAYOUT_WORK_GROUP_SIZE_Z)) {
+       Layout->id |= DefaultLayout->id & slvLAYOUT_WORK_GROUP_SIZE_Z;
+       Layout->workGroupSize[2] = DefaultLayout->workGroupSize[2];
+    }
+
+    if(!(Layout->id & slvLAYOUT_BINDING )) {
+       Layout->id |= DefaultLayout->id & slvLAYOUT_BINDING;
+    }
+
+    if(!(Layout->id & slvLAYOUT_OFFSET )) {
+        Layout->id |= DefaultLayout->id & slvLAYOUT_OFFSET;
+    }
+
+    if(!(Layout->id & slvLAYOUT_EARLY_FRAGMENT_TESTS )) {
+        Layout->id |= DefaultLayout->id & slvLAYOUT_EARLY_FRAGMENT_TESTS;
+    }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_MergeInterFaceLayoutId(
+    IN sloCOMPILER Compiler,
+    IN slsLAYOUT_QUALIFIER *DefaultLayout,
+    IN gctBOOL IsAtomicCounter,
+    IN gctBOOL IsInterFace,
+    IN OUT slsLAYOUT_QUALIFIER *Layout
+)
+{
+    gcmHEADER_ARG("Compiler=0x%x, DefaultLayout=0x%x Layout=0x%x",
+                  Compiler, DefaultLayout, Layout);
+
+    gcmASSERT(DefaultLayout && Layout);
+
+    if (!(Layout->id & slvLAYOUT_LOCATION) &&
+        (DefaultLayout->id & slvLAYOUT_LOCATION))
+    {
+        Layout->location = DefaultLayout->location;
+        Layout->id |= slvLAYOUT_LOCATION;
+    }
+
+    if (!(Layout->id & sldLAYOUT_MEMORY_BIT_FIELDS) &&
+        (DefaultLayout->id & sldLAYOUT_MEMORY_BIT_FIELDS) &&
+        IsInterFace)
+    {
+        Layout->id |= DefaultLayout->id & sldLAYOUT_MEMORY_BIT_FIELDS;
+    }
+
+    if (!(Layout->id & sldLAYOUT_MATRIX_BIT_FIELDS) &&
+        (DefaultLayout->id & sldLAYOUT_MATRIX_BIT_FIELDS) &&
+        IsInterFace)
+    {
+        Layout->id |= DefaultLayout->id & sldLAYOUT_MATRIX_BIT_FIELDS;
+    }
+
+    if (!(Layout->id & slvLAYOUT_BINDING) &&
+        (DefaultLayout->id & slvLAYOUT_BINDING) &&
+        !IsAtomicCounter)
+    {
+        Layout->binding = DefaultLayout->binding;
+        Layout->id |= DefaultLayout->id & slvLAYOUT_BINDING;
+    }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_MergeExtLayoutId(
+IN sloCOMPILER Compiler,
+IN slsLAYOUT_QUALIFIER *DefaultLayout,
+IN OUT slsLAYOUT_QUALIFIER *Layout
+)
+{
+    gcmHEADER_ARG("Compiler=0x%x, DefaultLayout=0x%x Layout=0x%x",
+                  Compiler, DefaultLayout, Layout);
+
+    gcmASSERT(DefaultLayout && Layout);
+
+    if(!(Layout->ext_id & slvLAYOUT_EXT_GS_PRIMITIVE)) {
+       Layout->ext_id |= DefaultLayout->ext_id & slvLAYOUT_EXT_GS_PRIMITIVE;
+       if (DefaultLayout->ext_id & slvLAYOUT_EXT_GS_PRIMITIVE)
+       {
+           Layout->gsPrimitive = DefaultLayout->gsPrimitive;
+       }
+    }
+
+    if(!(Layout->ext_id & slvLAYOUT_EXT_INVOCATIONS )) {
+        Layout->ext_id |= DefaultLayout->ext_id & slvLAYOUT_EXT_INVOCATIONS;
+        if (DefaultLayout->ext_id & slvLAYOUT_EXT_INVOCATIONS)
+        {
+            Layout->gsInvocationTime = DefaultLayout->gsInvocationTime;
+        }
+    }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gctBOOL
+sloCOMPILER_DefaultComputeGroupLayoutMatch(
+IN sloCOMPILER Compiler,
+IN slsLAYOUT_QUALIFIER *Layout
+)
+{
+    if((Compiler->context.inDefaultLayout.id & Layout->id & slvLAYOUT_WORK_GROUP_SIZE_X) && Compiler->context.inDefaultLayout.workGroupSize[0] != Layout->workGroupSize[0])
+    {
+        return gcvFALSE;
+    }
+    if((Compiler->context.inDefaultLayout.id & Layout->id & slvLAYOUT_WORK_GROUP_SIZE_Y) && Compiler->context.inDefaultLayout.workGroupSize[1] != Layout->workGroupSize[1])
+    {
+        return gcvFALSE;
+    }
+    if((Compiler->context.inDefaultLayout.id & Layout->id & slvLAYOUT_WORK_GROUP_SIZE_Z) && Compiler->context.inDefaultLayout.workGroupSize[2] != Layout->workGroupSize[2])
+    {
+        return gcvFALSE;
+    };
+
+    return gcvTRUE;
+}
+
+gceSTATUS
+sloCOMPILER_SetDefaultLayout(
+    IN sloCOMPILER Compiler,
+    IN slsLAYOUT_QUALIFIER *Layout,
+    IN sltSTORAGE_QUALIFIER StorageQualifier
+    )
+{
+    gceSTATUS status;
+    slsLAYOUT_QUALIFIER defaultLayout[1];
+    slsLAYOUT_QUALIFIER layout[1];
+
+    gcmHEADER_ARG("Compiler=0x%x, Layout=0x%x",
+                  Compiler, Layout);
+
+    gcmASSERT(Layout);
+
+    switch(StorageQualifier) {
+    case slvSTORAGE_QUALIFIER_UNIFORM:
+        *defaultLayout = Compiler->context.uniformDefaultLayout;
+        Compiler->context.uniformDefaultLayout = *Layout;
+        status = sloCOMPILER_MergeLayoutId(Compiler,
+                                           defaultLayout,
+                                           &Compiler->context.uniformDefaultLayout);
+        break;
+
+    case slvSTORAGE_QUALIFIER_BUFFER:
+        *defaultLayout = Compiler->context.bufferDefaultLayout;
+        Compiler->context.bufferDefaultLayout = *Layout;
+        status = sloCOMPILER_MergeLayoutId(Compiler,
+                                           defaultLayout,
+                                           &Compiler->context.bufferDefaultLayout);
+        break;
+
+    case slvSTORAGE_QUALIFIER_OUT:
+    case slvSTORAGE_QUALIFIER_OUT_IO_BLOCK:
+        *defaultLayout = Compiler->context.outDefaultLayout;
+        Compiler->context.outDefaultLayout = *Layout;
+        status = sloCOMPILER_MergeLayoutId(Compiler,
+                                           defaultLayout,
+                                           &Compiler->context.outDefaultLayout);
+        break;
+
+    case slvSTORAGE_QUALIFIER_IN:
+    case slvSTORAGE_QUALIFIER_IN_IO_BLOCK:
+        *defaultLayout = Compiler->context.inDefaultLayout;
+        *layout = *Layout;
+        if(layout->id & sldLAYOUT_WORK_GROUP_SIZE_FIELDS) {
+           if(!(layout->id & slvLAYOUT_WORK_GROUP_SIZE_X)) {
+
+              layout->id |= slvLAYOUT_WORK_GROUP_SIZE_X;
+              layout->workGroupSize[0] = 1;
+           }
+
+           if(!(layout->id & slvLAYOUT_WORK_GROUP_SIZE_Y)) {
+              layout->id |= slvLAYOUT_WORK_GROUP_SIZE_Y;
+              layout->workGroupSize[1] = 1;
+           }
+
+           if(!(layout->id & slvLAYOUT_WORK_GROUP_SIZE_Z)) {
+              layout->id |= slvLAYOUT_WORK_GROUP_SIZE_Z;
+              layout->workGroupSize[2] = 1;
+           }
+        }
+
+        Compiler->context.inDefaultLayout = *layout;
+        status = sloCOMPILER_MergeLayoutId(Compiler,
+                                           defaultLayout,
+                                           &Compiler->context.inDefaultLayout);
+
+        status = sloCOMPILER_MergeExtLayoutId(Compiler,
+                                              defaultLayout,
+                                              &Compiler->context.inDefaultLayout);
+        break;
+
+    default:
+        gcmASSERT(0);
+        status = gcvSTATUS_INVALID_DATA;
+        break;
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_GetDefaultLayout(
+    IN sloCOMPILER Compiler,
+    IN slsLAYOUT_QUALIFIER *Layout,
+    IN sltSTORAGE_QUALIFIER StorageQualifier
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Compiler=0x%x, Layout=0x%x",
+                  Compiler, Layout);
+
+    switch(StorageQualifier) {
+    case slvSTORAGE_QUALIFIER_UNIFORM:
+        *Layout = Compiler->context.uniformDefaultLayout;
+        break;
+
+    case slvSTORAGE_QUALIFIER_BUFFER:
+        *Layout = Compiler->context.bufferDefaultLayout;
+        break;
+
+    case slvSTORAGE_QUALIFIER_OUT:
+    case slvSTORAGE_QUALIFIER_OUT_IO_BLOCK:
+        *Layout = Compiler->context.outDefaultLayout;
+        break;
+
+    case slvSTORAGE_QUALIFIER_IN:
+    case slvSTORAGE_QUALIFIER_IN_IO_BLOCK:
+        *Layout = Compiler->context.inDefaultLayout;
+        break;
+
+    default:
+        gcmASSERT(0);
+        status = gcvSTATUS_INVALID_DATA;
+        break;
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_UpdateDefaultLayout(
+    IN sloCOMPILER Compiler,
+    IN slsLAYOUT_QUALIFIER Layout,
+    IN sltSTORAGE_QUALIFIER StorageQualifier
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Compiler=0x%x, Layout=0x%x StorageQualifier=%d",
+                  Compiler, Layout, StorageQualifier);
+
+    switch(StorageQualifier) {
+    case slvSTORAGE_QUALIFIER_UNIFORM:
+        Compiler->context.uniformDefaultLayout = Layout;
+        break;
+
+    case slvSTORAGE_QUALIFIER_BUFFER:
+        Compiler->context.bufferDefaultLayout = Layout;
+        break;
+
+    case slvSTORAGE_QUALIFIER_OUT:
+        Compiler->context.outDefaultLayout = Layout;
+        break;
+
+    case slvSTORAGE_QUALIFIER_IN:
+        Compiler->context.inDefaultLayout = Layout;
+        break;
+
+    default:
+        gcmASSERT(0);
+        status = gcvSTATUS_INVALID_DATA;
+        break;
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_SetInputLocationInUse(
+IN sloCOMPILER Compiler,
+IN gctINT Location,
+IN gctSIZE_T Length,
+OUT gctBOOL *InUseAlready
+)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctSIZE_T i;
+    gctUINT mask;
+    gctBOOL inUseAlready = gcvFALSE;
+
+    gcmHEADER_ARG("Compiler=0x%x, Location=0x%x Length=%lu",
+                  Compiler, Location, Length);
+
+    if((Location + Length - 1) >= 32)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Report(
+                                        Compiler,
+                                        0,
+                                        0,
+                                        slvREPORT_ERROR,
+                                        "location exceeds maximum"));
+
+        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+        gcmFOOTER();
+        return status;
+    }
+    gcmASSERT(InUseAlready);
+
+    mask = 1 << Location;
+    if((Location + Length - 1) < 32) {
+       for(i = 0; i < Length; i++) {
+          if(Compiler->context.inputLocationSettings & mask) {
+             inUseAlready = gcvTRUE;
+             break;
+          }
+          Compiler->context.inputLocationSettings |= mask;
+          mask <<= 1;
+       }
+    }
+    else {
+       status = gcvSTATUS_INVALID_DATA;
+    }
+    *InUseAlready = inUseAlready;
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_SetOutputLocationInUse(
+IN sloCOMPILER Compiler,
+IN gctINT Location,
+IN gctSIZE_T Length,
+OUT gctBOOL *InUseAlready
+)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctSIZE_T i;
+    gctUINT mask;
+    gctBOOL inUseAlready = gcvFALSE;
+
+    gcmHEADER_ARG("Compiler=0x%x, Location=0x%x Length=%lu",
+                  Compiler, Location, Length);
+
+    gcmASSERT((Location + Length - 1) < 32);
+    gcmASSERT(InUseAlready);
+
+    mask = 1 << Location;
+    if((Location + Length - 1) < 32) {
+       for(i = 0; i < Length; i++) {
+          if(Compiler->context.outputLocationSettings & mask) {
+             inUseAlready = gcvTRUE;
+             break;
+          }
+          Compiler->context.outputLocationSettings |= mask;
+          mask <<= 1;
+       }
+    }
+    else {
+       status = gcvSTATUS_INVALID_DATA;
+    }
+    *InUseAlready = inUseAlready;
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_SetUniformLocationInUse(
+IN sloCOMPILER Compiler,
+IN gctINT Location,
+IN gctSIZE_T Length,
+IN gctBOOL IsPostDecidedArray,
+OUT gctBOOL *InUseAlready
+)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctSIZE_T i;
+    gctUINT head_uint, tail_uint, head_mask, tail_mask;
+    gctBOOL inUseAlready = gcvFALSE;
+
+    gcmHEADER_ARG("Compiler=0x%x, Location=0x%x Length=%lu",
+                  Compiler, Location, Length);
+
+    if((Location + Length - 1) >= Compiler->context.uniformLocationMaxLength)
+    {
+        status = gcvSTATUS_INVALID_DATA;
+        return status;
+    }
+    gcmASSERT(InUseAlready);
+
+    /* For arrays defined with brackets following identifier, this function
+       will be called twice. The first time in slParseFullySpecifiedType,
+       Length is 1 and only the bit at Location is set. The second time in
+       slParseArrayVariableDecl/slParseArrayListVariableDecl, to avoid the
+       already set bit of Location, increase Location and decrease Length here.
+    */
+    if(IsPostDecidedArray)
+    {
+        Location++;
+        Length--;
+    }
+
+    head_uint = Location / 32;
+    tail_uint = (Location + (gctINT)Length - 1) / 32;
+    if(head_uint < tail_uint)
+    {
+        head_mask = 1 << (Location % 32);
+        for(i = Location % 32; i < 32; i++)
+        {
+            if(Compiler->context.uniformLocationSettings[head_uint] & head_mask)
+            {
+                inUseAlready = gcvTRUE;
+                break;
+            }
+            Compiler->context.uniformLocationSettings[head_uint] |= head_mask;
+            head_mask <<= 1;
+        }
+        tail_mask = 1;
+        for(i = 0; i < (Location + Length - 1) % 32; i++)
+        {
+            if(Compiler->context.uniformLocationSettings[tail_uint] & tail_mask)
+            {
+                inUseAlready = gcvTRUE;
+                break;
+            }
+            Compiler->context.uniformLocationSettings[tail_uint] |= tail_mask;
+            tail_mask <<= 1;
+        }
+        for(i = head_uint + 1; i < tail_uint; i++)
+        {
+            if(Compiler->context.uniformLocationSettings[i] != 0)
+            {
+                inUseAlready = gcvTRUE;
+                break;
+            }
+            Compiler->context.uniformLocationSettings[i] = gcvMAXUINT32;
+        }
+    }
+    else
+    {
+        head_mask = 1 << (Location % 32);
+        for(i = 0; i < Length; i++)
+        {
+            if(Compiler->context.uniformLocationSettings[head_uint] & head_mask)
+            {
+                inUseAlready = gcvTRUE;
+                break;
+            }
+            Compiler->context.uniformLocationSettings[head_uint] |= head_mask;
+            head_mask <<= 1;
+        }
+    }
+    *InUseAlready = inUseAlready;
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_SetUnspecifiedInputLocationExist(
+IN sloCOMPILER Compiler
+)
+{
+    gctBOOL isOK;
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    isOK = !slsCOMPILER_HasUnspecifiedLocation(Compiler->context.compilerFlags) &&
+           Compiler->context.inputLocationSettings == 0;
+    if(isOK) {
+       slsCOMPILER_SetUnspecifiedLocation(Compiler->context.compilerFlags);
+       gcmFOOTER_NO();
+       return gcvSTATUS_OK;
+    }
+    else {
+       gcmFOOTER_NO();
+       return gcvSTATUS_INVALID_DATA;
+    }
+}
+
+gceSTATUS
+sloCOMPILER_SetUnspecifiedOutputLocationExist(
+IN sloCOMPILER Compiler
+)
+{
+    gctBOOL isOK;
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    isOK = !slsCOMPILER_HasUnspecifiedLocation(Compiler->context.compilerFlags) &&
+           Compiler->context.outputLocationSettings == 0;
+    if(isOK) {
+       slsCOMPILER_SetUnspecifiedLocation(Compiler->context.compilerFlags);
+       gcmFOOTER_NO();
+       return gcvSTATUS_OK;
+    }
+    else {
+       gcmFOOTER_NO();
+       return gcvSTATUS_INVALID_DATA;
+    }
+}
+
+gceSTATUS
+sloCOMPILER_SetVecConstant(
+    IN sloCOMPILER Compiler,
+    IN slsNAME *ConstantVariable
+    )
+{
+   gceSTATUS status = gcvSTATUS_OK;
+   slsDLINK_LIST *constantList;
+   gctINT8 componentCount;
+
+   gcmHEADER_ARG("Compiler=0x%x ConstantVariable=0x%x", Compiler, ConstantVariable);
+   gcmASSERT(ConstantVariable);
+
+   componentCount = slmDATA_TYPE_vectorSize_GET(ConstantVariable->dataType);
+   gcmASSERT(componentCount > 0);
+   if (componentCount == 0)
+   {
+        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+        gcmFOOTER();
+        return status;
+   }
+   if (slsDATA_TYPE_IsVec(ConstantVariable->dataType))
+   {
+       constantList = &Compiler->context.vecConstants.typeFloat[componentCount - 1];
+   }
+   else if (slsDATA_TYPE_IsSignedIVec(ConstantVariable->dataType))
+   {
+       constantList = &Compiler->context.vecConstants.typeInt[componentCount - 1];
+   }
+   else if (slsDATA_TYPE_IsUnsignedIVec(ConstantVariable->dataType))
+   {
+       constantList = &Compiler->context.vecConstants.typeUInt[componentCount - 1];
+   }
+   else
+   {
+       gcmASSERT(slsDATA_TYPE_IsBVec(ConstantVariable->dataType));
+       constantList = &Compiler->context.vecConstants.typeBool[componentCount - 1];
+   }
+
+   slsDLINK_LIST_InsertFirst(constantList, &ConstantVariable->node);
+
+   gcmFOOTER();
+   return status;
+}
+
+gceSTATUS
+sloCOMPILER_GetVecConstant(
+    IN sloCOMPILER Compiler,
+    IN sloIR_CONSTANT Constant,
+    OUT slsNAME **ConstantVariable
+    )
+{
+   gceSTATUS status = gcvSTATUS_NOT_FOUND;
+   slsDLINK_LIST *constantList;
+   gctINT8 componentCount;
+   slsNAME *constVar;
+   gctUINT i;
+   gctBOOL found;
+
+   gcmHEADER_ARG("Compiler=0x%x Constant=0x%x", Compiler, Constant);
+   gcmASSERT(ConstantVariable);
+
+   componentCount = slmDATA_TYPE_vectorSize_GET(Constant->exprBase.dataType);
+   gcmASSERT(componentCount > 0);
+   if (componentCount == 0)
+   {
+        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+        gcmFOOTER();
+        return status;
+   }
+   if (slsDATA_TYPE_IsVec(Constant->exprBase.dataType))
+   {
+       constantList = &Compiler->context.vecConstants.typeFloat[componentCount - 1];
+   }
+   else if (slsDATA_TYPE_IsSignedIVec(Constant->exprBase.dataType))
+   {
+       constantList = &Compiler->context.vecConstants.typeInt[componentCount - 1];
+   }
+   else if (slsDATA_TYPE_IsUnsignedIVec(Constant->exprBase.dataType))
+   {
+       constantList = &Compiler->context.vecConstants.typeUInt[componentCount - 1];
+   }
+   else
+   {
+       gcmASSERT(slsDATA_TYPE_IsBVec(Constant->exprBase.dataType));
+       constantList = &Compiler->context.vecConstants.typeBool[componentCount - 1];
+   }
+
+   FOR_EACH_DLINK_NODE(constantList, slsNAME, constVar)
+   {
+      found = gcvTRUE;
+      for (i = 0; i < Constant->valueCount; i++)
+      {
+          if (Constant->values[i].intValue != constVar->u.variableInfo.constant->values[i].intValue)
+          {
+              found = gcvFALSE;
+              break;
+          }
+      }
+      if (found)
+      {
+         *ConstantVariable = constVar;
+         gcmFOOTER_ARG("*ConstantVariable=0x%x", *ConstantVariable);
+         return gcvSTATUS_OK;
+      }
+   }
+
+   *ConstantVariable = gcvNULL;
+   gcmFOOTER();
+   return status;
+}
+
+gceSTATUS
+sloCOMPILER_GetVecConstantLists(
+    IN sloCOMPILER Compiler,
+    IN sltELEMENT_TYPE ElementType,
+    OUT slsDLINK_LIST **ConstantList
+    )
+{
+   slsDLINK_LIST *constantList;
+
+   gcmHEADER_ARG("Compiler=0x%x ElementType=%d", Compiler, ElementType);
+   gcmASSERT(ConstantList);
+
+   switch(ElementType) {
+   case slvTYPE_FLOAT:
+       constantList = Compiler->context.vecConstants.typeFloat;
+       break;
+
+   case slvTYPE_INT:
+       constantList = Compiler->context.vecConstants.typeInt;
+       break;
+
+   case slvTYPE_UINT:
+       constantList = Compiler->context.vecConstants.typeUInt;
+       break;
+
+   case slvTYPE_BOOL:
+       constantList = Compiler->context.vecConstants.typeBool;
+       break;
+
+   default:
+       gcmASSERT(0);
+       *ConstantList = gcvNULL;
+       gcmFOOTER_NO();
+       return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+   }
+
+   *ConstantList = constantList;
+   gcmFOOTER_ARG("*ConstantList=0x%x", *ConstantList);
+   return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_GetSharedVariableList(
+IN sloCOMPILER Compiler,
+OUT slsSLINK_LIST **SharedVariableList
+)
+{
+   gcmHEADER_ARG("Compiler=0x%x", Compiler);
+   gcmASSERT(SharedVariableList);
+
+   *SharedVariableList = &Compiler->context.sharedVariables;
+   gcmFOOTER_ARG("*SharedVariableList=0x%x", *SharedVariableList);
+   return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_AddSharedVariable(
+IN sloCOMPILER Compiler,
+IN slsNAME *VariableName
+)
+{
+    gceSTATUS status;
+    slsSHARED_VARIABLE *sharedVariable;
+    gctPOINTER pointer;
+
+    gcmHEADER_ARG("Compiler=0x%x VariableName=0x%x", Compiler, VariableName);
+
+    /* Verify the arguments. */
+    slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
+    status = sloCOMPILER_Allocate(Compiler,
+                                  (gctSIZE_T)sizeof(slsSHARED_VARIABLE),
+                                  (gctPOINTER *) &pointer);
+    if (gcmIS_ERROR(status)) {
+        gcmFOOTER_NO();
+        return gcvSTATUS_OUT_OF_MEMORY;
+    }
+
+    sharedVariable = pointer;
+    sharedVariable->name = VariableName;
+    slsSLINK_LIST_InsertFirst(&Compiler->context.sharedVariables, &sharedVariable->node);
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gctBOOL
+sloCOMPILER_IsShaderType(
+   IN sloCOMPILER Compiler,
+   IN sleSHADER_TYPE ShaderType
+)
+{
+    return Compiler->shaderType == ShaderType;
+}
+
+gceSTATUS
+sloCOMPILER_GetCurrentIterationCount(
+    IN sloCOMPILER Compiler,
+    OUT gctINT * CurrentIterationCount
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x CurrentIterationCount=0x%x", Compiler, CurrentIterationCount);
+
+    if (CurrentIterationCount)
+    {
+        *CurrentIterationCount = Compiler->context.currentIterationCount;
+    }
+
+    gcmFOOTER_ARG("CurrentIterationCount=%d", Compiler->context.currentIterationCount);
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_SetCurrentIterationCount(
+    IN sloCOMPILER Compiler,
+    IN gctINT CurrentIterationCount
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x CurrentIterationCount=%d", Compiler, CurrentIterationCount);
+
+    Compiler->context.currentIterationCount = CurrentIterationCount;
+
+    gcmFOOTER_ARG("CurrentIterationCount=%d", Compiler->context.currentIterationCount);
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_SetCompilerFlag(
+    IN sloCOMPILER Compiler,
+    IN sleCOMPILER_FLAGS Flag
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x, Flag=0x%x", Compiler, Flag);
+
+    Compiler->context.compilerFlags = Flag;
+
+    gcmFOOTER_ARG("compilerFlags=0x%x", Flag);
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_GetCompilerFlag(
+    IN sloCOMPILER Compiler,
+    OUT sleCOMPILER_FLAGS * Flag
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    if (Flag)
+    {
+        *Flag = Compiler->context.compilerFlags;
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+sloCOMPILER_SetNotStagesRelatedLinkError(
+    IN sloCOMPILER Compiler,
+    IN gceSTATUS   NotStagesRelatedLinkError
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    Compiler->context.hasNotStagesRelatedLinkError = NotStagesRelatedLinkError;
+
+    gcmFOOTER_ARG("NotStagesRelatedLinkError=%d", Compiler->context.hasNotStagesRelatedLinkError);
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_GetNotStagesRelatedLinkError(
+    IN sloCOMPILER Compiler
+    )
+{
+    return Compiler->context.hasNotStagesRelatedLinkError;
+}
+
+gceSTATUS
+sloCOMPILER_SetLayout(
+    IN sloCOMPILER Compiler
+    )
+{
+    slsLAYOUT_QUALIFIER inLayout;
+    slsLAYOUT_QUALIFIER outLayout;
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    if (Compiler->shaderType == slvSHADER_TYPE_COMPUTE)
+    {
+        if(Compiler->context.inDefaultLayout.id & sldLAYOUT_WORK_GROUP_SIZE_FIELDS)
+        {
+            SetShaderWorkGroupSize(Compiler->binary, Compiler->context.inDefaultLayout.workGroupSize);
+        }
+    }
+    else if (Compiler->shaderType == slvSHADER_TYPE_TCS)
+    {
+        gcmVERIFY_OK(sloCOMPILER_GetDefaultLayout(Compiler, &outLayout, slvSTORAGE_QUALIFIER_OUT));
+        gcmVERIFY_OK(sloCOMPILER_GetDefaultLayout(Compiler, &inLayout, slvSTORAGE_QUALIFIER_IN));
+        SetTcsShaderLayout(Compiler->binary,
+                           (gctUINT)outLayout.verticesNumber,
+                           inLayout.tcsInputVerticesUniform);
+    }
+    else if (Compiler->shaderType == slvSHADER_TYPE_TES)
+    {
+        gcmVERIFY_OK(sloCOMPILER_GetDefaultLayout(Compiler, &inLayout, slvSTORAGE_QUALIFIER_IN));
+        SetTesShaderLayout(Compiler->binary,
+                           inLayout.tesPrimitiveMode == slvTES_PRIMITIVE_MODE_NONE ? 0 : (gcTessPrimitiveMode)inLayout.tesPrimitiveMode,
+                           inLayout.tesVertexSpacing == slvTES_VERTEX_SPACING_NONE ? 0 : (gcTessVertexSpacing)inLayout.tesVertexSpacing,
+                           inLayout.tesOrdering == slvTES_ORDERING_NONE ? 0 : (gcTessOrdering)inLayout.tesOrdering,
+                           inLayout.tesPointMode == slvTES_POINT_MODE_NONE ? gcvFALSE : gcvTRUE,
+                           0);
+    }
+    else if (Compiler->shaderType == slvSHADER_TYPE_GS)
+    {
+        gcmVERIFY_OK(sloCOMPILER_GetDefaultLayout(Compiler, &outLayout, slvSTORAGE_QUALIFIER_OUT));
+        gcmVERIFY_OK(sloCOMPILER_GetDefaultLayout(Compiler, &inLayout, slvSTORAGE_QUALIFIER_IN));
+        SetGeoShaderLayout(Compiler->binary,
+                           inLayout.gsInvocationTime,
+                           outLayout.maxGSVerticesNumber,
+                           (gcGeoPrimitive)inLayout.gsPrimitive,
+                           (gcGeoPrimitive)outLayout.gsPrimitive);
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+gcePATCH_ID
+sloCOMPILER_GetPatchID(
+    IN sloCOMPILER Compiler
+    )
+{
+    return Compiler->patchId;
+}
+

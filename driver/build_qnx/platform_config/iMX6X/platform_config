@@ -1,0 +1,52 @@
+
+CUSTOM_PIXMAP?=0
+USE_NEW_LINUX_SIGNAL?=1
+USE_FB_DOUBLE_BUFFER?=0
+
+################################################################
+# Arch.
+
+HARDWARENAME    ?= gc320v0
+
+ARCH            ?= arm
+ARCH_TYPE       ?= arm
+FIXED_ARCH_TYPE	?= arm-qnx
+CPU_TYPE        ?= 0
+CPU_ARCH        ?= 0
+STATIC_LINK     ?= 0
+EGL_API_FB      ?= 0
+USE_VDK         ?= 1
+USE_SW_FB       ?= 0
+USE_OPENCL      ?= 1
+VIVANTE_ENABLE_VG ?= 1
+VIVANTE_ENABLE_2D ?= 1
+VIVANTE_ENABLE_3D ?= 1
+USE_HAL_TRACER  ?= 0
+USE_CMDBUF_TRACER  ?= 0
+USE_GL_TRACER   ?= 0
+USE_VG_TRACER   ?= 0
+ABI             ?= 0
+ANDROID         ?= 0
+EGL_API_ANDROID ?= 0
+ENDIANNESS		?= 0
+ENABLE_DEBUG	?= 0
+ENABLE_PROFILING ?= 0
+
+USE_FAST_MEM_COPY    ?= 1
+
+USE_BANK_ALIGNMENT   ?= 1
+BANK_BIT_START       ?= 13
+BANK_BIT_END         ?= 15
+BANK_CHANNEL_BIT     ?= 12
+
+################################################################
+# Force to use dma_coherent_* stuff.
+NO_DMA_COHERENT ?= 0
+
+################################################################
+# Set this value to 1 if you are using ARM L2 cache.
+ENABLE_ARM_L2_CACHE	?= 0
+
+CCFLAGS += -DgcdMMU_SIZE=2097152
+
+CCFLAGS += -DIMX6X

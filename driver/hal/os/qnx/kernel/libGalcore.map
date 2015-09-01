@@ -1,0 +1,7 @@
+{
+    global:
+        win_gpu_module_getfuncs;
+
+    local:
+        *;
+};

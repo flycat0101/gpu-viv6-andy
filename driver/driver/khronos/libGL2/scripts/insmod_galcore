@@ -1,0 +1,11 @@
+#!/bin/bash
+
+pushd ..
+
+export AQROOT=$PWD/../../..
+export LD_LIBRARY_PATH=$AQROOT/build/sdk/drivers:$LD_LIBRARY_PATH
+export VDK_FRAMEBUFFER=/dev/fb2
+export FB_FRAMEBUFFER_0=/dev/fb2
+insmod $AQROOT/build/sdk/drivers/galcore.ko irqLine=41 irqLine2D=42 registerMemBase=0x00130000 registerMemSize=0x00004000 registerMemBase2D=0x00134000 registerMemSize2D=0x00004000 contiguousBase=0x78000000 contiguousSize=134217728 showArgs=1
+
+popd

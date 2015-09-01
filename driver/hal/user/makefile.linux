@@ -1,0 +1,288 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# Linux build file for user HAL layer.
+#
+
+################################################################################
+# Include common definitions.
+
+include $(AQROOT)/makefile.linux.def
+
+################################################################################
+# Define target module name.
+
+ifeq ($(gcdSTATIC_LINK), 1)
+  STATIC            := 1
+  TARGET_MODULE     := $(OBJ_DIR)/libGAL.a
+else
+  DYNAMIC           := 1
+  TARGET_MODULE     := $(OBJ_DIR)/libGAL.so
+  TARGET_SONAME     := libGAL.so
+endif
+
+################################################################################
+# Installation directory
+
+INSTALL_DIR         := $(SDK_DIR)/drivers
+
+################################################################################
+# Supply additional include directories.
+
+INCLUDE := -I$(AQROOT)/hal/inc \
+           -I$(AQROOT)/hal/user \
+           -I$(AQROOT)/compiler/libVSC/include
+
+  INCLUDE += -I$(AQROOT)/hal/os/linux/user
+
+ifeq ($(EGL_API_WL), 1)
+  INCLUDE += -I$(WAYLAND_DIR)/include \
+             -I$(WAYLAND_DIR)/include/wayland-viv
+endif
+
+ifeq ($(EGL_API_DFB), 1)
+  INCLUDE += -I$(DFB_DIR)/usr/include \
+             -I$(DFB_DIR)/include \
+             -I$(DFB_DIR)/include/directfb-internal \
+             -I$(DFB_DIR)/include/directfb
+endif
+
+ifeq ($(EGL_API_DRI), 1)
+  INCLUDE += -I$(X11_ARM_DIR)/include
+endif
+
+ifeq ($(EGL_API_X), 1)
+  INCLUDE += -I$(X11_ARM_DIR)/include
+endif
+
+CFLAGS += $(INCLUDE)
+
+################################################################################
+# Add extra flags for object files.
+
+ifneq ($(USE_ARMCC), 1)
+  ifeq ($(EGL_API_DFB), 1)
+    CFLAGS += -pipe -fPIC -DPIC
+  else
+    ifeq ($(EGL_API_WL), 1)
+      CFLAGS += -fPIC -Werror
+    else
+        CFLAGS += -fPIC -Werror -ansi
+    endif
+  endif
+endif
+
+ifeq ($(BUILD_OPENCL_FP), 1)
+  CFLAGS += -DBUILD_OPENCL_FP=1
+endif
+
+################################################################################
+# Define flags for the linker.
+
+ifneq ($(USE_ARMCC), 1)
+  LFLAGS += -Wl,--version-script=libGAL.map
+endif
+
+ifeq ($(USE_ARMCC),1)
+  LFLAGS += --shared -L--soname=,$(TARGET_SONAME)
+else
+  LFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
+endif
+
+################################################################################
+# Supply dependent libraries.
+
+# Specify Vivante libraries twice to resolve references between libraries.
+ifeq ($(VIVANTE_ENABLE_VG), 1)
+  LIBS := -Wl,-whole-archive \
+          -lhalarchuser -lhalarchuser_vg -lhalosuser \
+          -Wl,-no-whole-archive
+else
+  LIBS := -Wl,-whole-archive \
+          -lhalarchuser -lhalosuser \
+          -Wl,-no-whole-archive
+endif
+
+# Specify Vivante library paths.
+LIBS += -L$(AQROOT)/hal/user/arch/$(OBJ_DIR)
+
+  LIBS += -L $(AQROOT)/hal/os/linux/user/$(OBJ_DIR)
+
+ifeq ($(VIVANTE_ENABLE_VG), 1)
+  LIBS += -L$(AQROOT)/hal/user/archvg/$(OBJ_DIR)
+endif
+
+ifeq ($(EGL_API_DRI), 1)
+  LIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lX11
+endif
+
+ifeq ($(EGL_API_X), 1)
+  LIBS += -L$(X11_ARM_DIR)/lib -lX11 -lXext
+endif
+
+ifeq ($(EGL_API_WL), 1)
+  LIBS += -L$(WAYLAND_DIR)/lib -lwayland-client
+  LIBS += -L$(WAYLAND_DIR)/lib -lgc_wayland_protocol -lwayland-server
+endif
+
+ifeq ($(EGL_API_DFB), 1)
+  LIBS += -L$(DFB_DIR)/lib -ldirectfb -ldirect -lz
+endif
+
+# Supply necessary libraries.
+LIBS += -lm -pthread -ldl -lrt
+
+
+################################################################################
+# Describe object files.
+
+OBJECTS := $(OBJ_DIR)/gc_hal_user_brush.o \
+           $(OBJ_DIR)/gc_hal_user_brush_cache.o \
+           $(OBJ_DIR)/gc_hal_user_dump.o \
+           $(OBJ_DIR)/gc_hal_user.o \
+           $(OBJ_DIR)/gc_hal_user_raster.o \
+           $(OBJ_DIR)/gc_hal_user_heap.o \
+           $(OBJ_DIR)/gc_hal_user_query.o \
+           $(OBJ_DIR)/gc_hal_user_rect.o \
+           $(OBJ_DIR)/gc_hal_user_buffer.o \
+           $(OBJ_DIR)/gc_hal_user_surface.o \
+           $(OBJ_DIR)/gc_hal_user_queue.o \
+           $(OBJ_DIR)/gc_hal_user_bitmask.o \
+           $(OBJ_DIR)/gc_hal_user_profiler.o
+
+ifeq ($(VIVANTE_ENABLE_VG),1)
+  OBJECTS += $(OBJ_DIR)/gc_hal_user_vg.o \
+             $(OBJ_DIR)/gc_hal_user_buffer_vg.o
+endif
+
+ifeq ($(VIVANTE_ENABLE_3D),1)
+  OBJECTS += $(OBJ_DIR)/gc_hal_user_engine.o \
+             $(OBJ_DIR)/gc_hal_user_index.o \
+             $(OBJ_DIR)/gc_hal_user_vertex_array.o \
+             $(OBJ_DIR)/gc_hal_user_vertex.o \
+             $(OBJ_DIR)/gc_hal_user_format.o \
+             $(OBJ_DIR)/gc_hal_user_texture.o \
+             $(OBJ_DIR)/gc_hal_user_mem.o \
+             $(OBJ_DIR)/gc_hal_user_bufobj.o \
+             $(OBJ_DIR)/gc_hal_user_statistics.o \
+             $(OBJ_DIR)/gc_hal_user_shader.o
+
+  ifeq ($(USE_OPENCL),1)
+    OBJECTS += $(OBJ_DIR)/gc_hal_user_cl.o
+  endif
+
+  ifeq ($(USE_OPENVX),1)
+    OBJECTS += $(OBJ_DIR)/gc_hal_user_vx.o
+  endif
+else
+  ifeq ($(VIVANTE_ENABLE_VG),1)
+    OBJECTS += $(OBJ_DIR)/gc_hal_user_mem.o
+  endif
+endif
+
+################################################################################
+# Define targets.
+
+.PHONY: all clean install extra_install
+
+all: $(TARGET_MODULE)
+
+clean:
+	@rm -rf $(OBJ_DIR)
+
+install: extra_install
+	@mkdir -p $(INSTALL_DIR)
+	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
+
+extra_install: all
+	@mkdir -p $(SDK_DIR)/drivers
+	@mkdir -p $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_enum.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_types.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_version.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_base.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_raster.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_options.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_profiler.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_dump.h $(SDK_DIR)/include/HAL
+ifeq ($(VIVANTE_ENABLE_VG),1)
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_vg.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_engine_vg.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_driver_vg.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_eglplatform.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_eglplatform_type.h $(SDK_DIR)/include/HAL
+endif
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_driver.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_rename.h $(SDK_DIR)/include/HAL
+ifeq ($(VIVANTE_ENABLE_3D),1)
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_engine.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_eglplatform.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_eglplatform_type.h $(SDK_DIR)/include/HAL
+	@-cp -f $(AQROOT)/hal/inc/gc_hal_statistics.h $(SDK_DIR)/include/HAL
+endif
+	@-cd $(SDK_DIR)/include/HAL; echo "#include \"HAL/gc_hal.h\"" >aqHal.h; cd -
+ifeq ($(gcdSTATIC_LINK), 0)
+  ifeq ($(EGL_API_FB), 1)
+    ifeq ($(EGL_API_WL), 1)
+	@-cp -f $(TARGET_MODULE) $(INSTALL_DIR)/libGAL.wl.so
+    else
+	@-cp -f $(TARGET_MODULE) $(INSTALL_DIR)/libGAL.fb.so
+    endif # EGL_API_WL
+  else
+    ifeq ($(EGL_API_DRI), 1)
+	@-cp -f $(TARGET_MODULE) $(INSTALL_DIR)/libGAL.dri.so
+    else
+	@-cp -f $(TARGET_MODULE) $(INSTALL_DIR)/libGAL.x11.so
+    endif # EGL_API_DRI
+  endif # EGL_API_FB
+endif # gcdSTATIC_LINK
+
+################################################################################
+# Module rules.
+
+ifeq ($(STATIC),1)
+$(TARGET_MODULE): $(OBJECTS)
+	$(AR) -r -c $@ $(OBJECTS)
+ifneq ($(USE_ARMCC),1)
+	$(RANLIB) $@
+endif
+endif
+
+ifeq ($(DYNAMIC),1)
+
+# module dependencies
+ifeq ($(VIVANTE_ENABLE_VG),1)
+$(TARGET_MODULE): $(AQROOT)/hal/user/arch/$(OBJ_DIR)/libhalarchuser.a \
+                  $(AQROOT)/hal/user/archvg/$(OBJ_DIR)/libhalarchuser_vg.a
+else
+$(TARGET_MODULE): $(AQROOT)/hal/user/arch/$(OBJ_DIR)/libhalarchuser.a
+endif
+
+$(TARGET_MODULE): $(AQROOT)/hal/os/linux/user/$(OBJ_DIR)/libhalosuser.a
+
+$(TARGET_MODULE): $(OBJECTS)
+	$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LIBS)
+endif
+
+################################################################################
+# Object rules.
+
+$(OBJ_DIR)/%.o: %.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -MMD -o $@ $<
+
+# object dependencies.
+-include $(OBJECTS:.o=.d)
+

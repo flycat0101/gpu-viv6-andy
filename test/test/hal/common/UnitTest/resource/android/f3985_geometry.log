@@ -1,0 +1,17 @@
+Frame 3985: 3 layer(s)
+  layer[0]: BLITTER
+    source=<f3985_l0_h0x40000ad0_p43346710_s1920x1128.bmp>, stride=3840
+    rotation=0 DEG mirror=0,0 alpha blending=0
+    ANDROID srcRect=[0, 0, 1920, 1128] dstRect=[0, 0, 1920, 1128]
+    GC srcRect=[0, 0, 1920, 1128] dstRect=[0, 0, 1920, 1128]
+  layer[1]: BLITTER
+    source=<f3985_l1_h0x457c68b0_p90d37000_s1920x1128.bmp>, stride=7680
+    rotation=0 DEG mirror=0,0 alpha blending=1
+    ANDROID srcRect=[0, 0, 1920, 1128] dstRect=[0, 0, 1920, 1128]
+    GC srcRect=[0, 0, 1920, 1128] dstRect=[0, 0, 1920, 1128]
+  layer[2]: BLITTER
+    source=<f3985_l2_h0x457c8328_p9adcb000_s1920x72.bmp>, stride=3840
+    rotation=0 DEG mirror=0,0 alpha blending=0
+    ANDROID srcRect=[0, 0, 1920, 72] dstRect=[0, 1128, 1920, 1200]
+    GC srcRect=[0, 0, 1920, 72] dstRect=[0, 1128, 1920, 1200]
+  Result=<f3985_fb.bmp>

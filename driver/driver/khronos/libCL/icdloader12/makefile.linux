@@ -1,0 +1,88 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# ICD Loader for OpenCL 1.1.
+#
+
+#############################################################################
+# Include common definitions.
+
+include ./makefile.linux.def
+
+#############################################################################
+# Macros.
+
+ifeq ($(ANDROID), 1)
+    STATIC = 1
+else
+    ifeq ($(gcdSTATIC_LINK), 1)
+        STATIC = 1
+    else
+        DYNAMIC = 1
+    endif
+endif
+
+ifeq ($(STATIC), 1)
+    TARGET_NAME = libOpenCL.a
+else
+    TARGET_NAME = libOpenCL.so
+endif
+
+#############################################################################
+# Objects.
+
+OBJECTS			=	$(OBJ_DIR)/icd.o \
+					$(OBJ_DIR)/icd_dispatch.o \
+					$(OBJ_DIR)/icd_linux.o
+
+
+################################################################################
+# Add extra flags for object files.
+
+CFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_0_APIS -DCL_USE_DEPRECATED_OPENCL_1_1_APIS
+
+ifneq ($(USE_ARMCC), 1)
+CFLAGS += -fPIC
+ifeq (,$(GL_2_APPENDIX))
+LFLAGS += -Wl,--version-script=icd_exports.map
+endif
+endif
+
+################################################################################
+# Add extra library path.
+LIBS += -ldl
+
+################################################################################
+# Define the macros used in common makefile.
+
+# installation directory
+INSTALL_DIR	:= $(SDK_DIR)/drivers
+
+################################################################################
+# Include the common makefile.
+
+include $(AQROOT)/common.target
+
+################################################################################
+# Extra installation.
+
+install: extra_install
+
+.PHONY: extra_install
+extra_install:
+	@mkdir -p $(SDK_DIR)/drivers
+
+################################################################################
+# Dependencies.
+

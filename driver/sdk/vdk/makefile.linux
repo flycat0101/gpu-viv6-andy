@@ -1,0 +1,193 @@
+##############################################################################
+#
+#    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+#    All Rights Reserved.
+#
+#    Permission is hereby granted, free of charge, to any person obtaining
+#    a copy of this software and associated documentation files (the
+#    'Software'), to deal in the Software without restriction, including
+#    without limitation the rights to use, copy, modify, merge, publish,
+#    distribute, sub license, and/or sell copies of the Software, and to
+#    permit persons to whom the Software is furnished to do so, subject
+#    to the following conditions:
+#
+#    The above copyright notice and this permission notice (including the
+#    next paragraph) shall be included in all copies or substantial
+#    portions of the Software.
+#
+#    THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+#    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+#    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
+#    IN NO EVENT SHALL VIVANTE AND/OR ITS SUPPLIERS BE LIABLE FOR ANY
+#    CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+#    TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+#    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+##############################################################################
+
+
+#
+# This file is a part of Vivante software stack build environment for Linux.
+# It defines the rules necessary to build Vivante SDK.
+#
+
+################################################################################
+# Include the global definitions.
+
+include $(AQROOT)/makefile.linux.def
+
+################################################################################
+# Define a shortcut for the main target.
+
+ifeq ($(gcdSTATIC_LINK), 1)
+  STATIC            := 1
+  TARGET_MODULE     := $(OBJ_DIR)/libVDK.a
+else
+  DYNAMIC           := 1
+  TARGET_MODULE     := $(OBJ_DIR)/libVDK.so
+  TARGET_SONAME     := libVDK.so
+endif
+
+################################################################################
+# Installation directory.
+
+INSTALL_DIR         := $(SDK_DIR)/drivers
+
+################################################################################
+# Supply additional include directories.
+
+INCLUDE += -I$(AQROOT)/sdk/inc
+INCLUDE += -I$(AQROOT)/hal/inc
+
+INCLUDE += -I$(AQROOT)/hal/os/linux/user
+ifeq ($(EGL_API_DRI), 1)
+  INCLUDE += -I$(X11_ARM_DIR)/include
+endif
+
+ifeq ($(EGL_API_X), 1)
+  INCLUDE += -I$(X11_ARM_DIR)/include
+endif
+
+ifeq ($(EGL_API_DFB), 1)
+  INCLUDE += -I$(DFB_DIR)/usr/include
+  INCLUDE += -I$(DFB_DIR)/include
+  INCLUDE += -I$(DFB_DIR)/include/directfb-internal
+  INCLUDE += -I$(DFB_DIR)/include/directfb
+endif
+
+CFLAGS += $(INCLUDE)
+
+################################################################################
+# Supply additional include directories.
+
+ifneq ($(USE_ARMCC), 1)
+  ifeq ($(EGL_API_DFB), 1)
+    CFLAGS  += -pipe -fPIC
+  else
+    ifeq ($(EGL_API_WL), 1)
+      CFLAGS += -fPIC -Werror
+    else
+      CFLAGS += -fPIC -Werror -ansi
+    endif
+  endif
+endif
+
+ifeq ($(EGL_API_DFB), 1)
+  CFLAGS += -DPIC
+endif
+
+CFLAGS += -D__VDK_EXPORT
+
+################################################################################
+# Define flags for the linker.
+
+ifneq ($(USE_ARMCC),1)
+  ifeq ($(EGL_APPENDIX),)
+    LFLAGS += -Wl,--version-script=libVDK.map
+  endif
+endif
+
+ifeq ($(USE_ARMCC),1)
+  LFLAGS += --shared -L--soname=,$(TARGET_SONAME)
+else
+  LFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
+endif
+
+################################################################################
+# Supply necessary libraries.
+
+ifeq ($(gcdSTATIC_LINK), 0)
+  ifeq ($(EGL_API_DFB), 1)
+    LIBS    += -L$(DFB_DIR)/lib -ldirectfb -ldirect -lz
+  endif
+
+  ifeq ($(EGL_API_DRI), 1)
+    LIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11
+  endif
+
+  ifeq ($(EGL_API_X), 1)
+    LIBS += -L$(X11_ARM_DIR)/lib -lXau -lXdmcp -lX11
+  endif
+
+  LIBS += -L$(SDK_DIR)/drivers -L$(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR) -lEGL -lm -lpthread -ldl
+endif
+
+################################################################################
+# Describe object files.
+
+OBJECTS := $(OBJ_DIR)/gc_vdk.o \
+           $(OBJ_DIR)/gc_vdk_egl.o \
+           $(OBJ_DIR)/gc_vdk_gl.o \
+           $(OBJ_DIR)/gc_vdk_hal.o
+
+################################################################################
+# Define targets.
+
+.PHONY: all clean install
+
+all: $(TARGET_MODULE)
+
+clean:
+	@rm -rf $(OBJ_DIR)
+
+install: all
+	@mkdir -p $(INSTALL_DIR)
+	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
+	@mkdir -p $(SDK_DIR)/include
+	@-cp -f  ../inc/gc_vdk.h $(SDK_DIR)/include
+	@-cp -f  ../inc/gc_vdk_types.h $(SDK_DIR)/include
+	@-cp -f  ../inc/gc_vdk_hal.h $(SDK_DIR)/include
+	@-cd $(SDK_DIR)/include; echo "#include \"gc_vdk.h\"" >vdk.h; cd -
+
+################################################################################
+# Module rules.
+
+ifeq ($(STATIC),1)
+$(TARGET_MODULE): $(OBJECTS)
+	$(AR) -r -c $@ $(OBJECTS)
+ifneq ($(USE_ARMCC),1)
+	$(RANLIB) $@
+endif
+endif
+
+ifeq ($(DYNAMIC),1)
+
+# module dependencies
+$(TARGET_MODULES): $(wildcard $(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)/libEGL.so \
+                              $(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)/libEGL.a)
+
+
+$(TARGET_MODULE): $(OBJECTS)
+	$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LIBS)
+endif
+
+################################################################################
+# Object rules.
+
+$(OBJ_DIR)/%.o: %.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -MMD -o $@ $<
+
+# object dependencies.
+-include $(OBJECTS:.o=.d)
+

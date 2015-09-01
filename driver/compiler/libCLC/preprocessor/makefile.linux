@@ -1,0 +1,93 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+
+#
+# Linux build file for CLC library.
+#
+
+################################################################################
+# Include common definitions.
+
+include ../makefile.linux.def
+
+STATIC		:=	1
+TARGET_NAME	:=	libclPreprocessor.a
+
+ifndef FIXED_ARCH_TYPE
+################################################################################
+# Supply additional include directories.
+
+CFLAGS	+=	$(INCLUDE)
+
+################################################################################
+# Add extra flags for object files.
+
+ifneq ($(USE_ARMCC), 1)
+CFLAGS += -fPIC
+endif
+
+################################################################################
+# Supply additional definitions.
+
+CFLAGS	+=	$(CDEFS)
+
+################################################################################
+# Describe object files.
+
+OBJECTS	:=	gc_cl_base.o \
+			gc_cl_expression.o \
+			gc_cl_hide_set.o \
+			gc_cl_input_stream.o \
+			gc_cl_macro_manager.o \
+			gc_cl_syntax.o \
+			gc_cl_syntax_util.o \
+			gc_cl_token.o \
+			gc_cl_api.o \
+			gc_cl_macro_expand.o \
+			gc_cl_preprocessor.o \
+
+OBJS	:=	$(addprefix $(OBJ_DIR)/,$(OBJECTS))
+OBJECTS	:=	$(OBJS)
+endif
+
+################################################################################
+# Define the macros used in common makefile.
+ifeq ($(STATIC_LINK), 1)
+INSTALL_DIR = $(SDK_DIR)/drivers
+endif
+
+################################################################################
+# Include the common makefile.
+
+include $(AQROOT)/common.target
+
+ifdef FIXED_ARCH_TYPE
+OBJECTS :=
+
+clean: rmfile
+
+install: cpfile
+
+.PHONY: cpfile rmfile
+cpfile:
+ifeq ($(gcdSTATIC_LINK), 1)
+	@-cp -f $(FIXED_ARCH_TYPE)/$(TARGET_NAME) $(INSTALL_DIR)/
+endif
+
+rmfile:
+ifeq ($(gcdSTATIC_LINK), 1)
+	@-rm -f $(INSTALL_DIR)/$(TARGET_NAME)
+endif
+
+endif

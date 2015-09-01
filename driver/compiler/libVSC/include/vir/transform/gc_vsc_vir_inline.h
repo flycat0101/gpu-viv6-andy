@@ -1,0 +1,99 @@
+/****************************************************************************
+*
+*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*
+*    The material in this file is confidential and contains trade secrets
+*    of Vivante Corporation. This is proprietary information owned by
+*    Vivante Corporation. No part of this work may be disclosed,
+*    reproduced, copied, transmitted, or used in any way for any purpose,
+*    without the express written permission of Vivante Corporation.
+*
+*****************************************************************************/
+
+
+#ifndef __gc_vsc_vir_inline_h_
+#define __gc_vsc_vir_inline_h_
+
+#include "gc_vsc.h"
+
+BEGIN_EXTERN_C()
+
+#define VSC_IL_MEM_BLK_SIZE         2048
+
+/* Right now, all the chips have the same call stack limitation, 4. */
+#define VSC_MAX_CALL_STACK_DEPTH    3
+
+typedef struct _VSC_IL_INST_LIST_NODE
+{
+    VSC_UNI_LIST_NODE         node;
+    VIR_Instruction           *inst;
+}VSC_IL_INST_LIST_NODE;
+
+#define CAST_INST_NODE_2_ULN(pInstNode)            (VSC_UNI_LIST_NODE*)(pInstNode)
+#define CAST_ULN_2_INST_NODE(pUln)                 (VSC_IL_INST_LIST_NODE*)(pUln)
+
+#define INST_NODE_GET_NEXT(pInstNode)               CAST_ULN_2_USGN(vscULN_GetNextNode(CAST_USGN_2_ULN(pInstNode)))
+#define INST_NODE_GET_INST(pInstNode)              ((pInstNode)->inst)
+
+typedef VSC_UNI_LIST                   VSC_IL_INST_LIST;
+#define INST_LIST_INITIALIZE(pInstList)             vscUNILST_Initialize((pInstList), gcvFALSE)
+#define INST_LIST_FINALIZE(pInstList)               vscUNILST_Finalize((pInstList))
+#define INST_LIST_ADD_NODE(pInstList, pInstNode)    vscUNILST_Append((pInstList), CAST_USGN_2_ULN((pInstNode)))
+
+typedef VSC_UL_ITERATOR VSC_IL_INST_LIST_ITERATOR;
+#define VSC_IL_INST_LIST_ITERATOR_INIT(iter, pInstList)       vscULIterator_Init((iter), pInstList)
+#define VSC_IL_INST_LIST_ITERATOR_FIRST(iter)                 (VSC_IL_INST_LIST_NODE*)vscULIterator_First((iter))
+#define VSC_IL_INST_LIST_ITERATOR_NEXT(iter)                  (VSC_IL_INST_LIST_NODE*)vscULIterator_Next((iter))
+#define VSC_IL_INST_LIST_ITERATOR_LAST(iter)                  (VSC_IL_INST_LIST_NODE*)vscULIterator_Last((iter))
+
+/* inliner define */
+typedef struct VIR_INLINER
+{
+    VIR_Shader                  *pShader;
+    VIR_Dumper                  *pDumper;
+    VSC_OPTN_ILOptions          *pOptions;
+    VSC_PRIMARY_MEM_POOL        pmp;
+    VSC_HW_CONFIG               *pHwCfg;
+    VIR_CALL_GRAPH              *pCG;
+    VSC_HASH_TABLE              *pCandidates; /* inline candidate */
+
+    gctINT                      inlineBudget;
+
+} VIR_Inliner;
+
+
+#define VSC_IL_GetShader(inliner)          ((inliner)->pShader)
+#define VSC_IL_SetShader(inliner, s)       ((inliner)->pShader = (s))
+#define VSC_IL_GetDumper(inliner)          ((inliner)->pDumper)
+#define VSC_IL_SetDumper(inliner, d)       ((inliner)->pDumper = (d))
+#define VSC_IL_GetOptions(inliner)         ((inliner)->pOptions)
+#define VSC_IL_SetOptions(inliner, o)      ((inliner)->pOptions = (o))
+#define VSC_IL_GetPmp(inliner)             (&((inliner)->pmp))
+#define VSC_IL_GetMM(inliner)              (&((inliner)->pmp.mmWrapper))
+#define VSC_IL_GetHwCfg(inliner)           ((inliner)->pHwCfg)
+#define VSC_IL_SetHwCfg(inliner, hc)       ((inliner)->pHwCfg = (hc))
+#define VSC_IL_GetCallGraph(inliner)       ((inliner)->pCG)
+#define VSC_IL_SetCallGraph(inliner, cg)   ((inliner)->pCG = (cg))
+#define VSC_IL_GetCandidates(inliner)      ((inliner)->pCandidates)
+#define VSC_IL_GetInlineBudget(inliner)     ((inliner)->inlineBudget)
+#define VSC_IL_SetInlineBudget(inliner, bg) ((inliner)->inlineBudget = (bg))
+
+
+extern void VSC_IL_Init(
+    VIR_Inliner         *pInliner,
+    VIR_Shader          *pShader,
+    VSC_HW_CONFIG       *pHwCfg,
+    VSC_OPTN_ILOptions  *pOptions,
+    VIR_Dumper          *pDumper,
+    VIR_CALL_GRAPH      *pCG);
+
+extern void VSC_IL_Final(
+    VIR_Inliner           *pInliner);
+
+extern VSC_ErrCode VSC_IL_PerformOnShader(
+    VIR_Inliner           *pInliner);
+
+END_EXTERN_C()
+
+#endif /* __gc_vsc_vir_inline_h_ */
+

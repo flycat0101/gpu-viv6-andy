@@ -1,0 +1,48 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+!IF "$(VIVANTE_ENABLE_2D)" != "1"
+SKIPBUILD=1
+!ENDIF
+
+!IF "$(DERIVED_FROM_GPE)" == "1"
+DERIVED_BASE_CLASS = GPE
+CDEFINES=$(CDEFINES) -DDERIVED_FROM_GPE
+!ELSE
+DERIVED_BASE_CLASS = DDGPE
+!ENDIF
+
+TARGETNAME=GC2D_$(DERIVED_BASE_CLASS)_Accelerator
+TARGETTYPE=LIBRARY
+RELEASETYPE=PLATFORM
+
+INCLUDES= \
+    $(INCLUDES); \
+    $(AQROOT)\hal\inc; \
+	$(AQROOT)\hal\os\ce\user
+
+SOURCES= \
+    gc_gpe_wrapper.cpp \
+    gc_gpe_init.cpp \
+    gc_gpe_sync.cpp \
+    gc_gpe_blit.cpp \
+    gc_gpe_surf.cpp \
+    gc_gpe_parms.cpp \
+    gc_gpe_debug.cpp \
+    gc_gpe_util.cpp \
+
+##########################################################
+# Install results
+EXTRA_COMMAND = xcopy /I /R /Y gc_gpe_accelerator.hpp $(VIVANTE_SDK_INC)
+
+!INCLUDE $(AQROOT)\wince_install.inc

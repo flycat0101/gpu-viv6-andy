@@ -1,0 +1,49 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+!IF "$(VIVANTE_ENABLE_3D)" != "1"
+SKIPBUILD=1
+!ENDIF
+
+!IF "$(USE_OPENCL)" == "0"
+SKIPBUILD=1
+!ENDIF
+
+DOSYSGEN=1
+SYNCHRONIZE_DRAIN=1
+TARGETNAME=libCLC_compiler
+TARGETTYPE=LIBRARY
+
+CDEFINES=$(CDEFINES) -DBUILD_OPENCL_12=1
+
+SOURCES= \
+    gc_cl_built_ins.c \
+    gc_cl_compiler.c \
+    gc_cl_emit_code.c \
+    gc_cl_gen_code.c \
+    gc_cl_ir.c \
+    gc_cl_parser.c \
+    gc_cl_parser_misc.c \
+    gc_cl_scanner.c \
+    gc_cl_scanner_misc.c \
+    gc_cl_tune.c
+
+INCLUDES= \
+  $(INCLUDES); \
+  $(AQROOT)\hal\inc; \
+  $(AQROOT)\hal\user; \
+  $(AQROOT)\hal\os\ce\user; \
+  $(AQROOT)\compiler\libVSC\include; \
+  $(AQROOT)\compiler\libCLC\inc; \
+
+WARNLEVEL=2

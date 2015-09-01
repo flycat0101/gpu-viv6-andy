@@ -1,0 +1,61 @@
+
+Files layout
+============
+<AQROOT>/
+    |
+    +---hal/os/ce                         : Test tree for WinCE
+    |
+    +---sdk
+    |    |
+    |    +---source                       : libVivanteDK library
+    |    |
+    |    +---inc                          : Header file for libVivanteDK library
+    |    |
+    |    \----samples
+    |         |
+    |         +---hal
+    |         |    |
+    |         |    +---tvui               : TV UI based on libVivanteDK library
+    |         |    |
+    |         |    +---clear              : A simple HAL test based on libVivanteDK library
+    |         |    |
+    |         |    \---virtual            : A simple HAL test based on libVivanteDK library
+    |         |
+    |         \---vdk
+    |              |
+    |              +---es11               : OpenGL ES 1.1 tutorials
+    |              |
+    |              +---es20               : OpenGL ES 2.0 tutorials
+    |              |
+    |              \---vg                 : OpenVG 1.1 tiger
+    |
+    +---test
+    |    |
+    |    +---gfx
+    |    |    |
+    |    |    +---unit                    : Unit test for DirectFB driver
+    |    |
+    |    +---vg11
+    |    |    |
+    |    |    +---vgframe                 : VG test framework
+    |    |    |
+    |    |    \---tiger                   : tiger head
+    |    |
+    |    +---hal
+    |    |    |
+    |    |    \---common
+    |    |         |
+    |    |         \-UnitTest             : HAL 2D unit tests
+    |    |
+    |    \---es20
+    |         |
+    |         \---vv_launcher             : OpenGL ES 2.0 vv_launcher
+    |
+    +---release/SW                        : SDK release ReadMe files
+    |
+    \---resources                         : resoruces files
+
+How to build
+============
+1. Build steps for Linux: $(AQROOT)/release/SW/ReadMe_Linux.txt
+2. Build steps for WinCE: $(AQROOT)/release/SW/ReadMe_WinCE.txt

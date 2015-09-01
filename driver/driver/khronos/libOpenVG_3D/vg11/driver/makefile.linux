@@ -1,0 +1,122 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# Driver part of OpenVG.
+#
+
+#############################################################################
+# Include common definitions.
+
+include ../makefile.linux.def
+
+#############################################################################
+# Macros.
+
+ifeq ($(gcdSTATIC_LINK), 1)
+  STATIC      = 1
+  TARGET_NAME = libOpenVG.a
+else
+  DYNAMIC = 1
+  TARGET_NAME = libOpenVG.so
+endif
+
+TARGET_OUTPUT = $(OBJ_DIR)/$(TARGET_NAME)
+
+OBJECTS = $(OBJ_DIR)/gc_vgsh_egl.o \
+          $(OBJ_DIR)/gc_vgsh_dump.o \
+          $(OBJ_DIR)/gc_vgsh_context.o \
+          $(OBJ_DIR)/gc_vgsh_font.o \
+          $(OBJ_DIR)/gc_vgsh_image.o \
+          $(OBJ_DIR)/gc_vgsh_matrix.o \
+          $(OBJ_DIR)/gc_vgsh_mask_layer.o \
+          $(OBJ_DIR)/gc_vgsh_math.o \
+          $(OBJ_DIR)/gc_vgsh_object.o \
+          $(OBJ_DIR)/gc_vgsh_paint.o \
+          $(OBJ_DIR)/gc_vgsh_path.o \
+          $(OBJ_DIR)/gc_vgsh_scanline.o \
+          $(OBJ_DIR)/gc_vgsh_shader.o \
+          $(OBJ_DIR)/gc_vgsh_tessellator.o \
+          $(OBJ_DIR)/gc_vgsh_hardware.o \
+          $(OBJ_DIR)/gc_vgsh_vgu.o
+
+
+OBJECTS += $(OBJ_DIR)/gc_vgsh_profiler.o
+
+
+################################################################################
+# Add extra library path.
+
+LIBS += -L$(SDK_DIR)/drivers
+LIBS += -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL
+LIBS += -L$(AQROOT)/compiler/libVSC/$(OBJ_DIR) -lVSC
+LIBS += -L$(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR) -lEGL
+LIBS += -lm
+
+################################################################################
+# Add extra flags for object files.
+
+ifneq ($(USE_ARMCC), 1)
+  CFLAGS += -fPIC
+  ifeq (,$(VG_APPENDIX))
+    LFLAGS += -Wl,--version-script=libOpenVG.map
+  endif
+endif
+
+################################################################################
+# Extra includes.
+
+INCOPVG = $(VG11_DIR)/driver \
+          $(SDK_DIR)/include \
+          $(AQROOT)/hal/user \
+          $(AQROOT)/hal/os/linux/user \
+          $(AQROOT)/driver/khronos/libEGL/inc
+
+ifeq ($(EGL_API_DFB), 1)
+    INCOPVG += $(DFB_DIR)/usr/include
+    INCOPVG += $(DFB_DIR)/include
+    INCOPVG += $(DFB_DIR)/include/directfb-internal
+    INCOPVG += $(DFB_DIR)/include/directfb
+endif
+ifeq ($(EGL_API_DRI), 1)
+    INCOPVG += $(X11_ARM_DIR)/include
+endif
+ifeq ($(EGL_API_X), 1)
+    INCOPVG += $(X11_ARM_DIR)/include
+endif
+
+CFLAGS += $(addprefix -I,$(INCOPVG))
+
+################################################################################
+# Define macros used in common.target.
+
+INSTALL_DIR := $(SDK_DIR)/drivers
+
+################################################################################
+# Include common makefile.
+
+include $(AQROOT)/common.target
+
+################################################################################
+# Extra installation.
+
+install: $(TARGET_OUTPUT) extra_install
+
+.PHONY: extra_install
+extra_install: $(TARGET_OUTPUT)
+	@mkdir -p $(SDK_DIR)/drivers
+	@mkdir -p $(SDK_DIR)/include/VG
+	@-cp -f $(AQROOT)/sdk/inc/VG/*.h $(SDK_DIR)/include/VG
+ifeq ($(gcdSTATIC_LINK), 0)
+	@-cp -rf $(TARGET_OUTPUT) $(INSTALL_DIR)/libOpenVG.3d.so
+endif

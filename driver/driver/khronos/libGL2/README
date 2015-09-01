@@ -1,0 +1,131 @@
+Instructions to setup OpenGL Desktop driver on Ubuntu
+
+Contens
+1. prepare openGL desktop build environment
+2. Build driver
+3. Install driver
+4. Start X server
+5. Troubleshooting
+
+1. prepare openGL desktop build environment
+===========================================
+1.1 Install follow packages on your target board(sudo apt-get xxx install):
+    xserver-xorg-dev
+    x11proto-xf86dri-dev
+    x11proto-render-dev
+    x11proto-gl-dev
+    libdrm-dev
+    libdrm2
+    mesa-utils
+    libgl1-mesa-dev
+    libglu1-mesa-dev
+    freeglut3-dev
+    build-essential
+    xutils-dev
+
+1.2 Comment out '/usr/bin/lightdm' in /etc/X11/default-display-manager to disable start X by default
+    #/usr/sbin/lightdm
+
+1.3 Set up a mapping directory between host and target board;
+    Linux kernel source code and GPU driver source code need to be visible to both host and board.
+    Mount host machine code directory ($HOST_CODE_ROOT) to the target board ($BOARD_CODE_ROOT) on your target board.
+        export HOST_CODE_ROOT=$HOME/srcdir
+        export BOARD_CODE_ROOT=/mnt/rmt
+        mount -o nolock <hostip>:$HOST_CODE_ROOT $BOARD_CODE_ROOT
+
+1.4 Install Linux kernel source codes on the host
+    export KERNEL_DIR environment variable:
+        export KERNEL_DIR=$HOST_CODE_ROOT/linux_kernel
+    Install you kernel driver to $KERNEL_DIR;
+
+1.5 Install Vivante GPU driver source code
+    export AQROOT environment variable:
+        export AQROOT=$HOST_CODE_ROOT/gpu_viv
+    Install GPU driver source code on your host;
+        tar xzf VIVANTE_GAL_Unified_Src_drv_<version>.tgz -C $AQROOT
+        tar xzf VIVANTE_GAL_Unified_Src_drv_GL2-addon_<version>.tgz -C $AQROOT
+    Install more special driver add-on if need;
+
+    Export AQROOT, KERNEL_DIR environment variables on your target board too
+        export AQROOT=$BOARD_CODE_ROOT/gpu_viv
+        export KERNEL_DIR=$BOARD_CODE_ROOT/gpu_viv
+
+1.6 Install Vivante DRM drivers to your Linux kernel directory on the host
+        cd $KERNEL_DIR
+        patch -p1 < $AQROOT/driver/X/drm/drm.patch
+        cp -R $AQROOT/driver/X/drm/vivante drivers/gpu/drm
+        cp $AQROOT/driver/X/drm/Kconfig drivers/gpu/drm
+        cp $AQROOT/driver/X/drm/Makefile drivers/gpu/drm
+    Then added the follow configurations in your $KERNEL_DIR/.config to add Vivante DRM modules to your kernel modules build list;
+            CONFIG_DRM=m
+            CONFIG_DRM_VIVANTE=m
+    More information please see $AQROOT/driver/X/drm/README.drm.
+
+1.7 Copy /usr/lib & /usr/include files on your target board to host machine for cross compiling
+    mkdir $BOARD_CODE_ROOT/ROOTFS_USR
+    cp -R /usr/lib/ $BOARD_CODE_ROOT/ROOTFS_USR
+    cp -R /usr/include/ $BOARD_CODE_ROOT/ROOTFS_USR
+
+2. Build driver
+===============
+1.1 Set up CROSS_COMPILE on your host to build Linux kernel & vivante GPU driver;
+        export PATH=<YOUR TOOL CHAIN BIN DIR>:$PATH
+        export ARCH=arm
+        export CROSS_COMPILE=arm-none-linux-gnueabi-
+    More information please see $AQROOT/release/SW/ReadMe_Linux.txt
+
+2.2 Build Vivante GPU driver;
+    Please refer to $AQROOT/release/SW/ReadMe_Linux.txt
+
+2.3 Build OpenGL ICD(installable client driver) driver on host:
+    Need to export ROOTFS_USE environment as following to reference head files in $(ROOTFS_USR)/include
+        export ROOTFS_USR=$HOST_CODE_ROOT/ROOTFS_USR
+        cd $AQROOT/driver/khronos/libGL2
+        make -f Makefile.linux install
+
+2.4 Build/install DRI driver on board:
+    We use Xserver 1.10.4 open source code as baseline, you can download source package from here:
+        http://ftp.x.org/pub/individual/xserver/xorg-server-1.10.4.tar.gz
+
+2.5 Build DRM driver on board:
+    cd $BOARD_CODE_ROOT/${LINUX_KERNEL_DIR}
+    make modules_install
+
+2.6 Build EXA driver on board:
+    cd $AQROOT/driver/X/EXA
+    . ./viv-configure.sh
+    make install
+
+3. Install driver
+=================
+3.1 Install DRM kernel driver
+    please refer to 2.5 Build DRM driver on board;
+    Make sure /lib/modules/$(uname -r)/kernel/drivers/gpu/drm exist after you built/installed all kernel modules;
+
+3.2 Install vivante gpu drivers on your target board
+    cp $AQROOT/build/sdk/drivers/libGAL.so /usr/lib
+    mkdir -p /usr/lib/dri
+    cp lib/vivante_dri.so /usr/lib/dri
+    cp lib/libGL.so.1.2 /usr/lib
+    cd /usr/lib
+    if [ -e libGL.so.1 ]; then rm -f libGL.so.1; fi
+    ln -s libGL.so.1.2 libGL.so.1
+    if [ -e libGL.so ]; then rm -f libGL.so; fi
+    ln -s libGL.so.1 libGL.so
+    export LD_LIBRARY_PATH=$AQROOT/build/sdk/drivers:$LD_LIBRARY_PATH
+    # specified frame buffer device by environment variable, e.g.
+    export VDK_FRAMEBUFFER=/dev/fb2
+    export FB_FRAMEBUFFER_0=/dev/fb2
+    # insert galcore.ko, more arguments might be needed(refer to 'Insert the kernel driver' in $AQROOT/release/SW/ReadMe_Linux.txt).
+    insmod $AQROOT/build/sdk/drivers/galcore.ko
+
+4. Start X server
+=================
+    copy $AQROOT/driver/khronos/libGL2/script/xorg.conf /etc/X11/
+    startx
+
+5. Troubleshooting
+==================
+5.1 export ${__GL_DEV_FB} environment variable on your target board
+    Try to export this variable if you run OpenGL application and find window was created, but nothing was drawn:
+    export __GL_DEV_FB=$FB_FRAMEBUFFER_0

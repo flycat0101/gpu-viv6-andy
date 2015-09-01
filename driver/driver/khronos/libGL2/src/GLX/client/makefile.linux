@@ -1,0 +1,133 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+# Makefile for GLX client
+
+################################################################################
+
+#Include common definitions.
+include $(AQROOT)/makefile.linux.def
+
+DYNAMIC = 1
+
+TOPDIR = ../../..
+CLIENT_GLX_DIR = $(TOPDIR)/src/GLX/client
+
+CLIENT_GLX_SOURCE_FILES = \
+	glxcmds.c \
+	clientattrib.c \
+	compsize.c \
+	eval.c \
+	g_render.c \
+	g_single.c \
+	g_vendpriv.c \
+	glxext.c \
+	glx_pbuffer.c \
+	glx_query.c \
+	indirect_init.c \
+	glthread.c \
+	pixel.c \
+	pixelstore.c \
+	render2.c \
+	renderpix.c \
+	single2.c \
+	singlepix.c \
+	vertarr.c \
+	xfont.c \
+	dri_glx.c \
+	dri_util.c \
+	XF86dri.c \
+	xf86drm.c \
+	xf86drmHash.c \
+	xf86drmRandom.c \
+	xf86drmSL.c \
+	g_api_entry.c \
+	g_pri_api_entry.c
+
+# compiler define
+GCC=$(CC)
+
+LIBDIR=-L$(SDK_DIR)/drivers -L$(ROOTFS_USR)/lib
+LLDLIBS = -lXdamage -lXfixes -lXext -lX11 -lpthread -lGAL -lm -ldl
+
+ifeq ($(DEBUG),1)
+CFLAGS +=-g -O0 -DDEBUG -fPIC
+else
+CFLAGS +=-O3 -fPIC
+endif
+
+CFLAGS += -D_LINUX_ -DPTHREADS -D_POSIX_SOURCE -D_POSIX_C_SOURCE=199309L -D_GNU_SOURCE -DUSE_DRM_MAP
+
+INCLUDE += \
+	-I$(AQROOT)/hal/inc \
+	-I$(AQROOT)/hal/user \
+	-I$(AQROOT)/hal/os/linux/user \
+	-I$(AQROOT)/sdk/inc/GL \
+	-I$(AQROOT)/sdk/inc \
+    -I$(TOPDIR)/include -I$(TOPDIR)/include/dri -I$(TOPDIR)/include/gl \
+    -I$(ROOTFS_USR)/include/X11/extensions \
+    -I$(ROOTFS_USR)/include \
+    -I$(ROOTFS_USR)/include/arm-linux-gnueabi \
+    -I$(ROOTFS_USR)/include/pixman-1 \
+    -I$(ROOTFS_USR)/include/drm
+
+CFLAGS += $(INCLUDE)
+
+TARGET_NAME=libGL.so.1.2
+INSTALL_DIR = $(SDK_DIR)/drivers
+TARGET_OUTPUT=$(OBJ_DIR)/$(TARGET_NAME)
+
+OBJECTS = \
+	$(OBJ_DIR)/glxcmds.o \
+	$(OBJ_DIR)/clientattrib.o \
+	$(OBJ_DIR)/compsize.o \
+	$(OBJ_DIR)/eval.o \
+	$(OBJ_DIR)/g_render.o \
+	$(OBJ_DIR)/g_single.o \
+	$(OBJ_DIR)/g_vendpriv.o \
+	$(OBJ_DIR)/glxext.o \
+	$(OBJ_DIR)/glx_pbuffer.o \
+	$(OBJ_DIR)/glx_query.o \
+	$(OBJ_DIR)/indirect_init.o \
+	$(OBJ_DIR)/glthread.o \
+	$(OBJ_DIR)/pixel.o \
+	$(OBJ_DIR)/pixelstore.o \
+	$(OBJ_DIR)/render2.o \
+	$(OBJ_DIR)/renderpix.o \
+	$(OBJ_DIR)/single2.o \
+	$(OBJ_DIR)/singlepix.o \
+	$(OBJ_DIR)/vertarr.o \
+	$(OBJ_DIR)/xfont.o \
+	$(OBJ_DIR)/dri_glx.o \
+	$(OBJ_DIR)/dri_util.o \
+	$(OBJ_DIR)/XF86dri.o \
+	$(OBJ_DIR)/xf86drm.o \
+	$(OBJ_DIR)/xf86drmHash.o \
+	$(OBJ_DIR)/xf86drmRandom.o \
+	$(OBJ_DIR)/xf86drmSL.o \
+	$(OBJ_DIR)/g_api_entry.o \
+	$(OBJ_DIR)/g_pri_api_entry.o
+
+
+LFLAGS += $(LIBDIR) $(LLDLIBS) -Wl,--version-script=GLSymExport
+
+install: extra_install
+
+include $(AQROOT)/common.target
+
+.PHONY: extra_install
+extra_install: $(TARGET_OUTPUT)
+	@mkdir -p $(SDK_DIR)/include/GL
+	@-cp -f $(AQROOT)/sdk/inc/GL/*.h $(SDK_DIR)/include/GL
+	-cd $(OBJ_DIR); ln -sf $(TARGET_NAME) libGL.so; ln -sf $(TARGET_NAME) libGL.so.1
+	cd $(SDK_DIR)/drivers; rm -f libGL.so libGL.so.1; ln -s $(TARGET_NAME) libGL.so; ln -s $(TARGET_NAME) libGL.so.1; cd -

@@ -1,0 +1,115 @@
+;#############################################################################
+;#
+;#   Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+;#
+;#   The material in this file is confidential and contains trade secrets
+;#   of Vivante Corporation. This is proprietary information owned by
+;#   Vivante Corporation. No part of this work may be disclosed,
+;#   reproduced, copied, transmitted, or used in any way for any purpose,
+;#   without the express written permission of Vivante Corporation.
+;#
+;#############################################################################
+
+
+LIBRARY	libVivanteOpenCL.dll
+
+EXPORTS
+	clGetPlatformIDs                        @1
+	clGetPlatformInfo                       @2
+	clGetDeviceIDs                          @3
+	clGetDeviceInfo                         @4
+	clCreateContext                         @5
+	clCreateContextFromType                 @6
+	clRetainContext                         @7
+	clReleaseContext                        @8
+	clGetContextInfo                        @9
+	clCreateCommandQueue                    @10
+	clRetainCommandQueue                    @11
+	clReleaseCommandQueue                   @12
+	clGetCommandQueueInfo                   @13
+	clCreateBuffer                          @14
+	clCreateSubBuffer                       @15
+	clCreateImage2D                         @16
+	clCreateImage3D                         @17
+	clRetainMemObject                       @18
+	clReleaseMemObject                      @19
+	clGetSupportedImageFormats              @20
+	clGetMemObjectInfo                      @21
+	clGetImageInfo                          @22
+	clSetMemObjectDestructorCallback        @23
+	clCreateSampler                         @24
+	clRetainSampler                         @25
+	clReleaseSampler                        @26
+	clGetSamplerInfo                        @27
+	clCreateProgramWithSource               @28
+	clCreateProgramWithBinary               @29
+	clRetainProgram                         @30
+	clReleaseProgram                        @31
+	clBuildProgram                          @32
+	clUnloadCompiler                        @33
+	clGetProgramInfo                        @34
+	clGetProgramBuildInfo                   @35
+	clCreateKernel                          @36
+	clCreateKernelsInProgram                @37
+	clRetainKernel                          @38
+	clReleaseKernel                         @39
+	clSetKernelArg                          @40
+	clGetKernelInfo                         @41
+	clGetKernelWorkGroupInfo                @42
+	clWaitForEvents                         @43
+	clGetEventInfo                          @44
+	clCreateUserEvent                       @45
+	clRetainEvent                           @46
+	clReleaseEvent                          @47
+	clSetUserEventStatus                    @48
+	clSetEventCallback                      @49
+	clGetEventProfilingInfo                 @50
+	clFlush                                 @51
+	clFinish                                @52
+	clEnqueueReadBuffer                     @53
+	clEnqueueReadBufferRect                 @54
+	clEnqueueWriteBuffer                    @55
+	clEnqueueWriteBufferRect                @56
+	clEnqueueCopyBuffer                     @57
+	clEnqueueCopyBufferRect                 @58
+	clEnqueueReadImage                      @59
+	clEnqueueWriteImage                     @60
+	clEnqueueCopyImage                      @61
+	clEnqueueCopyImageToBuffer              @62
+	clEnqueueCopyBufferToImage              @63
+	clEnqueueMapBuffer                      @64
+	clEnqueueMapImage                       @65
+	clEnqueueUnmapMemObject                 @66
+	clEnqueueNDRangeKernel                  @67
+	clEnqueueTask                           @68
+	clEnqueueNativeKernel                   @69
+	clEnqueueMarker                         @70
+	clEnqueueWaitForEvents                  @71
+	clEnqueueBarrier                        @72
+	clGetExtensionFunctionAddress           @73
+	clIcdGetPlatformIDsKHR                  @74
+    clCreateFromGLBuffer                    @75
+    clCreateFromGLTexture2D                 @76
+    clCreateFromGLTexture3D                 @77
+    clCreateFromGLRenderbuffer              @78
+    clGetGLObjectInfo                       @79
+    clGetGLTextureInfo                      @80
+    clEnqueueAcquireGLObjects               @81
+    clEnqueueReleaseGLObjects               @82
+    clGetGLContextInfoKHR                   @83
+	clCompileProgram                        @84
+;	clCreateFromGLTexture                   @85
+	clCreateImage                           @86
+	clCreateProgramWithBuiltInKernels       @87
+	clCreateSubDevices                      @88
+	clEnqueueBarrierWithWaitList            @89
+	clEnqueueFillBuffer                     @90
+	clEnqueueFillImage                      @91
+	clEnqueueMarkerWithWaitList             @92
+	clEnqueueMigrateMemObjects              @93
+	clGetExtensionFunctionAddressForPlatform @94
+	clGetKernelArgInfo                      @95
+	clLinkProgram                           @96
+	clReleaseDevice                         @97
+	clRetainDevice                          @98
+	clUnloadPlatformCompiler                @99

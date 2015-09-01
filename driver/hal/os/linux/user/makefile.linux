@@ -1,0 +1,165 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# Linux build file for user HAL layer.
+#
+
+################################################################################
+# Include common definitions.
+
+include $(AQROOT)/makefile.linux.def
+
+################################################################################
+# Define target module name.
+
+STATIC              := 1
+TARGET_NAME         := libhalosuser.a
+TARGET_MODULE       := $(OBJ_DIR)/$(TARGET_NAME)
+
+################################################################################
+# Installation directory.
+
+INSTALL_DIR         := $(SDK_DIR)/drivers
+
+################################################################################
+# Supply additional include directories.
+
+INCLUDE := -I$(AQROOT)/hal/inc \
+           -I$(AQROOT)/hal/user \
+           -I$(AQROOT)/hal/optimizer \
+           -I$(AQROOT)/hal/os/linux/user \
+           -I$(AQROOT)/compiler/libVSC/include
+
+ifeq ($(EGL_API_WL), 1)
+  INCLUDE += -I$(WAYLAND_DIR)/include \
+             -I$(WAYLAND_DIR)/include/wayland-viv
+endif
+
+ifeq ($(EGL_API_DFB), 1)
+  INCLUDE += -I$(DFB_DIR)/usr/include \
+             -I$(DFB_DIR)/include \
+             -I$(DFB_DIR)/include/directfb-internal \
+             -I$(DFB_DIR)/include/directfb
+endif
+
+ifeq ($(EGL_API_DRI), 1)
+  INCLUDE += -I$(X11_ARM_DIR)/include \
+             -I$(X11_ARM_DIR)/include/X11/extensions \
+             -I$(AQROOT)/driver/X/DRI/src
+endif
+
+ifeq ($(EGL_API_X), 1)
+  INCLUDE += -I$(X11_ARM_DIR)/include
+endif
+
+CFLAGS += $(INCLUDE)
+
+################################################################################
+# Add extra flags for object files.
+
+ifneq ($(USE_ARMCC), 1)
+  ifeq ($(EGL_API_WL), 1)
+    CFLAGS += -fPIC
+  else
+    ifeq ($(EGL_API_DRI), 1)
+      CFLAGS += -fPIC -Werror -march=armv7-a
+    else
+      ifeq ($(EGL_API_DFB),1)
+        CFLAGS += -pipe -fPIC -DPIC
+        CFLAGS += -DDIRECTFB_MAJOR_VERSION=$(DIRECTFB_MAJOR_VERSION) \
+                  -DDIRECTFB_MINOR_VERSION=$(DIRECTFB_MINOR_VERSION) \
+                  -DDIRECTFB_MICRO_VERSION=$(DIRECTFB_MICRO_VERSION)
+      else
+          CFLAGS += -fPIC -Werror -ansi
+      endif
+    endif
+  endif
+endif
+
+################################################################################
+# Describe object files.
+
+OBJECTS := $(OBJ_DIR)/gc_hal_user_debug.o \
+           $(OBJ_DIR)/gc_hal_user_os.o \
+           $(OBJ_DIR)/gc_hal_user_math.o
+
+ifneq ($(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_VG), 0_0)
+  ifeq ($(EGL_API_FB),1)
+    ifeq ($(EGL_API_WL),1)
+      OBJECTS += $(OBJ_DIR)/gc_hal_user_wayland.o
+    else
+      OBJECTS += $(OBJ_DIR)/gc_hal_user_fbdev.o
+    endif
+  else
+    ifeq ($(EGL_API_DFB),1)
+      OBJECTS += $(OBJ_DIR)/gc_hal_user_dfb.o
+    else
+      ifeq ($(EGL_API_DRI),1)
+        OBJECTS += $(OBJ_DIR)/gc_hal_user_dri.o \
+                   $(OBJ_DIR)/XF86dri.o \
+                   $(OBJ_DIR)/xf86drm.o \
+                   $(OBJ_DIR)/xf86drmHash.o \
+                   $(OBJ_DIR)/xf86drmRandom.o
+      else
+        ifeq ($(EGL_API_X),1)
+          OBJECTS += $(OBJ_DIR)/gc_hal_user_x.o
+        endif
+      endif
+    endif
+  endif
+endif
+
+################################################################################
+# Define targets.
+
+.PHONY: all clean install
+
+all: $(TARGET_MODULE)
+
+clean:
+	@rm -rf $(OBJ_DIR)
+
+install: all
+
+ifeq ($(gcdSTATIC_LINK), 1)
+install:
+	@mkdir -p $(INSTALL_DIR)
+	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
+endif
+
+################################################################################
+# Module rules.
+
+$(TARGET_MODULE): $(OBJECTS)
+	$(AR) -r -c $@ $(OBJECTS)
+ifneq ($(USE_ARMCC), 1)
+	$(RANLIB) $@
+endif
+
+################################################################################
+# Object rules.
+
+ifeq ($(EGL_API_DRI),1)
+$(OBJ_DIR)/%.o: ../../../../driver/X/DRI/src/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -MMD -o $@ $<
+endif
+
+$(OBJ_DIR)/%.o: %.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -MMD -o $@ $<
+
+# object dependencies.
+-include $(OBJECTS:.o=.d)
+

@@ -1,0 +1,280 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# Linux build file for OpenGL ES 1.1 library.
+#
+
+################################################################################
+# Include common definitions.
+
+include $(AQROOT)/makefile.linux.def
+
+################################################################################
+# Define target module name.
+
+OBJ_DIR_CL          := $(OBJ_DIR)_cl
+OBJ_DIR_V1_CL       := $(OBJ_DIR)_v1_cl
+OBJ_DIR_CM          := $(OBJ_DIR)_cm
+OBJ_DIR_V1_CM       := $(OBJ_DIR)
+
+ifeq ($(gcdSTATIC_LINK), 1)
+  STATIC            := 1
+  GLES_CL           := $(OBJ_DIR_CL)/libGLES_CL.a
+  GLES_CM           := $(OBJ_DIR_CM)/libGLES_CM.a
+  GLES_V1_CL        := $(OBJ_DIR_V1_CL)/libGLESv1_CL.a
+  GLES_V1_CM        := $(OBJ_DIR_V1_CM)/libGLESv1_CM.a
+else
+  DYNAMIC           := 1
+  GLES_CL           := $(OBJ_DIR_CL)/libGLES_CL.so
+  GLES_CM           := $(OBJ_DIR_CM)/libGLES_CM.so
+  GLES_V1_CL        := $(OBJ_DIR_V1_CL)/libGLESv1_CL.so
+  GLES_V1_CM        := $(OBJ_DIR_V1_CM)/libGLESv1_CM.so
+
+  # Define target soname.
+  GLES_CL_SONAME    := libGLES_CL.so
+  GLES_CM_SONAME    := libGLES_CM.so
+  GLES_V1_CL_SONAME := libGLESv1_CL.so
+  GLES_V1_CM_SONAME := libGLESv1_CM.so
+endif
+
+TARGET_MODULES      := $(GLES_CL)
+TARGET_MODULES      += $(GLES_CM)
+TARGET_MODULES      += $(GLES_V1_CL)
+TARGET_MODULES      += $(GLES_V1_CM)
+
+################################################################################
+# Installation directory.
+
+INSTALL_DIR         := $(SDK_DIR)/drivers
+
+################################################################################
+# Supply additional include directories.
+
+INCLUDE := -I$(AQROOT)/hal/inc \
+           -I$(AQROOT)/hal/os/linux/user \
+           -I$(AQROOT)/hal/user \
+           -I$(AQARCH)/cmodel/inc \
+           -I$(AQROOT)/sdk/inc \
+           -I$(AQROOT)/compiler/libVSC/include \
+           -I$(AQROOT)/driver/khronos/libEGL/inc
+
+ifeq ($(EGL_API_DFB), 1)
+  INCLUDE += -I$(DFB_DIR)/usr/include \
+             -I$(DFB_DIR)/include \
+             -I$(DFB_DIR)/include/directfb-internal \
+             -I$(DFB_DIR)/include/directfb
+endif
+
+ifeq ($(EGL_API_DRI), 1)
+  INCLUDE += -I$(X11_ARM_DIR)/include
+endif
+
+ifeq ($(EGL_API_X), 1)
+  INCLUDE += -I$(X11_ARM_DIR)/include
+endif
+
+CFLAGS += $(INCLUDE)
+
+################################################################################
+# Add extra flags for object files.
+
+ifneq ($(USE_ARMCC), 1)
+  ifeq ($(EGL_API_DFB), 1)
+    CFLAGS  += -pipe -fPIC
+  else
+    CFLAGS += -fPIC -Werror -ansi
+  endif
+endif
+
+ifeq ($(EGL_API_DFB), 1)
+  CFLAGS  += -DPIC
+endif
+
+CFLAGS += -D__GL_EXPORTS
+
+
+################################################################################
+# Define flags for the linker.
+
+ifneq ($(USE_ARMCC),1)
+  ifeq ($(GL_11_APPENDIX),)
+    LFLAGS += -Wl,--version-script=libGLESv11.map
+  endif
+endif
+
+ifeq ($(USE_ARMCC),1)
+  LFAGS += --shared
+else
+  LFLAGS += -Wall -shared -Wl,-z,defs
+endif
+
+ifeq ($(USE_ARMCC),1)
+  SONAME_OPTION := -L--soname=,
+else
+  SONAME_OPTION := -Wl,-soname,
+endif
+
+################################################################################
+# Supply dependent libraries.
+
+LIBS := -L$(SDK_DIR)/drivers \
+        -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL \
+        -L$(AQROOT)/compiler/libVSC/$(OBJ_DIR) -lVSC \
+        -L$(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR) -lEGL -lm
+
+################################################################################
+# Describe object files.
+
+OBJECTS := gc_glff.o \
+           gc_glff_alpha.o \
+           gc_glff_basic_types.o \
+           gc_glff_buffer.o \
+           gc_glff_clear.o \
+           gc_glff_clip_plane.o \
+           gc_glff_context.o \
+           gc_glff_cull.o \
+           gc_glff_depth.o \
+           gc_glff_draw.o \
+           gc_glff_egl.o \
+           gc_glff_enable.o \
+           gc_glff_fixed_func.o \
+           gc_glff_fragment_shader.o \
+           gc_glff_frag_proc.o \
+           gc_glff_framebuffer.o \
+           gc_glff_fog.o\
+           gc_glff_hash.o \
+           gc_glff_lighting.o \
+           gc_glff_line.o \
+           gc_glff_matrix.o \
+           gc_glff_multisample.o \
+           gc_glff_named_object.o \
+           gc_glff_pixel.o \
+           gc_glff_point.o \
+           gc_glff_query.o \
+           gc_glff_renderbuffer.o \
+           gc_glff_render_thread.o \
+           gc_glff_states.o \
+           gc_glff_stream.o \
+           gc_glff_texture.o \
+           gc_glff_vertex_shader.o \
+           gc_glff_viewport.o \
+           gc_glff_profiler.o
+
+GLES_CL_OBJECTS     := $(addprefix $(OBJ_DIR_CL)/,$(OBJECTS))
+GLES_CM_OBJECTS     := $(addprefix $(OBJ_DIR_CM)/,$(OBJECTS))
+GLES_V1_CL_OBJECTS  := $(addprefix $(OBJ_DIR_V1_CL)/,$(OBJECTS))
+GLES_V1_CM_OBJECTS  := $(addprefix $(OBJ_DIR_V1_CM)/,$(OBJECTS))
+
+################################################################################
+# Define targets.
+
+.PHONY: all clean install
+
+all: $(TARGET_MODULES)
+
+clean:
+	@rm -rf $(OBJ_DIR_CL) $(OBJ_DIR_CM) $(OBJ_DIR_V1_CL) $(OBJ_DIR_V1_CM)
+
+install: all
+	@mkdir -p $(INSTALL_DIR)
+	@-cp $(TARGET_MODULES) $(INSTALL_DIR)
+	@mkdir -p $(SDK_DIR)/drivers
+	@mkdir -p $(SDK_DIR)/include/GLES
+	@-cp -f $(AQROOT)/sdk/inc/GLES/*.h $(SDK_DIR)/include/GLES
+
+################################################################################
+# Module rules.
+
+ifeq ($(STATIC),1)
+
+$(GLES_CL): $(GLES_CL_OBJECTS)
+	$(AR) -r -c $@ $(GLES_CL_OBJECTS)
+ifneq ($(USE_ARMCC),1)
+	$(RANLIB) $@
+endif
+
+$(GLES_CM): $(GLES_CM_OBJECTS)
+	$(AR) -r -c $@ $(GLES_CM_OBJECTS)
+ifneq ($(USE_ARMCC),1)
+	$(RANLIB) $@
+endif
+
+$(GLES_V1_CL): $(GLES_V1_CL_OBJECTS)
+	$(AR) -r -c $@ $(GLES_V1_CL_OBJECTS)
+ifneq ($(USE_ARMCC),1)
+	$(RANLIB) $@
+endif
+
+$(GLES_V1_CM): $(GLES_V1_CM_OBJECTS)
+	$(AR) -r -c $@ $(GLES_V1_CM_OBJECTS)
+ifneq ($(USE_ARMCC),1)
+	$(RANLIB) $@
+endif
+
+endif # End STATIC
+
+ifeq ($(DYNAMIC),1)
+
+# module dependencies
+$(TARGET_MODULES): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so \
+                              $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.a) \
+                   $(wildcard $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.so \
+                              $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.a) \
+                   $(wildcard $(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)/libEGL.so \
+                              $(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)/libEGL.a)
+
+$(GLES_CL):     TARGET_SONAME := $(GLES_CL_SONAME)
+$(GLES_CM):     TARGET_SONAME := $(GLES_CM_SONAME)
+$(GLES_V1_CL):  TARGET_SONAME := $(GLES_V1_CL_SONAME)
+$(GLES_V1_CM):  TARGET_SONAME := $(GLES_V1_CM_SONAME)
+
+$(GLES_CL): $(GLES_CL_OBJECTS)
+	$(CC) $(LFLAGS) $(SONAME_OPTION)$(TARGET_SONAME) -o $@ $(GLES_CL_OBJECTS) $(LIBS)
+
+$(GLES_CM): $(GLES_CM_OBJECTS)
+	$(CC) $(LFLAGS) $(SONAME_OPTION)$(TARGET_SONAME) -o $@ $(GLES_CM_OBJECTS) $(LIBS)
+
+$(GLES_V1_CL): $(GLES_V1_CL_OBJECTS)
+	$(CC) $(LFLAGS) $(SONAME_OPTION)$(TARGET_SONAME) -o $@ $(GLES_V1_CL_OBJECTS) $(LIBS)
+
+$(GLES_V1_CM): $(GLES_V1_CM_OBJECTS)
+	$(CC) $(LFLAGS) $(SONAME_OPTION)$(TARGET_SONAME) -o $@ $(GLES_V1_CM_OBJECTS) $(LIBS)
+
+endif # End DYNAMIC
+
+################################################################################
+# Object rules.
+
+$(OBJ_DIR_CL)/%.o: %.c
+	@mkdir -p $(OBJ_DIR_CL)
+	$(CC) -c $(CFLAGS) -DCOMMON_LITE -DgcdES11_CORE_WITH_EGL -MMD -o $@ $<
+
+$(OBJ_DIR_CM)/%.o: %.c
+	@mkdir -p $(OBJ_DIR_CM)
+	$(CC) -c $(CFLAGS) -UCOMMON_LITE -DgcdES11_CORE_WITH_EGL -MMD -o $@ $<
+
+$(OBJ_DIR_V1_CL)/%.o: %.c
+	@mkdir -p $(OBJ_DIR_V1_CL)
+	$(CC) -c $(CFLAGS) -DCOMMON_LITE -UgcdES11_CORE_WITH_EGL -MMD -o $@ $<
+
+$(OBJ_DIR_V1_CM)/%.o: %.c
+	@mkdir -p $(OBJ_DIR_V1_CM)
+	$(CC) -c $(CFLAGS) -UCOMMON_LITE -UgcdES11_CORE_WITH_EGL -MMD -o $@ $<
+
+# object dependencies.
+-include $(GLES_CL_OBJECTS:.o=.d)
+-include $(GLES_CM_OBJECTS:.o=.d)
+-include $(GLES_V1_CL_OBJECTS:.o=.d)
+-include $(GLES_V1_CM_OBJECTS:.o=.d)
+

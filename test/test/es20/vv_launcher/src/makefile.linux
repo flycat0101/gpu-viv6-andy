@@ -1,0 +1,114 @@
+##############################################################################
+#
+#    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+#    All Rights Reserved.
+#
+#    Permission is hereby granted, free of charge, to any person obtaining
+#    a copy of this software and associated documentation files (the
+#    'Software'), to deal in the Software without restriction, including
+#    without limitation the rights to use, copy, modify, merge, publish,
+#    distribute, sub license, and/or sell copies of the Software, and to
+#    permit persons to whom the Software is furnished to do so, subject
+#    to the following conditions:
+#
+#    The above copyright notice and this permission notice (including the
+#    next paragraph) shall be included in all copies or substantial
+#    portions of the Software.
+#
+#    THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
+#    EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+#    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
+#    IN NO EVENT SHALL VIVANTE AND/OR ITS SUPPLIERS BE LIABLE FOR ANY
+#    CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+#    TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+#    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+##############################################################################
+
+
+#
+# Linux build file for vv_launcher
+#
+TOP_DIR	:= ../
+
+################################################################################
+# Include the common difinitions.
+include $(TOP_DIR)/makefile.linux.def
+
+
+################################################################################
+# Define the program.
+
+PROGRAM		:= 1
+TARGET_NAME	:= vv_launcher
+
+################################################################################
+# Describe object files.
+
+OBJECTS = 	$(OBJ_DIR)/Chiclet.o \
+			$(OBJ_DIR)/ChicletProg.o \
+			$(OBJ_DIR)/ContentProg.o \
+			$(OBJ_DIR)/EnvProg.o \
+			$(OBJ_DIR)/Geodesic.o \
+			$(OBJ_DIR)/LauncherApp.o \
+			$(OBJ_DIR)/resources.o \
+			$(OBJ_DIR)/vv_main.o
+
+###############################################################################
+# Additional include directories.
+
+CFLAGS	+= -I$(TOP_DIR)/lib
+
+################################################################################
+# Installation directory.
+INSTALL_DIR = $(SDK_DIR)/samples/es20/vv_launcher
+ifeq ($(gcdSTATIC_LINK), 1)
+    LIBS += $(VIVANTE_SDK_LIB)/libVIVANTE.a
+	LIBS += -l m -l pthread -l dl -lrt
+else
+    # Specify libraries.
+    ifeq ($(QNX), 1)
+        LIBS += -lGLESv2 -lEGL -lm
+    else
+        LIBS += -l m -l pthread -l dl -lrt
+        LIBS += -L$(VIVANTE_SDK_LIB) -l EGL
+        LIBS += -L$(VIVANTE_SDK_LIB) -l GAL
+        LIBS += -L$(VIVANTE_SDK_LIB) -lGLESv2
+    endif
+
+    ifeq ($(USE_VDK), 1)
+        LIBS += -L$(VIVANTE_SDK_LIB) -l VDK
+    endif
+    ifneq ($(QNX), 1)
+        LIBS += -lm -lpthread -ldl -lstdc++ -lrt
+        ifeq ($(EGL_API_DRI), 1)
+            LIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11
+        endif
+        ifeq ($(EGL_API_X), 1)
+            LIBS += -L$(X11_ARM_DIR)/lib -lXau -lXdmcp -lX11
+        endif
+        ifeq ($(EGL_API_DFB), 1)
+            LIBS += -L$(DFB_DIR)/lib -ldirectfb -ldirect -lfusion
+        endif
+    endif
+
+endif
+LIBS += $(TOP_DIR)/lib/glutils/$(OBJ_DIR)/libglutils.a
+LIBS += $(TOP_DIR)/lib/math/$(OBJ_DIR)/libmath.a
+LIBS += $(TOP_DIR)/lib/rc/$(OBJ_DIR)/librc.a
+
+################################################################################
+# Include the common makefile.
+
+include $(AQROOT)/common.target
+
+################################################################################
+# Extra installation.
+
+install: extra_install
+
+.PHONY: extra_install
+extra_install:
+	@-mkdir -p $(INSTALL_DIR)
+	@-cp ../script/*.sh  $(INSTALL_DIR)/
+

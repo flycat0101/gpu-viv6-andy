@@ -1,0 +1,11 @@
+{
+	global:
+		gcCompileKernel;
+		gcCLCompileProgram;
+		gcLoadKernelCompiler;
+		gcUnloadKernelCompiler;
+
+	local:
+		*;
+};
+

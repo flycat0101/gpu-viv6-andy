@@ -1,0 +1,134 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+################################################################################
+# Include common definitions.
+
+include $(AQROOT)/makefile.linux.def
+
+OBJ_DIR_ORIG := $(OBJ_DIR)
+
+################################################################################
+# Define shared library output name.
+
+ifeq ($(gcdSTATIC_LINK), 1)
+STATIC=1
+TARGET_NAME = libOpenVG.a
+else
+DYNAMIC=1
+TARGET_NAME = libOpenVG.so
+endif
+
+TARGET_OUTPUT = $(OBJ_DIR)/$(TARGET_NAME)
+
+################################################################################
+# Installation directory.
+
+INSTALL_DIR = $(SDK_DIR)/drivers
+
+################################################################################
+# Supply additional include directories.
+
+INCLUDE += -I$(AQROOT)/hal/inc
+INCLUDE += -I$(AQARCH)/cmodel/inc
+INCLUDE += -I$(AQROOT)/sdk/inc
+INCLUDE += -I$(AQROOT)/compiler/libVSC/include
+INCLUDE += -I$(AQROOT)/driver/khronos/libEGL/inc
+INCLUDE += -I$(AQROOT)/hal/os/linux/user
+ifeq ($(EGL_API_DFB), 1)
+    INCLUDE += -I$(DFB_DIR)/usr/include
+    INCLUDE += -I$(DFB_DIR)/include
+    INCLUDE += -I$(DFB_DIR)/include/directfb-internal
+    INCLUDE += -I$(DFB_DIR)/include/directfb
+endif
+ifeq ($(EGL_API_DRI), 1)
+INCLUDE += -I$(X11_ARM_DIR)/include
+endif
+ifeq ($(EGL_API_X), 1)
+INCLUDE += -I$(X11_ARM_DIR)/include
+endif
+
+CFLAGS += $(INCLUDE)
+
+################################################################################
+# Add extra flags for object files.
+
+CFLAGS += -fPIC -D__GL_EXPORTS -Werror
+ifneq ($(USE_ARMCC), 1)
+ifeq ($(EGL_API_DFB), 1)
+CFLAGS  += -pipe -fPIC
+endif
+endif
+
+ifeq ($(ADROID),0)
+CFLAGS += -ansi
+endif
+ifeq ($(EGL_API_DFB), 1)
+CFLAGS  += -DPIC
+endif
+
+LFLAGS += -Wl,--version-script=libOpenVG.map
+
+################################################################################
+# Supply dependent libraries.
+
+LIBS += -L$(GAL_DIR)/user/$(OBJ_DIR_ORIG)
+LIBS += -lGAL
+LIBS += -pthread -lm
+
+################################################################################
+# Describe object files.
+
+OBJECTS = $(OBJ_DIR)/gc_vg_arc.o \
+          $(OBJ_DIR)/gc_vg_context.o \
+          $(OBJ_DIR)/gc_vg_debug.o \
+          $(OBJ_DIR)/gc_vg_filter.o \
+          $(OBJ_DIR)/gc_vg_format.o \
+          $(OBJ_DIR)/gc_vg_image.o \
+          $(OBJ_DIR)/gc_vg_main.o \
+          $(OBJ_DIR)/gc_vg_mask.o \
+          $(OBJ_DIR)/gc_vg_matrix.o \
+          $(OBJ_DIR)/gc_vg_memory_manager.o \
+          $(OBJ_DIR)/gc_vg_object.o \
+          $(OBJ_DIR)/gc_vg_paint.o \
+          $(OBJ_DIR)/gc_vg_path.o \
+          $(OBJ_DIR)/gc_vg_path_append.o \
+          $(OBJ_DIR)/gc_vg_path_coordinate.o \
+          $(OBJ_DIR)/gc_vg_path_import.o \
+          $(OBJ_DIR)/gc_vg_path_interpolate.o \
+          $(OBJ_DIR)/gc_vg_path_modify.o \
+          $(OBJ_DIR)/gc_vg_path_normalize.o \
+          $(OBJ_DIR)/gc_vg_path_point_along.o \
+          $(OBJ_DIR)/gc_vg_path_storage.o \
+          $(OBJ_DIR)/gc_vg_path_transform.o \
+          $(OBJ_DIR)/gc_vg_path_walker.o \
+          $(OBJ_DIR)/gc_vg_state.o \
+          $(OBJ_DIR)/gc_vg_stroke.o \
+          $(OBJ_DIR)/gc_vg_text.o \
+          $(OBJ_DIR)/gc_vgu_library.o
+
+include $(AQROOT)/common.target
+
+################################################################################
+# Extra installation.
+
+install: $(TARGET_OUTPUT) extra_install
+
+.PHONY: extra_install
+extra_install: $(TARGET_OUTPUT)
+	@mkdir -p $(SDK_DIR)/drivers
+	@mkdir -p $(SDK_DIR)/include
+	@-cp -rf $(AQROOT)/sdk/inc/VG $(SDK_DIR)/include
+ifeq ($(gcdSTATIC_LINK), 0)
+	@-cp -rf $(TARGET_OUTPUT) $(INSTALL_DIR)/libOpenVG.2d.so
+endif

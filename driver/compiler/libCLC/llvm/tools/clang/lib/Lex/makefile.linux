@@ -1,0 +1,98 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+
+#
+# Linux build file for LLVM library.
+#
+
+################################################################################
+# Include common definitions.
+
+include ../makefile.linux.def
+
+STATIC		:= 1
+TARGET_NAME	:= libclangLex.a
+
+ifndef FIXED_ARCH_TYPE
+################################################################################
+# Supply additional include directories.
+
+CFLAGS	+=	$(INCLUDE) $(CDEFS)
+
+################################################################################
+# Add extra flags for object files.
+
+ifneq ($(USE_ARMCC), 1)
+CFLAGS += -fPIC -w
+endif
+
+################################################################################
+# Describe object files.
+
+OBJECTS :=	HeaderMap.o \
+			HeaderSearch.o \
+			Lexer.o \
+			LiteralSupport.o \
+			MacroArgs.o \
+			MacroInfo.o \
+			PPCaching.o \
+			PPDirectives.o \
+			PPExpressions.o \
+			PPLexerChange.o \
+			PPMacroExpansion.o \
+			Pragma.o \
+			PreprocessingRecord.o \
+			Preprocessor.o \
+			PreprocessorLexer.o \
+			PTHLexer.o \
+			ScratchBuffer.o \
+			TokenConcatenation.o \
+			TokenLexer.o
+
+OBJS	:=	$(addprefix $(OBJ_DIR)/,$(OBJECTS))
+OBJECTS	:=	$(OBJS)
+endif
+
+################################################################################
+# Define the macros used in common makefile.
+ifeq ($(gcdSTATIC_LINK), 1)
+INSTALL_DIR = $(SDK_DIR)/drivers
+endif
+
+################################################################################
+# Include the common makefile.
+
+include $(AQROOT)/common.target
+
+ifdef FIXED_ARCH_TYPE
+
+OBJECTS :=
+
+clean: rmfile
+
+install: cpfile
+
+.PHONY: cpfile rmfile
+cpfile:
+ifeq ($(gcdSTATIC_LINK), 1)
+	@-cp -f $(FIXED_ARCH_TYPE)/$(TARGET_NAME) $(INSTALL_DIR)/
+endif
+
+rmfile:
+ifeq ($(gcdSTATIC_LINK), 1)
+	@-rm -f $(INSTALL_DIR)/$(TARGET_NAME)
+endif
+
+endif
+

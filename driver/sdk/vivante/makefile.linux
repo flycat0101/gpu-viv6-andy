@@ -1,0 +1,419 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+
+# Default appendix for GL name collision.
+GL_11_APPENDIX ?= _es11
+GL_2_APPENDIX  ?= _es2
+GL_3_APPENDIX  ?= _es3
+OS_DIR=linux
+
+# Include common makefile.
+include $(AQROOT)/makefile.linux.def
+
+# Define target to build.
+ifeq ($(gcdSTATIC_LINK),1)
+	STATIC = 1
+else
+	DYNAMIC = 1
+endif
+
+ifeq ($(STATIC), 1)
+	TARGET_NAME = libVIVANTE.a
+else
+	TARGET_NAME = libVIVANTE.so
+endif
+
+TARGET_OUTPUT = $(OBJ_DIR)/$(TARGET_NAME)
+
+# Set installation directory.
+INSTALL_DIR = $(SDK_DIR)/drivers
+
+# Set source directories.
+vpath %.c $(AQROOT)/hal/user
+vpath %.c $(AQROOT)/hal/os/$(OS_DIR)/user
+ifeq ($(VIVANTE_ENABLE_3D),1)
+vpath %.c $(AQROOT)/sdk/vdk
+vpath %.c $(AQROOT)/driver/khronos/libEGL/source
+vpath %.c $(AQROOT)/driver/khronos/libEGL/api
+vpath %.c $(AQROOT)/driver/khronos/libEGL/os
+vpath %.c $(AQROOT)/driver/khronos/libGLESv11
+vpath %.c $(AQROOT)/driver/khronos/libGLESv3/src/glcore
+vpath %.c $(AQROOT)/driver/khronos/libGLESv3/src/chip
+vpath %.c $(AQROOT)/compiler/libGLSLC/common
+vpath %.c $(AQROOT)/compiler/libGLSLC/compiler
+vpath %.c $(AQROOT)/compiler/libGLSLC/preprocessor
+vpath %.c $(AQROOT)/compiler/libGLSLC/entry
+ifneq ($(VIVANTE_NO_VG), 1)
+ifeq ($(VIVANTE_ENABLE_VG),1)
+vpath %.c $(AQROOT)/driver/khronos/libOpenVG
+else
+vpath %.c $(AQROOT)/driver/khronos/libOpenVG_3D/vg11/driver
+endif
+endif
+endif
+ifeq ($(EGL_API_DRI),1)
+vpath %.c $(AQROOT)/driver/X/DRI/src
+endif
+
+# Set include directories.
+INC_DIR = \
+	$(AQROOT)/hal/inc \
+	$(AQROOT)/hal/user \
+	$(AQROOT)/hal/os/$(OS_DIR)/user \
+	$(AQROOT)/sdk/inc \
+	$(AQROOT)/hal/user/arch \
+	$(AQROOT)/hal/user/archvg \
+
+INC_DIR += \
+    $(AQROOT)/driver/khronos/libGLESv3/include/chip \
+    $(AQROOT)/driver/khronos/libGLESv3/include/glcore \
+    $(AQROOT)/driver/khronos/libGLESv3/src/glcore \
+
+CFLAGS += -DGL_GLEXT_PROTOTYPES -D_LINUX_
+
+ifeq ($(VIVANTE_ENABLE_3D),1)
+INC_DIR += \
+	$(AQROOT)/driver/khronos/libEGL/os \
+	$(AQROOT)/driver/khronos/libEGL/source \
+	$(AQROOT)/driver/khronos/libEGL/inc \
+	$(AQROOT)/driver/khronos/libEGL/api \
+	$(AQROOT)/compiler/libVSC/include \
+	$(AQROOT)/compiler/libGLSLC/inc
+endif
+
+ifeq ($(EGL_API_WL), 1)
+INC_DIR += \
+    $(WAYLAND_DIR)/include \
+    $(WAYLAND_DIR)/include/wayland-viv
+
+LIBS += -L$(WAYLAND_DIR)/lib -lwayland-client
+LIBS += -L$(WAYLAND_DIR)/lib -lgc_wayland_protocol -lwayland-server
+endif
+
+ifeq ($(EGL_API_DFB), 1)
+INC_DIR += $(DFB_DIR)/usr/include \
+    $(DFB_DIR)/include \
+    $(DFB_DIR)/include/directfb-internal \
+    $(DFB_DIR)/include/directfb
+
+    LIBS    += -L$(DFB_DIR)/lib -ldirectfb -ldirect -lz
+endif
+
+ifeq ($(EGL_API_DRI),1)
+INC_DIR += \
+    $(X11_ARM_DIR)/include \
+    $(X11_ARM_DIR)/include/X11/extensions \
+    $(AQROOT)/driver/X/DRI/src
+
+LIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lX11 -ldrm
+endif
+
+ifeq ($(EGL_API_X), 1)
+INC_DIR += \
+    $(X11_ARM_DIR)/include
+
+LIBS += -L$(X11_ARM_DIR)/lib -lX11 -lXext
+endif
+
+CFLAGS += $(addprefix -I,$(INC_DIR))
+
+ifeq ($(VIVANTE_NO_VG), 1)
+	CFLAGS += -DVIVANTE_NO_VG
+endif
+
+ifneq ($(USE_ARMCC), 1)
+ifeq ($(EGL_API_DFB), 1)
+CFLAGS  += -pipe -fPIC
+else
+ifneq ($(EGL_API_WL), 1)
+ifeq ($(EGL_API_DRI), 1)
+	CFLAGS += -fPIC -Werror
+else
+	CFLAGS += -fPIC -Werror -MD -ansi
+endif
+endif
+endif
+endif
+ifeq ($(EGL_API_WL), 1)
+CFLAGS += -fPIC -Werror -MD -ansi
+endif
+ifeq ($(EGL_API_DFB), 1)
+CFLAGS  += -DPIC
+endif
+
+# libGAL
+libGAL_SOURCE := $(wildcard \
+					$(AQROOT)/hal/user/*.c \
+					$(AQROOT)/hal/user/arch/*.c \
+					$(AQROOT)/hal/os/$(OS_DIR)/user/*.c \
+					)
+
+OBJECTS += \
+	$(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(libGAL_SOURCE))))
+
+ifeq ($(VIVANTE_ENABLE_VG),1)
+ARCHVG_SOURCE := $(wildcard \
+					$(AQROOT)/hal/user/archvg/*.c \
+					)
+
+OBJECTS += \
+	$(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(ARCHVG_SOURCE))))
+endif
+
+ifeq ($(EGL_API_DRI),1)
+libDRI_SOURCE = $(wildcard \
+                   $(AQROOT)/driver/X/DRI/src/*.c \
+                   )
+OBJECTS += \
+	$(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(libDRI_SOURCE))))
+endif
+
+ifeq ($(VIVANTE_ENABLE_3D),1)
+# libVDK
+libVDK_SOURCE = $(wildcard \
+					$(AQROOT)/sdk/vdk/*_egl.c \
+					$(AQROOT)/sdk/vdk/*_gl.c \
+					$(AQROOT)/sdk/vdk/gc_vdk.c \
+					$(AQROOT)/sdk/vdk/gc_vdk_hal.c \
+					)
+
+ifeq ($(USE_VDK),1)
+OBJECTS += \
+	$(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(libVDK_SOURCE))))
+endif
+
+
+# libEGL
+libEGL_SOURCE = $(wildcard \
+					$(AQROOT)/driver/khronos/libEGL/source/*.c \
+					$(AQROOT)/driver/khronos/libEGL/os/*_$(OS_DIR).c \
+					)
+libEGL_SOURCE += $(wildcard $(AQROOT)/driver/khronos/libEGL/api/*_platform.c)
+OBJECTS += \
+	$(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(libEGL_SOURCE))))
+
+#libGLES_CM
+libGLES_CM_SOURCE = $(wildcard $(AQROOT)/driver/khronos/libGLESv11/*.c)
+OBJECTS += \
+	$(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(libGLES_CM_SOURCE))))
+
+# libGLESv2
+libGLESv2_SOURCE = $(wildcard \
+                        $(AQROOT)/driver/khronos/libGLESv3/src/chip/*.c \
+                        $(AQROOT)/driver/khronos/libGLESv3/src/glcore/*.c \
+                        )
+OBJECTS += \
+    $(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(libGLESv2_SOURCE))))
+
+libVSC_SOURCE :=\
+	$(wildcard \
+		$(AQROOT)/compiler/libVSC/old_impl/*.c \
+		$(AQROOT)/compiler/libVSC/old_impl/optimizer/*.c \
+		)
+
+ifeq ($(VSC_VIR_BUILD),1)
+libVSC_SOURCE += \
+	$(wildcard \
+		$(AQROOT)/compiler/libVSC/asm/*.c \
+		$(AQROOT)/compiler/libVSC/chip/*.c \
+		$(AQROOT)/compiler/libVSC/drvi/*.c \
+		$(AQROOT)/compiler/libVSC/utils/*.c \
+		$(AQROOT)/compiler/libVSC/utils/array/*.c \
+		$(AQROOT)/compiler/libVSC/utils/base/*.c \
+		$(AQROOT)/compiler/libVSC/utils/bitvector/*.c \
+		$(AQROOT)/compiler/libVSC/utils/graph/*.c \
+		$(AQROOT)/compiler/libVSC/utils/hash/*.c \
+		$(AQROOT)/compiler/libVSC/utils/list/*.c \
+		$(AQROOT)/compiler/libVSC/utils/mm/*.c \
+		$(AQROOT)/compiler/libVSC/utils/string/*.c \
+		$(AQROOT)/compiler/libVSC/utils/table/*.c \
+		$(AQROOT)/compiler/libVSC/utils/tree/*.c \
+		$(AQROOT)/compiler/libVSC/vir/analysis/*.c \
+		$(AQROOT)/compiler/libVSC/vir/codegen/*.c \
+		$(AQROOT)/compiler/libVSC/vir/ir/*.c \
+		$(AQROOT)/compiler/libVSC/vir/lower/*.c \
+		$(AQROOT)/compiler/libVSC/vir/passmanager/*.c \
+		$(AQROOT)/compiler/libVSC/vir/transform/*.c \
+		)
+endif
+
+OBJECTS += \
+	$(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(libVSC_SOURCE))))
+
+
+# libGLSLC
+libGLSLC_SOURCE = \
+	$(wildcard $(AQROOT)/compiler/libGLSLC/*/*.c)
+
+OBJECTS += \
+	$(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(libGLSLC_SOURCE))))
+
+ifneq ($(VIVANTE_NO_VG), 1)
+ifeq ($(VIVANTE_ENABLE_VG),1)
+CFLAGS += -I$(AQROOT)/driver/khronos/libOpenVG
+lib2DVG_SOURCE = $(wildcard $(AQROOT)/driver/khronos/libOpenVG/*.c)
+FILTER_C_FILES := $(AQROOT)/driver/khronos/libOpenVG/gc_vg_format_writer.c
+FILTER_C_FILES += $(AQROOT)/driver/khronos/libOpenVG/gc_vg_format_reader.c
+FILTER_C_FILES += $(FILTER_C_FILES) $(AQROOT)/driver/khronos/libOpenVG/gc_vg_format_array.c
+FILTER_C_FILES += $(FILTER_C_FILES) $(AQROOT)/driver/khronos/libOpenVG/gc_vg_format_lookup.c
+libOpenVG_SOURCE = $(filter-out $(FILTER_C_FILES),$(lib2DVG_SOURCE))
+
+OBJECTS += \
+	$(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(libOpenVG_SOURCE))))
+else
+libOpenVG_SOURCE = $(wildcard $(AQROOT)/driver/khronos/libOpenVG_3D/vg11/driver/*.c)
+OBJECTS += \
+	$(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(libOpenVG_SOURCE))))
+endif
+endif # VIVANTE_NO_VG
+ifdef FIXED_ARCH_TYPE
+OBJECTS += $(AQROOT)/sdk/vivante/$(FIXED_ARCH_TYPE)/*.o
+endif
+endif
+
+ifneq ($(gcdSTATIC_LINK), 1)
+LIBS += -lm -pthread -ldl
+endif
+
+
+$(OBJ_DIR)/%.o: $(AQROOT)/hal/user/arch/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+ifeq ($(VIVANTE_ENABLE_VG),1)
+$(OBJ_DIR)/%.o: $(AQROOT)/hal/user/archvg/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQVGARCH)/cmodel/inc -o $@ $<
+endif
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/old_impl/optimizer/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/old_impl/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+ifeq ($(VSC_VIR_BUILD),1)
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/asm/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/chip/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/drvi/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/utils/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/utils/array/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/utils/base/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/utils/bitvector/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/utils/graph/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/utils/hash/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/utils/list/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/utils/mm/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/utils/string/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/utils/table/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/utils/tree/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/vir/analysis/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/vir/codegen/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/vir/ir/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/vir/lower/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/vir/passmanager/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/vir/transform/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+endif
+
+include $(AQROOT)/common.target
+
+ifneq ($(wildcard $(OBJ_DIR)/*.d),)
+include $(wildcard $(OBJ_DIR)/*.d)
+endif
+
+install: $(TARGET_OUTPUT) extra_install
+
+.PHONY: extra_install
+extra_install: $(TARGET_OUTPUT)
+	@-mkdir -p $(INSTALL_DIR)
+ifeq ($(gcdSTATIC_LINK), 0)
+ifeq ($(EGL_API_FB), 1)
+ifeq ($(EGL_API_WL), 1)
+	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.wl.so
+else
+	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.fb.so
+endif # EGL_API_WL
+else
+ifeq ($(EGL_API_DRI), 1)
+	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.dri.so
+endif # EGL_API_DRI
+ifeq ($(EGL_API_X), 1)
+	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.x11.so
+endif # EGL_API_X
+ifeq ($(EGL_API_DFB), 1)
+	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.dfb.so
+endif # EGL_API_DFB
+endif # EGL_API_FB
+endif # gcdSTATIC_LINK

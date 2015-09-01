@@ -1,0 +1,31 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# This is the SOURCES file for OpenGL code
+#
+include ../../../makefile.linux.def
+
+STATIC = 1
+TARGET_NAME=libgl2programmable.a
+
+OBJECTS = \
+    $(OBJ_DIR)/gc_gl_program.o \
+    $(OBJ_DIR)/gc_gl_shader.o
+
+ifeq ($(gcdSTATIC_LINK), 1)
+INSTALL_DIR = $(SDK_DIR)/drivers
+endif
+
+include $(AQROOT)/common.target
+

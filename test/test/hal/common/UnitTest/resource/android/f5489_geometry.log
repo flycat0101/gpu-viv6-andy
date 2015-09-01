@@ -1,0 +1,12 @@
+Frame 5489: 2 layer(s)
+  layer[0]: BLITTER
+    source=<f5489_l0_h0x457c6048_p43346710_s1200x1848.bmp>, stride=4800
+    rotation=90 DEG mirror=0,0 alpha blending=0
+    ANDROID srcRect=[0, 0, 1200, 1848] dstRect=[0, 0, 1848, 1200]
+    GC srcRect=[0, 0, 1848, 1200] dstRect=[0, 0, 1848, 1200]
+  layer[1]: BLITTER
+    source=<f5489_l1_h0x45700dd0_pbd8e1000_s1200x72.bmp>, stride=2400
+    rotation=90 DEG mirror=0,0 alpha blending=0
+    ANDROID srcRect=[0, 0, 1200, 72] dstRect=[1848, 0, 1920, 1200]
+    GC srcRect=[0, 0, 72, 1200] dstRect=[1848, 0, 1920, 1200]
+  Result=<f5489_fb.bmp>

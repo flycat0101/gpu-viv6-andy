@@ -1,0 +1,99 @@
+;#############################################################################
+;#
+;#   Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+;#
+;#   The material in this file is confidential and contains trade secrets
+;#   of Vivante Corporation. This is proprietary information owned by
+;#   Vivante Corporation. No part of this work may be disclosed,
+;#   reproduced, copied, transmitted, or used in any way for any purpose,
+;#   without the express written permission of Vivante Corporation.
+;#
+;#############################################################################
+
+
+LIBRARY libOpenCL.dll
+
+EXPORTS
+    clGetPlatformIDs
+    clGetPlatformInfo
+    clGetDeviceIDs
+    clGetDeviceInfo
+    clCreateContext
+    clCreateContextFromType
+    clRetainContext
+    clReleaseContext
+    clGetContextInfo
+    clCreateCommandQueue
+    clRetainCommandQueue
+    clReleaseCommandQueue
+    clGetCommandQueueInfo
+    clCreateBuffer
+    clCreateSubBuffer
+    clCreateImage2D
+    clCreateImage3D
+    clRetainMemObject
+    clReleaseMemObject
+    clGetSupportedImageFormats
+    clGetMemObjectInfo
+    clGetImageInfo
+    clSetMemObjectDestructorCallback
+    clCreateSampler
+    clRetainSampler
+    clReleaseSampler
+    clGetSamplerInfo
+    clCreateProgramWithSource
+    clCreateProgramWithBinary
+    clRetainProgram
+    clReleaseProgram
+    clBuildProgram
+    clUnloadCompiler
+    clGetProgramInfo
+    clGetProgramBuildInfo
+    clCreateKernel
+    clCreateKernelsInProgram
+    clRetainKernel
+    clReleaseKernel
+    clSetKernelArg
+    clGetKernelInfo
+    clGetKernelWorkGroupInfo
+    clWaitForEvents
+    clGetEventInfo
+    clCreateUserEvent
+    clRetainEvent
+    clReleaseEvent
+    clSetUserEventStatus
+    clSetEventCallback
+    clGetEventProfilingInfo
+    clFlush
+    clFinish
+    clEnqueueReadBuffer
+    clEnqueueReadBufferRect
+    clEnqueueWriteBuffer
+    clEnqueueWriteBufferRect
+    clEnqueueCopyBuffer
+    clEnqueueCopyBufferRect
+    clEnqueueReadImage
+    clEnqueueWriteImage
+    clEnqueueCopyImage
+    clEnqueueCopyImageToBuffer
+    clEnqueueCopyBufferToImage
+    clEnqueueMapBuffer
+    clEnqueueMapImage
+    clEnqueueUnmapMemObject
+    clEnqueueNDRangeKernel
+    clEnqueueTask
+    clEnqueueNativeKernel
+    clEnqueueMarker
+    clEnqueueWaitForEvents
+    clEnqueueBarrier
+    clCreateFromGLBuffer
+    clCreateFromGLTexture2D
+    clCreateFromGLTexture3D
+    clCreateFromGLRenderbuffer
+    clGetGLObjectInfo
+    clGetGLTextureInfo
+    clEnqueueAcquireGLObjects
+    clEnqueueReleaseGLObjects
+    clGetExtensionFunctionAddress
+    clIcdGetPlatformIDsKHR
+    clGetGLContextInfoKHR

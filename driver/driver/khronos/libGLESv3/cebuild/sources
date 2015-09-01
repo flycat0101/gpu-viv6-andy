@@ -1,0 +1,101 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+!IF "$(VIVANTE_ENABLE_3D)" != "1"
+SKIPBUILD=1
+!ENDIF
+
+
+SYNCHRONIZE_DRAIN = 1
+TARGETNAME=libGLESv2
+TARGETTYPE=DYNLINK
+DLLENTRY=DllMain
+
+INCLUDES = \
+  $(INCLUDES); \
+  ..\include\glcore; \
+  ..\include\chip; \
+  ..\src\glcore; \
+  $(AQROOT)\sdk\inc; \
+  $(AQROOT)\hal\inc; \
+  $(AQROOT)\hal\user; \
+  $(AQROOT)\hal\os\ce\user; \
+  $(AQROOT)\compiler\libVSC\include; \
+  $(AQROOT)\driver\khronos\libEGL\inc; \
+  $(AQROOT)\driver\khronos\libEGL\source
+
+TARGETLIBS = \
+  $(_SYSGENSDKROOT)\lib\$(_CPUINDPATH)\coredll.lib \
+  $(GCLIB_PATH)\libGAL.lib \
+  $(GCLIB_PATH)\libVSC.lib \
+
+CDEFINES=$(CDEFINES) \
+    -DGL_GLEXT_PROTOTYPES \
+    -D_WINDOWS
+
+DEFFILE = ..\libGLESv3x.def
+
+SOURCES = \
+    ..\src\chip\gc_chip_basic_types.c  \
+    ..\src\chip\gc_chip_buffer.c       \
+    ..\src\chip\gc_chip_clear.c        \
+    ..\src\chip\gc_chip_context.c      \
+    ..\src\chip\gc_chip_depth.c        \
+    ..\src\chip\gc_chip_device.c       \
+    ..\src\chip\gc_chip_draw.c         \
+    ..\src\chip\gc_chip_drawable.c     \
+    ..\src\chip\gc_chip_fbo.c          \
+    ..\src\chip\gc_chip_misc.c         \
+    ..\src\chip\gc_chip_patch.c        \
+    ..\src\chip\gc_chip_pixel.c        \
+    ..\src\chip\gc_chip_profiler.c     \
+    ..\src\chip\gc_chip_shader.c       \
+    ..\src\chip\gc_chip_state.c        \
+    ..\src\chip\gc_chip_texture.c      \
+    ..\src\chip\gc_chip_codec.c        \
+    ..\src\chip\gc_chip_utils.c        \
+    ..\src\glcore\gc_es_api.c           \
+    ..\src\glcore\gc_es_api_profiler.c  \
+    ..\src\glcore\gc_es_bufobj.c        \
+    ..\src\glcore\gc_es_context.c       \
+    ..\src\glcore\gc_es_dispatch.c      \
+    ..\src\glcore\gc_es_draw.c          \
+    ..\src\glcore\gc_es_egl.c           \
+    ..\src\glcore\gc_es_extensions.c    \
+    ..\src\glcore\gc_es_fbo.c           \
+    ..\src\glcore\gc_es_formats.c       \
+    ..\src\glcore\gc_es_fragop.c        \
+    ..\src\glcore\gc_es_misc.c          \
+    ..\src\glcore\gc_es_names.c         \
+    ..\src\glcore\gc_es_object_inline.c \
+    ..\src\glcore\gc_es_pixelop.c       \
+    ..\src\glcore\gc_es_query.c         \
+    ..\src\glcore\gc_es_raster.c        \
+    ..\src\glcore\gc_es_shader.c        \
+    ..\src\glcore\gc_es_teximage.c      \
+    ..\src\glcore\gc_es_texstate.c      \
+    ..\src\glcore\gc_es_varray.c        \
+    ..\src\glcore\gc_es_profiler.c      \
+
+{..\src\chip\}.c{$(_OBJDIR)\}.obj :
+    @$(GCHAL_C_COMPILING_COMMAND)
+
+{..\src\glcore\}.c{$(_OBJDIR)\}.obj :
+    @$(GCHAL_C_COMPILING_COMMAND)
+
+##########################################################
+# Install results
+
+EXTRA_COMMAND = xcopy /I /R /Y $(AQROOT)\sdk\inc\GLES3\*.h $(VIVANTE_SDK_INC)\GLES3
+
+!INCLUDE $(AQROOT)\wince_install.inc

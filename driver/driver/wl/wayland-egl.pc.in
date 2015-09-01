@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: wayland-egl
+Description: Bind the driver EGL to the Wayland API
+Version: 1.0.0
+Libs: -L${libdir} -lEGL
+Cflags: -I${includedir}

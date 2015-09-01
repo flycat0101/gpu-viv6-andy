@@ -1,0 +1,8 @@
+    {
+    global:
+        Clang_Preprocess;
+
+    local:
+        *;
+    };
+

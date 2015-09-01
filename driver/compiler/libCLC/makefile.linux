@@ -1,0 +1,45 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+######################################################
+# Include global difinitions.
+
+include ./makefile.linux.def
+
+######################################################
+# Components of the project.
+
+CLC_LLVM			:= llvm
+CLC_COMMON			:= common
+CLC_COMPILER		:= compiler
+CLC_PREPROCESSOR	:= preprocessor
+CLC_ENTRY			:= entry
+
+LIB_CLC	:= $(CLC_COMMON) $(CLC_COMPILER) $(CLC_PREPROCESSOR) $(CLC_LLVM)  $(CLC_ENTRY)
+
+######################################################
+# Define the macros used in the common file.
+
+MODULES		:= $(LIB_CLC)
+MAIN_MODULE	:= $(CLC_ENTRY)
+
+######################################################
+# Include the common makefile.
+
+include $(AQROOT)/common.node
+
+######################################################
+# Define the denpendencies.
+
+$(CLC_LLVM): $(CLC_COMMON) $(CLC_COMPILER) $(CLC_PREPROCESSOR)
+$(CLC_ENTRY): $(CLC_LLVM)

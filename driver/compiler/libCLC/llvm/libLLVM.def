@@ -1,0 +1,5 @@
+LIBRARY libLLVM_viv
+
+EXPORTS
+
+    Clang_Preprocess

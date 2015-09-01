@@ -1,0 +1,40 @@
+Frame 12418: 8 layer(s)
+  layer[0]: BLITTER
+    source=<f12418_l0_h0x457c8d48_p43346710_s1200x1848.bmp>, stride=4800
+    rotation=90 DEG mirror=0,0 alpha blending=0
+    ANDROID srcRect=[0, 0, 1200, 1848] dstRect=[0, 0, 1848, 1200]
+    GC srcRect=[0, 0, 1848, 1200] dstRect=[0, 0, 1848, 1200]
+  layer[1]: DIM
+    color32=0x99000000
+  region[0]: [0, 0, 1848, 1200]
+  layer[2]: BLITTER
+    source=<f12418_l2_h0x40000ad0_pcf282000_s870x514.bmp>, stride=3520
+    rotation=90 DEG mirror=0,0 alpha blending=1
+    ANDROID srcRect=[0, 0, 870, 514] dstRect=[440, 165, 954, 1035]
+    GC srcRect=[0, 0, 514, 870] dstRect=[440, 165, 954, 1035]
+  layer[3]: BLITTER
+    source=<f12418_l3_h0x40000f20_pafb87000_s1200x924.bmp>, stride=4800
+    rotation=90 DEG mirror=0,0 alpha blending=1
+    ANDROID srcRect=[0, 0, 1200, 924] dstRect=[924, 0, 1848, 1200]
+    GC srcRect=[0, 0, 924, 1200] dstRect=[924, 0, 1848, 1200]
+  layer[4]: BLITTER
+    source=<f12418_l4_h0x40004540_pba755000_s870x316.bmp>, stride=3520
+    rotation=90 DEG mirror=0,0 alpha blending=1
+    ANDROID srcRect=[0, 0, 870, 316] dstRect=[766, 165, 1082, 1035]
+    GC srcRect=[0, 0, 316, 870] dstRect=[766, 165, 1082, 1035]
+  layer[5]: BLITTER
+    source=<f12418_l5_h0x456f1bd0_pb2f7c000_s691x120.bmp>, stride=2816
+    rotation=90 DEG mirror=0,0 alpha blending=1
+    ANDROID srcRect=[0, 0, 691, 120] dstRect=[120, 255, 240, 946]
+    GC srcRect=[0, 0, 120, 691] dstRect=[120, 255, 240, 946]
+  layer[6]: BLITTER
+    source=<f12418_l6_h0x457c8328_pc878b000_s1200x72.bmp>, stride=2400
+    rotation=90 DEG mirror=0,0 alpha blending=0
+    ANDROID srcRect=[0, 0, 1200, 72] dstRect=[1848, 0, 1920, 1200]
+    GC srcRect=[0, 0, 72, 1200] dstRect=[1848, 0, 1920, 1200]
+  layer[7]: BLITTER
+    source=<f12418_l7_h0x456f0b30_paa5b9000_s900x1920.bmp>, stride=3648
+    rotation=90 DEG mirror=0,0 alpha blending=1
+    ANDROID srcRect=[0, 0, 900, 1920] dstRect=[0, 300, 1920, 1200]
+    GC srcRect=[0, 0, 1920, 900] dstRect=[0, 300, 1920, 1200]
+  Result=<f12418_fb.bmp>

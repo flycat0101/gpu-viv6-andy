@@ -1,0 +1,50 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# Default definitions for GLESv2SC library.
+#
+
+################################################################################
+# Include the global difinitions.
+
+include $(AQROOT)/makefile.linux.def
+#include $(GLES2X_DIR)/makefile.linux.def
+
+################################################################################
+# Supply additional include directories.
+
+INCLUDE += -I$(AQROOT)/hal/inc
+INCLUDE += -I$(AQROOT)/hal/user
+INCLUDE += -I$(AQROOT)/hal/os/linux/user
+INCLUDE += -I$(AQROOT)/compiler/libVSC/include
+INCLUDE += -I$(AQROOT)/compiler/libGLSLC/inc
+
+CFLAGS += $(INCLUDE)
+
+################################################################################
+# Add extra flags for object files.
+
+ifneq ($(USE_ARMCC), 1)
+  ifeq ($(EGL_API_DFB), 1)
+    CFLAGS  += -pipe -fPIC
+  else
+    CFLAGS += -Werror -ansi
+  endif
+endif
+
+ifeq ($(EGL_API_DFB), 1)
+  CFLAGS  += -DPIC
+endif
+
+CDEFS   := -D_LIB

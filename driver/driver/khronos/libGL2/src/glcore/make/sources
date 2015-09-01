@@ -1,0 +1,63 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# This is the SOURCES file for OpenGL code
+#
+TARGETNAME=glcore
+TARGETTYPE=LIBRARY
+
+MODULEINCDIR=
+
+SOURCES= \
+../gc_glcore_dri.c \
+../gc_gl_attrib.c \
+../gc_gl_bufferobject.c \
+../gc_gl_bufferobjectati.c \
+../gc_gl_clear.c \
+../gc_gl_constantbuffer.c \
+../gc_gl_context.c \
+../gc_gl_convol.c \
+../gc_gl_ctable.c \
+../gc_gl_disp.c \
+../gc_gl_dispnop.c \
+../gc_gl_draw.c \
+../gc_gl_enable.c \
+../gc_gl_eval.c \
+../gc_gl_extensions.c \
+../gc_gl_feed.c \
+../gc_gl_finish.c \
+../gc_gl_fog.c \
+../gc_gl_framebufferobject.c \
+../gc_gl_get.c \
+../gc_gl_histo.c \
+../gc_gl_image.c \
+../gc_gl_init.c \
+../gc_gl_light.c \
+../gc_gl_material.c \
+../gc_gl_math.c \
+../gc_gl_memmgr.c \
+../gc_gl_names.c \
+../gc_gl_names_inline.c \
+../gc_gl_pixel.c \
+../gc_gl_prim.c \
+../gc_gl_px_util.c \
+../gc_gl_pushpop.c \
+../gc_gl_query.c \
+../gc_gl_rect.c \
+../gc_gl_select.c \
+../gc_gl_texel.c \
+../gc_gl_teximage.c \
+../gc_gl_texstate.c \
+../gc_gl_varray.c \
+../gc_gl_xform.c
