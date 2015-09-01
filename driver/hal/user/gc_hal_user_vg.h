@@ -1151,6 +1151,13 @@ gcoVGHARDWARE_ResolveRect(
     );
 #endif
 
+gceSTATUS
+gcoVGHARDWARE_EnablePremultiply(
+    IN gcoVGHARDWARE Hardware,
+    IN gctBOOL PremultiplySource,
+    IN gctBOOL PremultiplyTarget
+    );
+
 /******************************************************************************\
 ******************************** gcoVGBUFFER Object *******************************
 \******************************************************************************/
