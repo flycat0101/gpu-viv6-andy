@@ -201,6 +201,8 @@ _CalculateInstCount(
     case VIR_OP_BITRANGE:
     case VIR_OP_BITRANGE1:
     case VIR_OP_GET_SAMPLER_IDX:
+    case VIR_OP_GET_SAMPLER_LMM:
+    case VIR_OP_GET_SAMPLER_LBS:
     case VIR_OP_AQ_F2I:
         return 1;
     case VIR_OP_BITEXTRACT:
@@ -1154,15 +1156,15 @@ _GetRegisterIndex(
     switch(VIR_Symbol_GetKind(Sym))
     {
     case VIR_SYM_IMAGE:
-        return VIR_Symbol_GetImage(Sym)->index;
+        return VIR_Symbol_GetImage(Sym)->gcslIndex;
     case VIR_SYM_UNIFORM:
 #ifdef ADD_UNIFORM_CONSTANT
         return _FindValue(Converter->UniformTable, VIR_Symbol_GetUniform(Sym));
 #else
-        return VIR_Symbol_GetUniform(Sym)->index;
+        return VIR_Symbol_GetUniform(Sym)->gcslIndex;
 #endif
     case VIR_SYM_SAMPLER:
-        return VIR_Symbol_GetSampler(Sym)->index;
+        return VIR_Symbol_GetSampler(Sym)->gcslIndex;
     case VIR_SYM_TEXTURE:
     case VIR_SYM_VARIABLE:       /* global/local variables, input/output */
     {
@@ -1278,6 +1280,7 @@ _ConvVirOpcode2Opcode(
     case VIR_OP_IMG_LOAD_3D:    return gcSL_IMAGE_RD_3D;
     case VIR_OP_IMG_STORE_3D:   return gcSL_IMAGE_WR_3D;
     case VIR_OP_IMG_ADDR:       return gcSL_IMAGE_ADDR;
+    case VIR_OP_IMG_ADDR_3D:    return gcSL_IMAGE_ADDR_3D;
     case VIR_OP_CLAMP0MAX:      return gcSL_CLAMP0MAX;
     case VIR_OP_NOP:            return gcSL_NOP;
     case VIR_OP_MOV:            return gcSL_MOV;
@@ -1915,6 +1918,8 @@ _ConvVirInst2Inst(
     case VIR_OP_BITFIND_MSB:
     case VIR_OP_BITREV:
     case VIR_OP_GET_SAMPLER_IDX:
+    case VIR_OP_GET_SAMPLER_LMM:
+    case VIR_OP_GET_SAMPLER_LBS:
     case VIR_OP_AQ_F2I:
         {
             gctSIZE_T i = 0;
@@ -2821,7 +2826,7 @@ gcSHADER_ConvFromVIR(
 {
     gceSTATUS status    = gcvSTATUS_OK;
     Converter converter = { VirShader, Shader, gcvNULL, gcvNULL };
-    gctUINT    i, j, duboMemberIndex, uniformCount;
+    gctUINT    i, duboMemberIndex;
     gctBOOL seperatedShader = Flags & gcvSHADER_SEPERATED_PROGRAM;
     gcsUNIFORM_BLOCK dubo = gcvNULL, cubo = gcvNULL;
 
@@ -3002,8 +3007,6 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
 #else
 
 #endif
-    /* record the shader uniform count here, in case this number is increased by adding dubo/cubo address uniforms */
-    uniformCount = Shader->uniformCount;
     /* set _defaultUniformBlockSize if default ubo is constructed in VIR */
     if (VIR_Shader_GetDefaultUBOIndex(VirShader) != -1)
     {
@@ -3014,7 +3017,6 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
         VIR_Uniform* baseAddress_uniform;
         VIR_UniformBlock* virDUBO = VIR_Symbol_GetUBO(virDUBOSym);
         gcUNIFORM baseAddressUniform;
-        gctBOOL isduboExist = GetShaderDefaultUniformBlockIndex(Shader);
 
         _gcCreateAuxUBOLite(Shader, "#DefaultUBO", &dubo);
         SetUBBlockSize(dubo, virDUBO->blockSize);
@@ -3024,14 +3026,11 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                    (gctPOINTER *)&dubo->uniforms));
 
         /* Mapping the base address. */
-        if (!isduboExist)
-        {
-            gcSHADER_GetUniform(Shader, GetUBIndex(dubo), &baseAddressUniform);
-            baseAddress_sym = VIR_Shader_GetSymFromId(VirShader, virDUBO->baseAddr);
-            gcmASSERT(VIR_Symbol_isUniform(baseAddress_sym));
-            baseAddress_uniform = VIR_Symbol_GetUniform(baseAddress_sym);
-            baseAddress_uniform->index = baseAddressUniform->index;
-        }
+        gcSHADER_GetUniform(Shader, GetUBIndex(dubo), &baseAddressUniform);
+        baseAddress_sym = VIR_Shader_GetSymFromId(VirShader, virDUBO->baseAddr);
+        gcmASSERT(VIR_Symbol_isUniform(baseAddress_sym));
+        baseAddress_uniform = VIR_Symbol_GetUniform(baseAddress_sym);
+        baseAddress_uniform->gcslIndex = baseAddressUniform->index;
     }
 
     /* set _defaultConstantUniformBlockSize if default cubo is constructed in VIR */
@@ -3052,9 +3051,7 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
         virCUBOAddressSym = VIR_Shader_GetSymFromId(VirShader, virCUBO->baseAddr);
         gcmASSERT(VIR_Symbol_isUniform(virCUBOAddressSym));
         virCUBOAddressUniform = VIR_Symbol_GetUniform(virCUBOAddressSym);
-        SetUniformPhysical(baseAddressUniform, VIR_Uniform_GetPhysical(virCUBOAddressUniform));
-        SetUniformSwizzle(baseAddressUniform, VIR_Uniform_GetSwizzle(virCUBOAddressUniform));
-        SetUniformFlag(baseAddressUniform, gcvUNIFORM_FLAG_USED_IN_SHADER);
+        virCUBOAddressUniform->gcslIndex = baseAddressUniform->index;
 
         /* Allocate a memory to hold these constants. */
         gcmASSERT(Shader->constUBOData == gcvNULL);
@@ -3091,21 +3088,106 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
 
         if (virUniform)
         {
-            gcUNIFORM mappingGCSLUniform = gcvNULL;
-
-            for (j = 0; j < uniformCount; j++)
+            if(virUniform->gcslIndex == -1 &&
+               VIR_Symbol_GetUniformKind(virUniformSym) != VIR_UNIFORM_TEMP_REG_SPILL_MEM_ADDRESS)
             {
-                gcUNIFORM gcslUniform = Shader->uniforms[j];
-
-                if (gcslUniform && gcslUniform->index == virUniform->index)
+                if(VIR_Symbol_GetUniformKind(virUniformSym) == VIR_UNIFORM_LOD_MIN_MAX)
                 {
-                    mappingGCSLUniform = gcslUniform;
-                    break;
+                    gctINT16 lodMinMaxIndex;
+                    gcUNIFORM lodMinMaxUniform;
+                    gcUNIFORM samplerUniform;
+                    gctINT16 lastChildIndex;
+
+                    gcmASSERT(virUniform->u.parentSampler->gcslIndex != -1);
+                    gcSHADER_GetUniform(Shader, virUniform->u.parentSampler->gcslIndex, &samplerUniform);
+                    lastChildIndex = samplerUniform->firstChild;
+                    while (lastChildIndex != -1)
+                    {
+                        gcUNIFORM temp= gcvNULL;
+                        gcSHADER_GetUniform(Shader, (gctUINT)lastChildIndex, &temp);
+                        gcmASSERT(temp);
+                        lastChildIndex = temp->index;
+                        if (temp->nextSibling != -1)
+                        {
+                            lastChildIndex = temp->nextSibling;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    /* Create lodMinMax. */
+                    gcmONERROR(gcSHADER_AddUniformEx1(Shader,
+                                                      VIR_Shader_GetSymNameString(VirShader, virUniformSym),
+                                                      gcSHADER_FLOAT_X3,
+                                                      gcSHADER_PRECISION_MEDIUM,
+                                                      -1,
+                                                      -1,
+                                                      -1,
+                                                      0,
+                                                      gcvNULL,
+                                                      gcSHADER_VAR_CATEGORY_LOD_MIN_MAX,
+                                                      0,
+                                                      samplerUniform->index,
+                                                      lastChildIndex,
+                                                      gcIMAGE_FORMAT_DEFAULT,
+                                                      &lodMinMaxIndex,
+                                                      &lodMinMaxUniform));
+                    virUniform->gcslIndex = lodMinMaxIndex;
+                }
+                else if(VIR_Symbol_GetUniformKind(virUniformSym) == VIR_UNIFORM_LEVEL_BASE_SIZE)
+                {
+                    gctINT16 levelBaseSizeIndex;
+                    gcUNIFORM levelBaseSizeUniform;
+                    gcUNIFORM samplerUniform;
+                    gctINT16 lastChildIndex;
+
+                    gcmASSERT(virUniform->u.parentSampler->gcslIndex != -1);
+                    gcSHADER_GetUniform(Shader, virUniform->u.parentSampler->gcslIndex, &samplerUniform);
+                    lastChildIndex = samplerUniform->firstChild;
+                    while (lastChildIndex != -1)
+                    {
+                        gcUNIFORM temp= gcvNULL;
+                        gcSHADER_GetUniform(Shader, (gctUINT)lastChildIndex, &temp);
+                        gcmASSERT(temp);
+                        lastChildIndex = temp->index;
+                        if (temp->nextSibling != -1)
+                        {
+                            lastChildIndex = temp->nextSibling;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    /* Create levelBaseSize. */
+                    gcmONERROR(gcSHADER_AddUniformEx1(Shader,
+                                                      VIR_Shader_GetSymNameString(VirShader, virUniformSym),
+                                                      gcSHADER_INTEGER_X4,
+                                                      gcSHADER_PRECISION_MEDIUM,
+                                                      -1,
+                                                      -1,
+                                                      -1,
+                                                      0,
+                                                      gcvNULL,
+                                                      gcSHADER_VAR_CATEGORY_LEVEL_BASE_SIZE,
+                                                      0,
+                                                      samplerUniform->index,
+                                                      lastChildIndex,
+                                                      gcIMAGE_FORMAT_DEFAULT,
+                                                      &levelBaseSizeIndex,
+                                                      &levelBaseSizeUniform));
+                    virUniform->gcslIndex = levelBaseSizeIndex;
+                }
+                else
+                {
+                    gcmASSERT(VIR_Uniform_GetInitializer(virUniform) != VIR_INVALID_ID);
                 }
             }
 
-            if(mappingGCSLUniform)
+            if(virUniform->gcslIndex != -1)
             {
+                gcUNIFORM mappingGCSLUniform = Shader->uniforms[virUniform->gcslIndex];
                 /* if uniform is put into aubo by VIR, update its attributes */
                 if (VIR_Symbol_HasFlag(virUniformSym, VIR_SYMUNIFORMFLAG_MOVED_TO_DUBO))
                 {
@@ -3306,7 +3388,7 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
     if (VIR_Shader_isConstRegAllocated(VirShader))
     {
         /* change uniform physical/swizzle/address based on VIR_CG_MapUniform information */
-        gctSIZE_T   i, virNewAdded = 0;
+        gctSIZE_T   i;
         VIR_Symbol  *sym;
         VIR_UniformIdList     *pUniforms = VIR_Shader_GetUniforms(VirShader);
 
@@ -3343,19 +3425,12 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                 continue;
             }
 
-            if (isSymUniformVIRNewAdded(sym))
-            {
-                virNewAdded++;
-                gcmASSERT(isSymUniformCompiletimeInitialized(sym));
-                continue;
-            }
-
-            if (symUniform->index - virNewAdded >= Shader->uniformCount)
+            if (symUniform->gcslIndex == -1)
             {
                 continue;
             }
 
-            gcslUniform = Shader->uniforms[symUniform->index - virNewAdded];
+            gcslUniform = Shader->uniforms[symUniform->gcslIndex];
             gcslUniform->physical = symUniform->physical;
             gcslUniform->swizzle = symUniform->swizzle;
             gcslUniform->address = symUniform->address;

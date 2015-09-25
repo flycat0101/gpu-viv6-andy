@@ -17,11 +17,11 @@ vx_status vxAccumulate(vx_image input, vx_image accum)
 {
     gcoVX_Kernel_Context context = {{0}};
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, accum, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, accum, GC_VX_INDEX_AUTO);
 
     context.params.kernel = gcvVX_KERNEL_ACCUMULATE;
     context.params.xstep = 8;
@@ -34,19 +34,19 @@ vx_status vxAccumulateWeighted(vx_image input, vx_scalar scalar, vx_image accum)
     vx_float32 alpha = 0u;
     gcoVX_Kernel_Context context = {{0}};
 
-	vxAccessScalarValue(scalar, &alpha);
+    vxAccessScalarValue(scalar, &alpha);
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, accum, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, accum, GC_VX_INDEX_AUTO);
 
     context.params.kernel = gcvVX_KERNEL_ACCUMULATE_WEIGHTED;
     context.params.xstep = 16;
     context.params.policy = (gctUINT32)(alpha * 1000);
 
-	vxCommitScalarValue(scalar, &alpha);
+    vxCommitScalarValue(scalar, &alpha);
 
     return gcfVX_Kernel(&context);
 }
@@ -56,19 +56,19 @@ vx_status vxAccumulateSquare(vx_image input, vx_scalar scalar, vx_image accum)
     vx_uint32 shift = 0u;
     gcoVX_Kernel_Context context = {{0}};
 
-	vxAccessScalarValue(scalar, &shift);
+    vxAccessScalarValue(scalar, &shift);
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, accum, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, accum, GC_VX_INDEX_AUTO);
 
     context.params.kernel = gcvVX_KERNEL_ACCUMULATE_SQUARE;
     context.params.xstep = 8;
     context.params.policy = shift;
 
-	vxCommitScalarValue(scalar, &shift);
+    vxCommitScalarValue(scalar, &shift);
 
     return gcfVX_Kernel(&context);
 }

@@ -403,3 +403,8 @@ EXPORTS
         glDeleteVertexArraysOES
         glGenVertexArraysOES
         glIsVertexArrayOES
+        glGetGraphicsResetStatusEXT
+        glReadnPixelsEXT
+        glGetnUniformfvEXT
+        glGetnUniformivEXT
+

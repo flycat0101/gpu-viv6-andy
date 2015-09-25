@@ -1091,6 +1091,9 @@ GLvoid *__glCreateContext(GLint clientVersion, VEGLimports *imports, GLvoid* sha
     case 0x31:
         gc->apiVersion = __GL_API_VERSION_ES31;
         break;
+    case 0x32:
+        gc->apiVersion = __GL_API_VERSION_ES32;
+        break;
     default:
         GL_ASSERT(0);
         __GL_ERROR_EXIT2();
@@ -1163,6 +1166,12 @@ GLvoid __glSetError(__GLcontext *gc, GLenum code)
     if (!gc->error)
     {
         gc->error = code;
+    }
+
+    if (gc->debug.dbgOut)
+    {
+        __glDebugPrintLogMessage(gc, GL_DEBUG_SOURCE_API, GL_DEBUG_TYPE_ERROR, 0,
+                                 GL_DEBUG_SEVERITY_HIGH, "GL error 0x%x was generated", code);
     }
 }
 

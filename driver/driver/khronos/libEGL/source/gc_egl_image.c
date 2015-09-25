@@ -29,7 +29,7 @@
 #include "gc_gralloc_priv.h"
 #endif
 
-#if defined(EGL_API_WL)
+#if defined(WL_EGL_PLATFORM)
 #include "wayland-server.h"
 #endif
 
@@ -1120,7 +1120,7 @@ _CreateImageWL(
 {
     VEGLImage image = gcvNULL;
 
-#if defined(EGL_API_WL)
+#if defined(WL_EGL_PLATFORM)
     gcsWL_VIV_BUFFER *buffer = wl_resource_get_user_data(Buffer);
 
     /* Context must be null. */

@@ -864,12 +864,25 @@ veglSwapWorker(
     void* Display
     );
 
+
+typedef enum _veglAPIINDEX
+{
+    vegl_EGL,
+    vegl_OPENGL_ES11_CL,
+    vegl_OPENGL_ES11,
+    vegl_OPENGL_ES20,
+    vegl_OPENGL_ES30,
+    vegl_OPENVG,
+
+    vegl_API_LAST,
+}
+veglAPIINDEX;
+
 gctHANDLE
 veglGetModule(
-    gcoOS Os,
-    EGLBoolean Egl,
-    VEGLContext Context,
-    gctINT_PTR Index
+    IN gcoOS Os,
+    IN veglAPIINDEX Index,
+    IN veglDISPATCH **Dispatch
     );
 
 

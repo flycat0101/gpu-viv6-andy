@@ -457,88 +457,88 @@ VX_PUBLIC_API vx_status vxGetStatus(vx_reference reference)
 
     return status;
 }
-#define GC_GET_NODE(type, obj, p)	\
-	if(((type)(obj))->memory.nodePtrs == NULL)	\
-		status = VX_ERROR_NO_MEMORY;	\
-	else    \
-	{    \
-		*ptr = ((type)(obj))->memory.nodePtrs[p];	\
-		status = VX_SUCCESS;	\
-	}
+#define GC_GET_NODE(type, obj, p)   \
+    if(((type)(obj))->memory.nodePtrs == NULL)  \
+        status = VX_ERROR_NO_MEMORY;    \
+    else    \
+    {    \
+        *ptr = ((type)(obj))->memory.nodePtrs[p];   \
+        status = VX_SUCCESS;    \
+    }
 
 vx_status vxQuerySurfaceNode(vx_reference reference,
-							 vx_uint32 plane,
-							 void **ptr)
+                             vx_uint32 plane,
+                             void **ptr)
 {
     vx_status status = VX_FAILURE;
-	switch(reference->type)
-	{
-	case VX_TYPE_IMAGE:
-		GC_GET_NODE(vx_image, reference, plane);
-		if(*ptr == NULL)
-		{
-			vx_rectangle_t rect;
-			vx_imagepatch_addressing_t patch_addr;
-			void * pointer = NULL;
+    switch(reference->type)
+    {
+    case VX_TYPE_IMAGE:
+        GC_GET_NODE(vx_image, reference, plane);
+        if(*ptr == NULL)
+        {
+            vx_rectangle_t rect;
+            vx_imagepatch_addressing_t patch_addr;
+            void * pointer = NULL;
 
-			status |= vxGetValidRegionImage((vx_image)reference, &rect);
-			status |= vxAccessImagePatch((vx_image)reference, &rect, 0, &patch_addr, &pointer, VX_READ_ONLY);
-			status |= vxCommitImagePatch((vx_image)reference, NULL, 0, &patch_addr, pointer);
+            status |= vxGetValidRegionImage((vx_image)reference, &rect);
+            status |= vxAccessImagePatch((vx_image)reference, &rect, 0, &patch_addr, &pointer, VX_READ_ONLY);
+            status |= vxCommitImagePatch((vx_image)reference, NULL, 0, &patch_addr, pointer);
 
-			GC_GET_NODE(vx_image, reference, plane);
-		}
-		break;
-	case VX_TYPE_REMAP:
-		GC_GET_NODE(vx_remap, reference, plane);
-		break;
-	case VX_TYPE_DISTRIBUTION:
-		GC_GET_NODE(vx_distribution, reference, plane);
-		if(*ptr == NULL)
-		{
-			vx_uint32 size = 0;
-			void * pointer = NULL;
-			status |= vxAccessDistribution((vx_distribution)reference, &pointer, VX_WRITE_ONLY);
-			status |= vxQueryDistribution((vx_distribution)reference, VX_DISTRIBUTION_ATTRIBUTE_SIZE, &size, sizeof(size));
-			memset(pointer, 0, size);
-			status |= vxCommitDistribution((vx_distribution)reference, pointer);
+            GC_GET_NODE(vx_image, reference, plane);
+        }
+        break;
+    case VX_TYPE_REMAP:
+        GC_GET_NODE(vx_remap, reference, plane);
+        break;
+    case VX_TYPE_DISTRIBUTION:
+        GC_GET_NODE(vx_distribution, reference, plane);
+        if(*ptr == NULL)
+        {
+            vx_uint32 size = 0;
+            void * pointer = NULL;
+            status |= vxAccessDistribution((vx_distribution)reference, &pointer, VX_WRITE_ONLY);
+            status |= vxQueryDistribution((vx_distribution)reference, VX_DISTRIBUTION_ATTRIBUTE_SIZE, &size, sizeof(size));
+            memset(pointer, 0, size);
+            status |= vxCommitDistribution((vx_distribution)reference, pointer);
 
-			GC_GET_NODE(vx_distribution, reference, plane);
-		}
-		break;
-	case VX_TYPE_LUT:
-		GC_GET_NODE(vx_lut_s*, reference, plane);
-		break;
-	case VX_TYPE_ARRAY:
-		GC_GET_NODE(vx_array, reference, plane);
-		if(*ptr == NULL)
-		{
-			if (!vxoArray_AllocateMemory((vx_array)reference))
-				status = VX_ERROR_NO_MEMORY;
-			else
-			{
-				GC_GET_NODE(vx_array, reference, plane);
-			}
-		}
-		break;
-	case VX_TYPE_SCALAR:
-		vxAccessScalarValue((vx_scalar)reference, *ptr);
-		{
-			vx_scalar scalar = (vx_scalar)reference;
-			if(scalar->node != NULL && scalar->value != NULL)
-			{
-				*ptr = scalar->node;
-				status = VX_SUCCESS;
-			}
-			else
-				status = VX_ERROR_NO_MEMORY;
-		}
-		break;
-	default:
-		GC_GET_NODE(vx_image, reference, plane);
-		break;
-	}
+            GC_GET_NODE(vx_distribution, reference, plane);
+        }
+        break;
+    case VX_TYPE_LUT:
+        GC_GET_NODE(vx_lut_s*, reference, plane);
+        break;
+    case VX_TYPE_ARRAY:
+        GC_GET_NODE(vx_array, reference, plane);
+        if(*ptr == NULL)
+        {
+            if (!vxoArray_AllocateMemory((vx_array)reference))
+                status = VX_ERROR_NO_MEMORY;
+            else
+            {
+                GC_GET_NODE(vx_array, reference, plane);
+            }
+        }
+        break;
+    case VX_TYPE_SCALAR:
+        vxAccessScalarValue((vx_scalar)reference, *ptr);
+        {
+            vx_scalar scalar = (vx_scalar)reference;
+            if(scalar->node != NULL && scalar->value != NULL)
+            {
+                *ptr = scalar->node;
+                status = VX_SUCCESS;
+            }
+            else
+                status = VX_ERROR_NO_MEMORY;
+        }
+        break;
+    default:
+        GC_GET_NODE(vx_image, reference, plane);
+        break;
+    }
 
-	/*if(plane == 0) vxAcquireMutex(reference->lock);*/ /*disable this because vxRelaseMutes has problem in test case related with array*/
+    /*if(plane == 0) vxAcquireMutex(reference->lock);*/ /*disable this because vxRelaseMutes has problem in test case related with array*/
 
     return status;
 }
@@ -548,7 +548,7 @@ vx_status vxCommitSurfaceNode(vx_reference reference)
 {
     vx_status status = VX_FAILURE;
 
-	/*status = vxReleaseMutex(reference->lock);*/ /*disable this because vxRelaseMutes has problem in test case related with array*/
+    /*status = vxReleaseMutex(reference->lock);*/ /*disable this because vxRelaseMutes has problem in test case related with array*/
 
     return status;
 }

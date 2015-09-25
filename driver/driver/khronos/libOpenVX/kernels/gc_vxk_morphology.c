@@ -22,17 +22,17 @@ vx_status _gcfVX_Morphology(gceVX_KERNEL kernel, vx_image src, vx_image dst, vx_
     vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
     rect[0] = height;
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, GC_VX_INDEX_AUTO);
 
-    context.params.kernel		= kernel;
+    context.params.kernel       = kernel;
 
-    context.params.xstep		= 8;
+    context.params.xstep        = 8;
     context.params.ystep        = height;
-    context.params.borders	= bordermode->mode;
+    context.params.borders  = bordermode->mode;
 
     gcoOS_MemCopy(&context.uniforms[0].uniform, rect, sizeof(rect));
     context.uniforms[0].index       = 2;

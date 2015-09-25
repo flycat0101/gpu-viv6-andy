@@ -1194,7 +1194,7 @@ gcSHADER_EvaluateLTCValueWithinLinkTime(
 gceSTATUS
 gcSHADER_Conv2VIR(
     IN gcSHADER Shader,
-	IN VSC_HW_CONFIG	*hwCfg,
+    IN VSC_HW_CONFIG    *hwCfg,
     IN OUT VIR_Shader* VirShader
     );
 
@@ -1268,6 +1268,13 @@ gcSHADER_LinkLibFunction(
 gceSTATUS
 gcSHADER_PatchCentroidVaryingAsCenter(
     IN OUT gcSHADER         Shader
+    );
+
+gceSTATUS
+gcSHADER_FindMainFunction(
+    IN   gcSHADER           Shader,
+    OUT  gctINT *           StartCode,
+    OUT  gctINT *           EndCode
     );
 
 END_EXTERN_C()

@@ -249,26 +249,6 @@ _ConvComponentToVectorIndex(
     IN gctUINT8 Component
     );
 
-static gceSTATUS
-_CleanMatrixArrIndexSharing(
-    IN sloCOMPILER Compiler,
-    IN sloCODE_GENERATOR CodeGenerator
-    )
-{
-    gcmHEADER();
-    /* Destroy switch scope */
-    while (!slsSLINK_LIST_IsEmpty(&CodeGenerator->matrixArrIndex)) {
-        slsMATRIX_ARR_INDEX *matrixArrIndex;
-        slsSLINK_LIST_DetachFirst(&CodeGenerator->matrixArrIndex, slsMATRIX_ARR_INDEX, &matrixArrIndex);
-
-        gcmASSERT(matrixArrIndex->arrIndexVar);
-        matrixArrIndex->arrIndexVar->u.variableInfo.matrixArrIndex = gcvNULL;
-        gcmVERIFY_OK(sloCOMPILER_Free(Compiler, matrixArrIndex));
-    }
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
-}
-
 void
 slsOPERAND_CONSTANT_ChangeFloatFamilyDataType(
     IN gcSHADER_TYPE NewDataType,
@@ -857,7 +837,10 @@ slGetOpcodeName(
     case slvOPCODE_IMAGE_READ:          return "imageLoad";
     case slvOPCODE_IMAGE_WRITE:         return "imageStore";
     case slvOPCODE_IMAGE_ADDRESS:       return "imageAddress";
+    case slvOPCODE_IMAGE_ADDRESS_3D:    return "imageAddress3D";
     case slvOPCODE_GET_SAMPLER_IDX:     return "get_sampler_idx";
+    case slvOPCODE_GET_SAMPLER_LMM:     return "get_sampler_lmm";
+    case slvOPCODE_GET_SAMPLER_LBS:     return "get_sampler_lbs";
     case slvOPCODE_IMAGE_READ_3D:       return "imageLoad_3D";
     case slvOPCODE_IMAGE_WRITE_3D:      return "imageStore_3D";
     case slvOPCODE_CLAMP0MAX:           return "clamp0max";
@@ -3061,7 +3044,7 @@ _AllocLogicalRegsForStruct1(
                                                        fieldName->symbol,
                                                        &symbol));
 
-			/* Past the struct auxiliary qualifiers to its elements. */
+            /* Past the struct auxiliary qualifiers to its elements. */
             slsQUALIFIERS_SET_AUXILIARY(&fieldName->dataType->qualifiers, slsQUALIFIERS_GET_AUXILIARY(&DataType->qualifiers));
 
             if (fieldName->dataType->elementType == slvTYPE_STRUCT)
@@ -11936,6 +11919,7 @@ slGenArithmeticExprCode(
     case slvOPCODE_ATOMXCHG:
     case slvOPCODE_ATOMCMPXCHG:
     case slvOPCODE_IMAGE_ADDRESS:
+    case slvOPCODE_IMAGE_ADDRESS_3D:
         break;
 
     default: gcmASSERT(0);
@@ -12370,7 +12354,8 @@ slGenArithmeticExprCode(
                         || Opcode == slvOPCODE_ATOMOR
                         || Opcode == slvOPCODE_ATOMXOR
                         || Opcode == slvOPCODE_ATOMXCHG
-                        || Opcode == slvOPCODE_IMAGE_ADDRESS);
+                        || Opcode == slvOPCODE_IMAGE_ADDRESS
+                        || Opcode == slvOPCODE_IMAGE_ADDRESS_3D);
 
                 status = _ConvIOperandToTarget(
                                                 Compiler,
@@ -12746,6 +12731,8 @@ slGenGenericCode1(
 
     case slvOPCODE_SAMPLER_ASSIGN:
     case slvOPCODE_GET_SAMPLER_IDX:
+    case slvOPCODE_GET_SAMPLER_LMM:
+    case slvOPCODE_GET_SAMPLER_LBS:
         break;
 
     default: gcmASSERT(0);
@@ -13008,6 +12995,7 @@ slGenGenericCode3(
     case slvOPCODE_IMAGE_READ:
     case slvOPCODE_IMAGE_WRITE:
     case slvOPCODE_IMAGE_ADDRESS:
+    case slvOPCODE_IMAGE_ADDRESS_3D:
         break;
 
     default: gcmASSERT(0);
@@ -13529,6 +13517,7 @@ slGenGenericCode2WithFormat(
     case slvOPCODE_IMAGE_READ:
     case slvOPCODE_IMAGE_WRITE:
     case slvOPCODE_IMAGE_ADDRESS:
+    case slvOPCODE_IMAGE_ADDRESS_3D:
     case slvOPCODE_IMAGE_READ_3D:
     case slvOPCODE_IMAGE_WRITE_3D:
     case slvOPCODE_CLAMP0MAX:
@@ -22208,48 +22197,6 @@ _GenIndexScaleCode(
     return status;
 }
 
-static slsNAME *
-_IsMatrixArrIndexing(
-    IN sloCOMPILER Compiler,
-    IN sloIR_BINARY_EXPR BinaryExpr,
-    OUT gctUINT8 *MatrixSize
-    )
-{
-    gcmHEADER();
-
-    gcmASSERT(MatrixSize);
-
-    if(sloIR_OBJECT_GetType(&BinaryExpr->leftOperand->base) != slvIR_VARIABLE) {
-        gcmFOOTER_ARG("<return>=%s", "<nil>");
-        return gcvNULL;
-    }
-
-    if(sloIR_OBJECT_GetType(&BinaryExpr->rightOperand->base) == slvIR_UNARY_EXPR) {
-        sloIR_UNARY_EXPR unaryExpr;
-
-        unaryExpr = (sloIR_UNARY_EXPR)(&BinaryExpr->rightOperand->base);
-        if(unaryExpr->type == slvUNARY_COMPONENT_SELECTION &&
-           sloIR_OBJECT_GetType(&unaryExpr->operand->base) == slvIR_VARIABLE) {
-            sloIR_VARIABLE index;
-
-            index = (sloIR_VARIABLE)(&unaryExpr->operand->base);
-            if(slsDATA_TYPE_IsIVec(index->name->dataType)) {
-                gctUINT8 numColumn;
-
-                gcmASSERT(slsDATA_TYPE_IsArray(BinaryExpr->leftOperand->dataType));
-                numColumn = slmDATA_TYPE_matrixColumnCount_GET(BinaryExpr->leftOperand->dataType);
-                gcmASSERT(numColumn);
-                *MatrixSize = numColumn;
-                gcmFOOTER_ARG("Matrix array Index=0x%x", index->name);
-                return index->name;
-            }
-        }
-    }
-
-    gcmFOOTER_ARG("<return>=%s", "<nil>");
-    return gcvNULL;
-}
-
 #define _slmGenIndexAssignCode(Compiler, LineNo, StringNo, Index, TempIndex, VectorIndexing, Status)  \
     do { \
         if((Index)->isReg && _IsTempRegQualifier((Index)->u.reg.qualifier) && \
@@ -23069,130 +23016,47 @@ _GetNonConstantSubscriptCode(
               (Parameters->needLOperand && _IsLOperandInterfaceBlockMember(Compiler, &LeftParameters->lOperands[0])))
             )
         {
-            slsNAME *sharedVectorIndex = gcvNULL;
-
             indexRegIndex = 0;
-            if (slsDATA_TYPE_IsMat(BinaryExpr->exprBase.dataType) &&
-                CodeGenerator->shareMatrixArrIndex) {
-                gctUINT8 matrixSize;
 
-                /* Do special optimization for indexing to an array of matrices of
-                   the form M[I.x], M[I.y], ... where I is a vector */
+            if ((Parameters->needROperand && _IsROperandInterfaceBlockMember(Compiler, &LeftParameters->rOperands[0])) ||
+                (Parameters->needLOperand && _IsLOperandInterfaceBlockMember(Compiler, &LeftParameters->lOperands[0])))
 
-                sharedVectorIndex = _IsMatrixArrIndexing(Compiler, BinaryExpr, &matrixSize);
-                if(sharedVectorIndex) {
-                    slsMATRIX_ARR_INDEX *matrixArrIndex;
-
-                    matrixArrIndex = sharedVectorIndex->u.variableInfo.matrixArrIndex;
-                    if(!matrixArrIndex) {
-                        gctPOINTER pointer;
-
-                        status = sloCOMPILER_Allocate(Compiler,
-                                                      (gctSIZE_T)sizeof(slsMATRIX_ARR_INDEX),
-                                      (gctPOINTER *) &pointer);
-                        if (gcmIS_ERROR(status)) {
-                             gcmFOOTER_NO();
-                             return gcvSTATUS_OUT_OF_MEMORY;
-                        }
-
-                        matrixArrIndex = pointer;
-                        gcoOS_ZeroMemory(matrixArrIndex, gcmSIZEOF(slsMATRIX_ARR_INDEX));
-
-                        matrixArrIndex->arrIndexVar = sharedVectorIndex;
-                        slsSLINK_LIST_InsertFirst(&CodeGenerator->matrixArrIndex, &matrixArrIndex->node);
-                        sharedVectorIndex->u.variableInfo.matrixArrIndex = matrixArrIndex;
-                    }
-
-                    indexRegIndex = matrixArrIndex->indexReg[matrixSize - 2];
-                    if(indexRegIndex == 0) {
-                        slsIOPERAND         iOperand[1];
-                        slsROPERAND         rOperand[1];
-                        sluCONSTANT_VALUE   constantValue;
-                        sleINDEX_MODE vectorIndexMode;
-                        gcSHADER_TYPE operandType;
-
-                        gcmASSERT(&RightParameters->rOperands[0].isReg);
-                        vectorIndexMode = RightParameters->rOperands[0].vectorIndex.mode;
-                        operandType = RightParameters->rOperands[0].dataType;
-
-                        RightParameters->rOperands[0].vectorIndex.mode = slvINDEX_NONE;
-                        RightParameters->rOperands[0].dataType= RightParameters->rOperands[0].u.reg.dataType;
-
-                        slsIOPERAND_New(Compiler,
-                                        iOperand,
-                                        RightParameters->rOperands[0].dataType,
-                                        RightParameters->rOperands[0].u.reg.precision);
-
-                        constantValue.intValue = matrixSize;
-                        slsROPERAND_InitializeConstant(rOperand,
-                                                       gcSHADER_INTEGER_X1,
-                                                       gcSHADER_PRECISION_MEDIUM,
-                                                       1,
-                                                       &constantValue);
-
-                        status = slGenArithmeticExprCode(Compiler,
-                                                         BinaryExpr->rightOperand->base.lineNo,
-                                                         BinaryExpr->rightOperand->base.stringNo,
-                                                         slvOPCODE_MUL,
-                                                         iOperand,
-                                                         &RightParameters->rOperands[0],
-                                                         rOperand);
-                        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-                        RightParameters->rOperands[0].vectorIndex.mode = vectorIndexMode;
-                        RightParameters->rOperands[0].dataType= operandType;
-                        indexRegIndex = iOperand->tempRegIndex;
-                        matrixArrIndex->indexReg[matrixSize - 2] = indexRegIndex;
-                    }
-
-                    if(RightParameters->rOperands[0].vectorIndex.mode != slvINDEX_NONE) {
-                        vectorIndexing = &RightParameters->rOperands[0].vectorIndex;
-                    }
-                }
-            }
-
-            if (!sharedVectorIndex)
             {
-                if ((Parameters->needROperand && _IsROperandInterfaceBlockMember(Compiler, &LeftParameters->rOperands[0])) ||
-                    (Parameters->needLOperand && _IsLOperandInterfaceBlockMember(Compiler, &LeftParameters->lOperands[0])))
-
-                {
-                    _GetIOElementStride(Compiler, BinaryExpr, LeftParameters, Parameters, &elementDataTypeSize);
-                }
-                else
-                {
-                    for (i = 0, elementDataTypeSize = 0; i < Parameters->operandCount; i++)
-                    {
-                        elementDataTypeSize += gcGetDataTypeSize(Parameters->dataTypes[i]);
-                    }
-                }
-
-                if(IndexRegIndexInParent == (gctREG_INDEX)~0  &&
-                   elementDataTypeSize == 1) {
-                   _slmGenIndexAssignCode(Compiler,
-                                          BinaryExpr->rightOperand->base.lineNo,
-                                          BinaryExpr->rightOperand->base.stringNo,
-                                          &RightParameters->rOperands[0],
-                                          indexRegIndex,
-                                          vectorIndexing,
-                                          status);
-                }
-                else {
-                   indexRegIndex = slNewTempRegs(Compiler, 1);
-
-                   status = _GenIndexScaleCode(Compiler,
-                                               BinaryExpr->rightOperand->base.lineNo,
-                                               BinaryExpr->rightOperand->base.stringNo,
-                                               indexRegIndex,
-                                               &RightParameters->rOperands[0],
-                                               elementDataTypeSize,
-                                               0, /* (BinaryExpr->leftOperand->dataType->fieldSpace) ? LeftParameters->offsetInParent : 0, */
-                                               IndexRegIndexInParent,
-                                               IndexRegIndexMode);
-                }
-
-                if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+                _GetIOElementStride(Compiler, BinaryExpr, LeftParameters, Parameters, &elementDataTypeSize);
             }
+            else
+            {
+                for (i = 0, elementDataTypeSize = 0; i < Parameters->operandCount; i++)
+                {
+                    elementDataTypeSize += gcGetDataTypeSize(Parameters->dataTypes[i]);
+                }
+            }
+
+            if(IndexRegIndexInParent == (gctREG_INDEX)~0  &&
+                elementDataTypeSize == 1) {
+                _slmGenIndexAssignCode(Compiler,
+                                        BinaryExpr->rightOperand->base.lineNo,
+                                        BinaryExpr->rightOperand->base.stringNo,
+                                        &RightParameters->rOperands[0],
+                                        indexRegIndex,
+                                        vectorIndexing,
+                                        status);
+            }
+            else {
+                indexRegIndex = slNewTempRegs(Compiler, 1);
+
+                status = _GenIndexScaleCode(Compiler,
+                                            BinaryExpr->rightOperand->base.lineNo,
+                                            BinaryExpr->rightOperand->base.stringNo,
+                                            indexRegIndex,
+                                            &RightParameters->rOperands[0],
+                                            elementDataTypeSize,
+                                            0, /* (BinaryExpr->leftOperand->dataType->fieldSpace) ? LeftParameters->offsetInParent : 0, */
+                                            IndexRegIndexInParent,
+                                            IndexRegIndexMode);
+            }
+
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
         }
         else
         {
@@ -24586,8 +24450,6 @@ sloIR_BINARY_EXPR_GenAssignCode(
     slsGEN_CODE_PARAMETERS_Initialize(&leftParameters, gcvTRUE, Parameters->needROperand);
     slsGEN_CODE_PARAMETERS_Initialize(&rightParameters, gcvFALSE, gcvTRUE);
 
-    CodeGenerator->shareMatrixArrIndex = gcvTRUE;
-
     gcmONERROR(sloIR_OBJECT_Accept(Compiler,
                                 &BinaryExpr->leftOperand->base,
                                 &CodeGenerator->visitor,
@@ -24621,9 +24483,6 @@ sloIR_BINARY_EXPR_GenAssignCode(
 OnError:
     slsGEN_CODE_PARAMETERS_Finalize(&leftParameters);
     slsGEN_CODE_PARAMETERS_Finalize(&rightParameters);
-    gcmVERIFY_OK(_CleanMatrixArrIndexSharing(Compiler,
-                                             CodeGenerator));
-    CodeGenerator->shareMatrixArrIndex = gcvFALSE;
 
     gcmFOOTER();
     return status;
@@ -24658,8 +24517,6 @@ sloIR_BINARY_EXPR_GenArithmeticAssignCode(
 
     slsGEN_CODE_PARAMETERS_Initialize(&leftParameters, gcvTRUE, gcvTRUE);
     slsGEN_CODE_PARAMETERS_Initialize(&rightParameters, gcvFALSE, gcvTRUE);
-
-    CodeGenerator->shareMatrixArrIndex = gcvTRUE;
 
     gcmONERROR(sloIR_OBJECT_Accept(Compiler,
                                 &BinaryExpr->leftOperand->base,
@@ -24732,10 +24589,6 @@ OnError:
     slsGEN_CODE_PARAMETERS_Finalize(&leftParameters);
     slsGEN_CODE_PARAMETERS_Finalize(&rightParameters);
 
-    gcmVERIFY_OK(_CleanMatrixArrIndexSharing(Compiler,
-                                             CodeGenerator));
-    CodeGenerator->shareMatrixArrIndex = gcvFALSE;
-
     gcmFOOTER();
     return status;
 }
@@ -24769,8 +24622,6 @@ sloIR_BINARY_EXPR_GenShiftAssignCode(
 
     slsGEN_CODE_PARAMETERS_Initialize(&leftParameters, gcvTRUE, gcvTRUE);
     slsGEN_CODE_PARAMETERS_Initialize(&rightParameters, gcvFALSE, gcvTRUE);
-
-    CodeGenerator->shareMatrixArrIndex = gcvTRUE;
 
     gcmONERROR(sloIR_OBJECT_Accept(Compiler,
                        &BinaryExpr->leftOperand->base,
@@ -24842,10 +24693,6 @@ OnError:
     slsGEN_CODE_PARAMETERS_Finalize(&leftParameters);
     slsGEN_CODE_PARAMETERS_Finalize(&rightParameters);
 
-    gcmVERIFY_OK(_CleanMatrixArrIndexSharing(Compiler,
-                                                 CodeGenerator));
-    CodeGenerator->shareMatrixArrIndex = gcvFALSE;
-
     gcmFOOTER();
     return status;
 }
@@ -24880,7 +24727,6 @@ sloIR_BINARY_EXPR_GenBitwiseAssignCode(
     slsGEN_CODE_PARAMETERS_Initialize(&leftParameters, gcvTRUE, gcvTRUE);
     slsGEN_CODE_PARAMETERS_Initialize(&rightParameters, gcvFALSE, gcvTRUE);
 
-    CodeGenerator->shareMatrixArrIndex = gcvTRUE;
     gcmONERROR(sloIR_OBJECT_Accept(Compiler,
                        &BinaryExpr->leftOperand->base,
                        &CodeGenerator->visitor,
@@ -24946,10 +24792,6 @@ sloIR_BINARY_EXPR_GenBitwiseAssignCode(
 OnError:
     slsGEN_CODE_PARAMETERS_Finalize(&leftParameters);
     slsGEN_CODE_PARAMETERS_Finalize(&rightParameters);
-
-    gcmVERIFY_OK(_CleanMatrixArrIndexSharing(Compiler,
-                                                 CodeGenerator));
-    CodeGenerator->shareMatrixArrIndex = gcvFALSE;
 
     gcmFOOTER();
     return status;
@@ -25896,17 +25738,14 @@ sloIR_POLYNARY_EXPR_GenOperandsCodeForFuncCall(
                 gcoOS_ZeroMemory(pointer, (gctSIZE_T)sizeof(slsROPERAND) * operandsParameters[i].operandCount);
                 tempOperandsParameters[i].rOperands = (slsROPERAND *)pointer;
 
-                tempRegIndex = slNewTempRegs(Compiler,
-                    operandsParameters[i].operandCount * gcGetDataTypeSize(paramName->context.logicalRegs[0].dataType));
-
                 for (j = 0; j < operandsParameters[i].operandCount; j++)
                 {
+                    tempRegIndex = slNewTempRegs(Compiler, gcGetDataTypeSize(paramName->context.logicalRegs[j].dataType));
                     slsLOGICAL_REG_InitializeTemp(logicalRegs + j,
                                                   paramName->context.logicalRegs[j].qualifier,
                                                   paramName->context.logicalRegs[j].dataType,
                                                   paramName->context.logicalRegs[j].precision,
-                                                  tempRegIndex +
-                                                  (gctREG_INDEX)(j * gcGetDataTypeSize(paramName->context.logicalRegs[j].dataType)));
+                                                  tempRegIndex);
                 }
 
                 /* Assign the evaluation of the parameter into the temp operand. */
@@ -27144,6 +26983,7 @@ sloIR_POLYNARY_EXPR_GenBuiltInCode(
     slsGEN_CODE_PARAMETERS *        operandsParameters;
     slsIOPERAND                     iOperandBuf[1];
     slsIOPERAND                     *iOperand = gcvNULL;
+    gcSHADER_PRECISION              precision;
 
     gcmHEADER();
 
@@ -27176,11 +27016,20 @@ sloIR_POLYNARY_EXPR_GenBuiltInCode(
 
         gcmASSERT(Parameters->operandCount == 1);
 
+        if (operandCount == 0)
+        {
+            precision = Parameters->rOperands[0].u.reg.precision;
+        }
+        else
+        {
+            gcmASSERT(operandsParameters);
+            precision = GetHigherPrecison(operandsParameters->rOperands[0].u.reg.precision,
+                                          Parameters->rOperands[0].u.reg.precision);
+        }
         slsIOPERAND_New(Compiler,
                         iOperandBuf,
                         Parameters->dataTypes[0],
-                        GetHigherPrecison(operandsParameters->rOperands[0].u.reg.precision,
-                                          Parameters->rOperands[0].u.reg.precision));
+                        precision);
 
         iOperand = iOperandBuf;
         slsROPERAND_InitializeUsingIOperand(&Parameters->rOperands[0], iOperand);
@@ -28053,9 +27902,6 @@ sloCODE_GENERATOR_Construct(
         /* Initialize other data members */
         codeGenerator->currentIterationContext      = gcvNULL;
 
-        codeGenerator->shareMatrixArrIndex = gcvFALSE;
-        slsSLINK_LIST_Initialize(&codeGenerator->matrixArrIndex);
-
         if(slsCOMPILER_HasUnspecifiedLocation(flag)) {
             codeGenerator->layoutLocation = 0;
         }
@@ -28114,7 +27960,7 @@ sloCODE_GENERATOR_Destroy(
 gceSTATUS
 slAddUnusedOutputPatch(
     IN sloCOMPILER Compiler,
-	IN sloCODE_GENERATOR CodeGenerator,
+    IN sloCODE_GENERATOR CodeGenerator,
     IN slsNAME_SPACE* globalNameSpace
     )
 {
@@ -28152,7 +27998,7 @@ slAddUnusedOutputPatch(
 gceSTATUS
 slAddUnusedInputPatch(
     IN sloCOMPILER Compiler,
-	IN sloCODE_GENERATOR CodeGenerator,
+    IN sloCODE_GENERATOR CodeGenerator,
     IN slsNAME_SPACE* globalNameSpace
     )
 {

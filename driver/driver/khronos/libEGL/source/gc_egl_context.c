@@ -15,74 +15,54 @@
 
 #if defined(ANDROID)
 #define TAG "VIVANTE"
-#define LIB_PATH "/system/lib/egl/"
 #endif
 
 
 #define _GC_OBJ_ZONE    gcdZONE_EGL_CONTEXT
 
 #if !gcdSTATIC_LINK
-typedef enum _veglAPIINDEX
-{
-    vegl_EGL,
-    vegl_OPENGL_ES11_CL,
-    vegl_OPENGL_ES11,
-    vegl_OPENGL_ES20,
-    vegl_OPENGL_ES30,
-    vegl_OPENVG,
-}
-veglAPIINDEX;
 
+static const char * _dlls[] =
+{
 #if defined(ANDROID)
-static const char * _dlls[][2] =
-{
-    /* EGL */                       {LIB_PATH "libEGL_" TAG ".so",       gcvNULL},
-    /* OpenGL ES 1.1 Common Lite */ {LIB_PATH "libGLESv1_CM_" TAG ".so", gcvNULL},
-    /* OpenGL ES 1.1 Common */      {LIB_PATH "libGLESv1_CM_" TAG ".so", gcvNULL},
-    /* OpenGL ES 2.0 */             {LIB_PATH "libGLESv2_" TAG ".so",    gcvNULL},
-    /* OpenGL ES 3.0 */             {LIB_PATH "libGLESv2_" TAG ".so",    gcvNULL},
-    /* OpenVG 1.0 */                {"libOpenVG",                        gcvNULL},
-};
+    "libEGL_" TAG ".so",                /* EGL */
+    "libGLESv1_CL_" TAG ".so",          /* OpenGL ES 1.1 Common Lite */
+    "libGLESv1_CM_" TAG ".so",          /* OpenGL ES 1.1 Common */
+    "libGLESv2_" TAG ".so",             /* OpenGL ES 2.0 */
+    "libGLESv2_" TAG ".so",             /* OpenGL ES 3.0 */
+    "libOpenVG",                        /* OpenVG 1.0 */
 #elif defined(__QNXNTO__)
-static const char * _dlls[][2] =
-{
-    /* EGL */                       {"libEGL_viv",   gcvNULL},
-    /* OpenGL ES 1.1 Common Lite */ {"glesv1-dlls",  gcvNULL},
-    /* OpenGL ES 1.1 Common */      {"glesv1-dlls",  gcvNULL},
-    /* OpenGL ES 2.0 */             {"glesv2-dlls",  gcvNULL},
-    /* OpenGL ES 3.0 */             {"glesv2-dlls",  gcvNULL},
-    /* OpenVG 1.0 */                {"vg-dlls",      gcvNULL},
-};
+    "libEGL_viv",                       /* EGL */
+    "glesv1-dlls",                      /* OpenGL ES 1.1 Common Lite */
+    "glesv1-dlls",                      /* OpenGL ES 1.1 Common */
+    "glesv2-dlls",                      /* OpenGL ES 2.0 */
+    "glesv2-dlls",                      /* OpenGL ES 3.0 */
+    "vg-dlls",                          /* OpenVG 1.0 */
 #elif defined(__APPLE__)
-static const char * _dlls[][2] =
-{
-    /* EGL */                       {"libEGL.dylib",       gcvNULL},
-    /* OpenGL ES 1.1 Common Lite */ {"libGLESv1_CL.dylib", gcvNULL},
-    /* OpenGL ES 1.1 Common */      {"libGLESv1_CM.dylib", gcvNULL},
-    /* OpenGL ES 2.0 */             {"libGLESv2.dylib",    gcvNULL},
-    /* OpenGL ES 3.0 */             {"libGLESv3.dylib",    gcvNULL},
-    /* OpenVG 1.0 */                {"libOpenVG.dylib",    gcvNULL},
-};
+    "libEGL.dylib",                     /* EGL */
+    "libGLESv1_CL.dylib",               /* OpenGL ES 1.1 Common Lite */
+    "libGLESv1_CM.dylib",               /* OpenGL ES 1.1 Common */
+    "libGLESv2.dylib",                  /* OpenGL ES 2.0 */
+    "libGLESv3.dylib",                  /* OpenGL ES 3.0 */
+    "libOpenVG.dylib",                  /* OpenVG 1.0 */
 #else
-static const char * _dlls[][2] =
-{
-    /* EGL */                       {"libEGL",         gcvNULL},
-    /* OpenGL ES 1.1 Common Lite */ {"libGLESv1_CL",   gcvNULL},
-    /* OpenGL ES 1.1 Common */      {"libGLESv1_CM",   gcvNULL},
-    /* OpenGL ES 2.0 */             {"libGLESv2",      gcvNULL},
-    /* OpenGL ES 3.0 */             {"libGLESv2",      gcvNULL},
-    /* OpenVG 1.0 */                {"libOpenVG",      gcvNULL},
-};
+    "libEGL",                           /* EGL */
+    "libGLESv1_CL",                     /* OpenGL ES 1.1 Common Lite */
+    "libGLESv1_CM",                     /* OpenGL ES 1.1 Common */
+    "libGLESv2",                        /* OpenGL ES 2.0 */
+    "libGLESv2",                        /* OpenGL ES 3.0 */
+    "libOpenVG",                        /* OpenVG 1.0 */
 #endif
+};
 
 static const char * _dispatchNames[] =
 {
-    /* EGL                       */ "",
-    /* OpenGL ES 1.1 Common Lite */ "GLES_CL_DISPATCH_TABLE",
-    /* OpenGL ES 1.1 Common      */ "GLES_CM_DISPATCH_TABLE",
-    /* OpenGL ES 2.0             */ "GLESv2_DISPATCH_TABLE",
-    /* OpenGL ES 3.0             */ "GLESv2_DISPATCH_TABLE",
-    /* OpenVG                    */ "OpenVG_DISPATCH_TABLE",
+    "",                                 /* EGL */
+    "GLES_CL_DISPATCH_TABLE",           /* OpenGL ES 1.1 Common Lite */
+    "GLES_CM_DISPATCH_TABLE",           /* OpenGL ES 1.1 Common */
+    "GLESv2_DISPATCH_TABLE",            /* OpenGL ES 2.0 */
+    "GLESv2_DISPATCH_TABLE",            /* OpenGL ES 3.0 */
+    "OpenVG_DISPATCH_TABLE",            /* OpenVG 1.0 */
 };
 
 #if gcdGC355_PROFILER
@@ -90,13 +70,12 @@ extern gctUINT64 AppstartTimeusec;
 gctFILE ApiTimeFile;
 #endif
 
-static int
+static veglAPIINDEX
 _GetAPIIndex(
-    EGLBoolean Egl,
     VEGLContext Context
     )
 {
-    int index = -1;
+    veglAPIINDEX index = vegl_API_LAST;
 
     do
     {
@@ -104,12 +83,6 @@ _GetAPIIndex(
         VEGLContext context;
         EGLenum api;
         EGLint client;
-
-        if (Egl)
-        {
-            index = vegl_EGL;
-            break;
-        }
 
         /* Get thread data. */
         thread = veglGetThreadData();
@@ -165,57 +138,66 @@ _GetAPIIndex(
 gctHANDLE
 veglGetModule(
     IN gcoOS Os,
-    IN EGLBoolean Egl,
-    IN VEGLContext Context,
-    IN gctINT_PTR Index
+    IN veglAPIINDEX Index,
+    IN veglDISPATCH **Dispatch
     )
 {
     gctHANDLE library = gcvNULL;
-    gctINT index;
-    gctUINT libIndex = 0;
+#if defined(ANDROID)
+    gctUINT offset = 0;
+    gctCONST_STRING libName = (gcmSIZEOF(gctPOINTER) == 8) ? "lib64" : "lib";
+#endif
 
-    /* Get API index. */
-    index = _GetAPIIndex(Egl, Context);
-
-    if (index != -1)
+    if (Index < vegl_API_LAST)
     {
-        if (Index != gcvNULL)
+        gctCHAR dllName[gcdMAX_PATH];
+
+#if defined(ANDROID)
+        gcoOS_PrintStrSafe(dllName, gcdMAX_PATH, &offset, "/vendor/%s/egl/%s", libName, _dlls[Index]);
+#else
+        gcoOS_StrCopySafe(dllName, gcdMAX_PATH, _dlls[Index]);
+#endif
+
+        gcoOS_LoadLibrary(Os, dllName, &library);
+
+#if defined(ANDROID)
+        /* Try 2nd path for Android */
+        if (!library)
         {
-            /* Try the next lib, if being repetitively called. */
-            if(*Index == index)
-            {
-                libIndex = 1;
-            }
+            offset = 0;
+            gcoOS_PrintStrSafe(dllName, gcdMAX_PATH, &offset, "/system/%s/egl/%s", libName, _dlls[Index]);
+            gcoOS_LoadLibrary(Os, dllName, &library);
         }
+#endif
 
-        /* Query the handle. */
-        if (_dlls[index][libIndex] != gcvNULL)
+        /* Query the CL handle if CM not available. */
+        if (!library && Index == vegl_OPENGL_ES11)
         {
-            gcoOS_LoadLibrary(Os, _dlls[index][libIndex], &library);
+            --Index;
+#if defined(ANDROID)
+            offset = 0;
+            gcoOS_PrintStrSafe(dllName, gcdMAX_PATH, &offset, "/vendor/%s/egl/%s", libName, _dlls[Index]);
+#else
+            gcoOS_StrCopySafe(dllName, gcdMAX_PATH, _dlls[Index]);
+#endif
 
-            if ((library == gcvNULL) && (index == vegl_OPENGL_ES11))
+            gcoOS_LoadLibrary(Os, _dlls[vegl_OPENGL_ES11_CL], &library);
+
+#if defined(ANDROID)
+            /* Try 2nd path for Android */
+            if (!library)
             {
-                --index;
-
-                /* Query the CL handle if CM not available. */
-                gcoOS_LoadLibrary(Os, _dlls[index][libIndex], &library);
-            }
-
-#ifdef __APPLE__
-            if ((library == gcvNULL) && (index == vegl_OPENGL_ES20))
-            {
-                ++index;
-
-                /* Query the ES 3 handle if ES 2 not available. */
-                gcoOS_LoadLibrary(Os, _dlls[index][libIndex], &library);
+                offset = 0;
+                gcoOS_PrintStrSafe(dllName, gcdMAX_PATH, &offset, "/system/%s/egl/%s", libName, _dlls[Index]);
+                gcoOS_LoadLibrary(Os, dllName, &library);
             }
 #endif
         }
-    }
 
-    if (Index != gcvNULL)
-    {
-        *Index = index;
+        if (Dispatch && library)
+        {
+            gcoOS_GetProcAddress(Os, library, _dispatchNames[Index], (gctPOINTER*)Dispatch);
+        }
     }
 
     /* Return result. */
@@ -302,37 +284,7 @@ _GetDispatch(
             break;
         }
 #else /*gcdSTATIC_LINK*/
-        int index = -1, i;
-        gctHANDLE library;
-        gctPOINTER pointer = gcvNULL;
-
-        for (i = 0; i < 2; i++)
-        {
-            gceSTATUS status;
-
-            /* Get module handle and API index. */
-            library = veglGetModule(gcvNULL, EGL_FALSE, Context, &index);
-            if (library == gcvNULL)
-            {
-                return gcvNULL;
-            }
-            /* Query the dispatch table name. */
-            status =  gcoOS_GetProcAddress(gcvNULL,
-                                           library,
-                                           _dispatchNames[index],
-                                           &pointer);
-
-            if (gcmIS_SUCCESS(status))
-            {
-                Context->dispatch = pointer;
-                break;
-            }
-
-            if (status != gcvSTATUS_NOT_FOUND)
-            {
-                return gcvNULL;
-            }
-        }
+        veglGetModule(gcvNULL, _GetAPIIndex(Context), &Context->dispatch);
 #endif
     }
 
@@ -1846,9 +1798,12 @@ veglMakeCurrent(
 
                 if (sur->type & EGL_WINDOW_BIT)
                 {
-                    if (sur->newSwapModel)
+                    if (sur->newSwapModel && sur->backBuffer.surface)
                     {
-                        /* A back buffer is acquired if new swap model. */
+                        /*
+                         * A back buffer should be acquired if new swap model.
+                         * No if failed to get window back buffer previously.
+                         */
                         veglCancelWindowBackBuffer(dpy, sur, &sur->backBuffer);
 
                         /* Clear back buffer. */
@@ -2082,9 +2037,12 @@ veglMakeCurrent(
 
                 if (sur->type & EGL_WINDOW_BIT)
                 {
-                    if (sur->newSwapModel)
+                    if (sur->newSwapModel && sur->backBuffer.surface)
                     {
-                        /* A back buffer is acquired if new swap model. */
+                        /*
+                         * A back buffer should be acquired if new swap model.
+                         * No if failed to get window back buffer previously.
+                         */
                         veglCancelWindowBackBuffer(dpy, sur, &sur->backBuffer);
 
                         /* Clear back buffer. */
@@ -2304,6 +2262,7 @@ veglMakeCurrent(
 
             /* Reference external surface. */
             draw->renderTarget = draw->backBuffer.surface;
+            gcoSURF_SetColorType(draw->renderTarget, draw->colorType);
 
             if (draw->renderTarget != gcvNULL)
             {

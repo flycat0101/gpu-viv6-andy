@@ -45,6 +45,7 @@ _ForceRenderTarget(
     case gcvPATCH_BM21:
     case gcvPATCH_ANTUTU:
     case gcvPATCH_ANTUTU4X:
+    case gcvPATCH_ANTUTU5X:
     case gcvPATCH_GLBM21:
     case gcvPATCH_GLBM25:
     case gcvPATCH_GLBM27:
@@ -317,7 +318,8 @@ _CreateSurfaceObjects(
                 gcoHAL_GetPatchID(gcvNULL, &patchId);
 
                 if ((patchId == gcvPATCH_ANTUTU)
-                ||  (patchId == gcvPATCH_ANTUTU4X))
+                ||  (patchId == gcvPATCH_ANTUTU4X)
+                ||  (patchId == gcvPATCH_ANTUTU5X))
                 {
                     samples = 0;
                 }
@@ -566,7 +568,7 @@ EGLint veglResizeSurface(
     IN gctUINT Height
     )
 {
-    EGLint eglResult;
+    EGLint eglResult = EGL_SUCCESS;
     gceSTATUS status;
 
     gcmHEADER_ARG("Surface=0x%x Width=%u Height=%u", Surface, Width, Height);
@@ -669,8 +671,19 @@ EGLint veglResizeSurface(
 
             if (Surface->newSwapModel)
             {
+                EGLBoolean result;
+
                 /* Get window back buffer for new swap model. */
-                veglGetWindowBackBuffer(Display, Surface, &Surface->backBuffer);
+                result = veglGetWindowBackBuffer(Display, Surface, &Surface->backBuffer);
+
+                if (!result)
+                {
+                    /*
+                     * Do not break here. Need update drawable to client in
+                     * direct rendering mode. See below.
+                     */
+                    eglResult = EGL_BAD_NATIVE_WINDOW;
+                }
             }
 
             if (Surface->renderMode > 0)
@@ -678,22 +691,25 @@ EGLint veglResizeSurface(
                 /* Get render target from window back buffer. */
                 Surface->renderTarget = Surface->backBuffer.surface;
 
-                /* Reference external surface. */
-                gcoSURF_ReferenceSurface(Surface->renderTarget);
+                if (Surface->renderTarget)
+                {
+                    /* Reference external surface. */
+                    gcoSURF_ReferenceSurface(Surface->renderTarget);
 
-                /* Set preserve flag. */
-                gcmVERIFY_OK(gcoSURF_SetFlags(
-                    Surface->renderTarget,
-                    gcvSURF_FLAG_CONTENT_PRESERVED,
-                    (Surface->swapBehavior == EGL_BUFFER_PRESERVED)
-                    ));
+                    /* Set preserve flag. */
+                    gcmVERIFY_OK(gcoSURF_SetFlags(
+                        Surface->renderTarget,
+                        gcvSURF_FLAG_CONTENT_PRESERVED,
+                        (Surface->swapBehavior == EGL_BUFFER_PRESERVED)
+                        ));
 
-                /* Reset content updated flag. */
-                gcmVERIFY_OK(gcoSURF_SetFlags(
-                    Surface->renderTarget,
-                    gcvSURF_FLAG_CONTENT_UPDATED,
-                    gcvFALSE
-                    ));
+                    /* Reset content updated flag. */
+                    gcmVERIFY_OK(gcoSURF_SetFlags(
+                        Surface->renderTarget,
+                        gcvSURF_FLAG_CONTENT_UPDATED,
+                        gcvFALSE
+                        ));
+                }
 
                 /* Sync drawable with renderTarget. */
                 Surface->drawable.rtHandle     = Surface->renderTarget;
@@ -732,11 +748,7 @@ EGLint veglResizeSurface(
             }
         }
 
-        /* Return error code. */
-        gcmFOOTER_ARG("return=%d", EGL_SUCCESS);
-
-        /* Success. */
-        return EGL_SUCCESS;
+        /* eglResult could be failure here. */
     }
     while (gcvFALSE);
 
@@ -1052,7 +1064,11 @@ _InitializeSurface(
                 surface->renderTargetFormat = rtFormat;
             }
         }
-        else if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PE_DITHER_FIX2) != gcvTRUE) &&
+        else if (
+#if gcdENABLE_VG
+                !(Thread->openVGpipe && (Thread->api == EGL_OPENVG_API)) &&
+#endif
+                (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PE_DITHER_FIX2) != gcvTRUE) &&
                  (Config->greenSize == 4 || Config->greenSize == 5))
         {
             switch (surface->renderTargetFormat)
@@ -1584,7 +1600,8 @@ veglCreateRenderTarget(
     gcoHAL_GetPatchID(gcvNULL, &patchId);
 
     if ((patchId == gcvPATCH_ANTUTU)
-    ||  (patchId == gcvPATCH_ANTUTU4X))
+    ||  (patchId == gcvPATCH_ANTUTU4X)
+    ||  (patchId == gcvPATCH_ANTUTU5X))
     {
         samples = 0;
     }
@@ -2738,6 +2755,7 @@ eglSurfaceAttrib(
         if (surface->newSwapModel)
         {
             /* Get window back buffer for new swap model. */
+            /* TODO: handle get back buffer failure? */
             veglGetWindowBackBuffer(dpy, surface, &surface->backBuffer);
         }
 

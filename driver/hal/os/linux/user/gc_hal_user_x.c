@@ -1652,6 +1652,18 @@ gcoOS_SwapBuffers(
 {
     return gcvSTATUS_NOT_SUPPORTED;
 }
+
+gceSTATUS
+gcoOS_ResizeWindow(
+    IN gctPOINTER localDisplay,
+    IN HALNativeWindowType Drawable,
+    IN gctUINT Width,
+    IN gctUINT Height
+    )
+{
+    return gcvSTATUS_NOT_SUPPORTED;
+}
+
 #endif
 #endif
 

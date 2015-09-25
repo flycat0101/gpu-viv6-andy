@@ -474,6 +474,7 @@ gc_gralloc_alloc_buffer(
         * In surfaceflinger side: transfer first lock to 2D/3D lock.
         */
         gcmONERROR(gcoSURF_Unlock(surface, gcvNULL));
+        gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
 
         gcoHAL_SetHardwareType(gcvNULL, defaultHwType);
 
@@ -783,6 +784,7 @@ gc_gralloc_free(
             /* Unlock for 2D core in surfaceflinger side. */
             gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_2D);
             gcmVERIFY_OK(gcoSURF_Unlock(surface, gcvNULL));
+            gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
         }
 
         if (has3DCore && allocHwType != gcvHARDWARE_3D)
@@ -790,6 +792,7 @@ gc_gralloc_free(
             /* Unlock for 3D core in surfaceflinger side. */
             gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_2D);
             gcmVERIFY_OK(gcoSURF_Lock(surface, gcvNULL, gcvNULL));
+            gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
         }
 
         if (has3D2DCore && allocHwType != gcvHARDWARE_3D2D)
@@ -797,6 +800,7 @@ gc_gralloc_free(
             /* Unlock for 3D/2D core in surfaceflinger side. */
             gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D2D);
             gcmVERIFY_OK(gcoSURF_Lock(surface, gcvNULL, gcvNULL));
+            gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
         }
 
         if (usage_has_type(handle->allocUsage, GRALLOC_USAGE_HW_VG_RENDER_VIV))
@@ -809,6 +813,7 @@ gc_gralloc_free(
 
             /* Last lock for 2D/3D. */
             gcmVERIFY_OK(gcoSURF_Unlock(surface, gcvNULL));
+            gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
         }
 
         /* Restore hardware type. */
@@ -919,6 +924,7 @@ gc_gralloc_lock_ycbcr(
     void * vaddr[3];
     gctINT stride;
     gcoSURF surface;
+    gceHARDWARE_TYPE hwType = gcvHARDWARE_3D;
 
     if (private_handle_t::validate(Handle) < 0)
         return -EINVAL;
@@ -939,11 +945,19 @@ gc_gralloc_lock_ycbcr(
         return -EINVAL;
     }
 
+    /* Get hardware type. */
+    gcoHAL_GetHardwareType(gcvNULL, &hwType);
+
+    /* Switch to proper hardware type. */
+    switch_hardware_type(handle->allocUsage);
+
     /* Call general lock function. */
     err = gc_gralloc_lock(Module, Handle, Usage, Left, Top, Width, Height, vaddr);
 
     if (err)
     {
+        /* Restore hardware type. */
+        gcoHAL_SetHardwareType(gcvNULL, hwType);
         return err;
     }
 
@@ -968,6 +982,9 @@ gc_gralloc_lock_ycbcr(
     YCbCr->ystride = stride;
     YCbCr->cstride = stride;
     YCbCr->chroma_step = 2;
+
+    /* Restore hardware type. */
+    gcoHAL_SetHardwareType(gcvNULL, hwType);
 
     return 0;
 }

@@ -3758,8 +3758,11 @@ static VSC_ErrCode _VSC_IS_InstSched_PerformOnFunction(
         CFG_ITERATOR_INIT(&cfg_iter, cfg);
         for(bb = CFG_ITERATOR_FIRST(&cfg_iter); bb != gcvNULL; bb = CFG_ITERATOR_NEXT(&cfg_iter))
         {
-            if(_VSC_IS_GetBBEssence(bb, gcvNULL, gcvNULL) > 1 &&
-                (!VSC_OPTN_ISOptions_GetLLIOnly(options) || BB_FLAGS_GET_LLI(bb)))
+            gctUINT32 bb_length = _VSC_IS_GetBBEssence(bb, gcvNULL, gcvNULL);
+            if(bb_length > 1 &&
+               bb_length <= VSC_OPTN_ISOptions_GetBBCeiling(options) &&
+               (!VSC_OPTN_ISOptions_GetLLIOnly(options) || BB_FLAGS_GET_LLI(bb))
+              )
             {
                 VSC_IS_InstSched_SetCurrBB(is, bb);
                 err_code = _VSC_IS_DoInstructionSchedulingForBB(is);

@@ -365,33 +365,33 @@
 #if !defined (YYSTYPE) && ! defined (YYSTYPE_IS_DECLARED)
 #line 25 "gc_glsl.y"
 typedef union YYSTYPE {
-	slsLexToken					token;
+    slsLexToken                 token;
 
-	slsDeclOrDeclList			declOrDeclList;
+    slsDeclOrDeclList           declOrDeclList;
 
-	slsDLINK_LIST *				fieldDeclList;
+    slsDLINK_LIST *             fieldDeclList;
 
-	slsFieldDecl *				fieldDecl;
+    slsFieldDecl *              fieldDecl;
 
-	slsDATA_TYPE *				dataType;
+    slsDATA_TYPE *              dataType;
 
-	sloIR_EXPR				expr;
+    sloIR_EXPR              expr;
 
-	slsNAME	*				funcName;
+    slsNAME *               funcName;
 
-	slsNAME	*				paramName;
+    slsNAME *               paramName;
 
-	slsNAME *				blockName;
+    slsNAME *               blockName;
 
-	sloIR_SET					statements;
+    sloIR_SET                   statements;
 
-	sloIR_BASE					statement;
+    sloIR_BASE                  statement;
 
-	slsSelectionStatementPair	selectionStatementPair;
+    slsSelectionStatementPair   selectionStatementPair;
 
-	slsForExprPair				forExprPair;
+    slsForExprPair              forExprPair;
 
-	sloIR_POLYNARY_EXPR			funcCall;
+    sloIR_POLYNARY_EXPR         funcCall;
 
     slsASM_OPCODE               asmOpcode;
 

@@ -1354,7 +1354,7 @@ _AllocateSurface(
     Surface->info.isMsaa     = (Surface->info.sampleInfo.product > 1);
 
     if (Surface->info.isMsaa &&
-        gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_EDGEAA))
+        gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_VMSAA))
     {
         Surface->info.edgeAA = gcvTRUE;
     }
@@ -4867,6 +4867,8 @@ _ComputeClear(
          case gcvSURF_X16B16G16R16I:
          case gcvSURF_A16B16G16R16UI:
          case gcvSURF_X16B16G16R16UI:
+         case gcvSURF_A16B16G16R16I_1_G32R32F:
+         case gcvSURF_A16B16G16R16UI_1_G32R32F:
              gcmASSERT(LayerIndex == 0);
              clearValueType = ClearArgs->color.valueType;
 
@@ -6107,12 +6109,14 @@ _3DBlitClearRect_v2(
         {
             hzClearInfo.destTileStatusAddress = 0;
         }
+        gcmONERROR(gcoSURF_DisableTileStatus(surf, gcvTRUE));
     }
 
     /* Clear. */
-    if( surfInfo->bitsPerPixel >= 64 &&
-        surfInfo->tileStatusNode.pool == gcvPOOL_UNKNOWN &&
-        surfInfo->clearBitMask[LayerIndex] != surfInfo->clearBitMaskUpper[LayerIndex] )
+    if ((surfInfo->bitsPerPixel >= 64) &&
+        !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_64bpp_MASKED_CLEAR_FIX) &&
+        (surfInfo->tileStatusNode.pool == gcvPOOL_UNKNOWN) &&
+        (surfInfo->clearBitMask[LayerIndex] != surfInfo->clearBitMaskUpper[LayerIndex]))
     {
         status = gcoHARDWARE_ClearSoftware_v2(gcvNULL,
                                               SurfView,
@@ -6151,10 +6155,6 @@ _3DBlitClearRect_v2(
 
         /* Reset the tile status. */
         gcmONERROR(gcoSURF_EnableTileStatus(surf));
-    }
-    else
-    {
-        surfInfo->tileStatusDisabled = gcvTRUE;
     }
 
 OnError:
@@ -7226,6 +7226,7 @@ gcoSURF_ResolveRect_v2(
     gcsSURF_INFO_PTR dstInfo = &dstSurf->info;
     gcsPOINT_PTR srcOrigin, dstOrigin;
     gceSURF_FORMAT savedSrcFmt = gcvSURF_UNKNOWN;
+    gceFORMAT_DATATYPE savedSrcDataType = gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED;
     gcsSURF_RESOLVE_ARGS fullSizeArgs = {0};
     gceSTATUS status = gcvSTATUS_OK;
 
@@ -7253,6 +7254,9 @@ gcoSURF_ResolveRect_v2(
         */
         savedSrcFmt = srcInfo->format;
         srcInfo->format = dstInfo->format;
+
+        savedSrcDataType = srcInfo->formatInfo.fmtDataType;
+        srcInfo->formatInfo.fmtDataType = dstInfo->formatInfo.fmtDataType;
     }
 
     srcOrigin = &Args->uArgs.v2.srcOrigin;
@@ -7465,6 +7469,7 @@ OnError:
     if (savedSrcFmt != gcvSURF_UNKNOWN)
     {
         srcInfo->format = savedSrcFmt;
+        srcInfo->formatInfo.fmtDataType = savedSrcDataType;
     }
 
     /* Return the status. */
@@ -11548,6 +11553,10 @@ gcoSURF_SetWindow(
     Surface->info.node.u.wrapped.physical = Surface->physical;
     Surface->info.node.logical = Surface->logical;
     Surface->info.pfGetAddr = gcoHARDWARE_GetProcCalcPixelAddr(gcvNULL, &Surface->info);
+
+#if (gcdENABLE_3D==0) && (gcdENABLE_2D==0) && (gcdENABLE_VG==1)
+    Surface->info.node.u.wrapped.mappingInfo = gcvNULL;
+#endif
 
     Surface->info.node.lockCount = 1;
 

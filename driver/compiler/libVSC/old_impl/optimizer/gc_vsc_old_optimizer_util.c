@@ -1851,7 +1851,7 @@ gcOpt_InitializeTempArray(
         default:
             if (gcSL_isOpcodeHaveNoTarget(opcode))
             {
-				temp = gcvNULL;
+                temp = gcvNULL;
                 break;
             }
 
@@ -2673,6 +2673,7 @@ _BuildCodeList(
     Optimizer->codeTail = codePrev;
 
     /* Initialize caller and callee. */
+    Optimizer->jmpCount = 0;
     for (code = Optimizer->codeHead; code; code = code->next)
     {
         if (gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) == gcSL_CALL
@@ -2684,10 +2685,12 @@ _BuildCodeList(
 
             gcmASSERT(codeTarget->id == jumpTarget);
             code->callee = codeTarget;
-            if (jumpTarget < code->id)
+            if (gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) == gcSL_JMP && jumpTarget < code->id)
             {
                 code->backwardJump = gcvTRUE;
             }
+
+            Optimizer->jmpCount ++;
 
             gcmERR_RETURN(gcOpt_AddCodeToList(Optimizer, &codeTarget->callers, code));
         }
@@ -3645,7 +3648,7 @@ gcOpt_DeleteFunction(
             tempArray[index].argument = argument;
             tempArray[index].precision = (gcSHADER_PRECISION)argument->precision;
 
-			if (argument->variableIndex != 0xffff)
+            if (argument->variableIndex != 0xffff)
             {
                 gcmASSERT(argument->variableIndex < Optimizer->shader->variableCount);
                 tempArray[index].arrayVariable = Optimizer->shader->variables[argument->variableIndex];
@@ -3865,7 +3868,15 @@ gcOpt_CopyInShader(
         /* Set main's codeHead and codeTail. */
         if (i == 0)
         {
-            Optimizer->main->codeHead = Optimizer->codeHead;
+            if(codeRET->prev)
+            {
+                Optimizer->main->codeHead = Optimizer->codeHead;
+            }
+            else    /* empty main */
+            {
+                Optimizer->main->codeHead = codeRET;
+                Optimizer->codeHead = codeRET;
+            }
         }
         else
         {
@@ -4314,6 +4325,7 @@ _PackMainProgram(
     gctUINT             i;
     gctINT              k;
     gctBOOL             changeCode = gcvFALSE;
+    gctBOOL             functionRemoved;
 
     gcmHEADER_ARG("Optimizer=%p", Optimizer);
 
@@ -4364,14 +4376,11 @@ _PackMainProgram(
                     gcOPT_CODE codeTarget = function->codeTail;
 
                     gcmASSERT(gcmSL_OPCODE_GET(codeTarget->instruction.opcode, Opcode) == gcSL_RET);
+                    gcmASSERT(jumpTarget > code->id);
                     code->instruction.opcode = gcmSL_OPCODE_SET(code->instruction.opcode, Opcode, gcSL_JMP);
                     code->instruction.tempIndex = (gctUINT16)jumpTarget;
 
                     code->callee = codeTarget;
-                    if (jumpTarget < code->id)
-                    {
-                        code->backwardJump = gcvTRUE;
-                    }
                     gcmERR_RETURN(gcOpt_AddCodeToList(Optimizer, &codeTarget->callers, code));
                 }
 
@@ -4391,146 +4400,151 @@ _PackMainProgram(
     }
 
     /* Remove unused functions. */
-    for (k = Optimizer->functionCount - 1; k >= 0; k--)
+    do
     {
-        function = functionArray + k;
-
-        /* skip main kernel function if it is already
-         * merged with main */
-        if (function->kernelFunction != gcvNULL &&
-            function->kernelFunction->isMain)
+        functionRemoved = gcvFALSE;
+        for (k = Optimizer->functionCount - 1; k >= 0; k--)
         {
-            gcmASSERT(Optimizer->isMainMergeWithKerenel);
-            continue;
-        }
-        if (function->codeHead->callers == gcvNULL)
-        {
-            /* Function is not used at all or is a recursive function. */
-            /* Remove the function. */
-            gcOPT_TEMP tempArray = Optimizer->tempArray;
-            gcsFUNCTION_ARGUMENT_PTR argument;
-            gctUINT j;
+            function = functionArray + k;
 
-            /* Free the code list in the function. */
-#if _REMOVE_UNUSED_FUNCTION_CODE_
-            gcOpt_RemoveCodeList(Optimizer, function->codeHead, function->codeTail);
-#else
-            for (code = function->codeHead; code != gcvNULL && code != function->codeTail->next; code = code->next)
+            /* skip main kernel function if it is already
+             * merged with main */
+            if (function->kernelFunction != gcvNULL &&
+                function->kernelFunction->isMain)
             {
-                if (gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) == gcSL_CALL)
-                {
-                    /* Remove from callee's caller list */
-                    gcOpt_DeleteCodeFromList(Optimizer,
-                                &code->callee->callers,
-                                code);
-                    code->callee = gcvNULL;
-                }
-                else
-                {
-                    /* All other instruction is inside this function, remove caller and callee */
-                    gcOPT_LIST caller;
-                    gcOPT_LIST nextCaller;
+                gcmASSERT(Optimizer->isMainMergeWithKerenel);
+                continue;
+            }
+            if (function->codeHead->callers == gcvNULL)
+            {
+                /* Function is not used at all or is a recursive function. */
+                /* Remove the function. */
+                gcOPT_TEMP tempArray = Optimizer->tempArray;
+                gcsFUNCTION_ARGUMENT_PTR argument;
+                gctUINT j;
 
-                    for (caller = code->callers ;caller != gcvNULL;)
+                /* Free the code list in the function. */
+#if _REMOVE_UNUSED_FUNCTION_CODE_
+                gcOpt_RemoveCodeList(Optimizer, function->codeHead, function->codeTail);
+#else
+                for (code = function->codeHead; code != gcvNULL && code != function->codeTail->next; code = code->next)
+                {
+                    if (gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) == gcSL_CALL)
                     {
-                        nextCaller = caller->next;
-                        _FreeList(Optimizer->listMemPool, caller);
-                        caller = nextCaller;
+                        /* Remove from callee's caller list */
+                        gcOpt_DeleteCodeFromList(Optimizer,
+                                    &code->callee->callers,
+                                    code);
+                        code->callee = gcvNULL;
+                    }
+                    else
+                    {
+                        /* All other instruction is inside this function, remove caller and callee */
+                        gcOPT_LIST caller;
+                        gcOPT_LIST nextCaller;
+
+                        for (caller = code->callers ;caller != gcvNULL;)
+                        {
+                            nextCaller = caller->next;
+                            _FreeList(Optimizer->listMemPool, caller);
+                            caller = nextCaller;
+                        }
+
+                        code->callee = gcvNULL;
+                        code->callers = gcvNULL;
                     }
 
-                    code->callee = gcvNULL;
-                    code->callers = gcvNULL;
+                    code->instruction = gcvSL_NOP_INSTR;
+                    code->function = gcvNULL;
                 }
 
-                code->instruction = gcvSL_NOP_INSTR;
-                code->function = gcvNULL;
-            }
+                if (k > 0 &&
+                    ((function->codeHead->prev == functionArray[k - 1].codeTail) ||
+                     (function->codeTail->next == functionArray[k - 1].codeHead)))
+                {
+                    if (function->codeHead->prev == functionArray[k - 1].codeTail)
+                        functionArray[k - 1].codeTail = function->codeTail;
 
-            if (k > 0 &&
-                ((function->codeHead->prev == functionArray[k - 1].codeTail) ||
-                 (function->codeTail->next == functionArray[k - 1].codeHead)))
-            {
-                if (function->codeHead->prev == functionArray[k - 1].codeTail)
-                    functionArray[k - 1].codeTail = function->codeTail;
-
-                if (function->codeTail->next == functionArray[k - 1].codeHead)
-                    functionArray[k - 1].codeHead = function->codeHead;
-            }
-            else if (function->codeTail->next == Optimizer->main->codeHead)
-            {
-                if (k == 0)
-                {
-                    Optimizer->main->codeHead = Optimizer->codeHead;
+                    if (function->codeTail->next == functionArray[k - 1].codeHead)
+                        functionArray[k - 1].codeHead = function->codeHead;
                 }
-                else if (function->codeHead->prev != functionArray[k - 1].codeTail)
+                else if (function->codeTail->next == Optimizer->main->codeHead)
                 {
-                    Optimizer->main->codeHead = functionArray[k - 1].codeTail->next;
+                    if (k == 0)
+                    {
+                        Optimizer->main->codeHead = Optimizer->codeHead;
+                    }
+                    else if (function->codeHead->prev != functionArray[k - 1].codeTail)
+                    {
+                        Optimizer->main->codeHead = functionArray[k - 1].codeTail->next;
+                    }
+                    else
+                    {
+                        Optimizer->main->codeHead = function->codeHead;
+                    }
                 }
-                else
+                /* If the implementation of this function is after the main function,
+                ** we need to adjust the main function.
+                */
+                else if (function->codeHead->prev == Optimizer->main->codeTail)
                 {
-                    Optimizer->main->codeHead = function->codeHead;
+                    Optimizer->main->codeTail = function->codeTail;
+                    if (k + 1 < (gctINT)Optimizer->functionCount)
+                    {
+                        /* adjust the function after deleted function */
+                        gcmASSERT(functionArray[k + 1].codeHead->prev == function->codeTail);
+                        functionArray[k + 1].codeHead->prev = Optimizer->main->codeTail;
+                    }
                 }
-            }
-            /* If the implementation of this function is after the main function,
-            ** we need to adjust the main function.
-            */
-            else if (function->codeHead->prev == Optimizer->main->codeTail)
-            {
-                Optimizer->main->codeTail = function->codeTail;
-                if (k + 1 < (gctINT)Optimizer->functionCount)
-                {
-                    /* adjust the function after deleted function */
-                    gcmASSERT(functionArray[k + 1].codeHead->prev == function->codeTail);
-                    functionArray[k + 1].codeHead->prev = Optimizer->main->codeTail;
-                }
-            }
 #endif
 
-            /* Update temps' function for function arguments. */
-            argument = function->arguments;
-            for (j = 0; j < function->argumentCount; j++, argument++)
-            {
-                gctUINT index = argument->index;
-
-                gcmASSERT(tempArray[index].function == function);
-                tempArray[index].function = gcvNULL;
-                tempArray[index].argument = gcvNULL;
-            }
-
-            for (j = k; j < Optimizer->functionCount - 1; j++)
-            {
-                functionArray[j] = functionArray[j + 1];
-
                 /* Update temps' function for function arguments. */
-                argument = functionArray[j].arguments;
-                for (i = 0; i < functionArray[j].argumentCount; i++, argument++)
+                argument = function->arguments;
+                for (j = 0; j < function->argumentCount; j++, argument++)
                 {
                     gctUINT index = argument->index;
 
-                    gcmASSERT(tempArray[index].function == functionArray + j + 1);
-                    tempArray[index].function = functionArray + j;
-                    tempArray[index].argument = argument;
-                    tempArray[index].precision = (gcSHADER_PRECISION)argument->precision;
-
-					if (argument->variableIndex != 0xffff)
-		            {
-		                gcmASSERT(argument->variableIndex < Optimizer->shader->variableCount);
-		                tempArray[index].arrayVariable = Optimizer->shader->variables[argument->variableIndex];
-		                tempArray[index].precision = tempArray[index].arrayVariable->precision;
-		            }
+                    gcmASSERT(tempArray[index].function == function);
+                    tempArray[index].function = gcvNULL;
+                    tempArray[index].argument = gcvNULL;
                 }
-            }
-            Optimizer->functionCount--;
-            if (Optimizer->functionCount == 0)
-            {
-                /* Free the empty function array. */
-                gcmVERIFY_OK(_FreeFunctionArray(Optimizer->functionArrayMemPool, functionArray));
-                Optimizer->functionArray = gcvNULL;
-            }
 
-            changeCode = gcvTRUE;
+                for (j = k; j < Optimizer->functionCount - 1; j++)
+                {
+                    functionArray[j] = functionArray[j + 1];
+
+                    /* Update temps' function for function arguments. */
+                    argument = functionArray[j].arguments;
+                    for (i = 0; i < functionArray[j].argumentCount; i++, argument++)
+                    {
+                        gctUINT index = argument->index;
+
+                        gcmASSERT(tempArray[index].function == functionArray + j + 1);
+                        tempArray[index].function = functionArray + j;
+                        tempArray[index].argument = argument;
+                        tempArray[index].precision = (gcSHADER_PRECISION)argument->precision;
+
+                        if (argument->variableIndex != 0xffff)
+                        {
+                            gcmASSERT(argument->variableIndex < Optimizer->shader->variableCount);
+                            tempArray[index].arrayVariable = Optimizer->shader->variables[argument->variableIndex];
+                            tempArray[index].precision = tempArray[index].arrayVariable->precision;
+                        }
+                    }
+                }
+                Optimizer->functionCount--;
+                if (Optimizer->functionCount == 0)
+                {
+                    /* Free the empty function array. */
+                    gcmVERIFY_OK(_FreeFunctionArray(Optimizer->functionArrayMemPool, functionArray));
+                    Optimizer->functionArray = gcvNULL;
+                }
+
+                functionRemoved = gcvTRUE;
+                changeCode = gcvTRUE;
+            }
         }
-    }
+    } while(functionRemoved);
 
     if (changeCode)
     {
@@ -6105,6 +6119,7 @@ _BuildFunctionFlowGraph(
     gceSTATUS           status = gcvSTATUS_OK;
     gcOPT_TEMP_DEFINE   tempDefineArray = gcvNULL;
     gcOPT_CODE          code;
+    gcOPT_CODE          lastBackwardCallee = gcvNULL;
 
     gcmHEADER_ARG("Optimizer=0x%x Function=0x%x",
                    Optimizer, Function);
@@ -6127,6 +6142,11 @@ _BuildFunctionFlowGraph(
          code != Function->codeTail->next;
          code = code->next)
     {
+        if(lastBackwardCallee && code->id == lastBackwardCallee->id)
+        {
+            lastBackwardCallee = gcvNULL;
+        }
+
         if (code->callers)
         {
             gctBOOL isBackJump = gcvFALSE;
@@ -6136,6 +6156,10 @@ _BuildFunctionFlowGraph(
             {
                 if (callers->code && callers->code->backwardJump)
                 {
+                    if(lastBackwardCallee == gcvNULL && !callers->code->handled)
+                    {
+                        lastBackwardCallee = code;
+                    }
                     isBackJump = gcvTRUE;
                     break;
                 }
@@ -6147,8 +6171,21 @@ _BuildFunctionFlowGraph(
                 gcmERR_RETURN(_MergeTempDefineArray(Optimizer,
                                         code->tempDefine, isBackJump, &tempDefineArray));
             }
-            gcmERR_RETURN(_MergeTempDefineArray(Optimizer,
-                                        tempDefineArray, isBackJump, &code->tempDefine));
+
+            if(lastBackwardCallee == gcvNULL)
+            {
+                if(code->tempDefine)
+                {
+                    gcmVERIFY_OK(gcOpt_ClearTempArray(Optimizer, code->tempDefine));
+                    gcmVERIFY_OK(_FreeTempDefineArray(Optimizer->tempDefineArrayMemPool, code->tempDefine));
+                    code->tempDefine = gcvNULL;
+                }
+            }
+            else
+            {
+                gcmERR_RETURN(_MergeTempDefineArray(Optimizer,
+                                            tempDefineArray, isBackJump, &code->tempDefine));
+            }
         }
 
         gcmERR_RETURN(_BuildDataFlowForCode(Optimizer, code, tempDefineArray));
@@ -6517,7 +6554,6 @@ gcOpt_BuildFlowGraph(
     gceSTATUS           status = gcvSTATUS_OK;
     gcOPT_FUNCTION      functionArray = Optimizer->functionArray;
     gctUINT             i;
-    gcOPT_CODE          code;
 
     gcmHEADER_ARG("Optimizer=%p", Optimizer);
 
@@ -6592,18 +6628,6 @@ gcOpt_BuildFlowGraph(
         }
     }
 #endif
-
-    /* Set JUMP's backwardJump. */
-    for (code = Optimizer->codeHead; code; code = code->next)
-    {
-        if (code->instruction.opcode == gcSL_JMP)
-        {
-            gctUINT jumpTarget = code->instruction.tempIndex;
-
-            gcmASSERT(code->callee->id == jumpTarget);
-            code->backwardJump = (jumpTarget < code->id) ? gcvTRUE : gcvFALSE;
-        }
-    }
 
     if (Optimizer->functionCount > 0)
     {

@@ -1149,7 +1149,7 @@ gcoOS_GetEvent(
 
         screen_get_event_property_iv(screen_evt, SCREEN_PROPERTY_TYPE, &type);
 
-        if (type ==  SCREEN_EVENT_CLOSE)
+        if (type == SCREEN_EVENT_CLOSE)
         {
             Event->type = HAL_CLOSE;
 
@@ -1176,7 +1176,7 @@ gcoOS_GetEvent(
                 Event->data.button.x = pointer[0];
                 Event->data.button.y = pointer[1];
 
-                last_buttons =  buttons;
+                last_buttons = buttons;
             }
             else
             {
@@ -1220,7 +1220,7 @@ gcoOS_GetEvent(
             Event->type                   = HAL_KEYBOARD;
             Event->data.keyboard.scancode = scancode;
             Event->data.keyboard.pressed  = buffer < 0x80;
-            Event->data.keyboard.key      = (  (scancode < HAL_SPACE)
+            Event->data.keyboard.key      = ((scancode < HAL_SPACE)
                 || (scancode >= HAL_F1)
                 )
                 ? 0
@@ -1325,7 +1325,7 @@ gcoOS_IsValidDisplay(
     IN HALNativeDisplayType Display
     )
 {
-    if(Display != (HALNativeDisplayType) gcvNULL)
+    if (Display != (HALNativeDisplayType) gcvNULL)
         return gcvSTATUS_OK;
 
     return gcvSTATUS_INVALID_ARGUMENT;
@@ -1538,6 +1538,17 @@ gcoOS_SwapBuffers(
     IN gctPOINTER ResolveBits,
     OUT gctUINT *Width,
     OUT gctUINT *Height
+    )
+{
+    return gcvSTATUS_NOT_SUPPORTED;
+}
+
+gceSTATUS
+gcoOS_ResizeWindow(
+    IN gctPOINTER localDisplay,
+    IN HALNativeWindowType Drawable,
+    IN gctUINT Width,
+    IN gctUINT Height
     )
 {
     return gcvSTATUS_NOT_SUPPORTED;

@@ -214,7 +214,7 @@ sloIR_ITERATION_Count(
         slsNAME * loopIndexName;
         slsGEN_CODE_PARAMETERS initParameters, restParameters, bodyParameters;
         slsGEN_CODE_PARAMETERS condParameters;
-		gctUINT beginAtomicOpCount;
+        gctUINT beginAtomicOpCount;
 
         if (Iteration->type != slvFOR) break;
 

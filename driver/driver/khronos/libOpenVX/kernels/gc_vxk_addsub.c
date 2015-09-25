@@ -19,21 +19,21 @@ vx_status _gcfVX_AddSubOpration(gceVX_KERNEL kernel, vx_image in0, vx_image in1,
     gcoVX_Kernel_Context context = {{0}};
     vxAccessScalarValue(policy_param, &overflow_policy);
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, in0, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, in0, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, in1, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, in1, GC_VX_INDEX_AUTO);
 
-	/*index = 2*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+    /*index = 2*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
 
     context.params.kernel           = kernel;
     context.params.xstep            = 8;
 
     context.params.policy           = (overflow_policy == VX_CONVERT_POLICY_SATURATE)?gcvTRUE:gcvFALSE;
 
-	vxCommitScalarValue(policy_param, &overflow_policy);
+    vxCommitScalarValue(policy_param, &overflow_policy);
 
     return gcfVX_Kernel(&context);
 }

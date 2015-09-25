@@ -4357,9 +4357,9 @@ GLboolean __glChipCopyImageSubData(
             srcView.surf = chipRBO->surface;
         }
 
-        if (srcType != GL_RENDERBUFFER)
+        if (dstType != GL_RENDERBUFFER)
         {
-            if (srcType == __GL_TEXTURE_3D_INDEX)
+            if (dstType == __GL_TEXTURE_3D_INDEX)
             {
                 dstView = gcChipGetTextureSurface(chipCtx, (__GLtextureObject *)dstObject, dstLevel, 0, dstZ + i);
             }

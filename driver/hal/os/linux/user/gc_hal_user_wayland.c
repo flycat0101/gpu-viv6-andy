@@ -12,12 +12,12 @@
 
 
 #if gcdENABLE_3D || gcdENABLE_VG
-#ifdef EGL_API_FB
-#ifdef EGL_API_WL
+#if (defined EGL_API_FB && defined EGL_API_WL)
 /* Enable sigaction declarations. */
-
+#if defined(LINUX)
 #if !defined _XOPEN_SOURCE
 #   define _XOPEN_SOURCE 501
+#endif
 #endif
 #include "gc_hal_user_linux.h"
 #include <stdio.h>
@@ -39,6 +39,31 @@
 #include "gc_wayland_protocol.h"
 #include "wayland-viv-server-protocol.h"
 #include "wayland-server.h"
+#include "gc_hal_eglplatform.h"
+/*From include/linux/mxcfb.h*/
+#define MXCFB_WAIT_FOR_VSYNC _IOW('F',0x20, u_int32_t)
+
+#define MXCFB_SET_PREFETCH  _IOW('F', 0x30, int)
+#define MXCFB_GET_PREFETCH  _IOR('F', 0x31, int)
+#ifndef gcdENABLE_FB_PREFETCH
+#   define gcdENABLE_FB_PREFETCH       0
+#endif
+
+/*From include/linux/ipu.h*/
+#define fourcc(a, b, c, d)\
+     (((__u32)(a)<<0)|((__u32)(b)<<8)|((__u32)(c)<<16)|((__u32)(d)<<24))
+
+#define IPU_PIX_FMT_GPU32_SB_ST  fourcc('5', 'P', '4', 'S') /*!< 32bit split buf 4x4 standard */
+#define IPU_PIX_FMT_GPU32_SB_SRT fourcc('5', 'P', '4', 'R') /*!< 32bit split buf 4x4 super */
+#define IPU_PIX_FMT_GPU32_ST     fourcc('5', 'I', '4', 'S') /*!< 32bit single buf 4x4 standard */
+#define IPU_PIX_FMT_GPU32_SRT    fourcc('5', 'I', '4', 'R') /*!< 32bit single buf 4x4 super */
+#define IPU_PIX_FMT_GPU16_SB_ST  fourcc('4', 'P', '8', 'S') /*!< 16bit split buf 8x4 standard */
+#define IPU_PIX_FMT_GPU16_SB_SRT fourcc('4', 'P', '8', 'R') /*!< 16bit split buf 8x4 super */
+#define IPU_PIX_FMT_GPU16_ST     fourcc('4', 'I', '8', 'S') /*!< 16bit single buf 8x4 standard */
+#define IPU_PIX_FMT_GPU16_SRT    fourcc('4', 'I', '8', 'R') /*!< 16bit single buf 8x4 super */
+
+
+#define gcdUSE_PIXMAP_SURFACE 1
 #define _GC_OBJ_ZONE    gcvZONE_OS
 
 #define GC_FB_MAX_SWAP_INTERVAL     10
@@ -48,37 +73,51 @@
 #define FBIO_WAITFORVSYNC _IOW('F', 0x20, __u32)
 #endif
 
+#if defined (WAYLAND_VERSION_MAJOR) &&      \
+    WAYLAND_VERSION_MAJOR == 1 &&       \
+    WAYLAND_VERSION_MINOR < 6
+#define WAYLAND_LEGACY_SUPPORT
+#endif
+
+#define WL_EGL_NUM_BACKBUFFERS     3
+#define WL_EGL_MAX_NUM_BACKBUFFERS 3
+
 /* Structure that defines a display. */
 struct _FBDisplay
 {
     gctUINT                 wl_signature;
     /* Note that struct wl_display is not the same object for client and server. */
     struct wl_display *     wl_display;
-    gctINT                         file;
+    gctINT                  index;
+    gctINT                  file;
     gctSIZE_T               physical;
-    gctINT                         stride;
-    gctINT                         width;
-    gctINT                         height;
-    gctINT                         bpp;
-    gctINT                         size;
-    gctPOINTER                      memory;
+    gctINT                  stride;
+    gctINT                  width;
+    gctINT                  height;
+    gctINT                  bpp;
+    gctINT                  size;
+    gctPOINTER              memory;
     struct fb_fix_screeninfo    fixInfo;
     struct fb_var_screeninfo    varInfo;
     struct fb_var_screeninfo    orgVarInfo;
-    gctINT                         backBufferY;
-    gctINT                         multiBuffer;
-    pthread_cond_t              cond;
-    pthread_mutex_t             condMutex;
-    gctUINT                alphaLength;
-    gctUINT                alphaOffset;
-    gctUINT                redLength;
-    gctUINT                redOffset;
-    gctUINT                greenLength;
-    gctUINT                greenOffset;
-    gctUINT                blueLength;
-    gctUINT                blueOffset;
-    gceSURF_FORMAT      format;
-    gctINT                swapInterval;
+    gctINT                  backBufferY;
+    gctINT                  multiBuffer;
+    pthread_cond_t          cond;
+    pthread_mutex_t         condMutex;
+    gctUINT                 alphaLength;
+    gctUINT                 alphaOffset;
+    gctUINT                 redLength;
+    gctUINT                 redOffset;
+    gctUINT                 greenLength;
+    gctUINT                 greenOffset;
+    gctUINT                 blueLength;
+    gctUINT                 blueOffset;
+    gceSURF_FORMAT          format;
+    gctINT                  swapInterval;
+
+    gctBOOL                 fbPrefetch;
+
+    struct _FBDisplay *     next;
 };
 
 /* Structure that defines a window. */
@@ -98,9 +137,8 @@ struct _FBWindow
 struct _FBPixmap
 {
     struct wl_buffer wl_buffer;
-    gcoSURF          surface;
-    gctUINT32        gpu;
     /* Pointer to memory bits. */
+    gctPOINTER       original;
     gctPOINTER       bits;
 
     /* Bits per pixel. */
@@ -108,7 +146,13 @@ struct _FBPixmap
 
     /* Size. */
     gctINT         width, height;
+    gctINT         alignedWidth, alignedHeight;
     gctINT         stride;
+
+#if gcdUSE_PIXMAP_SURFACE
+    gcoSURF         surface;
+    gctUINT32       gpu;
+#endif
 };
 
 static halKeyMap keys[] =
@@ -255,8 +299,6 @@ struct termios  tty;
 gctINT ignore;
 gctINT hookSEGV = 0;
 
-#define WL_COMPOSITOR_SIGNATURE (0x31415926)
-
 static gctBOOL inline
 _IsCompositorDisplay(struct _FBDisplay *Display)
 {
@@ -269,6 +311,9 @@ _IsCompositorWindow(struct _FBWindow *Window)
     return ((Window->wl_signature == WL_COMPOSITOR_SIGNATURE) ? gcvTRUE : gcvFALSE);
 }
 
+static struct _FBDisplay *displayStack = gcvNULL;
+static pthread_mutex_t displayMutex = PTHREAD_MUTEX_INITIALIZER;
+#if defined(LINUX)
 static void sig_handler(gctINT signo)
 {
     if(hookSEGV == 0)
@@ -277,19 +322,24 @@ static void sig_handler(gctINT signo)
         hookSEGV = 1;
     }
     gcoOS_FreeEGLLibrary(gcvNULL);
-    exit(0);
+    signal(signo, SIG_DFL);
+    raise(signo);
 }
+#endif
 
 static void
 halOnExit(
     void
     )
 {
+#if defined(LINUX)
     signal(SIGINT,  SIG_DFL);
     signal(SIGQUIT, SIG_DFL);
     signal(SIGTERM, SIG_DFL);
+#endif
     gcoOS_FreeEGLLibrary(gcvNULL);
 }
+
 
 /*******************************************************************************
 ** Display. ********************************************************************
@@ -314,14 +364,38 @@ gcoOS_GetDisplayByIndex(
     char *dev, *p;
     int i;
     char fbDevName[256];
-    struct _FBDisplay* display;
-    gceSTATUS status = gcvSTATUS_OK;
+    struct _FBDisplay* display = NULL;
+    gceSTATUS status = gcvSTATUS_OUT_OF_RESOURCES;
     gcmHEADER();
+
+    /* Lock display stack. */
+    pthread_mutex_lock(&displayMutex);
 
     do
     {
-        if((DisplayIndex > 3) || (DisplayIndex < 0))
-            return gcvSTATUS_INVALID_ARGUMENT;
+        if (DisplayIndex < 0)
+        {
+            status = gcvSTATUS_INVALID_ARGUMENT;
+            break;
+        }
+
+        for (display = displayStack; display != NULL; display = display->next)
+        {
+            if (display->index == DisplayIndex)
+            {
+                /* Find display.*/
+                break;
+            }
+        }
+
+        if (display != NULL)
+        {
+            *Display = (HALNativeDisplayType)display;
+            pthread_mutex_unlock(&displayMutex);
+
+            gcmFOOTER_ARG("*Display=0x%x", *Display);
+            return gcvSTATUS_OK;
+        }
 
         display = (struct _FBDisplay*) malloc(sizeof(struct _FBDisplay));
 
@@ -330,32 +404,32 @@ gcoOS_GetDisplayByIndex(
             break;
         }
 
+        display->index    = DisplayIndex;
         display->memory   = gcvNULL;
         display->file     = -1;
 
         p = getenv("FB_MULTI_BUFFER");
-        if (p == NULL)
+        if (p == gcvNULL)
         {
             display->multiBuffer = 1;
         }
         else
         {
             display->multiBuffer = atoi(p);
+            if (display->multiBuffer < 1)
+            {
+                display->multiBuffer = 1;
+            }
         }
-        if (display->multiBuffer > 3)
-        {
-            display->multiBuffer = 3;
-        }
-        else if (display->multiBuffer < 1)
-        {
-            display->multiBuffer = 1;
-        }
+
         sprintf(fbDevName,"FB_FRAMEBUFFER_%d",DisplayIndex);
         dev = getenv(fbDevName);
-        if (dev != NULL)
+
+        if (dev != gcvNULL)
         {
             display->file = open(dev, O_RDWR);
         }
+
         if (display->file < 0)
         {
             unsigned char i = 0;
@@ -390,6 +464,69 @@ gcoOS_GetDisplayByIndex(
         }
         display->orgVarInfo = display->varInfo;
 
+#if gcdENABLE_FB_PREFETCH
+        /* Check if prefetch feature exists. */
+        do
+        {
+            int prefetch = 0;
+            display->fbPrefetch = gcvFALSE;
+
+            /* Try to enable FSL fbdev tiled input. */
+            p = getenv("GPU_VIV_EXT_RESOLVE");
+            if ((p != gcvNULL) && (p[0] == '0'))
+            {
+                /* Disable resolve requested. */
+                break;
+            }
+
+            if (ioctl(display->file, MXCFB_GET_PREFETCH, &prefetch) < 0)
+            {
+                break;
+            }
+
+            if (prefetch > 0)
+            {
+                /* Feature exists. */
+                display->fbPrefetch = gcvTRUE;
+                break;
+            }
+
+            /* Try to enable prefetch. */
+            prefetch = 1;
+
+            if (ioctl(display->file, MXCFB_SET_PREFETCH, &prefetch) < 0)
+            {
+                break;
+            }
+
+            if (ioctl(display->file, MXCFB_GET_PREFETCH, &prefetch) < 0)
+            {
+                break;
+            }
+
+            if(prefetch)
+            {
+                /* Feature exists. */
+                display->fbPrefetch = gcvTRUE;
+            }
+        }
+        while (0);
+#else
+        display->fbPrefetch = gcvFALSE;
+#endif
+
+        display->width  = display->varInfo.xres;
+        display->height = display->varInfo.yres;
+
+        if (display->fbPrefetch)
+        {
+            display->varInfo.xres = (display->varInfo.xres + 0x3F) & ~0x3F;
+            display->varInfo.yres = (display->varInfo.yres + 0x3F) & ~0x3F;
+        }
+        else
+        {
+            display->varInfo.nonstd = 0;
+        }
         for (i = display->multiBuffer; i >= 1; --i)
         {
             /* Try setting up multi buffering. */
@@ -411,13 +548,18 @@ gcoOS_GetDisplayByIndex(
         {
             break;
         }
+
         display->physical = display->fixInfo.smem_start;
         display->stride   = display->fixInfo.line_length;
         display->size     = display->fixInfo.smem_len;
-
-        display->width  = display->varInfo.xres;
-        display->height = display->varInfo.yres;
         display->bpp    = display->varInfo.bits_per_pixel;
+
+        if (display->multiBuffer > 1)
+        {
+            /* Calculate actual buffer count. */
+            display->multiBuffer = display->varInfo.yres_virtual
+                                 / display->varInfo.yres;
+        }
 
         /* Get the color format. */
         switch (display->varInfo.green.length)
@@ -464,6 +606,12 @@ gcoOS_GetDisplayByIndex(
             break;
         }
 
+        if (display->format == gcvSURF_UNKNOWN)
+        {
+            status = gcvSTATUS_NOT_SUPPORTED;
+            break;
+        }
+
         /* Get the color info. */
         display->alphaLength = display->varInfo.transp.length;
         display->alphaOffset = display->varInfo.transp.offset;
@@ -501,10 +649,18 @@ gcoOS_GetDisplayByIndex(
         display->wl_display = Context;
 
         *Display = (HALNativeDisplayType)display;
+
+        /* Add display into stack. */
+        display->next = displayStack;
+        displayStack = display;
+        pthread_mutex_unlock(&displayMutex);
+
         gcmFOOTER_ARG("*Display=0x%x", *Display);
         return status;
     }
     while (0);
+
+    pthread_mutex_unlock(&displayMutex);
 
     if (display != gcvNULL)
     {
@@ -599,6 +755,24 @@ gcoOS_GetDisplayInfo(
 }
 
 gceSTATUS
+gcoOS_SetWindowFormat(
+    IN HALNativeDisplayType Display,
+    IN HALNativeWindowType Window,
+    IN gceSURF_TYPE Type,
+    IN gceSURF_FORMAT Format
+    )
+{
+    /*
+     * Possiable types:
+     *   gcvSURF_BITMAP
+     *   gcvSURF_RENDER_TARGET
+     *   gcvSURF_RENDER_TARGET_NO_COMPRESSION
+     *   gcvSURF_RENDER_TARGET_NO_TILE_STATUS
+     */
+    return gcvSTATUS_NOT_SUPPORTED;
+}
+
+gceSTATUS
 gcoOS_GetDisplayInfoEx(
     IN HALNativeDisplayType Display,
     IN HALNativeWindowType Window,
@@ -625,13 +799,13 @@ gcoOS_GetDisplayInfoEx(
     {
         struct wl_egl_window* wl_window = Window;
 
-        DisplayInfo->width = wl_window->info.width;
-        DisplayInfo->height = wl_window->info.height;
+        DisplayInfo->width = wl_window->info->width;
+        DisplayInfo->height = wl_window->info->height;
         DisplayInfo->stride = WL_DUMMY;
-        DisplayInfo->bitsPerPixel = wl_window->info.bpp;
+        DisplayInfo->bitsPerPixel = wl_window->info->bpp;
         DisplayInfo->logical = (gctPOINTER) WL_DUMMY;
         DisplayInfo->physical = WL_DUMMY;
-        DisplayInfo->multiBuffer = WL_EGL_NUM_BACKBUFFERS;
+        DisplayInfo->multiBuffer = wl_window->info->bufferCount;
         DisplayInfo->backBufferY = 0;
         DisplayInfo->flip = gcvTRUE;
         DisplayInfo->wrapFB = gcvFALSE;
@@ -678,17 +852,179 @@ gcoOS_GetDisplayInfoEx(
     /* Determine flip support. */
     DisplayInfo->flip = (display->multiBuffer > 1);
 
-#ifndef __QNXNTO__
     /* 355_FB_MULTI_BUFFER */
     DisplayInfo->multiBuffer = display->multiBuffer;
     DisplayInfo->backBufferY = display->backBufferY;
-#endif
 
     DisplayInfo->wrapFB = gcvTRUE;
 
     /* Success. */
     gcmFOOTER_ARG("*DisplayInfo=0x%x", *DisplayInfo);
     return status;
+}
+
+static void wayland_release_pending_resource(void *data, struct wl_callback *callback, uint32_t time)
+{
+   gcoSURF surface = data;
+   wl_callback_destroy(callback);
+   gcoSURF_Unlock(surface, gcvNULL);
+   gcoSURF_Destroy(surface);
+}
+
+static const struct wl_callback_listener release_buffer_listener = { wayland_release_pending_resource};
+
+static void
+gcoWL_DestroryBO(struct wl_egl_window *window)
+{
+     gctUINT i;
+
+    if (window != gcvNULL)
+    {
+        for (i=0; i< window->info->bufferCount ; i++)
+        {
+            if (window->backbuffers[i]->info.surface != gcvNULL)
+            {
+                gcoSURF_Unlock(
+                    window->backbuffers[i]->info.surface,
+                    gcvNULL
+                    );
+
+                gcoSURF_Destroy(
+                    window->backbuffers[i]->info.surface
+                    );
+
+                gcmTRACE(gcvLEVEL_VERBOSE, "Surface %d (%p) destroyed", i, window->backbuffers[i]->info.surface);
+            }
+        }
+    }
+}
+
+static gceSTATUS
+gcoWL_CreateBO(struct wl_egl_window* window, int dx, int dy, int width, int height)
+{
+     gceSTATUS status = gcvSTATUS_OK;
+     gctUINT i;
+
+    gcmASSERT(window);
+    do
+    {
+        gcsSURF_FORMAT_INFO_PTR renderTargetInfo[2];
+        gceSURF_TYPE surfaceType = gcvSURF_BITMAP;
+        gceSURF_FORMAT resolveFormat = gcvSURF_UNKNOWN;
+        gceHARDWARE_TYPE currentType = gcvHARDWARE_INVALID;
+        window->info->dx     = dx;
+        window->info->dy     = dy;
+        window->info->width  = width;
+        window->info->height = height;
+        /* Get hardware type. */
+        gcmONERROR(gcoHAL_GetHardwareType(gcvNULL, &currentType));
+        gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
+
+        if (window->noResolve)
+        {
+            surfaceType = gcvSURF_TEXTURE;
+        }
+        /* Set the window surface format save as the config requested */
+        window->info->format = (gceSURF_FORMAT) gcoOS_GetPLSValue(gcePLS_VALUE_EGL_CONFIG_FORMAT_INFO);
+
+        gcmONERROR(
+            gcoSURF_QueryFormat(
+                window->info->format,
+                renderTargetInfo
+            ));
+
+        window->info->bpp = renderTargetInfo[0]->bitsPerPixel;
+        /* Query current hardware type. */
+        gcmONERROR(gcoHAL_GetHardwareType(gcvNULL, &currentType));
+
+        gcmONERROR(
+            gcoTEXTURE_GetClosestFormat(gcvNULL,
+                                        window->info->format,
+                                        &resolveFormat));
+        window->info->format = resolveFormat;
+
+        for (i=0; i< window->info->bufferCount ; i++)
+        {
+            gcmONERROR(
+                gcoSURF_Construct(
+                                gcvNULL,
+                                width,
+                                height,
+                                1,
+                                surfaceType,
+                                resolveFormat,
+                                gcvPOOL_DEFAULT,
+                                &window->backbuffers[i]->info.surface
+                                ));
+            if(surfaceType != gcvSURF_BITMAP)
+            {
+                gcmONERROR(
+                    gcoSURF_SetFlags(
+                        window->backbuffers[i]->info.surface,
+                        gcvSURF_FLAG_CONTENT_YINVERTED,
+                        gcvTRUE));
+            }
+/*
+            gcmONERROR(
+                gcoSURF_SetOrientation(
+                                    window->backbuffers[i]->info.surface,
+                                    gcvORIENTATION_BOTTOM_TOP));
+*/
+            gcmONERROR(
+                gcoSURF_Lock(
+                    window->backbuffers[i]->info.surface,
+                    gcvNULL,
+                    gcvNULL
+                    ));
+
+            gcmONERROR(
+                gcoSURF_GetAlignedSize(
+                    window->backbuffers[i]->info.surface,
+                    gcvNULL,
+                    gcvNULL,
+                    &window->backbuffers[i]->info.stride
+                    ));
+
+            gcmONERROR(
+               gcoSURF_QueryVidMemNode(
+                    window->backbuffers[i]->info.surface,
+                    (gctUINT32 *)&window->backbuffers[i]->info.node,
+                    &window->backbuffers[i]->info.pool,
+                    &window->backbuffers[i]->info.bytes
+                    ));
+
+            gcmONERROR(
+                gcoHAL_NameVideoMemory((gctUINT32)window->backbuffers[i]->info.node,
+                                       (gctUINT32 *)&window->backbuffers[i]->info.node));
+
+            window->backbuffers[i]->info.width = window->info->width;
+            window->backbuffers[i]->info.height = window->info->height;
+            window->backbuffers[i]->info.format = resolveFormat;
+            window->backbuffers[i]->info.type = surfaceType;
+            window->backbuffers[i]->info.invalidate = gcvTRUE;
+            window->backbuffers[i]->frame_callback = gcvNULL;
+            window->backbuffers[i]->info.locked = gcvFALSE;
+            gcmTRACE(gcvLEVEL_VERBOSE, "Surface %d (%p): width=%d, height=%d, format=%d, stride=%d, node=%p, pool=%d, bytes=%d, calc=%d",
+                        i, window->backbuffers[i]->info.surface,
+                        window->info->width, window->info->height,
+                        window->backbuffers[i]->info.format,
+                        window->backbuffers[i]->info.stride,
+                        window->backbuffers[i]->info.node,
+                        window->backbuffers[i]->info.pool,
+                        window->backbuffers[i]->info.bytes,
+                        window->backbuffers[i]->info.stride*window->info->width
+                        );
+        }
+        /* Restore hardware type. */
+        gcoHAL_SetHardwareType(gcvNULL, currentType);
+    }
+    while (gcvFALSE);
+    return status;
+OnError:
+    gcoWL_DestroryBO(window);
+    gcoOS_FreeMemory(gcvNULL, window);
+    window = gcvNULL;
+    return gcvSTATUS_INVALID_ARGUMENT;
 }
 
 gceSTATUS
@@ -735,10 +1071,10 @@ gcoOS_GetDisplayVirtual(
     }
 
     /* Compute number of buffers. */
-    display->multiBuffer = display->varInfo.yres_virtual / display->height;
+    display->multiBuffer = display->varInfo.yres_virtual / display->varInfo.yres;
 
     /* Move to off-screen memory. */
-    display->backBufferY = display->varInfo.yoffset + display->height;
+    display->backBufferY = display->varInfo.yoffset + display->varInfo.yres;
     if (display->backBufferY >= (int)(display->varInfo.yres_virtual))
     {
         /* Warp around. */
@@ -803,7 +1139,7 @@ gcoOS_GetDisplayBackbuffer(
         }
 
         /* Move to next back buffer. */
-        display->backBufferY += display->height;
+        display->backBufferY += display->varInfo.yres;
         if (display->backBufferY >= (int)(display->varInfo.yres_virtual))
         {
             /* Wrap around. */
@@ -822,11 +1158,6 @@ static void
 wl_buffer_release(void *data, struct wl_buffer *buffer)
 {
     gcsWL_EGL_BUFFER* egl_buffer = data;
-    if(egl_buffer->info.attached_surface)
-    {
-        gcoSURF_Destroy(egl_buffer->info.attached_surface);
-        egl_buffer->info.attached_surface = NULL;
-    }
     egl_buffer->info.locked = gcvFALSE;
 }
 
@@ -837,8 +1168,8 @@ static struct wl_buffer_listener wl_buffer_listener = {
 static void
 gcoWL_FrameCallback(void *data, struct wl_callback *callback, uint32_t time)
 {
-    struct wl_egl_window *wl_window = data;
-    wl_window->frame_callback = NULL;
+    gcsWL_EGL_BUFFER* egl_buffer = data;
+    egl_buffer->frame_callback = NULL;
     wl_callback_destroy(callback);
 }
 
@@ -919,7 +1250,7 @@ gcoOS_SetDisplayVirtual(
             display->varInfo.yoffset  = Y;
             display->varInfo.activate = FB_ACTIVATE_VBL;
             ioctl(display->file, FBIOPAN_DISPLAY, &(display->varInfo));
-            ioctl(display->file, FBIO_WAITFORVSYNC, NULL);
+            ioctl(display->file, MXCFB_WAIT_FOR_VSYNC, NULL);
 
             pthread_cond_broadcast(&(display->cond));
             pthread_mutex_unlock(&(display->condMutex));
@@ -957,40 +1288,49 @@ gcoOS_SetDisplayVirtualEx(
         struct wl_buffer* wl_buffer = egl_buffer->wl_buffer;
         gcsWL_EGL_DISPLAY* display = wl_window->display;
         int ret = 0;
+        int i   = 0;
         /* wait for frame callback */
-        while (wl_window->frame_callback && ret >= 0)
+        for(i = 0; i < wl_window->info->bufferCount; i++)
         {
-            ret = wl_display_dispatch_queue(display->wl_display, display->wl_swap_queue);
+            while (wl_window->backbuffers[i]->frame_callback && ret >= 0)
+            {
+                ret = wl_display_dispatch_queue(display->wl_display, display->wl_swap_queue);
+            }
         }
-
-         if(ret < 0)
-         {
+        if(ret < 0)
+        {
             return gcvSTATUS_FALSE;
-         }
-
-        if(display->swapInterval)
-        {
-            wl_window->frame_callback = wl_surface_frame(wl_window->surface);
-            wl_callback_add_listener(wl_window->frame_callback, &gcsWL_FRAME_LISTENER, wl_window);
-            wl_proxy_set_queue((struct wl_proxy *) wl_window->frame_callback, display->wl_swap_queue);
         }
-        wl_surface_attach(wl_window->surface, wl_buffer, wl_window->info.dx, wl_window->info.dy);
-        wl_window->info.attached_width  = wl_window->info.width;
-        wl_window->info.attached_height = wl_window->info.height;
-        wl_window->info.dx = 0;
-        wl_window->info.dy = 0;
+        if(display->swapInterval > 0)
+        {
+            gctINT swapInterval = display->swapInterval;
+            swapInterval--;
+            /* wait for swap interval  * vsync */
+            while(swapInterval--)
+            {
+                ioctl(display->file, FBIO_WAITFORVSYNC, (void *)0);
+            }
+            egl_buffer->frame_callback = wl_surface_frame(wl_window->surface);
+            wl_callback_add_listener(egl_buffer->frame_callback, &gcsWL_FRAME_LISTENER, egl_buffer);
+            wl_proxy_set_queue((struct wl_proxy *) egl_buffer->frame_callback, display->wl_swap_queue);
+        }
+        wl_surface_attach(wl_window->surface, wl_buffer, wl_window->info->dx, wl_window->info->dy);
+        wl_window->attached_width  = wl_window->info->width;
+        wl_window->attached_height = wl_window->info->height;
+        wl_window->info->dx = 0;
+        wl_window->info->dy = 0;
         wl_surface_damage(wl_window->surface, 0, 0,
-                            wl_window->info.width, wl_window->info.height);
+                            wl_window->info->width, wl_window->info->height);
         wl_surface_commit(wl_window->surface);
         /* If we're not waiting for a frame callback then we'll at least throttle
          * to a sync callback so that we always give a chance for the compositor to
          * handle the commit and send a release event before checking for a free
          * buffer */
-        if(wl_window->frame_callback == gcvNULL)
+        if(egl_buffer->frame_callback == gcvNULL)
         {
-            wl_window->frame_callback = wl_display_sync(display->wl_display);
-            wl_callback_add_listener(wl_window->frame_callback, &gcsWL_FRAME_LISTENER, wl_window);
-            wl_proxy_set_queue((struct wl_proxy *) wl_window->frame_callback, display->wl_swap_queue);
+            egl_buffer->frame_callback = wl_display_sync(display->wl_display);
+            wl_callback_add_listener(egl_buffer->frame_callback, &gcsWL_FRAME_LISTENER, egl_buffer);
+            wl_proxy_set_queue((struct wl_proxy *) egl_buffer->frame_callback, display->wl_swap_queue);
         }
         wl_display_flush(display->wl_display);
         return status;
@@ -1118,26 +1458,50 @@ gcoOS_DestroyDisplay(
 {
     struct _FBDisplay* display;
 
-    if (Display == gcvNULL)
+    pthread_mutex_lock(&displayMutex);
+
+    for (display = displayStack; display != NULL; display = display->next)
     {
-        return gcvSTATUS_OK;
+        if (display == (struct _FBDisplay*) Display)
+        {
+            /* Found display. */
+            break;
+        }
     }
 
     if (_IsCompositorDisplay((struct _FBDisplay*)Display) == gcvTRUE)
     {
-        display = (struct _FBDisplay*)Display;
+        /* Unlink form display stack. */
+        if (display == displayStack)
+        {
+            /* First one. */
+            displayStack = display->next;
+        }
+        else
+        {
+            struct _FBDisplay* prev = displayStack;
+
+            while (prev->next != display)
+            {
+                prev = prev->next;
+            }
+
+            prev->next = display->next;
+        }
     }
     else
     {
         display = gcvNULL;
     }
 
-    if (display != gcvNULL)
+    pthread_mutex_unlock(&displayMutex);
+
+    if (display != NULL)
     {
-        if (display->memory != gcvNULL)
+        if (display->memory != NULL)
         {
             munmap(display->memory, display->size);
-            display->memory = gcvNULL;
+            display->memory = NULL;
         }
 
         ioctl(display->file, FBIOPUT_VSCREENINFO, &(display->orgVarInfo));
@@ -1192,26 +1556,44 @@ gcoOS_CreateWindow(
     gcmHEADER_ARG("Display=%p X=%d Y=%d Width=%d Height=%d",
                   Display, X, Y, Width, Height);
 
-    if (Display == gcvNULL)
+    if (Display != gcvNULL && _IsCompositorDisplay((struct _FBDisplay*)Display) == gcvTRUE)
     {
-        status = gcvSTATUS_INVALID_ARGUMENT;
-        gcmFOOTER();
-        return status;
-    }
-
-    if (_IsCompositorDisplay((struct _FBDisplay*)Display) == gcvTRUE)
-    {
+        if (Display == gcvNULL)
+        {
+            status = gcvSTATUS_INVALID_ARGUMENT;
+            gcmFOOTER();
+            return status;
+        }
         display = (struct _FBDisplay*)Display;
     }
     else
     {
-        display = gcvNULL;
-    }
+        gctUINT i;
+        struct wl_egl_window* wl_window = (struct wl_egl_window*)(*Window);
 
-    if (display == NULL)
-    {
-        status = gcvSTATUS_INVALID_ARGUMENT;
-        gcmFOOTER();
+        gcoOS_AllocateMemory(gcvNULL, sizeof(struct _gcsWL_EGL_WINDOW_INFO),
+                            (gctPOINTER) &wl_window->info);
+        gcoOS_ZeroMemory( wl_window->info, sizeof(struct _gcsWL_EGL_WINDOW_INFO));
+
+        wl_window->info->bufferCount =  WL_EGL_NUM_BACKBUFFERS;
+        p = getenv("GPU_VIV_WL_MULTI_BUFFER");
+        if (p != gcvNULL)
+        {
+            int bufferCount = atoi(p);
+            if (bufferCount > 0 && bufferCount <= WL_EGL_MAX_NUM_BACKBUFFERS)
+            {
+                wl_window->info->bufferCount = bufferCount;
+            }
+        }
+        gcoOS_AllocateMemory(gcvNULL, wl_window->info->bufferCount * sizeof(struct _gcsWL_EGL_BUFFER *),
+                    (gctPOINTER) &wl_window->backbuffers);
+        for(i=0; i< wl_window->info->bufferCount; i++)
+        {
+            gcoOS_AllocateMemory(gcvNULL, sizeof(struct _gcsWL_EGL_BUFFER),
+                    (gctPOINTER) &wl_window->backbuffers[i]);
+            gcoOS_ZeroMemory( wl_window->backbuffers[i], sizeof(struct _gcsWL_EGL_BUFFER));
+        }
+        status = gcoWL_CreateBO((struct wl_egl_window*)(*Window), 0, 0, Width, Height);
         return status;
     }
 
@@ -1251,6 +1633,66 @@ gcoOS_CreateWindow(
 
     do
     {
+        int err;
+        int nonstd = 0;
+        int extResolve = 1;
+        struct fb_var_screeninfo varInfo;
+
+        if (!display->fbPrefetch)
+        {
+            /* No prefetch in hardware. */
+            break;
+        }
+
+        if ((X != 0) || (Y != 0) ||
+            (Width != display->width) || (Height != display->height))
+        {
+            /* Not full screen, can not enable. */
+            extResolve = 0;
+        }
+
+        if (extResolve)
+        {
+            switch (display->bpp)
+            {
+            case 16:
+                nonstd = IPU_PIX_FMT_GPU16_SRT;
+                break;
+            case 32:
+                nonstd = IPU_PIX_FMT_GPU32_SRT;
+                break;
+            default:
+                /* Unknown pixel format. */
+                extResolve = 0;
+                break;
+            }
+        }
+
+        if (!extResolve)
+        {
+            display->varInfo.xres = display->width;
+            display->varInfo.yres = display->height;
+        }
+
+        varInfo        = display->varInfo;
+        varInfo.nonstd = nonstd;
+
+        /* Disable split. */
+        err = ioctl(display->file, FBIOPUT_VSCREENINFO, &varInfo);
+
+        if (err < 0)
+        {
+            /* Not changed. */
+            break;
+        }
+
+        /* Prefetch mode changed. */
+        display->varInfo.nonstd = nonstd;
+    }
+    while (0);
+
+    do
+    {
         window = (struct _FBWindow *) malloc(gcmSIZEOF(struct _FBWindow));
         if (window == gcvNULL)
         {
@@ -1276,6 +1718,59 @@ gcoOS_CreateWindow(
     while (0);
 
     gcmFOOTER_ARG("*Window=0x%x", *Window);
+    return status;
+}
+
+gceSTATUS
+gcoOS_ResizeWindow(
+    IN gctPOINTER localDisplay,
+    IN HALNativeWindowType Window,
+    IN gctUINT Width,
+    IN gctUINT Height
+    )
+{
+    gceSTATUS           status = gcvSTATUS_OK;
+    gcmHEADER_ARG("localDisplay=%p Width=%d Height=%d",
+                  localDisplay, Width, Height);
+    if (Window == gcvNULL)
+    {
+        status = gcvSTATUS_INVALID_ARGUMENT;
+        gcmFOOTER();
+        return status;
+    }
+
+    if(_IsCompositorWindow((struct _FBWindow*)Window))
+    {
+        status = gcvSTATUS_INVALID_ARGUMENT;
+        gcmFOOTER();
+        return status;
+    }
+    else
+    {
+        struct wl_egl_window* window = (struct wl_egl_window*)Window;
+        /* Nothing to do if window size if same. */
+        if(window->info->width != Width || window->info->height != Height)
+        {
+            int i = 0;
+            /*Make sure the surface was not used in work thread*/
+            gcoHAL_Commit(gcvNULL, gcvTRUE);
+            for (i = 0; i < window->info->bufferCount ; i++)
+            {
+                /*In case the wl_egl_window_resize was called twice without drawing*/
+                if (window->backbuffers[i]->info.pendingSurface != gcvNULL)
+                {
+                    struct wl_callback *callback;
+                    callback = wl_display_sync(window->display->wl_display);
+                    wl_callback_add_listener(callback, &release_buffer_listener,
+                    window->backbuffers[i]->info.pendingSurface);
+                    wl_proxy_set_queue((struct wl_proxy *) callback, window->display->wl_swap_queue);
+                }
+                window->backbuffers[i]->info.pendingSurface = window->backbuffers[i]->info.surface;
+            }
+            gcoWL_CreateBO(window, 0, 0, Width, Height);
+        }
+    }
+    gcmFOOTER();
     return status;
 }
 
@@ -1362,17 +1857,17 @@ gcoOS_GetWindowInfo(
 
         if (Width != gcvNULL)
         {
-            *Width = wl_window->info.width;
+            *Width = wl_window->info->width;
         }
 
         if (Height != gcvNULL)
         {
-            *Height = wl_window->info.height;
+            *Height = wl_window->info->height;
         }
 
         if (BitsPerPixel != gcvNULL)
         {
-            *BitsPerPixel = wl_window->info.bpp;
+            *BitsPerPixel = wl_window->info->bpp;
         }
 
         if (Offset != gcvNULL)
@@ -1391,22 +1886,55 @@ gcoOS_DestroyWindow(
     IN HALNativeWindowType Window
     )
 {
-    struct _FBWindow* window;
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("Display=0x%x Window=0x%x", Display, Window);
+
+    if (Window == gcvNULL)
+    {
+        status = gcvSTATUS_INVALID_ARGUMENT;
+        gcmFOOTER();
+        return status;
+    }
 
     if (_IsCompositorWindow((struct _FBWindow*)Window) == gcvTRUE)
     {
+        struct _FBWindow* window;
         window = (struct _FBWindow*)Window;
+        if (window != gcvNULL)
+        {
+            free(window);
+        }
     }
     else
     {
-        window = gcvNULL;
-    }
+        struct wl_egl_window* window = (struct wl_egl_window*)Window;
+        gctUINT i;
+        gcoWL_DestroryBO(window);
+        for(i=0; i< window->info->bufferCount; i++)
+        {
+            if (window->backbuffers[i]->wl_buffer != gcvNULL)
+            {
+                wl_buffer_destroy(window->backbuffers[i]->wl_buffer);
+                window->backbuffers[i]->wl_buffer = gcvNULL;
+            }
+            if (window->backbuffers[i]->frame_callback != gcvNULL)
+            {
+                wl_callback_destroy(window->backbuffers[i]->frame_callback);
+                window->backbuffers[i]->frame_callback = gcvNULL;
+            }
 
-    if (window != gcvNULL)
-    {
-        free(window);
-    }
+            gcoOS_FreeMemory(gcvNULL, window->backbuffers[i]);
+            window->backbuffers[i] = gcvNULL;
+        }
+        gcoOS_FreeMemory(gcvNULL, window->backbuffers);
+        gcoOS_FreeMemory(gcvNULL, window->info);
+        window->info = gcvNULL;
+        window->backbuffers = gcvNULL;
 
+        /*Make sure to free the deferred list, which will be called in server after wl_buffer_destroy*/
+        gcoHAL_Commit(gcvNULL, gcvTRUE);
+
+    }
     return gcvSTATUS_OK;
 }
 
@@ -1524,9 +2052,13 @@ gcoOS_CreatePixmap(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
+#if !gcdUSE_PIXMAP_SURFACE
+    gctINT alignedWidth, alignedHeight;
+#endif
     struct _FBPixmap* pixmap;
+#if gcdUSE_PIXMAP_SURFACE
     gceSURF_FORMAT format;
-
+#endif
     gcmHEADER_ARG("Display=0x%x Width=%d Height=%d BitsPerPixel=%d", Display, Width, Height, BitsPerPixel);
 
     if ((Width <= 0) || (Height <= 0) || (BitsPerPixel <= 0))
@@ -1544,7 +2076,7 @@ gcoOS_CreatePixmap(
         {
             break;
         }
-
+#if gcdUSE_PIXMAP_SURFACE
         if (BitsPerPixel <= 16)
         {
             format = gcvSURF_R5G6B5;
@@ -1565,29 +2097,49 @@ gcoOS_CreatePixmap(
             format,
             gcvPOOL_DEFAULT,
             &pixmap->surface
-            ));
+        ));
 
         gcmERR_BREAK(gcoSURF_Lock(
             pixmap->surface,
-            &pixmap->gpu,
+                    &pixmap->gpu,
             &pixmap->bits
-            ));
+        ));
 
         gcmERR_BREAK(gcoSURF_GetSize(
             pixmap->surface,
             (gctUINT *) &pixmap->width,
             (gctUINT *) &pixmap->height,
             gcvNULL
-            ));
+        ));
 
         gcmERR_BREAK(gcoSURF_GetAlignedSize(
             pixmap->surface,
             gcvNULL,
             gcvNULL,
             &pixmap->stride
-            ));
+        ));
 
         pixmap->bpp = (BitsPerPixel <= 16) ? 16 : 32;
+#else
+        alignedWidth   = (Width + 0x0F) & (~0x0F);
+        alignedHeight  = (Height + 0x3) & (~0x03);
+        pixmap->original = malloc(alignedWidth * alignedHeight * (BitsPerPixel + 7) / 8 + 64);
+        if (pixmap->original == gcvNULL)
+        {
+            free(pixmap);
+            pixmap = gcvNULL;
+
+            break;
+        }
+        pixmap->bits = (gctPOINTER)(((gctUINTPTR_T)(gctCHAR*)pixmap->original + 0x3F) & (~0x3F));
+
+        pixmap->width = Width;
+        pixmap->height = Height;
+        pixmap->alignedWidth    = alignedWidth;
+        pixmap->alignedHeight   = alignedHeight;
+        pixmap->bpp     = (BitsPerPixel + 0x07) & (~0x07);
+        pixmap->stride  = Width * (pixmap->bpp) / 8;
+#endif
 
         *Pixmap = (HALNativePixmapType)pixmap;
         gcmFOOTER_ARG("*Pixmap=0x%x", *Pixmap);
@@ -1595,6 +2147,7 @@ gcoOS_CreatePixmap(
     }
     while (0);
 
+#if gcdUSE_PIXMAP_SURFACE
     if (pixmap!= gcvNULL)
     {
         if (pixmap->bits != gcvNULL)
@@ -1607,6 +2160,7 @@ gcoOS_CreatePixmap(
         }
         free(pixmap);
     }
+#endif
 
     status = gcvSTATUS_OUT_OF_RESOURCES;
     gcmFOOTER();
@@ -1657,7 +2211,7 @@ gcoOS_GetPixmapInfo(
 
     if (Bits != NULL)
     {
-        *Bits = pixmap->bits;
+        *Bits = (pixmap->bits ? pixmap->bits : pixmap->original);
     }
 
     gcmFOOTER_NO();
@@ -1674,6 +2228,7 @@ gcoOS_DestroyPixmap(
     pixmap = (struct _FBPixmap*)Pixmap;
     if (pixmap != gcvNULL)
     {
+#if gcdUSE_PIXMAP_SURFACE
         if (pixmap->bits != gcvNULL)
         {
             gcoSURF_Unlock(pixmap->surface, pixmap->bits);
@@ -1682,7 +2237,12 @@ gcoOS_DestroyPixmap(
         {
             gcoSURF_Destroy(pixmap->surface);
         }
-
+#else
+        if (pixmap->original != NULL)
+        {
+            free(pixmap->original);
+        }
+#endif
         free(pixmap);
         pixmap = gcvNULL;
         Pixmap = gcvNULL;
@@ -1719,11 +2279,17 @@ gcoOS_LoadEGLLibrary(
     file    = -1;
     mice    = -1;
 
+#if defined(ANDROID)
+    status = gcoOS_LoadLibrary(gcvNULL, "libEGL_VIVANTE.so", Handle);
+#else
     status = gcoOS_LoadLibrary(gcvNULL, "libEGL.so", Handle);
+#endif
 
+#if defined(LINUX)
     signal(SIGINT,  sig_handler);
     signal(SIGQUIT, sig_handler);
     signal(SIGTERM, sig_handler);
+#endif
 
     return status;
 }
@@ -1733,6 +2299,9 @@ gcoOS_FreeEGLLibrary(
     IN gctHANDLE Handle
     )
 {
+#if gcdSTATIC_LINK
+    return gcvSTATUS_OK;
+#else
     if (Handle != gcvNULL)
     {
         void (*fini)(void);
@@ -1775,6 +2344,7 @@ gcoOS_FreeEGLLibrary(
     file    = -1;
     mice    = -1;
     return gcvSTATUS_OK;
+#endif
 }
 
 gceSTATUS
@@ -1783,7 +2353,8 @@ gcoOS_ShowWindow(
     IN HALNativeWindowType Window
     )
 {
-    int i, fd, term = -1;
+#if gcdUSE_INPUT_DEVICE
+    int i, fd=0, term = -1;
     struct stat st;
     struct vt_stat v;
     struct termios t;
@@ -1882,12 +2453,10 @@ gcoOS_ShowWindow(
                 break;
             }
 
-            ioctl(display->file, FBIOGET_VSCREENINFO, &(display->varInfo));
-            display->varInfo.yres_virtual = display->height * display->multiBuffer;
             if (ioctl(display->file, FBIOPUT_VSCREENINFO, &display->varInfo) >= 0)
             {
                 ioctl(display->file, FBIOGET_VSCREENINFO, &(display->varInfo));
-                if (display->varInfo.yres_virtual != display->height * display->multiBuffer)
+                if (display->varInfo.yres_virtual < display->varInfo.yres * display->multiBuffer)
                 {   /* Fallback to single buffer. */
                     display->multiBuffer = 1;
                 }
@@ -1927,6 +2496,9 @@ gcoOS_ShowWindow(
     }
 
     return gcvSTATUS_NOT_SUPPORTED;
+#else
+    return gcvSTATUS_OK;
+#endif
 }
 
 gceSTATUS
@@ -2152,6 +2724,7 @@ gcoWL_ImportBuffer(struct wl_client *client,
                       uint32_t height,
                       uint32_t stride,
                       int32_t format,
+                      int32_t type,
                       int32_t node,
                       int32_t pool,
                       uint32_t bytes
@@ -2160,16 +2733,17 @@ gcoWL_ImportBuffer(struct wl_client *client,
     gceSTATUS status = gcvSTATUS_OK;
     gcoSURF surface = gcvNULL;
     gcsWL_VIV_BUFFER * wl_viv_buffer = gcvNULL;
-
+    gceHARDWARE_TYPE currentType = gcvHARDWARE_INVALID;
     gcmTRACE(gcvLEVEL_VERBOSE, "Ghost buffer width=%d, height=%d, stride=%d, format=%d, node=%p, pool=%d, bytes=%d",
                     width, height, stride, format, node, pool, bytes);
-
+    gcoHAL_GetHardwareType(gcvNULL, &currentType);
+    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
     gcmONERROR(
         gcoSURF_Construct(gcvNULL,
                           (gctUINT) width,
                           (gctUINT) height,
                           1,
-                          /*gcvSURF_TEXTURE_NO_VIDMEM*/gcvSURF_BITMAP_NO_VIDMEM,
+                          type | gcvSURF_NO_VIDMEM,
                           (gceSURF_FORMAT) format,
                           (gcePOOL) pool,
                           &surface));
@@ -2214,10 +2788,11 @@ gcoWL_ImportBuffer(struct wl_client *client,
     wl_resource_set_implementation(wl_viv_buffer->wl_buffer,
                        &gcsWL_BUFFER_IMPLEMENTATION,
                        wl_viv_buffer, gcoWL_DestroyBuffer);
-
+    gcoHAL_SetHardwareType(gcvNULL, currentType);
     return;
 
 OnError:
+    wl_resource_post_no_memory(resource);
     if (surface)
     {
         gcoSURF_Unlock(surface, gcvNULL);
@@ -2282,9 +2857,42 @@ gcoOS_InitLocalDisplayInfo(
     {
         struct wl_display *display = Display;
         gcsWL_EGL_DISPLAY *egl_display = gcvNULL;
+        char *dev;
+        char fbDevName[256];
+        int  DisplayIndex = 0;
 
         egl_display = gcoWL_GetDisplay(display);
         egl_display->swapInterval = 1;
+        egl_display->file = -1;
+        sprintf(fbDevName,"FB_FRAMEBUFFER_%d",DisplayIndex);
+        dev = getenv(fbDevName);
+        if (dev != NULL)
+        {
+            egl_display->file = open(dev, O_RDWR);
+        }
+        if (egl_display->file < 0)
+        {
+            unsigned char i = 0;
+            char const * const GALDeviceName[] =
+            {
+                "/dev/fb%d",
+                "/dev/graphics/fb%d",
+                gcvNULL
+            };
+
+            /* Create a handle to the device. */
+            while ((egl_display->file == -1) && GALDeviceName[i])
+            {
+                sprintf(fbDevName, GALDeviceName[i],DisplayIndex);
+                egl_display->file = open(fbDevName, O_RDWR);
+                i++;
+            }
+        }
+
+        if (egl_display->file < 0)
+        {
+            return gcvSTATUS_NOT_FOUND;
+        }
 
         *localDisplay = egl_display;
 
@@ -2314,11 +2922,18 @@ gcoOS_DeinitLocalDisplayInfo(
     }
     else
     {
+        gcsWL_EGL_DISPLAY *egl_display = *localDisplay;
+        if (egl_display->file >= 0)
+        {
+            close(egl_display->file);
+            egl_display->file = -1;
+        }
         gcoWL_ReleaseDisplay(*localDisplay);
     }
 
     return status;
 }
+
 
 gceSTATUS
 gcoOS_GetDisplayInfoEx2(
@@ -2350,12 +2965,15 @@ gcoWL_GetBackbuffer(
 {
     int i = 0;
     struct wl_egl_window* wl_window = (struct wl_egl_window*) Window;
-    for(i = 0; i < WL_EGL_NUM_BACKBUFFERS; i++)
+    for(i = 0; i < wl_window->info->bufferCount; i++)
     {
-       if(wl_window->backbuffers[i].info.locked == gcvFALSE)
+       if(wl_window->backbuffers[i]->info.locked == gcvFALSE)
        {
-           wl_window->current = i;
-           wl_window->backbuffers[i].info.locked = gcvTRUE;
+           wl_window->info->current = i;
+           if(wl_window->info->bufferCount > 1)
+           {
+               wl_window->backbuffers[i]->info.locked = gcvTRUE;
+           }
            return gcvTRUE;
        }
     }
@@ -2370,16 +2988,28 @@ gcoWL_CreateWLBuffer(
     )
 {
     struct wl_egl_window* wl_window = (struct wl_egl_window*) Window;
-    struct wl_buffer* wl_buffer = wl_window->backbuffers[wl_window->current].wl_buffer;
+    struct wl_buffer* wl_buffer = wl_window->backbuffers[wl_window->info->current]->wl_buffer;
     gcsWL_EGL_DISPLAY* display = ((gcsWL_EGL_DISPLAY*) localDisplay);
+
+    int i = wl_window->info->current;
+    if (wl_window->backbuffers[i]->info.pendingSurface != gcvNULL)
+    {
+        struct wl_callback *callback;
+        callback = wl_display_sync(wl_window->display->wl_display);
+        wl_callback_add_listener(callback, &release_buffer_listener,
+            wl_window->backbuffers[i]->info.pendingSurface);
+        wl_proxy_set_queue((struct wl_proxy *) callback, display->wl_swap_queue);
+        wl_window->backbuffers[i]->info.pendingSurface = NULL;
+    }
+
     if(wl_buffer)
     {
         wl_buffer_destroy(wl_buffer);
     }
-    gcoWL_CreateGhostBuffer(display, &wl_window->backbuffers[wl_window->current]);
-    wl_buffer = wl_window->backbuffers[wl_window->current].wl_buffer;
+    gcoWL_CreateGhostBuffer(display, &(*wl_window->backbuffers[i]));
+    wl_buffer = wl_window->backbuffers[i]->wl_buffer;
     wl_proxy_set_queue((struct wl_proxy *) wl_buffer, display->wl_queue);
-    wl_buffer_add_listener(wl_buffer, &wl_buffer_listener, &wl_window->backbuffers[wl_window->current]);
+    wl_buffer_add_listener(wl_buffer, &wl_buffer_listener, wl_window->backbuffers[i]);
 }
 
 gceSTATUS
@@ -2409,16 +3039,14 @@ gcoOS_GetDisplayBackbufferEx(
         if (ret < 0)
             return gcvSTATUS_INVALID_ARGUMENT;
 
-        if (wl_window->backbuffers[wl_window->current].info.invalidate == gcvTRUE)
+        if (wl_window->backbuffers[wl_window->info->current]->info.invalidate == gcvTRUE)
         {
             gcoWL_CreateWLBuffer(Window, localDisplay);
-            wl_window->backbuffers[wl_window->current].info.invalidate = gcvFALSE;
+            wl_window->backbuffers[wl_window->info->current]->info.invalidate = gcvFALSE;
         }
-         wl_window->backbuffers[wl_window->current].info.attached_surface =
-                wl_window->backbuffers[wl_window->current].info.surface;
-         gcoSURF_ReferenceSurface(wl_window->backbuffers[wl_window->current].info.surface);
-        *context = &wl_window->backbuffers[wl_window->current];
-        *surface = wl_window->backbuffers[wl_window->current].info.surface;
+
+        *context = wl_window->backbuffers[wl_window->info->current];
+        *surface = wl_window->backbuffers[wl_window->info->current]->info.surface;
         *Offset  = 0;
         *X       = 0;
         *Y       = 0;
@@ -2446,7 +3074,21 @@ gcoOS_SynchronousFlip(
     IN HALNativeDisplayType Display
     )
 {
-    return (WL_EGL_NUM_BACKBUFFERS < 2);
+    gctBOOL syncFlip = gcvFALSE;
+    if (_IsCompositorDisplay((struct _FBDisplay*)Display) == gcvFALSE)
+    {
+        gctCHAR *           p;
+        p = getenv("GPU_VIV_WL_MULTI_BUFFER");
+        if (p != gcvNULL)
+        {
+            gctINT bufferCount = atoi(p);
+            if (bufferCount == 1)
+            {
+                syncFlip = gcvTRUE;
+            }
+        }
+    }
+    return syncFlip;
 }
 
 gceSTATUS
@@ -2548,12 +3190,12 @@ gcoOS_GetWindowInfoEx(
         {
             *Type = gcvSURF_BITMAP;
         }
+
     }
     else
     {
         struct wl_egl_window* wl_window = Window;
-        *Format = wl_window->info.format;
-
+        *Format = wl_window->info->format;
         if (Type != gcvNULL)
         {
             *Type = gcvSURF_BITMAP;
@@ -2592,24 +3234,6 @@ gcoOS_DrawImageEx(
 }
 
 gceSTATUS
-gcoOS_SetWindowFormat(
-    IN HALNativeDisplayType Display,
-    IN HALNativeWindowType Window,
-    IN gceSURF_TYPE Type,
-    IN gceSURF_FORMAT Format
-    )
-{
-    /*
-     * Possiable types:
-     *   gcvSURF_BITMAP
-     *   gcvSURF_RENDER_TARGET
-     *   gcvSURF_RENDER_TARGET_NO_COMPRESSION
-     *   gcvSURF_RENDER_TARGET_NO_TILE_STATUS
-     */
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
 gcoOS_GetPixmapInfoEx(
     IN HALNativeDisplayType Display,
     IN HALNativePixmapType Pixmap,
@@ -2640,7 +3264,7 @@ gcoOS_GetPixmapInfoEx(
         break;
 
     case 32:
-        *Format = gcvSURF_X8R8G8B8;
+        *Format = gcvSURF_A8R8G8B8;
         break;
 
     default:
@@ -2726,7 +3350,6 @@ gcoOS_SwapBuffers(
     return gcvSTATUS_NOT_SUPPORTED;
 }
 
-#endif
 #endif
 #endif
 

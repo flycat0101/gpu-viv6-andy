@@ -89,8 +89,13 @@ LOCAL_SHARED_LIBRARIES := \
 	liblog \
 	libdl \
 	libVSC \
-	libGAL \
-	libEGL_$(TAG)
+	libGAL
+
+ifneq ($(TARGET_2ND_ARCH),)
+  LOCAL_MODULE_RELATIVE_PATH := egl
+else
+  LOCAL_MODULE_PATH          := $(TARGET_OUT_SHARED_LIBRARIES)/egl
+endif
 
 LOCAL_MODULE         := libGLESv2_$(TAG)
 LOCAL_MODULE_TAGS    := optional

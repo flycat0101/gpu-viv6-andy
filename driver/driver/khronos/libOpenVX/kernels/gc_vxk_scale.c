@@ -32,11 +32,11 @@ static vx_status vxVivScale(vx_image src_image, vx_image dst_image, vx_scalar st
 
     status |= vxAccessScalarValue(stype, &type);
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src_image, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src_image, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst_image, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst_image, GC_VX_INDEX_AUTO);
 
     context.params.kernel           = gcvVX_KERNEL_SCALE_IMAGE;
 
@@ -50,7 +50,7 @@ static vx_status vxVivScale(vx_image src_image, vx_image dst_image, vx_scalar st
 
     if(borders->mode == VX_BORDER_MODE_CONSTANT || borders->mode == VX_BORDER_MODE_UNDEFINED)
     {
-    	vx_uint32 bin[4];
+        vx_uint32 bin[4];
         bin[0] =
         bin[1] =
         bin[2] =
@@ -84,7 +84,7 @@ vx_status vxScaleImage(vx_image src_image, vx_image dst_image, vx_scalar stype, 
 
     vxAccessScalarValue(stype, &type);
     if (interm && size)
-	{
+    {
         status = vxVivScale(src_image, dst_image, stype, bordermode);
     }
     else

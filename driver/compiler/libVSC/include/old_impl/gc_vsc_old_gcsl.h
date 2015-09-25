@@ -285,6 +285,9 @@ typedef enum _gcSL_OPCODE
     gcSL_MOV_LONG, /* 0x87 mov two 4 byte integers to the lower/upper 4 bytes of a long/ulong integer */
     gcSL_MADSAT, /* 0x88 mad with saturation for integer only */
     gcSL_COPY, /* 0x89 copy register contents */
+    gcSL_IMAGE_ADDR_3D, /* 0x8A */
+    gcSL_GET_SAMPLER_LMM, /* 0x8B Get sampler's lodminmax */
+    gcSL_GET_SAMPLER_LBS, /* 0x8C Get sampler's levelbasesize */
     gcSL_MAXOPCODE
 }
 gcSL_OPCODE;
@@ -339,6 +342,13 @@ gcSL_OPCODE;
                                                  (Opcode) == gcSL_IMAGE_WR            ||  \
                                                  (Opcode) == gcSL_IMAGE_WR_3D         ||  \
                                                  (Opcode) == gcSL_ATTR_ST)
+
+#define gcSL_isOpcodeImageRelated(Opcode)       ((Opcode) == gcSL_IMAGE_ADDR          ||  \
+                                                 (Opcode) == gcSL_IMAGE_ADDR_3D       ||  \
+                                                 (Opcode) == gcSL_IMAGE_WR            ||  \
+                                                 (Opcode) == gcSL_IMAGE_WR_3D         ||  \
+                                                 (Opcode) == gcSL_IMAGE_RD            ||  \
+                                                 (Opcode) == gcSL_IMAGE_RD_3D)
 
 typedef enum _gcSL_OPCODE_ATTR_RESULT_PRECISION
 {
@@ -3246,6 +3256,8 @@ typedef enum _gceFUNCTION_FLAG
   gcvFUNC_RECOMPILER            = 0x2000, /* A recompile function. */
   gcvFUNC_RECOMPILER_STUB       = 0x4000, /* The function to stub a recompile function. */
   gcvFUNC_HAS_SAMPLER_INDEXINED = 0x8000, /* This function has sampler indexing used. */
+  gcvFUNC_PARAM_AS_IMG_SOURCE0  = 0x10000, /* Use parameter as source0 of a IMG op. */
+  gcvFUNC_USING_SAMPLER_VIRTUAL = 0x20000, /* Use sampler virtual instructions, like get_sampler_lmm or get_sampler_lbs. */
 } gceFUNCTION_FLAG;
 
 typedef enum _gceINTRINSICS_KIND
@@ -3435,10 +3447,14 @@ struct _gcsFUNCTION
 #define IsFunctionRecompiler(f)                     (((f)->flags & gcvFUNC_RECOMPILER) != 0)
 #define IsFunctionRecompilerStub(f)                 (((f)->flags & gcvFUNC_RECOMPILER_STUB) != 0)
 #define IsFunctionHasSamplerIndexing(f)             (((f)->flags & gcvFUNC_HAS_SAMPLER_INDEXINED) != 0)
+#define IsFunctionParamAsImgSource0(f)              (((f)->flags & gcvFUNC_PARAM_AS_IMG_SOURCE0) != 0)
+#define IsFunctionUsingSamplerVirtual(f)            (((f)->flags & gcvFUNC_USING_SAMPLER_VIRTUAL) != 0)
 
 #define SetFunctionRecompiler(f)                    if (f != gcvNULL) { (f)->flags |= gcvFUNC_RECOMPILER; }
 #define SetFunctionRecompilerStub(f)                if (f != gcvNULL) { (f)->flags |= gcvFUNC_RECOMPILER_STUB; }
 #define SetFunctionHasSamplerIndexing(f)            if (f != gcvNULL) { (f)->flags |= gcvFUNC_HAS_SAMPLER_INDEXINED; }
+#define SetFunctionParamAsImgSource0(f)             if (f != gcvNULL) { (f)->flags |= gcvFUNC_PARAM_AS_IMG_SOURCE0; }
+#define SetFunctionUsingSamplerVirtual(f)           if (f != gcvNULL) { (f)->flags |= gcvFUNC_USING_SAMPLER_VIRTUAL; }
 
 /* Same structure, but inside a binary.
    NOTE: to maintain backward compatibility, new fields must be added after before the name field

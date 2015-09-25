@@ -8847,7 +8847,7 @@ gcLINKTREE_Optimize(
         && (gcmSL_OPCODE_GET(code->opcode, Sat) == gcSL_NO_SATURATE)
 
         /* We cannot optimize an output register. */
-		&&  (code->tempIndex < Tree->tempCount)
+        &&  (code->tempIndex < Tree->tempCount)
         &&  (Tree->tempArray[code->tempIndex].lastUse > 0)
         &&  (Tree->tempArray[code->tempIndex].lastUse < (gctINT)shader->codeCount)
         )
@@ -11180,7 +11180,7 @@ _ConvertCONVForOneShader(
 
         _ConvertCONV(tree, i, code->tempIndex, convertToF2IOnly, &reConstruct, &codeOffset);
 
-		i += codeOffset;
+        i += codeOffset;
 
         changed = gcvTRUE;
     }
@@ -14043,7 +14043,7 @@ gceSTATUS
 gcLinkTree2VirShader(
     IN  gcLINKTREE              Tree,
     IN  VSC_PRIMARY_MEM_POOL*   Pmp,
-	IN VSC_HW_CONFIG			*hwCfg,
+    IN VSC_HW_CONFIG            *hwCfg,
     OUT VIR_Shader**            VirShader
     )
 {
@@ -14225,7 +14225,7 @@ gcLinkTreeThruVirShaders(
         /* Initialize 512KB PMP for shader use. */
         vscPMP_Intialize(&pmp, gcvNULL, 512*1024, sizeof(void *), gcvTRUE /*pooling*/);
 
-		gcmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg));
+        gcmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg));
 
         if (VsTree && *VsTree)
         {
@@ -20915,6 +20915,12 @@ _LinkBuiltinLibs(
             /* after linking successfully, reset the flag */
             ClearShaderOutputBlends(Shaders[i]);
         }
+
+        /* After link all built-in functions, analyze them. */
+        if (Shaders[i])
+        {
+            gcSHADER_AnalyzeFunctions(Shaders[i], gcvFALSE);
+        }
     }
     return status;
 }
@@ -21577,6 +21583,8 @@ _gcLINKTREE_CreateColorOutput(
             gctUINT16 t = (gctUINT16)gcSHADER_NewTempRegs(VertexShader, 1, gcSHADER_FLOAT_X4);
             gcmONERROR(gcSHADER_AddOutput(VertexShader, "gl_BackColor", gcSHADER_FLOAT_X4, 1, t, gcSHADER_PRECISION_DEFAULT));
         }
+
+        gcmOUTPUT_SetIsStaticallyUsed(varyingColor, gcvFALSE);
     }
 
     if(varying2Color)
@@ -21592,11 +21600,18 @@ _gcLINKTREE_CreateColorOutput(
             gctUINT16 t = (gctUINT16)gcSHADER_NewTempRegs(VertexShader, 1, gcSHADER_FLOAT_X4);
             gcmONERROR(gcSHADER_AddOutput(VertexShader, "gl_BackSecondaryColor", gcSHADER_FLOAT_X4, 1, t, gcSHADER_PRECISION_DEFAULT));
         }
+
+        gcmOUTPUT_SetIsStaticallyUsed(varying2Color, gcvFALSE);
     }
+
 OnError:
     return status;
 }
 
+/*
+** Using gl_FrontColor/gl_BackColor and gl_FrontSecondaryColor/gl_BackSecondaryColor to
+** replace gl_Color/gl_SecondaryColor.
+*/
 static gceSTATUS
 _gcLINKTREE_ReplaceColor2FrontBackColor(
     IN gcSHADER FragmentShader
@@ -21610,9 +21625,14 @@ _gcLINKTREE_ReplaceColor2FrontBackColor(
     gcATTRIBUTE  front2Color    = gcvNULL;
     gcATTRIBUTE  back2Color     = gcvNULL;
     gcATTRIBUTE  frontFacing    = gcvNULL;
-    gctUINT      attrIdx;
-    gctUINT      i = 0;
+    gcATTRIBUTE  fColor         = gcvNULL;
+    gcATTRIBUTE  bColor         = gcvNULL;
+    gctUINT32    attrIdx, i;
+    gctINT       mainStartIdx;
+    gctUINT16    realColor = 0, real2Color = 0;
+    gctUINT      origLastInstruction = FragmentShader->lastInstruction;
 
+    /* Find gl_Color/gl_SecondaryColor. */
     for (attrIdx = 0; attrIdx < FragmentShader->attributeCount; ++attrIdx)
     {
         gctBOOL compareName = gcvFALSE;
@@ -21669,7 +21689,8 @@ _gcLINKTREE_ReplaceColor2FrontBackColor(
         return status;
     }
 
-    if(varyingColor)
+    /* Find frontColor/backColor or frontSecondaryColor/backSecondaryColor. */
+    if (varyingColor)
     {
         if (frontColor == gcvNULL)
         {
@@ -21696,7 +21717,7 @@ _gcLINKTREE_ReplaceColor2FrontBackColor(
         }
     }
 
-    if(varying2Color)
+    if (varying2Color)
     {
         if (front2Color == gcvNULL)
         {
@@ -21735,70 +21756,111 @@ _gcLINKTREE_ReplaceColor2FrontBackColor(
             &frontFacing));
     }
 
-    for(i = 0; i < FragmentShader->lastInstruction; ++i)
+    /*
+    ** Insert:
+    ** CMP.z dest, dest0, src2
+    ** CMP.nz dest, dest0, src1
+    */
+    gcmONERROR(gcSHADER_FindMainFunction(FragmentShader, &mainStartIdx, gcvNULL));
+
+    if (varyingColor != gcvNULL)
+    {
+        fColor  = frontColor;
+        bColor  = backColor;
+
+        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(FragmentShader, mainStartIdx, 2));
+        gcOpt_Dump(gcvNULL, "Incoming Fragment Shader", gcvNULL, FragmentShader);
+        FragmentShader->instrIndex = (mainStartIdx == 0) ? gcSHADER_OPCODE : gcSHADER_SOURCE1;
+        FragmentShader->lastInstruction = (mainStartIdx == 0) ? 0 : (mainStartIdx - 1);
+
+        realColor = (gctUINT16)gcSHADER_NewTempRegs(FragmentShader, 1, gcSHADER_FLOAT_X4);
+
+        /* CMP.z dest, dest0, src2 */
+        gcmONERROR(gcSHADER_AddOpcode2(FragmentShader, gcSL_CMP, gcSL_ZERO, realColor, gcSL_ENABLE_XYZW, gcSL_FLOAT, bColor->precision));
+        gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, frontFacing, gcSL_SWIZZLE_XXXX, 0));
+        gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, bColor, gcSL_SWIZZLE_XYZW, 0));
+
+        /* CMP.nz dest, dest0, src1 */
+        gcmONERROR(gcSHADER_AddOpcode2(FragmentShader, gcSL_CMP, gcSL_NOT_ZERO, realColor, gcSL_ENABLE_XYZW, gcSL_FLOAT, fColor->precision));
+        gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, frontFacing, gcSL_SWIZZLE_XXXX, 0));
+        gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, fColor, gcSL_SWIZZLE_XYZW, 0));
+
+        FragmentShader->lastInstruction = origLastInstruction + 2;
+    }
+
+    if (varying2Color != gcvNULL)
+    {
+        fColor  = front2Color;
+        bColor  = back2Color;
+
+        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(FragmentShader, mainStartIdx, 2));
+        FragmentShader->instrIndex = gcSHADER_SOURCE1;
+        FragmentShader->lastInstruction = (mainStartIdx == 0) ? 0 : (mainStartIdx - 1);
+
+        real2Color = (gctUINT16)gcSHADER_NewTempRegs(FragmentShader, 1, gcSHADER_FLOAT_X4);
+
+        /* CMP.z dest, dest0, src2 */
+        gcmONERROR(gcSHADER_AddOpcode2(FragmentShader, gcSL_CMP, gcSL_ZERO, real2Color, gcSL_ENABLE_XYZW, gcSL_FLOAT, bColor->precision));
+        gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, frontFacing, gcSL_SWIZZLE_XXXX, 0));
+        gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, bColor, gcSL_SWIZZLE_XYZW, 0));
+
+        /* CMP.nz dest, dest0, src1 */
+        gcmONERROR(gcSHADER_AddOpcode2(FragmentShader, gcSL_CMP, gcSL_NOT_ZERO, real2Color, gcSL_ENABLE_XYZW, gcSL_FLOAT, fColor->precision));
+        gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, frontFacing, gcSL_SWIZZLE_XXXX, 0));
+        gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, fColor, gcSL_SWIZZLE_XYZW, 0));
+
+        FragmentShader->lastInstruction = origLastInstruction + 2;
+    }
+
+    /* Replace gl_Color/gl_SecondaryColor with realColor/real2Color. */
+    for (i = 0; i < FragmentShader->lastInstruction; ++i)
     {
         gctINT           j    = 0;
 
-        for(j = 0; j < 2; ++j)
+        for (j = 0; j < 2; ++j)
         {
             gctSOURCE_t              *source             = j == 0 ? &FragmentShader->code[i].source0 : &FragmentShader->code[i].source1;
             gctUINT16                *sourceIndex        = j == 0 ? &FragmentShader->code[i].source0Index : &FragmentShader->code[i].source1Index;
             gcSL_TYPE                 src_type;
             gctINT                    index              = 0;
-            gctUINT                   savedLastInstruction = 0;
-
-            gcATTRIBUTE               fColor               = gcvNULL;
-            gcATTRIBUTE               bColor               = gcvNULL;
-            gctUINT16                 realColor            = 0;
+            gctUINT16                 newColor;
 
             src_type = gcmSL_SOURCE_GET(*source, Type);
-            if(src_type != gcSL_ATTRIBUTE)
+            if (src_type != gcSL_ATTRIBUTE)
             {
                 continue;
             }
 
-            index   = gcmSL_INDEX_GET(*sourceIndex, Index);
+            index = gcmSL_INDEX_GET(*sourceIndex, Index);
             if (varyingColor != gcvNULL && index == varyingColor->index)
             {
-                fColor  = frontColor;
-                bColor  = backColor;
+                newColor = realColor;
             }
             else if (varying2Color != gcvNULL && index == varying2Color->index)
             {
-                fColor  = front2Color;
-                bColor  = back2Color;
+                newColor = real2Color;
             }
             else
             {
                 continue;
             }
 
-            realColor = (gctUINT16)gcSHADER_NewTempRegs(FragmentShader, 1, gcSHADER_FLOAT_X4);
-
             *source      = gcmSL_SOURCE_SET(*source, Type, gcSL_TEMP);
             *source      = gcmSL_SOURCE_SET(*source, Indexed, gcSL_NOT_INDEXED);
-
-            *sourceIndex = gcmSL_INDEX_SET(*sourceIndex, Index, realColor);
-
-            savedLastInstruction = FragmentShader->lastInstruction;
-            gcmONERROR(gcSHADER_InsertNOP2BeforeCode(FragmentShader, i, 2));
-
-            FragmentShader->lastInstruction = i - 1;
-            /* CMP.z dest, dest0, src2 */
-            gcmONERROR(gcSHADER_AddOpcode2(FragmentShader, gcSL_CMP, gcSL_ZERO, realColor, gcSL_ENABLE_XYZW, gcSL_FLOAT, bColor->precision));
-            gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, frontFacing, gcSL_SWIZZLE_XXXX, 0));
-            gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, bColor, gcSL_SWIZZLE_XYZW, 0));
-
-            /* CMP.nz dest, dest0, src1 */
-            gcmONERROR(gcSHADER_AddOpcode2(FragmentShader, gcSL_CMP, gcSL_NOT_ZERO, realColor, gcSL_ENABLE_XYZW, gcSL_FLOAT, fColor->precision));
-            gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, frontFacing, gcSL_SWIZZLE_XXXX, 0));
-            gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, fColor, gcSL_SWIZZLE_XYZW, 0));
-
-            FragmentShader->lastInstruction = savedLastInstruction + 2;
-
-            i += 2;
+            *sourceIndex = gcmSL_INDEX_SET(*sourceIndex, Index, newColor);
         }
     }
+
+    /* Mark gl_Color/gl_SecondaryColor as unused. */
+    if (varyingColor)
+    {
+        gcmATTRIBUTE_SetIsStaticallyUsed(varyingColor, gcvFALSE);
+    }
+    if (varying2Color)
+    {
+        gcmATTRIBUTE_SetIsStaticallyUsed(varying2Color, gcvFALSE);
+    }
+
 OnError:
     return status;
 }

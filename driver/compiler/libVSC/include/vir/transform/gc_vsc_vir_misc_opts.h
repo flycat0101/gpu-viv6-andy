@@ -28,6 +28,7 @@ VSC_ErrCode vscVIR_AdjustPrecision(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuI
 
 VSC_ErrCode vscVIR_PatchDual16Shader(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo);
 
+VSC_ErrCode vscVIR_ConvertVirtualInstructions(VIR_Shader* pShader);
 END_EXTERN_C()
 
 #endif /* __gc_vsc_vir_misc_opts_h_ */

@@ -955,7 +955,7 @@ gcoHARDWARE_3DBlitCopy(
         gcmONERROR(gcoHARDWARE_Semaphore(Hardware,
                                          gcvWHERE_COMMAND,
                                          gcvWHERE_BLT,
-                                         gcvHOW_SEMAPHORE,
+                                         gcvHOW_SEMAPHORE_STALL,
                                          gcvNULL));
     }
 
@@ -1092,6 +1092,7 @@ gcoHARDWARE_3DBlitBlt_v2(
     gctUINT32   height = rectSize->y;
     gctBOOL     dstConversion = srcInfo->dither3D;
     gctBOOL     bScale = gcvFALSE;
+    gceSURF_FORMAT srcSurfaceFormat = srcInfo->format;
 
     /* Define state buffer variables. */
     gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);
@@ -1110,13 +1111,30 @@ gcoHARDWARE_3DBlitBlt_v2(
     /***********************************************
     * Prepare arguments.
     */
+    if (Args->uArgs.v2.visualizeDepth)
+    {
+        switch (srcSurfaceFormat)
+        {
+        case gcvSURF_D16:
+            srcSurfaceFormat = gcvSURF_A4R4G4B4;
+            break;
 
-    gcmONERROR(_ConvertBlitFormat(srcInfo->format, &srcFormat, &srcSwizzle, &srcDownsampleMode, &srcSRGB, &bSrcFake));
+        case gcvSURF_D24X8:
+        case gcvSURF_D24S8:
+            srcSurfaceFormat = gcvSURF_A8R8G8B8;
+            break;
+
+        default:
+            break;
+        }
+
+    }
+    gcmONERROR(_ConvertBlitFormat(srcSurfaceFormat, &srcFormat, &srcSwizzle, &srcDownsampleMode, &srcSRGB, &bSrcFake));
     gcmONERROR(_ConvertBlitFormat(dstInfo->format, &dstFormat, &dstSwizzle, gcvNULL, &dstSRGB, &bDstFake));
 
     bScale = (srcInfo->sampleInfo.x != dstInfo->sampleInfo.x) || (srcInfo->sampleInfo.y != dstInfo->sampleInfo.y);
     if((bSrcFake || bDstFake)                                         &&
-        (srcInfo->format != dstInfo->format                         ||
+        (srcSurfaceFormat != dstInfo->format                         ||
          (bScale && srcDownsampleMode != gcvMSAA_DOWNSAMPLE_SAMPLE))
        )
     {
@@ -2025,7 +2043,7 @@ gcoHARDWARE_3DBlitBlt_v2(
         gcmONERROR(gcoHARDWARE_Semaphore(Hardware,
                                          gcvWHERE_COMMAND,
                                          gcvWHERE_BLT,
-                                         gcvHOW_SEMAPHORE,
+                                         gcvHOW_SEMAPHORE_STALL,
                                          gcvNULL));
     }
 
@@ -3001,7 +3019,7 @@ gcoHARDWARE_3DBlitClear(
         gcmONERROR(gcoHARDWARE_Semaphore(Hardware,
                                          gcvWHERE_RASTER,
                                          gcvWHERE_BLT,
-                                         gcvHOW_SEMAPHORE,
+                                         gcvHOW_SEMAPHORE_STALL,
                                          gcvNULL));
     }
 
@@ -3367,7 +3385,7 @@ gcoHARDWARE_3DBlitTileFill(
         gcmONERROR(gcoHARDWARE_Semaphore(Hardware,
                                          gcvWHERE_RASTER,
                                          gcvWHERE_BLT,
-                                         gcvHOW_SEMAPHORE,
+                                         gcvHOW_SEMAPHORE_STALL,
                                          gcvNULL));
     }
 
@@ -3634,7 +3652,7 @@ gcoHARDWARE_3DBlit420Tiler(
         gcmONERROR(gcoHARDWARE_Semaphore(Hardware,
                                          gcvWHERE_RASTER,
                                          gcvWHERE_BLT,
-                                         gcvHOW_SEMAPHORE,
+                                         gcvHOW_SEMAPHORE_STALL,
                                          gcvNULL));
     }
 
@@ -4423,7 +4441,7 @@ gcoHARDWARE_3DBlitMipMap(
         gcmONERROR(gcoHARDWARE_Semaphore(Hardware,
                                          gcvWHERE_COMMAND,
                                          gcvWHERE_BLT,
-                                         gcvHOW_SEMAPHORE,
+                                         gcvHOW_SEMAPHORE_STALL,
                                          gcvNULL));
     }
 

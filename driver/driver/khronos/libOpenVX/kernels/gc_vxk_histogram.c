@@ -27,11 +27,11 @@ static vx_status _vxHistogram(vx_image src, vx_distribution dist, vx_size offset
     vxQueryDistribution(dist, VX_DISTRIBUTION_ATTRIBUTE_RANGE, &range, sizeof(range));
     vxQueryDistribution(dist, VX_DISTRIBUTION_ATTRIBUTE_WINDOW, &window_size, sizeof(window_size));
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_DISTRIBUTION, dist, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_DISTRIBUTION, dist, GC_VX_INDEX_AUTO);
 
     /*
     *   |                            numBins                          |
@@ -80,19 +80,19 @@ static vx_status _vxHistogram(vx_image src, vx_distribution dist, vx_size offset
     bin1[3].bin32[1] =
     bin1[3].bin32[2] =
     bin1[3].bin32[3] = 0x01010101;
-	gcoOS_MemCopy(&context.uniforms[0].uniform, bin0, bytes);
+    gcoOS_MemCopy(&context.uniforms[0].uniform, bin0, bytes);
     gcoOS_MemCopy(&context.uniforms[1].uniform, bin1, bytes);
 
     context.uniforms[0].index = 4;
-    context.uniforms[0].num	= 4 * 4;
+    context.uniforms[0].num = 4 * 4;
 
     context.uniforms[1].index = 8;
-    context.uniforms[1].num	= 4 * 4;
+    context.uniforms[1].num = 4 * 4;
 
-    context.uniform_num		= 2;
+    context.uniform_num     = 2;
 
-    context.params.kernel		= gcvVX_KERNEL_HISTOGRAM;
-    context.params.xstep		= 16;
+    context.params.kernel       = gcvVX_KERNEL_HISTOGRAM;
+    context.params.xstep        = 16;
 
     return gcfVX_Kernel(&context);
 }
@@ -106,7 +106,7 @@ vx_status vxHistogram(vx_image src, vx_distribution dist, vx_reference* staging)
     vx_uint32* dist_ptr = NULL;
     vx_uint32* dist_src = NULL;
     vx_uint32 offsets = 0;
-	vx_distribution distribution;
+    vx_distribution distribution;
     vx_size size = 0;
 
     vxQueryDistribution(dist, VX_DISTRIBUTION_ATTRIBUTE_BINS, &numBins, sizeof(numBins));
@@ -124,7 +124,7 @@ vx_status vxHistogram(vx_image src, vx_distribution dist, vx_reference* staging)
 
     for(i = 0; i < count; i ++)
     {
-		memset(dist_src, 0, size);
+        memset(dist_src, 0, size);
 
         status |= _vxHistogram(src, distribution, offset + 16 * i * window_size);
         /* To clean up */
@@ -149,11 +149,11 @@ static vx_status _vxVivEqualizeHist_hist(vx_image src, vx_image hist)
 {
     gcoVX_Kernel_Context context = {{0}};
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, hist, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, hist, GC_VX_INDEX_AUTO);
 
     /*step is step index*/
     context.params.step             = EQUAL_HISTOGRAM_HIST;
@@ -168,16 +168,16 @@ static vx_status _vxVivEqualizeHist_cdf(vx_image cdf, vx_image hist, vx_uint32 d
 {
     gcoVX_Kernel_Context context = {{0}};
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, cdf, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, cdf, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, hist, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, hist, GC_VX_INDEX_AUTO);
 
     context.params.scale    = (gctFLOAT)div;
 
-	if(div <= 0)
-	{
+    if(div <= 0)
+    {
         vx_uint32 bin[4];
 
         bin[0] = 0;
@@ -185,13 +185,13 @@ static vx_status _vxVivEqualizeHist_cdf(vx_image cdf, vx_image hist, vx_uint32 d
         bin[2] = 2;
         bin[3] = 3;
 
-		gcoOS_MemCopy(&context.uniforms[context.uniform_num].uniform, bin, sizeof(bin));
+        gcoOS_MemCopy(&context.uniforms[context.uniform_num].uniform, bin, sizeof(bin));
         context.uniforms[context.uniform_num].num = 4 * 4;
         context.uniforms[context.uniform_num++].index = 4;
     }
 
     /*step is step index*/
-    context.params.step	  = EQUAL_HISTOGRAM_CDF;
+    context.params.step   = EQUAL_HISTOGRAM_CDF;
 
     context.params.kernel   = gcvVX_KERNEL_EQUALIZE_HISTOGRAM;
     context.params.xstep    = 4;
@@ -204,14 +204,14 @@ vx_status _vxVivEqualizeHist_lut(vx_image src, vx_image hist, vx_image dst)
     gcoVX_Kernel_Context context = {{0}};
     vx_status status = VX_SUCCESS;
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, hist, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, hist, GC_VX_INDEX_AUTO);
 
-	/*index = 2*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, GC_VX_INDEX_AUTO);
+    /*index = 2*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, GC_VX_INDEX_AUTO);
 
     /*step is step index*/
     context.params.step         = EQUAL_HISTOGRAM_LUT;
@@ -280,7 +280,7 @@ vx_status vxEqualizeHist(vx_image src, vx_image dst, vx_reference* staging)
     status |= vxGetValidRegionImage(hist, &rect);
     status |= vxAccessImagePatch(hist, &rect, 0, &addr, &base, VX_WRITE_ONLY);
 
-	gcoOS_ZeroMemory(base, 256 * 2 * 1 * 2);
+    gcoOS_ZeroMemory(base, 256 * 2 * 1 * 2);
 
     status |= vxCommitImagePatch(hist, NULL, 0, &addr, base);
 
@@ -290,7 +290,7 @@ vx_status vxEqualizeHist(vx_image src, vx_image dst, vx_reference* staging)
     status |= _generateCDF(hist, cdf, &min, &min_cdf);
 
     div = width * height - min_cdf;
-	status |= _vxVivEqualizeHist_cdf(cdf, hist, div);
+    status |= _vxVivEqualizeHist_cdf(cdf, hist, div);
 
     status |= _vxVivEqualizeHist_lut(src, hist, dst);
     /* To Clean up */

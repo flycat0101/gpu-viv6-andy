@@ -2507,10 +2507,37 @@ GLvoid GL_APIENTRY __GLES_APINAME(MultiDrawElementsIndirectEXT)(GLenum mode, GLe
 }
 #endif
 
+#if GL_KHR_blend_equation_advanced
 GLvoid GL_APIENTRY __GLES_APINAME(BlendBarrierKHR)(void)
 {
     __GL_GET_CONTEXT;
     gc->apiDispatchTable.BlendBarrier(gc);
 }
+#endif
 
+#if GL_EXT_robustness
+GLenum GL_APIENTRY __GLES_APINAME(GetGraphicsResetStatusEXT)()
+{
+    __GL_GET_CONTEXT_RET(GL_NO_ERROR);
+    return gc->apiDispatchTable.GetGraphicsResetStatus(gc);
+}
+
+GLvoid GL_APIENTRY __GLES_APINAME(ReadnPixelsEXT)(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, GLsizei bufSize, GLvoid *data)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.ReadnPixels(gc, x, y, width, height, format, type, bufSize, data);
+}
+
+GLvoid GL_APIENTRY __GLES_APINAME(GetnUniformfvEXT)(GLuint program, GLint location, GLsizei bufSize, GLfloat *params)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.GetnUniformfv(gc, program, location, bufSize, params);
+}
+
+GLvoid GL_APIENTRY __GLES_APINAME(GetnUniformivEXT)(GLuint program, GLint location, GLsizei bufSize, GLint *params)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.GetnUniformiv(gc, program, location, bufSize, params);
+}
+#endif
 

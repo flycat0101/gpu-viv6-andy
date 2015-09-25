@@ -17628,6 +17628,10 @@ gcoHARDWARE_BindTextureDesc(
             roundUV = (textureInfo->magFilter == gcvTEXTURE_POINT &&
                        baseLevelWidth <= 32 && baseLevelHeight <= 32 ) ? 0 : 1;
         }
+        else if (Hardware->patchID == gcvPATCH_NETFLIX)
+        {
+            roundUV = 1;
+        }
         else
         {
             roundUV = (textureInfo->minFilter == gcvTEXTURE_POINT ||

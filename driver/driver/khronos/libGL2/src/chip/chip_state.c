@@ -1328,7 +1328,7 @@ GLvoid validateLineState(__GLcontext *gc, GLbitfield localMask)
 
     if (localMask & (__GL_LINEWIDTH_BIT | __GL_LINESMOOTH_ENDISABLE_BIT)) {
         /* looks like HW does not support normal wide line, so turned on aaline if line width is greater than 1 */
-        if (gc->state.line.aliasedWidth > 1) {
+        if (gc->state.line.aliasedWidth >= 1) {
             gco3D_SetAntiAliasLine(chipCtx->hw, GL_TRUE);
         } else {
             if (!gc->state.enables.line.smooth) {
@@ -1442,6 +1442,74 @@ GLvoid updateColorSum(__GLcontext *gc)
 
 extern GLenum setCulling(__GLcontext *gc);
 extern GLenum validatePolygonOffset(__GLcontext *gc);
+
+static gceSTATUS validateShader(__GLcontext *gc)
+{
+    glsCHIPCONTEXT_PTR chipCtx = CHIP_CTXINFO(gc);
+    gcSHADER fsProgram;
+    GLProgram program = chipCtx->currGLSLProgram;
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
+
+    if (chipCtx->drawRT[0])
+    {
+        gcmFOOTER();
+        return status;
+    }
+
+    if ( program == gcvNULL )
+    {
+        gcmFOOTER();
+        return status;
+    }
+
+    fsProgram = program->fragmentShader;
+
+    if (fsProgram)
+    {
+        gctBOOL enableEarlyTest = gcvFALSE;
+        gcsHINT_PTR psHints = program->hints;
+        gctBOOL psReadZ   = psHints->useFragCoord[2];
+        gctBOOL psReadW   = psHints->useFragCoord[3];
+        gctUINT samples;
+
+        gcmONERROR(gcoSURF_GetSamples(chipCtx->drawRT[0], &samples));
+        gcmONERROR(gcSHADER_GetEarlyFragTest(fsProgram, &enableEarlyTest));
+        gcmONERROR(gco3D_SetAllEarlyDepthModes(chipCtx->hw, enableEarlyTest ?
+                                                                        gcvFALSE : psHints->psHasFragDepthOut || psHints->useMemoryAccess[gcvPROGRAM_STAGE_FRAGMENT]));
+
+        gcmONERROR(gco3D_SetSampleShading(chipCtx->hw, psHints->usedSampleIdOrSamplePosition,
+                                                    psHints->psUsedSampleInput,
+                                                    ((psHints->usedSampleIdOrSamplePosition || psHints->psUsedSampleInput) ? (gctFLOAT)samples : 0)));
+
+        gcmONERROR(gco3D_EnableSampleMaskOut(chipCtx->hw, psHints->sampleMaskOutWritten, psHints->sampleMaskLoc));
+
+        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_MSAA_SHADING))
+        {
+            gcmONERROR(gco3D_SetEarlyDepthFromAPP(chipCtx->hw, enableEarlyTest));
+        }
+
+        if(gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_RA_DEPTH_WRITE))
+        {
+            gcmONERROR(gco3D_SetRADepthWrite(chipCtx->hw, enableEarlyTest ?
+                                                        gcvFALSE : psHints->psHasFragDepthOut || psHints->hasKill || psHints->useMemoryAccess[gcvPROGRAM_STAGE_FRAGMENT],
+                                                        psReadZ, (psReadW || (psHints->rtArrayComponent != -1))));
+        }
+        gcmONERROR(gco3D_SetShaderLayered(chipCtx->hw, (psHints->rtArrayComponent != -1)));
+    }
+
+
+    if (gc->state.light.shadingModel == GL_FLAT) {
+        gco3D_SetShading(chipCtx->hw, gcvSHADING_FLAT_OPENGL);
+    } else {
+        gco3D_SetShading(chipCtx->hw, gcvSHADING_SMOOTH);
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
 
 GLvoid validateState(__GLcontext *gc)
 {
@@ -1692,16 +1760,16 @@ GLvoid validateState(__GLcontext *gc)
         if (localMask & __GL_COLORMATERIAL_ENDISABLE_BIT) {
             glmSETHASH_1BIT(hashMaterialEnabled, gc->state.enables.lighting.colorMaterial, 0);
         }
+
         if (localMask & __GL_LIGHTMODEL_TWOSIDE_BIT) {
             updatePrimitive(gc);
         }
+
         if (localMask & __GL_SHADEMODEL_BIT) {
-            if (gc->state.light.shadingModel == GL_FLAT) {
-                gco3D_SetShading(chipCtx->hw, gcvSHADING_FLAT_OPENGL);
-            } else {
-                gco3D_SetShading(chipCtx->hw, gcvSHADING_SMOOTH);
-            }
+
+            validateShader(gc);
             __glChipUpdateShadingMode(gc, gc->state.light.shadingModel);
+
         }
 
         if (localMask & __GL_MATERIAL_EMISSION_FRONT_BIT) {

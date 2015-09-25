@@ -72,6 +72,8 @@ typedef enum
     __GL_EXTID_KHR_texture_compression_astc_ldr,
     __GL_EXTID_KHR_blend_equation_advanced,
     __GL_EXTID_KHR_debug,
+    __GL_EXTID_KHR_robustness,
+    __GL_EXTID_KHR_robust_buffer_access_behavior,
 
     /* EXT extensions */
     __GL_EXTID_EXT_texture_type_2_10_10_10_REV,

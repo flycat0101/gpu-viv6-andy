@@ -2248,287 +2248,111 @@ veglSyncToPixmap(
 
 /******************************************************************************/
 
-#if defined(EGL_API_WL)
-struct wl_egl_window *
-wl_egl_window_create(struct wl_surface *surface, int width, int height)
+#if defined(WL_EGL_PLATFORM)
+
+static void
+gcoWL_QueryResolveFeature(int* noResolve)
 {
-    struct wl_egl_window* window = gcvNULL;
-    gctUINT i;
     gceSTATUS status = gcvSTATUS_OK;
+    gctCHAR * p         = gcvNULL;
 
-    gcmASSERT(surface);
-
+    VEGLThreadData thread;
     do
     {
-        gcsSURF_FORMAT_INFO_PTR renderTargetInfo[2];
-        int typeChanged = 0;
-        gceSURF_FORMAT resolveFormat = gcvSURF_UNKNOWN;
-        gceHARDWARE_TYPE currentType = gcvHARDWARE_INVALID;
-        gcmONERROR(
-            gcoOS_AllocateMemory(
-                gcvNULL,
-                sizeof *window,
-                (gctPOINTER) &window
-            ));
-
-        gcoOS_ZeroMemory(
-                window,
-                sizeof *window
-             );
-
-        window->surface     = surface;
-        window->info.dx     = 0;
-        window->info.dy     = 0;
-        window->info.width  = width;
-        window->info.height = height;
-        /* Set the window surface format save as the config requested */
-        /* window->info.format = (gceSURF_FORMAT) gcoOS_GetPLSValue(gcePLS_VALUE_EGL_CONFIG_FORMAT_INFO); */
-        window->info.format = gcvSURF_A8R8G8B8;
-
-        gcmONERROR(
-            gcoSURF_QueryFormat(
-                window->info.format,
-                renderTargetInfo
-            ));
-
-        window->info.bpp = renderTargetInfo[0]->bitsPerPixel;
-        /* Query current hardware type. */
-        gcmONERROR(gcoHAL_GetHardwareType(gcvNULL, &currentType));
-
-        if(currentType == gcvHARDWARE_VG)
+        if(noResolve == NULL)
         {
-            /* VG355 cannot support gcoTEXTURE_GetClosestFormat */
-            gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
-            typeChanged = 1;
+            break;
         }
-        gcmONERROR(
-            gcoTEXTURE_GetClosestFormat(gcvNULL,
-                                        window->info.format,
-                                        &resolveFormat));
-        window->info.format = resolveFormat;
+        *noResolve = 1;
 
-        if(typeChanged)
+        p = getenv("GPU_VIV_EXT_RESOLVE");
+        if ((p != gcvNULL) && (p[0] == '0'))
         {
-            gcoHAL_SetHardwareType(gcvNULL, currentType);
+            /* Disable no-resolve requested. */
+            *noResolve = 0;
+            break;
         }
 
-        for (i=0; i<WL_EGL_NUM_BACKBUFFERS ; i++)
+        p = getenv("GPU_VIV_DISABLE_SUPERTILED_TEXTURE");
+        if ((p != gcvNULL) && (p[0] == '1'))
         {
-            gcmONERROR(
-                gcoSURF_Construct(
-                                gcvNULL,
-                                width,
-                                height,
-                                1,
-                                /*gcvSURF_TEXTURE*/gcvSURF_BITMAP,
-                                resolveFormat,
-                                gcvPOOL_DEFAULT,
-                                &window->backbuffers[i].info.surface
-                                ));
-/*
-            gcmONERROR(
-                gcoSURF_SetOrientation(
-                                    window->backbuffers[i].info.surface,
-                                    gcvORIENTATION_BOTTOM_TOP));
-*/
-            gcmONERROR(
-                gcoSURF_Lock(
-                    window->backbuffers[i].info.surface,
-                    gcvNULL,
-                    gcvNULL
-                    ));
+            /* Disable no-resolve while supertiled texture was disabled. */
+            *noResolve = 0;
+            break;
+        }
 
-            gcmONERROR(
-                gcoSURF_GetAlignedSize(
-                    window->backbuffers[i].info.surface,
-                    gcvNULL,
-                    gcvNULL,
-                    &window->backbuffers[i].info.stride
-                    ));
+        status = gcoHAL_IsFeatureAvailable(
+            gcvNULL,
+            gcvFEATURE_SUPERTILED_TEXTURE
+            );
 
-            gcmONERROR(
-               gcoSURF_QueryVidMemNode(
-                    window->backbuffers[i].info.surface,
-                    (gctUINT32 *)&window->backbuffers[i].info.node,
-                    &window->backbuffers[i].info.pool,
-                    &window->backbuffers[i].info.bytes
-                    ));
-
-            gcmONERROR(
-                gcoHAL_NameVideoMemory((gctUINT32)window->backbuffers[i].info.node,
-                                       (gctUINT32 *)&window->backbuffers[i].info.node));
-
-            window->backbuffers[i].info.width = window->info.width;
-            window->backbuffers[i].info.height = window->info.height;
-            window->backbuffers[i].info.format = resolveFormat;
-            window->backbuffers[i].info.invalidate = gcvTRUE;
-            window->backbuffers[i].info.locked = gcvFALSE;
-            window->frame_callback = gcvNULL;
-            gcmTRACE(gcvLEVEL_VERBOSE, "Surface %d (%p): width=%d, height=%d, format=%d, stride=%d, node=%p, pool=%d, bytes=%d, calc=%d",
-                        i, window->backbuffers[i].info.surface,
-                        width, height,
-                        window->backbuffers[i].info.format,
-                        window->backbuffers[i].info.stride,
-                        window->backbuffers[i].info.node,
-                        window->backbuffers[i].info.pool,
-                        window->backbuffers[i].info.bytes,
-                        window->backbuffers[i].info.stride*width
-                        );
+        if (status != gcvSTATUS_TRUE)
+        {
+            *noResolve = 0;
+            break;
+        }
+        thread = veglGetThreadData();
+        if(thread->api == EGL_OPENVG_API)
+        {
+            /* OpenVG cannot support direct rendering.*/
+            *noResolve = 0;
         }
     }
     while (gcvFALSE);
+    return;
+}
+
+struct wl_egl_window *
+wl_egl_window_create(struct wl_surface *surface, int width, int height)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    struct wl_egl_window* window = gcvNULL;
+
+    gcoOS_AllocateMemory(gcvNULL, sizeof *window, (gctPOINTER) &window );
+    gcoOS_ZeroMemory( window, sizeof *window);
+    if (!window)
+        return NULL;
+
+    window->surface = surface;
+    gcoWL_QueryResolveFeature(&window->noResolve);
+    status = gcoOS_CreateWindow(gcvNULL, 0, 0, width, height, (HALNativeWindowType*)(&window));
+    if(status != gcvSTATUS_OK)
+        return NULL;
 
     return window;
-
-OnError:
-    wl_egl_window_destroy(window);
-    return gcvNULL;
 }
 
 void
 wl_egl_window_destroy(struct wl_egl_window *window)
 {
-    gctUINT i;
 
-    if (window != gcvNULL)
-    {
-        /* Make sure the last rendering completed */
-        gcoHAL_Commit(gcvNULL, gcvTRUE);
-        for (i=0; i<WL_EGL_NUM_BACKBUFFERS ; i++)
-        {
-            if (window->backbuffers[i].info.surface != gcvNULL)
-            {
-                gcoSURF_Unlock(
-                    window->backbuffers[i].info.surface,
-                    gcvNULL
-                    );
+    gcmASSERT(window);
 
-                gcoSURF_Destroy(
-                    window->backbuffers[i].info.surface
-                    );
+    gcoOS_DestroyWindow(gcvNULL, (HALNativeWindowType)window);
 
-                gcmTRACE(gcvLEVEL_VERBOSE, "Surface %d (%p) destroyed", i, window->backbuffers[i].info.surface);
-            }
-            if (window->backbuffers[i].wl_buffer != gcvNULL)
-            {
-                wl_buffer_destroy(window->backbuffers[i].wl_buffer);
-            }
-        }
-
-        gcoOS_FreeMemory(gcvNULL, window);
-    }
+    gcoOS_FreeMemory(gcvNULL, window);
 }
+
 
 void
 wl_egl_window_resize(struct wl_egl_window *window, int width, int height, int dx, int dy)
 {
-    gctUINT i;
-    gceSTATUS status = gcvSTATUS_OK;
     gcmASSERT(window);
 
-    window->info.dx = dx;
-    window->info.dy = dy;
-
-    /* Nothing to do if window size if same. */
-    if(window->info.width == width && window->info.height == height)
-    {
-        return;
-    }
-
-    window->info.width  = width;
-    window->info.height = height;
-
-    for (i=0; i<WL_EGL_NUM_BACKBUFFERS ; i++)
-    {
-        gceSURF_FORMAT resolveFormat = window->info.format;
-
-        if (window->backbuffers[i].info.surface != gcvNULL)
-        {
-            gcoSURF_Unlock(
-                window->backbuffers[i].info.surface,
-                gcvNULL
-            );
-
-            gcoSURF_Destroy(
-                window->backbuffers[i].info.surface
-            );
-
-            gcmTRACE(gcvLEVEL_VERBOSE, "Surface %d (%p) destroyed", i, window->backbuffers[i].info.surface);
-        }
-
-        gcmONERROR(
-                gcoSURF_Construct(
-                gcvNULL,
-                width,
-                height,
-                1,
-                /*gcvSURF_TEXTURE*/gcvSURF_BITMAP,
-                resolveFormat,
-                gcvPOOL_DEFAULT,
-                &window->backbuffers[i].info.surface
-                ));
-/*
-        gcmONERROR(
-                gcoSURF_SetOrientation(
-                window->backbuffers[i].info.surface,
-                gcvORIENTATION_BOTTOM_TOP));
-*/
-        gcmONERROR(
-                gcoSURF_Lock(
-                window->backbuffers[i].info.surface,
-                gcvNULL,
-                gcvNULL
-                ));
-
-        gcmONERROR(
-                gcoSURF_GetAlignedSize(
-                window->backbuffers[i].info.surface,
-                gcvNULL,
-                gcvNULL,
-                &window->backbuffers[i].info.stride
-                ));
-
-        gcmONERROR(
-                gcoSURF_QueryVidMemNode(
-                window->backbuffers[i].info.surface,
-                (gctUINT32*) &window->backbuffers[i].info.node,
-                &window->backbuffers[i].info.pool,
-                &window->backbuffers[i].info.bytes
-                ));
-
-        gcmONERROR(gcoHAL_NameVideoMemory((gctUINT32)window->backbuffers[i].info.node, (gctUINT32 *)&window->backbuffers[i].info.node));
-
-        window->backbuffers[i].info.width = window->info.width;
-        window->backbuffers[i].info.height = window->info.height;
-        window->backbuffers[i].info.format = resolveFormat;
-        window->backbuffers[i].info.invalidate = gcvTRUE;
-
-        gcmTRACE(gcvLEVEL_VERBOSE, "Surface %d (%p): x=%d, y=%d, width=%d, height=%d, format=%d, stride=%d, node=%p, pool=%d, bytes=%d, calc=%d",
-                i, window->backbuffers[i].info.surface,
-                dx, dy, width, height,
-                window->backbuffers[i].info.format,
-                window->backbuffers[i].info.stride,
-                window->backbuffers[i].info.node,
-                window->backbuffers[i].info.pool,
-                window->backbuffers[i].info.bytes,
-                window->backbuffers[i].info.stride*width
-                );
-    }
-OnError:
-    /* Nothing to do; */
-    return;
+    gcoOS_ResizeWindow(gcvNULL, (HALNativeWindowType*)(window), width, height);
 }
 void wl_egl_window_get_attached_size(struct wl_egl_window *egl_window,int *width, int *height)
 {
     gcmASSERT(egl_window);
 
     if (width)
-            *width = egl_window->info.attached_width;
+            *width = egl_window->attached_width;
     if (height)
-            *height = egl_window->info.attached_height;
+            *height = egl_window->attached_height;
 }
 
 #endif
+
 
 /******************************************************************************/
 

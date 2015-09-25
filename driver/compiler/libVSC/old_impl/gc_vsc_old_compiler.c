@@ -170,7 +170,7 @@ const gcSL_OPCODE_ATTR gcvOpcodeAttr[] =
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID }, /* gcSL_TEXU_LOD, 0x74  paired with gcSL_TEXLD to implement HW texld_u_lod */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID }, /* gcSL_MEM_BARRIER, 0x75  Memory Barrier. */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID }, /* gcSL_SAMPLER_ASSIGN, 0x76  Sampler assignment as a parameter, only exist on FE. */
-    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_GET_SAMPLER_IDX,0x77  Get Image/Sampler index */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_LP      }, /* gcSL_GET_SAMPLER_IDX,0x77  Get Image/Sampler index */
 
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_IMAGE_RD_3D, 0x78 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_IMAGE_WR_3D, 0x79 */
@@ -190,7 +190,11 @@ const gcSL_OPCODE_ATTR gcvOpcodeAttr[] =
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_MOV_LONG, 0x87 mov two 4 byte integers to the lower/upper 4 bytes of a long/ulong integer */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HIA     }, /* gcSL_MADSAT, 0x88 mad with saturation for integer only */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_COPY, 0x89 copy register contents */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HP      }, /* gcSL_IMAGE_ADDR_3D, 0x8A  ES31 */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_MP      }, /* gcSL_GET_SAMPLER_LMM,0x8B Get sampler's lodminmax */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_MP      }, /* gcSL_GET_SAMPLER_LBS,0x8C Get sampler's levelbasesize */
 };
+char _checkOpAttr_size[sizeof(gcvOpcodeAttr)/sizeof(gcvOpcodeAttr[0]) == gcSL_MAXOPCODE];
 
 const gcSHADER_TYPEINFO gcvShaderTypeInfo[] =
 {
@@ -22692,7 +22696,8 @@ gcSHADER_AddSourceAttributeIndexed(
     /* Cteate the source. */
     source = gcmSL_SOURCE_SET(0, Type, gcSL_ATTRIBUTE)
            | gcmSL_SOURCE_SET(0, Indexed, Mode)
-           | gcmSL_SOURCE_SET(0, Swizzle, Swizzle);
+           | gcmSL_SOURCE_SET(0, Swizzle, Swizzle)
+           | gcmSL_SOURCE_SET(0, Precision, Attribute->precision);
 
     /* Create the index. */
     index = gcmSL_INDEX_SET(0, Index, Attribute->index)
@@ -22848,7 +22853,8 @@ gcSHADER_AddSourceUniformIndexed(
     /* Create the source. */
     source = gcmSL_SOURCE_SET(0, Type, gcSL_UNIFORM)
            | gcmSL_SOURCE_SET(0, Indexed, Mode)
-           | gcmSL_SOURCE_SET(0, Swizzle, Swizzle);
+           | gcmSL_SOURCE_SET(0, Swizzle, Swizzle)
+           | gcmSL_SOURCE_SET(0, Precision, Uniform->precision);
 
     /* Create the index. */
     index = gcmSL_INDEX_SET(0, Index, Uniform->index)
@@ -24385,12 +24391,34 @@ _AnalyzeFunctions(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gctUINT i, funcID;
+    gctUINT i, j, funcID;
+    gcSL_OPCODE opcode;
+    gcsFUNCTION_ARGUMENT argument;
 
     for (i = Shader->functions[Index]->codeStart; i < Shader->functions[Index]->codeStart + Shader->functions[Index]->codeCount; ++i)
     {
-        if (gcmSL_OPCODE_GET(Shader->code[i].opcode, Opcode) != gcSL_CALL)
+        opcode = (gcSL_OPCODE)gcmSL_OPCODE_GET(Shader->code[i].opcode, Opcode);
+
+        if (gcSL_isOpcodeImageRelated(opcode) &&
+            gcmSL_SOURCE_GET(Shader->code[i].source0, Type) == gcSL_TEMP)
+        {
+            for (j = 0; j < Shader->functions[Index]->argumentCount; j++)
+            {
+                argument = Shader->functions[Index]->arguments[j];
+
+                if (argument.index == Shader->code[i].source0Index)
+                {
+                    SetFunctionParamAsImgSource0(Shader->functions[Index]);
+                }
+            }
+
             continue;
+        }
+
+        if (opcode != gcSL_CALL)
+        {
+            continue;
+        }
 
         funcID = _locateFunction(Shader, Shader->code[i].tempIndex);
 
@@ -24399,6 +24427,11 @@ _AnalyzeFunctions(
         if (IsFunctionHasSamplerIndexing(Shader->functions[funcID]))
         {
             SetFunctionHasSamplerIndexing(Shader->functions[Index]);
+        }
+
+        if (IsFunctionParamAsImgSource0(Shader->functions[funcID]))
+        {
+            SetFunctionParamAsImgSource0(Shader->functions[Index]);
         }
 
         /* If the caller is a recursive function, then the callee itself is also a recursive function */
@@ -24441,7 +24474,8 @@ _AnalyzeFunctions(
 */
 gceSTATUS
 gcSHADER_AnalyzeFunctions(
-    IN gcSHADER Shader
+    IN gcSHADER Shader,
+    IN gctBOOL InFE
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -24454,7 +24488,9 @@ gcSHADER_AnalyzeFunctions(
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Shader, gcvOBJ_SHADER);
 
-    if (Shader->functionCount == 0)
+    if (Shader->functionCount == 0 ||
+        /* TODO: we need to add support for kernel function check. */
+        GetShaderType(Shader) == gcSHADER_TYPE_CL)
     {
         gcmFOOTER_NO();
         return status;
@@ -24497,6 +24533,12 @@ gcSHADER_AnalyzeFunctions(
     }
 
     status = gcvSTATUS_OK;
+
+    if (!InFE)
+    {
+        gcmFOOTER_NO();
+        return status;
+    }
 
     /*
     ** According to GLSL-ES Spec,
@@ -33822,6 +33864,114 @@ gcSHADER_Has64BitOperation(
     }
 
     gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcSHADER_FindMainFunction(
+    IN   gcSHADER           Shader,
+    OUT  gctINT *           StartCode,
+    OUT  gctINT *           EndCode
+    )
+{
+    gceSTATUS    status    = gcvSTATUS_OK;
+    gctPOINTER * codeOwner = gcvNULL;
+    gctSIZE_T    size      = gcmSIZEOF(gctINT *) * Shader->codeCount;
+    gctUINT      i, f;
+    gctINT       mainStart = -1;
+    gctINT       mainEnd   = -1;
+    gctPOINTER  pointer = gcvNULL;
+
+    if (Shader->lastInstruction == 0)
+    {
+        *StartCode  = 0;
+        *EndCode    = 0;
+        return status;
+    }
+
+    gcmONERROR(gcoOS_Allocate(gcvNULL, size, &pointer));
+    codeOwner = (gctPOINTER *) pointer;
+
+    /* Zero the memory. */
+    gcoOS_ZeroMemory(pointer, size);
+
+    /* Walk through functions to mark the code owner */
+
+    /* Determine ownership of the code for functions. */
+    for (f = 0; f < Shader->functionCount; ++f)
+    {
+        gcFUNCTION function = Shader->functions[f];
+        gctUINT    codeEnd  = function->codeStart + function->codeCount;
+
+        gcmASSERT(function != gcvNULL &&
+                  codeEnd <= Shader->codeCount );
+        for (i = function->codeStart; i < codeEnd; i++)
+        {
+            gcmASSERT(codeOwner[i] == gcvNULL);
+            codeOwner[i] = function;
+        }
+    }
+
+    /* Determine ownership of the code for kernel functions. */
+    for (f = 0; f < Shader->kernelFunctionCount; ++f)
+    {
+        gcKERNEL_FUNCTION kernelFunction = Shader->kernelFunctions[f];
+        gctUINT    codeEnd  = kernelFunction->codeStart + kernelFunction->codeCount;
+
+        if (kernelFunction->isMain)
+        {
+            continue;
+        }
+
+        gcmASSERT(kernelFunction != gcvNULL &&
+                  codeEnd <= Shader->codeCount );
+        for (i = kernelFunction->codeStart; i < codeEnd; i++)
+        {
+            gcmASSERT(codeOwner[i] == gcvNULL);
+            codeOwner[i] = kernelFunction;
+        }
+    }
+
+    /* Walk through all code to find main */
+    for (i = 0; i < Shader->lastInstruction; )
+    {
+        if (codeOwner[i] == gcvNULL)
+        {
+            gcmASSERT(mainStart == -1);
+            mainStart = i;
+            /* find the end of main */
+            for (i = i + 1; i < Shader->lastInstruction; i++)
+            {
+                if (codeOwner[i] != gcvNULL)
+                    break;
+            }
+            mainEnd = i;
+            gcmASSERT(mainStart != -1 && mainEnd != -1);
+            break;
+        }
+        else
+        {
+            i++;
+        }
+    }
+
+    if (StartCode)
+    {
+        *StartCode = mainStart;
+    }
+    if (EndCode)
+    {
+        *EndCode   = mainEnd;
+    }
+
+OnError:
+    if (codeOwner)
+    {
+        /* Free the current code buffer. */
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, codeOwner));
+    }
+
+    /* Return the status. */
     return status;
 }
 

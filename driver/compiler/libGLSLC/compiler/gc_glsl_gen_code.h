@@ -169,7 +169,10 @@ typedef enum _sleOPCODE
     slvOPCODE_IMAGE_READ,
     slvOPCODE_IMAGE_WRITE,
     slvOPCODE_IMAGE_ADDRESS,
+    slvOPCODE_IMAGE_ADDRESS_3D,
     slvOPCODE_GET_SAMPLER_IDX,
+    slvOPCODE_GET_SAMPLER_LMM,
+    slvOPCODE_GET_SAMPLER_LBS,
     slvOPCODE_IMAGE_READ_3D,
     slvOPCODE_IMAGE_WRITE_3D,
     slvOPCODE_CLAMP0MAX,
@@ -1160,14 +1163,14 @@ slDefineSelectionFalseOperandEnd(
 gceSTATUS
 slAddUnusedOutputPatch(
     IN sloCOMPILER Compiler,
-	IN sloCODE_GENERATOR CodeGenerator,
+    IN sloCODE_GENERATOR CodeGenerator,
     IN slsNAME_SPACE* globalNameSpace
     );
 
 gceSTATUS
 slAddUnusedInputPatch(
     IN sloCOMPILER Compiler,
-	IN sloCODE_GENERATOR CodeGenerator,
+    IN sloCODE_GENERATOR CodeGenerator,
     IN slsNAME_SPACE* globalNameSpace
     );
 
@@ -1330,8 +1333,6 @@ struct _sloCODE_GENERATOR
     slsVISITOR              visitor;
     slsFUNC_DEF_CONTEXT     currentFuncDefContext;
     slsITERATION_CONTEXT *  currentIterationContext;
-    gctBOOL                 shareMatrixArrIndex;
-    slsSLINK_LIST           matrixArrIndex;
     gctINT                  layoutLocation;
     gctINT                  layoutUniformLocation;
     gctBOOL                 createDefaultUBO;

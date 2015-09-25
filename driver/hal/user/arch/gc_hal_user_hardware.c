@@ -1708,16 +1708,20 @@ _FillInFeatureTableByDatabase(
 
     Features[gcvFEATURE_128BTILE] = gcvFALSE;
 
-    Features[gcvFEATURE_EDGEAA] = gcvFALSE;
+
+    Features[gcvFEATURE_VMSAA] = gcvFALSE;
+
+    Features[gcvFEATURE_32F_COLORMASK_FIX] = database->PE_32BPC_COLORMASK_FIX;
 
     Features[gcvFEATURE_COLOR_COMPRESSION] = gcvFALSE;
+
 
     if (Features[gcvFEATURE_128BTILE])
     {
         Features[gcvFEATURE_COLOR_COMPRESSION] = gcvTRUE;
 
         /* EDGEAA depend on 128BTILE now, disable for now */
-        Features[gcvFEATURE_EDGEAA] = gcvFALSE;
+        Features[gcvFEATURE_VMSAA] = gcvFALSE;
     }
 
     Features[gcvFEATURE_ADVANCED_BLEND_OPT] = gcvFALSE;
@@ -2207,6 +2211,11 @@ _FillInFeatureTableByDatabase(
     Hardware->features[gcvFEATURE_PE_64bit_FENCE_FIX] = database->PE_64bit_FENCE_FIX;
     Hardware->features[gcvFEATURE_PE_RGBA16I_FIX] = database->PE_RGBA16I_FIX;
     Hardware->features[gcvFEATURE_BLT_8bit_256TILE_FC_FIX] = database->BLT_8bpp_256TILE_FC_FIX;
+    Hardware->features[gcvFEATURE_BLT_64bpp_MASKED_CLEAR_FIX] = database->BLT_64bpp_MASKED_CLEAR_FIX;
+    Hardware->features[gcvFEATURE_SH_PSO_MSAA1x_FIX] = database->SH_PSO_MSAA1x_FIX;
+    Hardware->features[gcvFEATURE_USC_ATOMIC_FIX] = database->USC_ATOMIC_FIX;
+
+    Hardware->features[gcvFEATURE_USC_GOS_ADDR_FIX] = database->USC_GOS_ADDR_FIX;
 
 #if gcdENABLE_2D
     Fill2DFeaturesByDatabase(Hardware, Features);
@@ -2697,12 +2706,6 @@ gcoHARDWARE_DetectProcess(
             "\x9c\x90\x92\xd1\x9e\x8a\x8d\x90\x8d\x9e\x8c\x90\x99\x8b\x88\x90"
             "\x8d\x94\x8c\xd1\x8e\x8a\x9e\x9b\x8d\x9e\x91\x8b",
             gcvFALSE
-        },
-        {
-            gcvPATCH_ANTUTU,
-            "\x9c\x90\x92\xd1\x9e\x91\x8b\x8a\x8b\x8a\xd1\xbe\xbd\x9a\x91\x9c"
-            "\x97\xb2\x9e\x8d\x94",
-            gcvTRUE
         },
 #endif
         {
@@ -3565,6 +3568,11 @@ gcoHARDWARE_DetectProcess(
             gcvFALSE
         },
         {
+            gcvPATCH_NETFLIX,
+            /* "com.netflix.ninja" */ "\x9c\x90\x92\xd1\x91\x9a\x8b\x99\x93\x96\x87\xd1\x91\x96\x91\x95\x9e",
+            gcvFALSE
+        },
+        {
             gcvPATCH_AFTERBURNER,
             /* "com.sega.afterburner" */
             "\x9c\x90\x92\xd1\x8c\x9a\x98\x9e\xd1\x9e\x99\x8b\x9a\x8d\x9d\x8a"
@@ -3633,6 +3641,11 @@ gcoHARDWARE_DetectProcess(
             gcvFALSE
         },
         {
+            gcvPATCH_YOUTUBE_TV,
+            /* "com.google.android.youtube.tv" */ "\x9c\x90\x92\xd1\x98\x90\x90\x98\x93\x9a\xd1\x9e\x91\x9b\x8d\x90\x96\x9b\xd1\x86\x90\x8a\x8b\x8a\x9d\x9a\xd1\x8b\x89",
+            gcvFALSE
+        },
+        {
             gcvPATCH_YOUILABS_SHADERTEST,
             /* "com.youilabs.shadertest" */
             "\x9c\x90\x92\xd1\x86\x90\x8a\x96\x93\x9e\x9d\x8c\xd1\x8c\x97\x9e\x9b\x9a\x8d\x8b\x9a\x8c\x8b",
@@ -3675,6 +3688,14 @@ gcoHARDWARE_DetectProcess(
             "\x9c\x90\x92\xd1\x8c\x8a\x8f\x9a\x8d\x9c\x9a\x93\x93\xd1\x9c\x93\x9e\x8c\x97\x90\x99\x9c\x93\x9e\x91\x8c",
             gcvFALSE
         },
+        {
+            gcvPATCH_3DMARKSS,
+            /* com.futuremark.dmandroid.slingshot:workload */
+            "\x9c\x90\x92\xd1\x99\x8a\x8b\x8a\x8d\x9a\x92\x9e\x8d\x94\xd1\x9b\x92\x9e\x91\x9b\x8d\x90\x96\x9b\xd1\x8c\x93\x96\x91\x98\x8c\x97\x90\x8b\xc5\x88\x90\x8d\x94\x93\x90\x9e\x9b",
+            gcvFALSE
+        },
+
+
 
     };
 
@@ -3850,6 +3871,21 @@ gcoHARDWARE_DetectProcess(
             }
         },
 
+        /* Symbol list for Antutu 5.x */
+        {
+            gcvPATCH_ANTUTU5X,
+            {
+ "\x9d\x9a\x91\x9c\x97\xa0\x9b\x9e\x8b\x9e\xa0\x8f\x8d\x90\x9c\x9a\x8c\x8c\x96\x91\x98",
+ "\x9e\x91\x9b\x8d\x90\x96\x9b\xa0\x98\x9a\x8b\xbc\x8f\x8a\xb6\x9b\xbe\x8d\x92",
+ "\x9d\x9a\x91\x9c\x97\xa0\x8c\x9c\x90\x8d\x9a\xa0\x97\x86\x9d\x8d\x96\x9b",
+ "\x9b\x9a\x9c\xa0\x8c\x8b\x8d\x96\x91\x98\xa0\x90\x8f\x9a\x91\x98\x93\x9a\x8c\xcc",
+ "\x9b\x9a\x8c\xa0\x9a\x91\x9c\x8d\x86\x8f\x8b\x96\x90\x91",
+ "\x98\x9a\x91\x9a\x8d\x9e\x8b\x9a\xa0\x8b\x9a\x8c\x8b\xa0\x9b\x9e\x8b\x9e\xa0\x99\x96\x93\x9a",
+ "\xb5\x9e\x89\x9e\xa0\x9c\x90\x92\xa0\x9e\x91\x8b\x8a\x8b\x8a\xa0\xbe\xbd\x9a\x91\x9c\x97\xb2\x9e\x8d\x94\xa0\xb5\xb1\xb6\xb3\xb6\xbd\xa0\x9c\x97\x9a\x9c\x94\xaf\x9e\x9c\x94\x9e\x98\x9a",
+ "\xb5\x9e\x89\x9e\xa0\x9c\x90\x92\xa0\x9e\x91\x8b\x8a\x8b\x8a\xa0\xbe\xbd\x9a\x91\x9c\x97\xb2\x9e\x8d\x94\xa0\xb5\xb1\xb6\xb3\xb6\xbd\xa0\x8c\x8a\x9d\x92\x96\x8b\xc9\xcb\x9d\x96\x8b",
+            }
+        },
+
         {
             gcvPATCH_NENAMARK2,
             {
@@ -3969,7 +4005,14 @@ gcoHARDWARE_DetectProcess(
 
             break;
         }
-        else if (status)
+        else if (status == gcvSTATUS_MISMATCH)
+        {
+            gcPLS.patchID     =
+            Hardware->patchID = gcvPATCH_INVALID;
+
+            continue;
+        }
+        else if (status == gcvSTATUS_TRUE)
         {
             gcPLS.patchID     =
             Hardware->patchID = programList[i].patchId;
@@ -6378,7 +6421,11 @@ _ConstructFence(
         fence->loopCount    = gcdFENCE_WAIT_LOOP_COUNT;
     }
 
+#if gcdFPGA_BUILD
+    fence->delayCount   = 20000000;
+#else
     fence->delayCount   = 20000;
+#endif
 
     iface.u.QueryResetTimeStamp.timeStamp = 0;
 

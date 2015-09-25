@@ -548,6 +548,8 @@
     VIR_OPINFO(LODQ_G, 2, HasDest, 1, LM),
 
     VIR_OPINFO(GET_SAMPLER_IDX, 2, HasDest, 1, AL),
+    VIR_OPINFO(GET_SAMPLER_LMM, 2, HasDest, 1, AL),
+    VIR_OPINFO(GET_SAMPLER_LBS, 2, HasDest, 1, AL),
 
     /**
      ** surface instructions

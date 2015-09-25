@@ -1140,8 +1140,6 @@ typedef struct _slsNAME
             struct _sloIR_CONSTANT *        constant;
             /* if variable belongs to an interface block which can be a uniform or storage block */
             struct _slsNAME *               interfaceBlock;
-            /* used as index to a matrix array */
-            struct _slsMATRIX_ARR_INDEX *   matrixArrIndex;
             /* for a sampler with LODmin, LODmax:
                uniform is a vec2 where the x component is LODmin
                and the y component is LODmax */

@@ -463,6 +463,7 @@ int gc_gralloc_unwrap(private_handle_t * hnd)
         /* Unlock for 2D core. */
         gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_2D);
         gcmVERIFY_OK(gcoSURF_Unlock(surface, gcvNULL));
+        gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
     }
 
     if (has3DCore && allocHwType != gcvHARDWARE_3D)
@@ -470,6 +471,7 @@ int gc_gralloc_unwrap(private_handle_t * hnd)
         /* Unlock for 3D core side. */
         gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
         gcmVERIFY_OK(gcoSURF_Unlock(surface, gcvNULL));
+        gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
     }
 
     if (has3D2DCore && allocHwType != gcvHARDWARE_3D2D)
@@ -477,7 +479,11 @@ int gc_gralloc_unwrap(private_handle_t * hnd)
         /* Unlock for 3D/2D core. */
         gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D2D);
         gcmVERIFY_OK(gcoSURF_Unlock(surface, gcvNULL));
+        gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
     }
+
+    /* Restore hardware type. */
+    gcoHAL_SetHardwareType(gcvNULL, allocHwType);
 
     gcmVERIFY_OK(gcoSURF_Destroy(surface));
     gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));

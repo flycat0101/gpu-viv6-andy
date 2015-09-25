@@ -165,6 +165,7 @@ gcSHADER_SpecialHint(
     case gcvPATCH_QUADRANT:
     case gcvPATCH_ANTUTU:
     case gcvPATCH_ANTUTU4X:
+    case gcvPATCH_ANTUTU5X:
     case gcvPATCH_SMARTBENCH:
     case gcvPATCH_JPCT:
     case gcvPATCH_NEOCORE:

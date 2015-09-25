@@ -50,12 +50,12 @@ wl_viv_destroy(struct wl_viv *wl_viv)
 }
 
 static inline struct wl_buffer *
-wl_viv_create_buffer(struct wl_viv *wl_viv, uint32_t width, uint32_t height, uint32_t stride, int32_t format, int32_t node, int32_t pool, uint32_t bytes)
+wl_viv_create_buffer(struct wl_viv *wl_viv, uint32_t width, uint32_t height, uint32_t stride, int32_t format, int32_t type, int32_t node, int32_t pool, uint32_t bytes)
 {
     struct wl_proxy *id;
 
     id = wl_proxy_marshal_constructor((struct wl_proxy *) wl_viv,
-             WL_VIV_CREATE_BUFFER, &wl_buffer_interface, NULL, width, height, stride, format, node, pool, bytes);
+             WL_VIV_CREATE_BUFFER, &wl_buffer_interface, NULL, width, height, stride, format, type, node, pool, bytes);
 
     return (struct wl_buffer *) id;
 }

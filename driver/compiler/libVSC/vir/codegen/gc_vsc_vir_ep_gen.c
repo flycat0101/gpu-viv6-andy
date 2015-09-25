@@ -450,6 +450,18 @@ static void _FillIoRegChannel(VIR_Shader* pShader,
     gcmASSERT(hwRegChannel <= CHANNEL_W);
     gcmASSERT(ioUsage < SHADER_IO_USAGE_TOTAL_COUNT);
 
+    if (bHighPrecisionOnDual16 && !bNeedSpecialHwRegNo && (ioUsage != SHADER_IO_USAGE_SAMPLE_DEPTH))
+    {
+        if (hwLoc != hwRegNoT1)
+        {
+            gcmASSERT(hwRegChannel == hwRegChannelT1);
+        }
+        else
+        {
+            gcmASSERT(hwRegChannel != hwRegChannelT1);
+        }
+    }
+
     pThisIoChannelMapping->ioUsage = ioUsage;
     pThisIoChannelMapping->usageIndex = usageIndex;
 
@@ -792,7 +804,7 @@ static VSC_ErrCode _CollectPerExeObjIoMappingToSEP(VIR_Shader* pShader,
                         }
                         else
                         {
-                            /* output is coming from vreg symbol, since the array could be not consecutive */
+                            /* Output is coming from vreg symbol, since the array could be not consecutive */
                             gcmASSERT(pVregSym != gcvNULL);
                             hwRegFirstChannel = VIR_Symbol_GetHwShift(pVregSym);
                             hiHwRegFirstChannel = VIR_Symbol_GetHIHwShift(pVregSym);
@@ -831,19 +843,6 @@ static VSC_ErrCode _CollectPerExeObjIoMappingToSEP(VIR_Shader* pShader,
                                            hwRegFirstChannel;
 #endif
                             hiHwRegChannel = hiHwRegFirstChannel + (channelIdx - pThisIoRegMapping->firstValidIoChannel);
-
-                            if (VIR_Symbol_GetPrecision(pVirIoSym) == VIR_PRECISION_HIGH &&
-                                pShader->__IsDual16Shader)
-                            {
-                                if (hwLoc != hiHwLoc)
-                                {
-                                    gcmASSERT(hwRegChannel == hiHwRegChannel);
-                                }
-                                else
-                                {
-                                    gcmASSERT(hwRegChannel != hiHwRegChannel);
-                                }
-                            }
                         }
 
                         _FillIoRegChannel(pShader,
@@ -1048,7 +1047,7 @@ static VSC_ErrCode _CollectConstantMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelpe
             {
                 gcmASSERT(thisUniformRegCount == 1);
 
-                pThisVirCTCVal = (VIR_Const*)VIR_GetSymFromId(&pShader->constTable, pVirUniform->initializer);
+                pThisVirCTCVal = (VIR_Const*)VIR_GetSymFromId(&pShader->constTable, pVirUniform->u.initializer);
 
                 pThisCTC = gcvNULL;
 

@@ -154,6 +154,13 @@ gcChipUtilsDumpTexture(
     __GLcontext *gc,
     __GLtextureObject *tex
     );
+
+gceSTATUS
+gcChipUtilsDumpRT(
+    __GLcontext *gc,
+    GLuint flag
+    );
+
 #endif
 
 __GL_INLINE gctUINT

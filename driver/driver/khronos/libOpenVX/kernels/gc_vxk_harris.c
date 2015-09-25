@@ -26,10 +26,10 @@ vx_status vxHarrisScore(vx_image grad_x, vx_image grad_y, vx_image dst,
         vx_uint32 width = 0, height = 0;
         gcoVX_Index indexs[]            = {
             /* index,  num,             shift0,         shift1,      mask0,        mask1 */
-            {    3,   4 * 4, {			   1,		       0,      0xffffffff,   0xfffffffe  }  }, /* y start */
-            {    4,   4 * 4, {			   1,		       0,      0xffffffff,   0xfffffffe  }  }, /* y end */
-            {    5,   4 * 4, {			   1,		       0,      0xffffffff,   0xfffffffe  }  }, /* x start */
-            {    6,   4 * 4, {			   1,		       0,      0xffffffff,   0xfffffffe  }  }, /* x end */
+            {    3,   4 * 4, {             1,              0,      0xffffffff,   0xfffffffe  }  }, /* y start */
+            {    4,   4 * 4, {             1,              0,      0xffffffff,   0xfffffffe  }  }, /* y end */
+            {    5,   4 * 4, {             1,              0,      0xffffffff,   0xfffffffe  }  }, /* x start */
+            {    6,   4 * 4, {             1,              0,      0xffffffff,   0xfffffffe  }  }, /* x end */
         };
 
         status |= vxAccessScalarValue(winds, &block_size);
@@ -38,14 +38,14 @@ vx_status vxHarrisScore(vx_image grad_x, vx_image grad_y, vx_image dst,
         status |= vxQueryImage(grad_x, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
         status |= vxQueryImage(grad_x, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
 
-		/*index = 0*/
-		gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, grad_x, GC_VX_INDEX_AUTO);
+        /*index = 0*/
+        gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, grad_x, GC_VX_INDEX_AUTO);
 
-		/*index = 1*/
-		gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, grad_y, GC_VX_INDEX_AUTO);
+        /*index = 1*/
+        gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, grad_y, GC_VX_INDEX_AUTO);
 
-		/*index = 2*/
-		gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, GC_VX_INDEX_AUTO);
+        /*index = 2*/
+        gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, GC_VX_INDEX_AUTO);
 
         context.params.kernel               = gcvVX_KERNEL_HARRIS_CORNERS;
 
@@ -63,13 +63,13 @@ vx_status vxHarrisScore(vx_image grad_x, vx_image grad_y, vx_image dst,
 
         for(i = 0; i < context.uniform_num; i++)
         {
-								/* y start,					y end,					x start,				x end */
-			vx_int32 base[4] = {block_size/2 + 1, height - (block_size/2 + 1), (block_size/2 + 1), width - (block_size/2 + 1)};
-			vx_int32 offset = (i>1)?1:0;
-			indexs[i].bin[0] = base[i];									 /* y start */
-			indexs[i].bin[1] = indexs[i].bin[0] - offset;                /* y end */
-			indexs[i].bin[2] = ((vx_int32)indexs[i].bin[1] - offset);    /* x start */
-			indexs[i].bin[3] = ((vx_int32)indexs[i].bin[2] - offset);    /* x end */
+                                /* y start,                 y end,                  x start,                x end */
+            vx_int32 base[4] = {block_size/2 + 1, height - (block_size/2 + 1), (block_size/2 + 1), width - (block_size/2 + 1)};
+            vx_int32 offset = (i>1)?1:0;
+            indexs[i].bin[0] = base[i];                                  /* y start */
+            indexs[i].bin[1] = indexs[i].bin[0] - offset;                /* y end */
+            indexs[i].bin[2] = ((vx_int32)indexs[i].bin[1] - offset);    /* x start */
+            indexs[i].bin[3] = ((vx_int32)indexs[i].bin[2] - offset);    /* x end */
 
             gcoOS_MemCopy(&context.uniforms[i].uniform, indexs[i].bin, sizeof(indexs[i].bin));
             context.uniforms[i].num = indexs[i].num;
@@ -97,7 +97,7 @@ static vx_status packArrays(vx_image img, vx_array src_array, vx_uint32 src_row_
     vx_uint32 bin[4];
 
     /*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, img, GC_VX_INDEX_AUTO);
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, img, GC_VX_INDEX_AUTO);
 
     if (src_array && dst_array)
     {
@@ -134,8 +134,8 @@ vx_status createLister(vx_image src, vx_image countImg, vx_array tempArray, vx_i
     vx_uint32 constantData[8] = {0, 8, 16, 24, 0, 0, 0, 0};
 
     /*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
-	/*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
+    /*index = 1*/
     gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, countImg, GC_VX_INDEX_AUTO);
     if (tempArray)
     {
@@ -173,7 +173,7 @@ vx_status vxImageLister(vx_image src, vx_array arrays, vx_scalar num, vx_referen
     vx_uint32 numCorners  = 0;
     void *base = NULL;
     vx_size cap = 0;
-	vx_size itemSize = 0;
+    vx_size itemSize = 0;
     vx_int32 width, height;
     vx_image countImg;
     vx_array tempArray;

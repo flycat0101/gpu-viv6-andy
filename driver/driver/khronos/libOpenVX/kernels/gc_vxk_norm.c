@@ -30,18 +30,18 @@ vx_status vxNorm(vx_image input_x, vx_image input_y, vx_scalar norm_type, vx_ima
         vxQueryImage(output, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
         vxQueryImage(output, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
 
-		/*index = 0*/
-		gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input_x, GC_VX_INDEX_AUTO);
+        /*index = 0*/
+        gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input_x, GC_VX_INDEX_AUTO);
 
-		/*index = 1*/
-		gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input_y, GC_VX_INDEX_AUTO);
+        /*index = 1*/
+        gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input_y, GC_VX_INDEX_AUTO);
 
-		/*index = 2*/
-		gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+        /*index = 2*/
+        gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
 
-		context.params.row                  = width;
-		context.params.col                  = height;
-		context.params.xstep                = 8;
+        context.params.row                  = width;
+        context.params.col                  = height;
+        context.params.xstep                = 8;
 
         context.params.kernel = gcvVX_KERNEL_ELEMENTWISE_NORM;
 
@@ -63,7 +63,7 @@ vx_status vxNorm(vx_image input_x, vx_image input_y, vx_scalar norm_type, vx_ima
 vx_status vivEdgeTraceThreshold(vx_image input, vx_threshold threshold, vx_image output)
 {
     vx_status status = VX_SUCCESS;
-	gcoVX_Kernel_Context context = {{0}};
+    gcoVX_Kernel_Context context = {{0}};
     vx_int32 lower = 0, upper = 0;
     vx_uint32 bin[4];
     vx_uint32 constantData[2];
@@ -79,17 +79,17 @@ vx_status vivEdgeTraceThreshold(vx_image input, vx_threshold threshold, vx_image
     bin[2] = FV2(upper+1);
     bin[3] = FV2(65535U);
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
 
     gcoOS_MemCopy(&context.uniforms[0].uniform, bin, sizeof(bin));
     context.uniforms[0].index           = 2;
     context.uniforms[0].num             = 16;
     gcoOS_MemCopy(&context.uniforms[1].uniform, constantData, sizeof(constantData));
-	context.uniforms[1].index           = 3;
+    context.uniforms[1].index           = 3;
     context.uniforms[1].num             = 8;
     context.uniform_num                 = 2;
 
@@ -104,7 +104,7 @@ vx_status vivEdgeTraceThreshold(vx_image input, vx_threshold threshold, vx_image
 vx_status vivEdgeTraceHysteresis(vx_image input, vx_image output, vx_scalar flag)
 {
     vx_status status = VX_SUCCESS;
-	gcoVX_Kernel_Context context = {{0}};
+    gcoVX_Kernel_Context context = {{0}};
     vx_uint32 width;
     vx_uint32 height;
     vx_uint32 bin[2];
@@ -114,14 +114,14 @@ vx_status vivEdgeTraceHysteresis(vx_image input, vx_image output, vx_scalar flag
     bin[0] = width;
     bin[1] = height;
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
 
-	/*index = 2*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_SCALAR, flag, GC_VX_INDEX_AUTO);
+    /*index = 2*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_SCALAR, flag, GC_VX_INDEX_AUTO);
 
     gcoOS_MemCopy(&context.uniforms[0].uniform, bin, sizeof(bin));
     context.uniforms[0].index           = 3;
@@ -142,17 +142,17 @@ vx_status vivEdgeTraceHysteresis(vx_image input, vx_image output, vx_scalar flag
 vx_status vivEdgeTraceClamp(vx_image input, vx_image output)
 {
     vx_status status = VX_SUCCESS;
-	gcoVX_Kernel_Context context = {{0}};
+    gcoVX_Kernel_Context context = {{0}};
     vx_uint32 bin[2];
 
     bin[0] = FORMAT_VALUE(7U);
     bin[1] = FORMAT_VALUE(255U);
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
 
     gcoOS_MemCopy(&context.uniforms[0].uniform, bin, sizeof(bin));
     context.uniforms[0].index           = 2;
@@ -176,8 +176,8 @@ vx_status vxEdgeTrace(vx_image norm, vx_threshold threshold, vx_image output, vx
     vx_uint32 curr, next = 0;
     vx_uint32 j = 0;
 
-	img[0] = (vx_image)staging[0];
-	img[1] = (vx_image)staging[1];
+    img[0] = (vx_image)staging[0];
+    img[1] = (vx_image)staging[1];
     countScalar = (vx_scalar)staging[2];
 
     status = vivEdgeTraceThreshold(norm,threshold,img[0]);

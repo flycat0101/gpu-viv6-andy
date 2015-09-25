@@ -6593,7 +6593,8 @@ gcChipIsLTCEnabled(
     gcoHAL_GetPatchID(gcvNULL, &patchId);
 
     /* Disable LTC optimization for real racing */
-    if (patchId == gcvPATCH_REALRACING)
+    if (patchId == gcvPATCH_REALRACING || patchId == gcvPATCH_NENAMARK
+        || patchId == gcvPATCH_BM21 || patchId == gcvPATCH_MM07)
     {
         return gcvFALSE;
     }
@@ -9045,6 +9046,7 @@ gcChipLoadCompiler(
 
         chipCtx->pfCompile = gcCompileShader;
         chipCtx->pfInitCompiler = gcInitializeCompiler;
+        chipCtx->pfFinalizeCompiler = gcFinalizeCompiler;
 
         gcmERR_BREAK(gcInitializeCompiler(chipCtx->hal, &gc->constants.shaderCaps));
         gcmERR_BREAK(gcoHAL_SetCompilerFuncTable(chipCtx->hal, &vscAPIs));
@@ -9060,6 +9062,12 @@ gcChipLoadCompiler(
             gctGLSLInitCompiler initGLSL;
             gctPOINTER          ptr;
         } intializer;
+
+        union __GLfinalizerUnion
+        {
+            gctGLSLFinalizeCompiler finalizeGLSL;
+            gctPOINTER ptr;
+        } finalizer;
 
         union __GLcompilerUnion
         {
@@ -9086,9 +9094,11 @@ gcChipLoadCompiler(
 
         gcmERR_BREAK(gcoOS_GetProcAddress(gcvNULL, chipCtx->dll, "gcCompileShader", &compiler.ptr));
         gcmERR_BREAK(gcoOS_GetProcAddress(gcvNULL, chipCtx->dll, "gcInitializeCompiler", &intializer.ptr));
+        gcmERR_BREAK(gcoOS_GetProcAddress(gcvNULL, chipCtx->dll, "gcFinalizeCompiler", &finalizer.ptr));
 
         chipCtx->pfCompile = compiler.compile;
         chipCtx->pfInitCompiler = intializer.initGLSL;
+        chipCtx->pfFinalizeCompiler = finalizer.finalizeGLSL;
         gcmERR_BREAK(chipCtx->pfInitCompiler(chipCtx->hal, &gc->constants.shaderCaps));
     } while (gcvFALSE);
 
@@ -9104,40 +9114,16 @@ gcChipReleaseCompiler(
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-
     gceSTATUS status = gcvSTATUS_OK;
+
     gcmHEADER_ARG("gc=0x%x", gc);
 
-#if gcdSTATIC_LINK
     do
     {
-        gcmERR_BREAK(gcFinalizeCompiler(chipCtx->hal));
-
+        gcmERR_BREAK(chipCtx->pfFinalizeCompiler(chipCtx->hal));
         chipCtx->pfCompile = gcvNULL;
-    }
-    while (gcvFALSE);
+    } while (gcvFALSE);
 
-#else
-    do
-    {
-        union __GLfinalizerUnion
-        {
-            gceSTATUS (*funcPtr)(IN  gcoHAL Hal);
-            gctPOINTER ptr;
-        } finalizer;
-
-        if (chipCtx->dll != gcvNULL)
-        {
-            gcmERR_BREAK(gcoOS_GetProcAddress(gcvNULL, chipCtx->dll, "gcFinalizeCompiler", &finalizer.ptr));
-
-            gcmERR_BREAK((*finalizer.funcPtr)(chipCtx->hal));
-
-            gcmERR_BREAK(gcoOS_FreeLibrary(gcvNULL, chipCtx->dll));
-
-            chipCtx->dll = gcvNULL;
-        }
-    } while(gcvFALSE);
-#endif
 
     gcmFOOTER();
     return status;

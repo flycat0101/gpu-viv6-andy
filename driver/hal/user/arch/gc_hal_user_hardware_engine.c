@@ -4918,8 +4918,10 @@ OnError:
 
 static gctUINT8
 _GetColorMask(
+    gcoHARDWARE Hardware,
     gctUINT8 oldValue,
     gctUINT32 hwFormat,
+    gctUINT32 format,
     gctUINT32 layerIndex
     )
 {
@@ -4930,31 +4932,70 @@ _GetColorMask(
         gctUINT8 gMask = (oldValue & 0x2) >> 1;
         gctUINT8 bMask = (oldValue & 0x4) >> 2;
         gctUINT8 aMask = (oldValue & 0x8) >> 3;
-        switch(hwFormat)
-        {
-        case 0x14:
-            newColorMask = (aMask << 3) | (bMask << 2) | (rMask << 1) | rMask;
-            break;
 
-        case 0x15:
-            switch (layerIndex)
+        if (!Hardware->features[gcvFEATURE_32F_COLORMASK_FIX])
+        {
+            switch(format)
             {
-            case 0:
+            case gcvSURF_R32F:
+            case gcvSURF_R32I:
+            case gcvSURF_R32UI:
+                newColorMask = (aMask << 3) | (bMask << 2) | (rMask << 1) | rMask;
+                break;
+
+            case gcvSURF_X32R32F:
+            case gcvSURF_G32R32F:
+            case gcvSURF_X32R32I:
+            case gcvSURF_G32R32I:
+            case gcvSURF_X32R32UI:
+            case gcvSURF_G32R32UI:
+            case gcvSURF_G32R32I_1_G32R32F:
+            case gcvSURF_G32R32UI_1_G32R32F:
                 newColorMask =  (gMask << 3) | (gMask << 2) | (rMask << 1) | rMask;
                 break;
-            case 1:
-                newColorMask =  (aMask << 3) | (aMask << 2) | (bMask << 1) | bMask;
+
+            case gcvSURF_B16G16R16I_1_G32R32F:
+            case gcvSURF_B16G16R16UI_1_G32R32F:
+            case gcvSURF_X16B16G16R16I_1_G32R32F:
+            case gcvSURF_A16B16G16R16I_1_G32R32F:
+            case gcvSURF_X16B16G16R16UI_1_G32R32F:
+            case gcvSURF_A16B16G16R16UI_1_G32R32F:
+                newColorMask =  (aMask << 3) | (bMask << 2) | (gMask << 1) | rMask;
                 break;
 
-            default:
-                gcmASSERT(0);
+            case gcvSURF_X32B32G32R32F_2_G32R32F:
+            case gcvSURF_A32B32G32R32F_2_G32R32F:
+            case gcvSURF_A32B32G32R32I_2_G32R32F:
+            case gcvSURF_A32B32G32R32UI_2_G32R32F:
+            case gcvSURF_X32B32G32R32I_2_G32R32I:
+            case gcvSURF_A32B32G32R32I_2_G32R32I:
+            case gcvSURF_X32B32G32R32UI_2_G32R32UI:
+            case gcvSURF_A32B32G32R32UI_2_G32R32UI:
+                switch (layerIndex)
+                {
+                case 0:
+                    newColorMask =  (gMask << 3) | (gMask << 2) | (rMask << 1) | rMask;
+                    break;
+                case 1:
+                    newColorMask =  (aMask << 3) | (aMask << 2) | (bMask << 1) | bMask;
+                    break;
+
+                default:
+                    gcmASSERT(0);
+                    break;
+                }
                 break;
             }
+        }
+        else if ((hwFormat == 0x15)  && (layerIndex == 1))
+        {
+            newColorMask = (aMask << 1) | bMask;
         }
     }
 
     return newColorMask;
 }
+
 
 static gceSTATUS
 _FlushMultiTarget(
@@ -5286,7 +5327,7 @@ _FlushMultiTarget(
 
         }
 
-        pColorTarget->hwColorWrite = _GetColorMask(pColorTarget->colorWrite, pColorTarget->format, pColorTarget->layerIndex);
+        pColorTarget->hwColorWrite = _GetColorMask(Hardware, pColorTarget->colorWrite, pColorTarget->format, surface->format, pColorTarget->layerIndex);
 
         if (Hardware->features[gcvFEATURE_SEPARATE_RT_CTRL] ||
             Hardware->features[gcvFEATURE_128BTILE])
@@ -5528,7 +5569,7 @@ gcoHARDWARE_FlushTarget(
             physicalBaseAddr1 = physicalBaseAddr0 + surface->bottomBufferOffset;
 
             colorWrite =
-            pColorTarget->hwColorWrite = _GetColorMask(pColorTarget->colorWrite, format, pColorTarget->layerIndex);
+            pColorTarget->hwColorWrite = _GetColorMask(Hardware, pColorTarget->colorWrite, pColorTarget->format, surface->format, pColorTarget->layerIndex);
 
             stride = surface->stride;
             surface->dither3D = Hardware->PEStates->ditherEnable;
@@ -5718,7 +5759,7 @@ gcoHARDWARE_FlushTarget(
     if ((Hardware->features[gcvFEATURE_HALTI5] &&
         !Hardware->features[gcvFEATURE_MRT_8BIT_DUAL_PIPE_FIX]) ||
         Hardware->features[gcvFEATURE_128BTILE] ||
-        Hardware->features[gcvFEATURE_EDGEAA])
+        Hardware->features[gcvFEATURE_VMSAA])
     {
         gcsSURF_INFO_PTR depth = Hardware->PEStates->depthStates.surface;
 
@@ -7943,7 +7984,7 @@ gcoHARDWARE_FlushSampling(
 
     if (Hardware->features[gcvFEATURE_MSAA_SHADING])
     {
-        if(msaaEnable && (Hardware->MsaaStates->sampleShading || Hardware->MsaaStates->sampleShadingByPS || Hardware->MsaaStates->isSampleIn))
+        if (msaaEnable && (Hardware->MsaaStates->sampleShading || Hardware->MsaaStates->sampleShadingByPS || Hardware->MsaaStates->isSampleIn))
         {
             sampleShadingEnable = gcvTRUE;
             if(Hardware->MsaaStates->sampleShading)
@@ -7956,7 +7997,13 @@ gcoHARDWARE_FlushSampling(
             }
         }
 
-        if((minSampleShadingValue == 1 && sampleShadingEnable) || !sampleShadingEnable)
+        if (!Hardware->features[gcvFEATURE_SH_PSO_MSAA1x_FIX] && (Hardware->PEStates->colorOutCount > 1))
+        {
+            sampleShadingEnable = gcvTRUE;
+            minSampleShadingValue = 4;
+        }
+
+        if ((minSampleShadingValue == 1 && sampleShadingEnable) || !sampleShadingEnable)
         {
             sampleCenter = gcvTRUE;
         }
@@ -10910,7 +10957,7 @@ gcoHARDWARE_SetColorCacheMode(
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
 
     if (Hardware->features[gcvFEATURE_128BTILE] ||
-        Hardware->features[gcvFEATURE_EDGEAA])
+        Hardware->features[gcvFEATURE_VMSAA])
     {
         /* Loop all at set cacheMode */
         if (Hardware->PEStates->colorOutCount >= 1)

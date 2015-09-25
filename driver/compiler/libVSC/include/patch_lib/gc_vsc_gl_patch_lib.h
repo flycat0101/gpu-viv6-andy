@@ -2431,6 +2431,19 @@ static gctSTRING gcLibTexFormatConvertHalti2_OutputCvtFunc =
 "    vec4 fret = _outputcvt_R16UI_to_ARGB4(uintval.x & 0xffu);\n"
 "    fret.w = 1.0;\n"
 "    return fret;\n"
+"}\n"
+"highp vec4 _outputcvt_A16B16G16R16I_1_G32R32F(highp ivec4 inval)\n"
+"{\n"
+"    highp int x = (inval.x & 0xffff) | ((inval.y & 0xffff) << 16);\n"
+"    highp int y = (inval.z & 0xffff) | ((inval.w & 0xffff) << 16);\n"
+"    return vec4(intBitsToFloat(x), intBitsToFloat(y), 0.0, 1.0);\n"
+"}\n"
+"\n"
+"highp vec4 _outputcvt_A16B16G16R16UI_1_G32R32F(highp uvec4 inval)\n"
+"{\n"
+"    highp uint x = (inval.x & 0xffffu) | ((inval.y & 0xffffu) << 16);\n"
+"    highp uint y = (inval.z & 0xffffu) | ((inval.w & 0xffffu) << 16);\n"
+"    return vec4(uintBitsToFloat(x), uintBitsToFloat(y), 0.0, 1.0);\n"
 "}\n";
 
 static gctSTRING gcLibTexFormatConvertHalti2_MainFunc =

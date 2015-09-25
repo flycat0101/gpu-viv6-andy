@@ -529,14 +529,15 @@ VIR_Enable VIR_RA_LS_LR2WebChannelMask(
         {
         case 1:
         case 2:
+        case 3:
             retEnable = VIR_ENABLE_XY;
             break;
-        case 3:
         case 4:
+        case 8:
+        case 12:
             retEnable = VIR_ENABLE_ZW;
             break;
         default:
-            gcmASSERT(gcvFALSE);
             retEnable = VIR_ENABLE_XYZW;
         }
     }
@@ -2349,31 +2350,13 @@ void _VIR_RA_LS_MarkUses(
     }
 }
 
-gctUINT _VIR_RA_LS_GetSym_Components(
-    VIR_Symbol      *pSym)
-{
-    gctUINT         components = 0;
-    VIR_Type        *symType = VIR_Symbol_GetType(pSym);
-
-    if (VIR_Type_isPrimitive(symType))
-    {
-        components = VIR_GetTypeComponents(VIR_Type_GetIndex(symType));
-    }
-    else
-    {
-        components = VIR_GetTypeComponents(VIR_Type_GetBaseTypeId(symType));
-    }
-
-    return components;
-}
-
 void _VIR_RA_LS_GetSym_Enable_Swizzle(
     VIR_Symbol      *pSym,
     VIR_Enable      *symEnable,
     VIR_Swizzle     *symSwizzle
     )
 {
-    gctUINT         components = _VIR_RA_LS_GetSym_Components(pSym);
+    gctUINT         components = VIR_Symbol_GetComponents(pSym);
 
     switch(components)
     {
@@ -4008,7 +3991,7 @@ gctBOOL VIR_CG_ConstUniformExistBefore(
     VIR_Uniform *uniform = gcvNULL;
 
     VIR_Const *pConstVal = (VIR_Const *) VIR_GetSymFromId(&pShader->constTable,
-        pSymUniform->initializer);
+        pSymUniform->u.initializer);
 
     switch (pConstVal->type)
     {
@@ -4139,7 +4122,7 @@ gctBOOL VIR_CG_ConstUniformExistBefore(
             (uniform->physical != -1))
         {
             VIR_Const *constVal = (VIR_Const *) VIR_GetSymFromId(
-                &pShader->constTable, uniform->initializer);
+                &pShader->constTable, uniform->u.initializer);
             gctINT constCount = VIR_GetTypeComponents(constVal->type);
 
             gcmASSERT(constCount > 0);
@@ -4386,14 +4369,7 @@ VSC_ErrCode VIR_CG_MapNonSamplerUniforms(
             gctUINT32 components = 0, rows = 0;
             VIR_Type    *symType = VIR_Symbol_GetType(sym);
 
-            if (VIR_Type_isPrimitive(symType))
-            {
-                components = VIR_GetTypeComponents(VIR_Type_GetIndex(symType));
-            }
-            else
-            {
-                components = VIR_GetTypeComponents(VIR_Type_GetBaseTypeId(symType));
-            }
+            components = VIR_Symbol_GetComponents(sym);
 
             if (symUniform->realUseArraySize == -1)
             {
@@ -5254,106 +5230,12 @@ gctBOOL _VIR_RA_LS_handleBuiltinAttr(
     return retValue;
 }
 
-void _VIR_RA_LS_SortAttributes(
-    VIR_RA_LS       *pRA,
-    gctUINT         *pSortedInputIdxArray)
-{
-    VIR_Shader              *pShader = VIR_RA_LS_GetShader(pRA);
-    VIR_AttributeIdList     *pAttrs = VIR_Shader_GetAttributes(pShader);
-
-    gctUINT         attrCount = VIR_IdList_Count(pAttrs);
-    gctUINT         i, j, tempIdx;
-
-    /* initialize the default order */
-    for (i = 0; i < attrCount; i++)
-    {
-        pSortedInputIdxArray[i] = i;
-    }
-
-    /* in dual16, we need to put all HP attributes in front of MP attributes,
-       r0/r1: highp position
-       highp varying:
-        1) all vec3 and vec4 at 2 register each
-        2) all vec1 and vec2 at 1 register
-       mediump varying: 1 register each
-    */
-    if (VIR_Shader_isDual16Mode(pShader))
-    {
-        /* put all highp to the front */
-        for (i = 0; i < attrCount; i ++)
-        {
-            VIR_Symbol  *attribute = VIR_Shader_GetSymFromId(
-                pShader, VIR_IdList_GetId(pAttrs, pSortedInputIdxArray[i]));
-
-            if (VIR_Symbol_GetPrecision(attribute) == VIR_PRECISION_HIGH)
-            {
-                continue;
-            }
-            else
-            {
-                for (j = i + 1; j < attrCount; j ++)
-                {
-                    VIR_Symbol  *nextAttribute = VIR_Shader_GetSymFromId(
-                        pShader, VIR_IdList_GetId(pAttrs, pSortedInputIdxArray[j]));
-
-                    if (VIR_Symbol_GetPrecision(nextAttribute) == VIR_PRECISION_HIGH)
-                    {
-                        tempIdx = pSortedInputIdxArray[j];
-                        pSortedInputIdxArray[j] = pSortedInputIdxArray[i];
-                        pSortedInputIdxArray[i] = tempIdx;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (VIR_RA_LS_GetHwCfg(pRA)->hwFeatureFlags.highpVaryingShift)
-        {
-            /* put all highp vec3/vec4 to the front */
-            for (i = 0; i < attrCount; i ++)
-            {
-                VIR_Symbol  *attribute = VIR_Shader_GetSymFromId(
-                    pShader, VIR_IdList_GetId(pAttrs, pSortedInputIdxArray[i]));
-
-                if (VIR_Symbol_GetPrecision(attribute) == VIR_PRECISION_HIGH &&
-                    _VIR_RA_LS_GetSym_Components(attribute) > 2)
-                {
-                    continue;
-                }
-                else
-                {
-                    for (j = i + 1; j < attrCount; j ++)
-                    {
-                        VIR_Symbol  *nextAttribute = VIR_Shader_GetSymFromId(
-                            pShader, VIR_IdList_GetId(pAttrs, pSortedInputIdxArray[j]));
-
-                        if (VIR_Symbol_GetPrecision(nextAttribute) == VIR_PRECISION_HIGH &&
-                            _VIR_RA_LS_GetSym_Components(nextAttribute) > 2)
-                        {
-                            tempIdx = pSortedInputIdxArray[j];
-                            pSortedInputIdxArray[j] = pSortedInputIdxArray[i];
-                            pSortedInputIdxArray[i] = tempIdx;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 gctBOOL _VIR_RA_NeedHighpPosition(
     VIR_Shader      *pShader)
 {
     gctUINT                 inputIdx, outputIdx;
     VIR_AttributeIdList     *pAttrs = VIR_Shader_GetAttributes(pShader);
     VIR_AttributeIdList     *pOutputs = VIR_Shader_GetOutputs(pShader);
-
-    if (VIR_Shader_PS_NeedSampleMaskId(pShader) &&
-        pShader->sampleMaskIdRegStart == 0)
-    {
-        return gcvTRUE;
-    }
 
     for (inputIdx = 0; inputIdx < VIR_IdList_Count(pAttrs); inputIdx ++)
     {
@@ -5461,7 +5343,6 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
     VIR_Symbol  *primIdAttr = gcvNULL, *ptCoordAttr = gcvNULL;
 
     VIR_RA_HWReg_Color  LRColor;
-    gctUINT     sortedInputIdxArray[MAX_SHADER_IO_NUM];
 
     _VIR_RA_MakeColor(VIR_RA_INVALID_REG, 0, &LRColor);
     _VIR_RA_MakeColorHI(VIR_RA_INVALID_REG, 0, &LRColor);
@@ -5490,14 +5371,25 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
         {
             gctUINT unusedChannel = _VIR_RA_Check_First_Unused_Pos_Attr_Channel(pRA);
 
-            /* sampleMaskIdRegStart will be changed to last temp */
-            pShader->sampleMaskIdRegStart = (unusedChannel == NOT_ASSIGNED) ? VIR_REG_MULTISAMPLEDEPTH : 0;
-            pShader->sampleMaskIdChannelStart = (unusedChannel == NOT_ASSIGNED) ? CHANNEL_X : unusedChannel;
+            /* In dual16, Sample mask should always be in HIGHP. So sample ID and sample position should always be in HIGHP as well.
+               Because,
+               o   Medium position mode doesn’t support mask LOCATION_W  (can’t)and LOCATION_Z (make it simple).
+               o   Sample depth is always high precision. So LOCATION_SUB_Z is also high precision. */
+            if (VIR_Shader_isDual16Mode(pShader))
+            {
+                /* sampleMaskIdRegStart will be changed to last temp */
+                pShader->sampleMaskIdRegStart = VIR_REG_MULTISAMPLEDEPTH;
+                pShader->sampleMaskIdChannelStart = CHANNEL_X;
+            }
+            else
+            {
+                /* sampleMaskIdRegStart will be changed to last temp or r0.z/ro.w */
+                pShader->sampleMaskIdRegStart = (unusedChannel == NOT_ASSIGNED) ? VIR_REG_MULTISAMPLEDEPTH : 0;
+                pShader->sampleMaskIdChannelStart = (unusedChannel == NOT_ASSIGNED) ? CHANNEL_X : unusedChannel;
+            }
         }
 
-        if (VIR_Shader_isDual16Mode(pShader)
-           && _VIR_RA_NeedHighpPosition(pShader)
-           )
+        if (VIR_Shader_isDual16Mode(pShader) && _VIR_RA_NeedHighpPosition(pShader))
         {
             reg = 2;
         }
@@ -5628,17 +5520,14 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
     }
     pCP->colorMap[VIR_RA_HWREG_GR].availReg = reg;
 
-    /* in dual16, we need to put all HP attributes in front of MP attributes */
-    _VIR_RA_LS_SortAttributes(pRA, sortedInputIdxArray);
-
     /* only allocate for used attributes */
     for (currAttr = 0; currAttr < attrCount; currAttr++)
     {
         VIR_Symbol  *attribute = VIR_Shader_GetSymFromId(pShader,
-                                    VIR_IdList_GetId(pAttrs, sortedInputIdxArray[currAttr]));
+                                    VIR_IdList_GetId(pAttrs, currAttr));
         VIR_Type    *attrType = VIR_Symbol_GetType(attribute);
         gctUINT     attrRegCount = VIR_Type_GetVirRegCount(pShader, attrType);
-        gctUINT     components = _VIR_RA_LS_GetSym_Components(attribute);
+        gctUINT     components = VIR_Symbol_GetComponents(attribute);
 
         VIR_DEF_KEY     defKey;
         gctUINT         defIdx, webIdx;
@@ -5946,11 +5835,23 @@ VSC_ErrCode _VIR_RA_LS_AssignAttributes(
 
                 if (!skipAlloc)
                 {
+                    VIR_RA_ColorPool    *pCP = VIR_RA_LS_GetColorPool(pRA);
                     VIR_Symbol_SetHwRegId(attribute, curReg);
+                    /* it is possible that some input are not in du (i.e., not used), thus it will not
+                       be added to active list and change the maxAllocReg. Thus we have to update
+                       the maxAllocReg here. */
+                    if (curReg > pCP->colorMap[VIR_RA_HWREG_GR].maxAllocReg)
+                    {
+                        pCP->colorMap[VIR_RA_HWREG_GR].maxAllocReg = curReg;
+                    }
                     if (VIR_Shader_isDual16Mode(pShader) &&
                         VIR_Symbol_GetPrecision(attribute) == VIR_PRECISION_HIGH)
                     {
                         VIR_Symbol_SetHIHwRegId(attribute, curReg + 1);
+                        if (curReg + 1 > pCP->colorMap[VIR_RA_HWREG_GR].maxAllocReg)
+                        {
+                            pCP->colorMap[VIR_RA_HWREG_GR].maxAllocReg = curReg + 1;
+                        }
                     }
 
                     /* Move to next register */
@@ -6868,8 +6769,19 @@ void _VIR_RA_LS_SetSymbolHwRegInfo(
             VIR_Symbol_SetHwRegId(pSym, 0);
             VIR_Symbol_SetHwShift(pSym, 3);
             _VIR_RA_SetLRColor(pLR, 0, 3);
-            gcmASSERT(VIR_Symbol_GetPrecision(pSym) != VIR_PRECISION_HIGH);
-            _VIR_RA_SetLRColorHI(pLR, VIR_RA_INVALID_REG, 0);
+            if (VIR_Shader_isDual16Mode(pShader))
+            {
+                gcmASSERT(VIR_Symbol_GetPrecision(pSym) == VIR_PRECISION_HIGH);
+                /* r1.w is not allocated */
+                gcmASSERT(_VIR_RA_LS_TestUsedColor(pRA, VIR_RA_HWREG_GR, 1, 0x8) == gcvFALSE);
+                VIR_Symbol_SetHIHwRegId(pSym, 1);
+                VIR_Symbol_SetHIHwShift(pSym, 3);
+                _VIR_RA_SetLRColorHI(pLR, 1, 3);
+            }
+            else
+            {
+                 _VIR_RA_SetLRColorHI(pLR, VIR_RA_INVALID_REG, 0);
+            }
         }
         else if(VIR_Symbol_isInput(pSym))
         {
@@ -8213,6 +8125,7 @@ _VIR_RA_LS_RewriteColor_Src(
                                         symId,
                                         VIR_Operand_GetType(pOpnd));
             _VIR_RA_LS_SetOperandHwRegInfo(pRA, pOpnd, curColor);
+            VIR_Inst_SetThreadMode(newInst, VIR_THREAD_D16_DUAL_32);
         }
     }
 
@@ -10059,7 +9972,16 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
         if (VIR_RA_LS_GetHwCfg(pRA)->hwFeatureFlags.hasHalti5)
         {
             VIR_Swizzle  src2Swizzle = VIR_Operand_GetSwizzle(pInst->src[2]);
-            VIR_Operand_SetEnable(pInst->dest, VIR_ENABLE_XY);
+            VIR_Enable   dstEnable = VIR_ENABLE_XY;
+            VIR_RA_LS_Liverange *pLR;
+
+            defIdx = _VIR_RA_LS_InstFirstDefIdx(pRA, pInst);
+            if (VIR_INVALID_DEF_INDEX != defIdx)
+            {
+                pLR =  _VIR_RA_LS_Def2ColorLR(pRA, defIdx);
+                dstEnable = VIR_RA_LS_LR2WebChannelMask(pRA, pLR);
+            }
+            VIR_Operand_SetEnable(pInst->dest, dstEnable);
             VIR_Swizzle_SetChannel(src2Swizzle, 2,
                                    VIR_Swizzle_GetChannel(src2Swizzle, 0));
             VIR_Swizzle_SetChannel(src2Swizzle, 3,
@@ -10178,6 +10100,8 @@ VSC_ErrCode _VIR_RA_LS_RewriteColors(
     VSC_ErrCode         retValue  = VSC_ERR_NONE;
     VIR_Instruction     *pInst;
     VIR_InstIterator    instIter;
+
+    VIR_Shader_SetCurrentFunction(VIR_RA_LS_GetShader(pRA), pFunc);
 
     VIR_InstIterator_Init(&instIter, &pFunc->instList);
     pInst = (VIR_Instruction *)VIR_InstIterator_First(&instIter);

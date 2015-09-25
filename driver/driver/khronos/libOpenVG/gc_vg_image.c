@@ -2122,6 +2122,15 @@ gceSTATUS vgfTesselateImage(
             Context->maskingEnable,
             gcvFALSE
             ));
+
+        /* Update paint. */
+        gcmERR_BREAK(vgfUpdatePaint(
+            Context,
+            Context->drawImageSurfaceToPaint,
+            Context->fillPaint,
+            gcvFALSE
+            ));
+
         /* Determine the image quality. */
         imageQuality = Context->imageQuality & Image->allowedQuality;
 

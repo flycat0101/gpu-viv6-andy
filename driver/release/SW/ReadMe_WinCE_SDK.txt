@@ -4,94 +4,95 @@ Files layout
 |   ReadMe.txt
 |
 +---bin
-|       libEGL.dll                      # the driver of EGL
-|       libGAL.dll                      # the user driver of HAL
-|       libGALCore.dll                  # the kernel driver of HAL
-|       libGLESv1_CM.dll                # OpenGL ES 1.1 driver
-|       libGLESv2.dll                   # OpenGL ES 3.0 driver
-|       libGLSLC.dll                    # OpenGL ES 3.0 shader compiler
-|       libVSC.dll                      # backend of compiler
-|       libOpenVG.dll                   # OpenVG driver
-|		libVDK.dll						# Vivante Development Kit
-|       PBUserProjects.reg              # REG file for kernel dirver of HAL
-|       PBUserProjects.bib              # BIB file for kernel dirver of HAL
+|     libEGL.dll                      # the driver of EGL
+|     libGAL.dll                      # the user driver of HAL
+|     libGALCore.dll                  # the kernel driver of HAL
+|     libGLESv1_CM.dll                # OpenGL ES 1.1 driver
+|     libGLESv2.dll                   # OpenGL ES 3.x driver
+|     libGLSLC.dll                    # OpenGL ES 3.x shader compiler
+|     libVSC.dll                      # backend of compiler
+|     libOpenVG.dll                   # OpenVG driver
+|     libVDK.dll                      # Vivante Development Kit
+|     PBUserProjects.reg              # REG file for kernel dirver of HAL
+|     PBUserProjects.bib              # BIB file for kernel dirver of HAL
 |
 +---inc
-|	|	gc_vdk_types.h
-|	|	gc_vdk_hal.h
-|	|	gc_vdk.h
-|	|
-|   +---HAL
-|   |       gc_hal.h
-|   |       gc_hal_types.h
-|   |       gc_hal_enum.h
-|   |       gc_hal_dump.h
-|   |       gc_hal_base.h
-|   |       gc_hal_mem.h
-|   |       gc_hal_rename.h
-|   |       gc_hal_raster.h
-|   |       gc_hal_vg.h
-|   |       gc_hal_engine.h
-|   |       gc_hal_engine_vg.h
-|   |       gc_hal_options.h
-|   |       gc_hal_driver.h
-|   |       gc_hal_profiler.h
-|   |       gc_hal_statistics.h
-|   |       gc_hal_version.h
-|   |       gc_hal_eglplatform.h
-|   |       gc_hal_eglplatform_type.h
-|   |
-|	+---KHR
-|	|		khrplatform.h
-|	|
-|   +---EGL
-|   |       egl.h
-|   |       eglext.h
-|   |       eglplatform.h
-|   |       eglvivante.h
-|   |       eglrename.h
-|   |       eglunname.h
-|   |
-|   +---GLES
-|   |       gl.h
-|	|		glext.h
-|	|		egl.h
-|   |       glplatform.h
-|   |       glrename.h
-|   |       glunname.h
-|   |
-|   +---GLES2
-|   |       gl2.h
-|   |       gl2ext.h
-|   |       gl2platform.h
-|   |       gl2rename.h
-|   |       gl2unname.h
-|   |
-|   |
-|   +---GLES3
-|   |       gl3.h
-|   |       gl3ext.h
-|   |       gl3platform.h
-|   |       gl3rename.h
-|   |       gl3unname.h
-|   |
-|   \---VG
-|           openvg.h
-|           vgu.h
-|           vgext.h
-|           vgplatform.h
-|           vgrename.h
-|           vgunname.h
+|    |    gc_vdk_types.h
+|    |    gc_vdk_hal.h
+|    |    gc_vdk.h
+|    |
+|    +---HAL
+|    |     gc_hal.h
+|    |     gc_hal_types.h
+|    |     gc_hal_enum.h
+|    |     gc_hal_dump.h
+|    |     gc_hal_base.h
+|    |     gc_hal_mem.h
+|    |     gc_hal_rename.h
+|    |     gc_hal_raster.h
+|    |     gc_hal_vg.h
+|    |     gc_hal_engine.h
+|    |     gc_hal_engine_vg.h
+|    |     gc_hal_options.h
+|    |     gc_hal_driver.h
+|    |     gc_hal_profiler.h
+|    |     gc_hal_statistics.h
+|    |     gc_hal_version.h
+|    |     gc_hal_eglplatform.h
+|    |     gc_hal_eglplatform_type.h
+|    |
+|    +---KHR
+|    |     khrplatform.h
+|    |
+|    +---EGL
+|    |     egl.h
+|    |     eglext.h
+|    |     eglplatform.h
+|    |     eglvivante.h
+|    |     eglrename.h
+|    |     eglunname.h
+|    |
+|    +---GLES
+|    |     gl.h
+|    |     glext.h
+|    |     egl.h
+|    |     glplatform.h
+|    |     glrename.h
+|    |     glunname.h
+|    |
+|    +---GLES2
+|    |     gl2.h
+|    |     gl2ext.h
+|    |     gl2platform.h
+|    |     gl2rename.h
+|    |     gl2unname.h
+|    |
+|    +---GLES3
+|    |     gl3.h
+|    |     gl31.h
+|    |     gl32.h
+|    |     gl3ext.h
+|    |     gl3platform.h
+|    |     gl3rename.h
+|    |     gl3unname.h
+|    |
+|    \---VG
+|          openvg.h
+|          vgu.h
+|          vgext.h
+|          vgplatform.h
+|          vgrename.h
+|          vgunname.h
 |
 \---lib
-       libEGL.lib
-       libGAL.lib
-       libVSC.lib
-       libGLSLC.lib
-       libGLESv2.lib
-       libGLESv1_CM.lib
-       libOpenVG.lib
-	   libVDK.lib
+      libEGL.lib
+      libGAL.lib
+      libVSC.lib
+      libGLSLC.lib
+      libGLESv2.lib
+      libGLESv1_CM.lib
+      libOpenVG.lib
+      libVDK.lib
 
 
 Running applications on the target machine

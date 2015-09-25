@@ -32,12 +32,12 @@ vx_status vxIntegralImage(vx_image src, vx_image dst)
     constantData[7] = 1;
 
 
-	/************* integral step 0 *************/
-	/*index = 0*/
-	gcoVX_AddObject(&gcContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
+    /************* integral step 0 *************/
+    /*index = 0*/
+    gcoVX_AddObject(&gcContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&gcContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&gcContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, GC_VX_INDEX_AUTO);
 
     gcoOS_MemCopy(&gcContext.uniforms[0].uniform, constantData, sizeof(constantData));
 
@@ -45,23 +45,23 @@ vx_status vxIntegralImage(vx_image src, vx_image dst)
     gcContext.uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
     gcContext.uniform_num = 1;
 
-	gcContext.params.step = INTEGRAL_IMAGE_P0;
+    gcContext.params.step = INTEGRAL_IMAGE_P0;
     gcContext.params.kernel = gcvVX_KERNEL_INTEGRAL_IMAGE;
     gcContext.params.xstep = 4;
     gcContext.params.ystep = height;
 
     status = gcfVX_Kernel(&gcContext);
 
-	/************* integral step 1 *************/
-	memset(&gcContext, 0, sizeof(gcoVX_Kernel_Context));
+    /************* integral step 1 *************/
+    memset(&gcContext, 0, sizeof(gcoVX_Kernel_Context));
 
-	/*index = 0*/
-	gcoVX_AddObject(&gcContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, dst, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&gcContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, dst, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&gcContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&gcContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, GC_VX_INDEX_AUTO);
 
-	gcContext.params.step = INTEGRAL_IMAGE_P1;
+    gcContext.params.step = INTEGRAL_IMAGE_P1;
     gcContext.params.kernel = gcvVX_KERNEL_INTEGRAL_IMAGE;
     gcContext.params.xstep = width;
     gcContext.params.ystep = 2;

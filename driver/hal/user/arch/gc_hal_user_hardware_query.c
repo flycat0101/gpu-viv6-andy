@@ -3740,6 +3740,28 @@ gcoHARDWARE_InitializeFormatArrayTable(
         info->pixelSwizzle        = baseComponents_rgba;
         info->txSwizzle           = baseComponents_rgba;
 
+        /* Cannot have only one fix */
+        gcmASSERT(!(Hardware->features[gcvFEATURE_PE_RGBA16I_FIX] ^ Hardware->features[gcvFEATURE_32F_COLORMASK_FIX]));
+
+        if (!Hardware->features[gcvFEATURE_PE_RGBA16I_FIX])
+        {
+            info = gcmGET_SURF_FORMAT_INFO(gcvSURF_X16B16G16R16I);
+            info->closestRenderFormat = gcvSURF_X16B16G16R16I_1_G32R32F;
+            info->renderFormat = gcvINVALID_RENDER_FORMAT;
+
+            info = gcmGET_SURF_FORMAT_INFO(gcvSURF_A16B16G16R16I);
+            info->closestRenderFormat = gcvSURF_A16B16G16R16I_1_G32R32F;
+            info->renderFormat        = gcvINVALID_RENDER_FORMAT;
+
+            info = gcmGET_SURF_FORMAT_INFO(gcvSURF_X16B16G16R16UI);
+            info->closestRenderFormat = gcvSURF_X16B16G16R16UI_1_G32R32F;
+            info->renderFormat        = gcvINVALID_RENDER_FORMAT;
+
+            info = gcmGET_SURF_FORMAT_INFO(gcvSURF_A16B16G16R16UI);
+            info->closestRenderFormat = gcvSURF_A16B16G16R16UI_1_G32R32F;
+            info->renderFormat        = gcvINVALID_RENDER_FORMAT;
+        }
+
         info = gcmGET_SURF_FORMAT_INFO(gcvSURF_X32B32G32R32I);
         info->closestRenderFormat =
         info->closestTXFormat     = gcvSURF_X32B32G32R32I_2_G32R32I;

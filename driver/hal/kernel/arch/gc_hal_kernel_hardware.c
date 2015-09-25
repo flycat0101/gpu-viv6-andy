@@ -93,7 +93,8 @@ typedef struct _gcsiDEBUG_REGISTERS
     gctUINT         shift;
     gctUINT         data;
     gctUINT         count;
-    gctUINT32       signature;
+    gctUINT32       pipeMask;
+    gctUINT32       selectStart;
 }
 gcsiDEBUG_REGISTERS;
 
@@ -653,52 +654,56 @@ _DumpDebugRegisters(
     IN gcsiDEBUG_REGISTERS_PTR Descriptor
     )
 {
+/* If this value is changed, print formats need to be changed too. */
+#define REG_PER_LINE 8
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT32 select;
-    gctUINT32 data = 0;
-    gctUINT i;
-    gctUINT32 datas[48];
+    gctUINT i, j, pipe;
+    gctUINT32 datas[REG_PER_LINE];
+    gctUINT32 oldControl, control;
 
     gcmkHEADER_ARG("Os=0x%X Descriptor=0x%X", Os, Descriptor);
 
-    gcmkPRINT_N(4, "    %s debug registers:\n", Descriptor->module);
+    /* Record control. */
+    gckOS_ReadRegisterEx(Os, Core, 0x0, &oldControl);
 
-    for (i = 0; i < Descriptor->count; i += 1)
+    for (pipe = 0; pipe < 2; pipe++)
     {
-        select = i << Descriptor->shift;
-
-        gcmkONERROR(gckOS_WriteRegisterEx(Os, Core, Descriptor->index, select));
-        gcmkONERROR(gckOS_ReadRegisterEx(Os, Core, Descriptor->data, &datas[i]));
-
-    }
-
-    for (i = 0; i < Descriptor->count; i += 4)
-    {
-        gcmkPRINT_N(32, "      [0x%02X] 0x%08X [0x%02X] 0x%08X [0x%02X] 0x%08X [0x%02X] 0x%08X\n",
-                    i, datas[i], i + 1, datas[i + 1], i + 2, datas[i + 2], i + 3, datas[i + 3]);
-    }
-
-    select = 0xF << Descriptor->shift;
-
-    for (i = 0; i < 500; i += 1)
-    {
-        gcmkONERROR(gckOS_WriteRegisterEx(Os, Core, Descriptor->index, select));
-        gcmkONERROR(gckOS_ReadRegisterEx(Os, Core, Descriptor->data, &data));
-
-        if (data == Descriptor->signature)
+        if (!(Descriptor->pipeMask & (1 << pipe)))
         {
-            break;
+            continue;
+        }
+
+        gcmkPRINT_N(8, "    %s[%d] debug registers:\n", Descriptor->module, pipe);
+
+        /* Switch pipe. */
+        gcmkONERROR(gckOS_ReadRegisterEx(Os, Core, 0x0, &control));
+        control &= ~(0xF << 20);
+        control |= (pipe << 20);
+        gcmkONERROR(gckOS_WriteRegisterEx(Os, Core, 0x0, control));
+
+        gcmkASSERT(Descriptor->count % REG_PER_LINE);
+
+        for (i = 0; i < Descriptor->count; i += REG_PER_LINE)
+        {
+            /* Select of first one in the group. */
+            select = i + Descriptor->selectStart;
+
+            /* Read a group of registers. */
+            for (j = 0; j < REG_PER_LINE; j++)
+            {
+                /* Shift select to right position. */
+                gcmkONERROR(gckOS_WriteRegisterEx(Os, Core, Descriptor->index, (select + j) << Descriptor->shift));
+                gcmkONERROR(gckOS_ReadRegisterEx(Os, Core, Descriptor->data, &datas[j]));
+            }
+
+            gcmkPRINT_N(32, "    [%02X] %08X %08X %08X %08X %08X %08X %08X %08X\n",
+                        select, datas[0], datas[1], datas[2], datas[3], datas[4], datas[5], datas[6], datas[7]);
         }
     }
 
-    if (i == 500)
-    {
-        gcmkPRINT_N(4, "      failed to obtain the signature (read 0x%08X).\n", data);
-    }
-    else
-    {
-        gcmkPRINT_N(8, "      signature = 0x%08X (%d read attempt(s))\n", data, i + 1);
-    }
+    /* Restore control. */
+    gcmkONERROR(gckOS_WriteRegisterEx(Os, Core, 0x0, oldControl));
 
 OnError:
     /* Return the error. */
@@ -10672,16 +10677,21 @@ gckHARDWARE_DumpGPUState(
 
     static gcsiDEBUG_REGISTERS _dbgRegs[] =
     {
-        { "RA", 0x474, 16, 0x448, 32, 0x12344321 },
-        { "TX", 0x474, 24, 0x44C, 32, 0x12211221 },
-        { "FE", 0x470, 0, 0x450, 32, 0xBABEF00D },
-        { "PE", 0x470, 16, 0x454, 48, 0xBABEF00D },
-        { "DE", 0x470, 8, 0x458, 32, 0xBABEF00D },
-        { "SH", 0x470, 24, 0x45C, 32, 0xDEADBEEF },
-        { "PA", 0x474, 0, 0x460, 32, 0x0000AAAA },
-        { "SE", 0x474, 8, 0x464, 32, 0x5E5E5E5E },
-        { "MC", 0x478, 0, 0x468, 32, 0x12345678 },
-        { "HI", 0x478, 8, 0x46C, 32, 0xAAAAAAAA }
+        { "RA", 0x474, 16, 0x448, 256, 0x1, 0x00 },
+        { "TX", 0x474, 24, 0x44C, 128, 0x1, 0x00 },
+        { "FE", 0x470, 0, 0x450, 256, 0x1, 0x00 },
+        { "PE", 0x470, 16, 0x454, 256, 0x3, 0x00 },
+        { "DE", 0x470, 8, 0x458, 256, 0x1, 0x00 },
+        { "SH", 0x470, 24, 0x45C, 256, 0x1, 0x00 },
+        { "PA", 0x474, 0, 0x460, 256, 0x1, 0x00 },
+        { "SE", 0x474, 8, 0x464, 256, 0x1, 0x00 },
+        { "MC", 0x478, 0, 0x468, 256, 0x3, 0x00 },
+        { "HI", 0x478, 8, 0x46C, 256, 0x1, 0x00 },
+        { "TPG", 0x474, 24, 0x44C, 32, 0x2, 0x80 },
+        { "TFB", 0x474, 24, 0x44C, 32, 0x2, 0xA0 },
+        { "USC", 0x474, 24, 0x44C, 64, 0x2, 0xC0 },
+        { "L2", 0x478, 0, 0x564, 256, 0x1, 0x00 },
+        { "BLT", 0x478, 0, 0x1A4, 256, 0x1, 0x00 }
     };
 
     static gctUINT32 _otherRegs[] =
@@ -10800,12 +10810,19 @@ gckHARDWARE_DumpGPUState(
     gcmkPRINT_N(8, "    cal state           = %d (%s)\n", calState, _calState   [calState]);
     gcmkPRINT_N(8, "    VE request state    = %d (%s)\n", veReqState, _veReqState [veReqState]);
 
+    gcmkPRINT_N(0, "  Debug registers:\n");
+
+    for (i = 0; i < gcmCOUNTOF(_dbgRegs); i += 1)
+    {
+        gcmkONERROR(_DumpDebugRegisters(os, core, &_dbgRegs[i]));
+    }
+
     /* Record control. */
     gckOS_ReadRegisterEx(os, core, 0x0, &oldControl);
 
     for (pipe = 0; pipe < pixelPipes; pipe++)
     {
-        gcmkPRINT_N(4, "  Debug registers of pipe[%d]:\n", pipe);
+        gcmkPRINT_N(4, "    Other Registers[%d]:\n", pipe);
 
         /* Switch pipe. */
         gcmkONERROR(gckOS_ReadRegisterEx(os, core, 0x0, &control));
@@ -10813,12 +10830,6 @@ gckHARDWARE_DumpGPUState(
         control |= (pipe << 20);
         gcmkONERROR(gckOS_WriteRegisterEx(os, core, 0x0, control));
 
-        for (i = 0; i < gcmCOUNTOF(_dbgRegs); i += 1)
-        {
-            gcmkONERROR(_DumpDebugRegisters(os, core, &_dbgRegs[i]));
-        }
-
-        gcmkPRINT_N(0, "    Other Registers:\n");
         for (i = 0; i < gcmCOUNTOF(_otherRegs); i += 1)
         {
             gctUINT32 read;
@@ -10832,21 +10843,6 @@ gckHARDWARE_DumpGPUState(
 
             gckHARDWARE_DumpMMUException(Hardware);
         }
-    }
-
-    if (((gcsFEATURE_DATABASE *)(Hardware->featureDatabase))->REG_DebugMode)
-    {
-        gctUINT32 read0, read1, write;
-
-        read0 = read1 = write = 0;
-
-        gcmkONERROR(gckOS_ReadRegisterEx(os, core, 0x43C, &read0));
-        gcmkONERROR(gckOS_ReadRegisterEx(os, core, 0x440, &read1));
-        gcmkONERROR(gckOS_ReadRegisterEx(os, core, 0x444, &write));
-
-        gcmkPRINT_N(4, "  read0    = 0x%08X\n", read0);
-        gcmkPRINT_N(4, "  read1    = 0x%08X\n", read1);
-        gcmkPRINT_N(4, "  write    = 0x%08X\n", write);
     }
 
     /* Restore control. */

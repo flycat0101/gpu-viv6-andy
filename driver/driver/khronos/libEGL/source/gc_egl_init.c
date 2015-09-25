@@ -98,7 +98,7 @@ static const char extension[] =
     "EGL_ANDROID_native_fence_sync"
 #   endif
 #endif
-#if defined(EGL_API_WL)
+#if defined(WL_EGL_PLATFORM)
     " "
     "EGL_WL_bind_wayland_display"
 #endif
@@ -118,7 +118,7 @@ static const char clientExtension[] =
     " "
     "EGL_KHR_platform_gbm"
      */
-#elif defined(EGL_API_WL)
+#elif defined(WL_EGL_PLATFORM)
     /* Not ready.
     "EGL_KHR_platform_wayland"
     " "

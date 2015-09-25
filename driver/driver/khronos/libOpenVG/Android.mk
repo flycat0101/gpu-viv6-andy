@@ -66,8 +66,7 @@ LOCAL_LDFLAGS := \
 LOCAL_SHARED_LIBRARIES := \
     liblog \
     libdl \
-    libGAL \
-    libEGL_$(TAG)
+    libGAL
 
 LOCAL_MODULE        := libOpenVG
 LOCAL_MODULE_TAGS   := optional

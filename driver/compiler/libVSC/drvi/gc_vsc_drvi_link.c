@@ -616,6 +616,9 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
                 /* Add layer to input of ps */
                 pAttrSym = VIR_Shader_AddBuiltinAttribute(pLowerShader, VIR_TYPE_UINT32, gcvFALSE, VIR_NAME_LAYER);
 
+                /* per HW requirement, layer is highp*/
+                VIR_Symbol_SetPrecision(pAttrSym, VIR_PRECISION_HIGH);
+
                 pAttrSym->layout.llFirstSlot = pOutputSym->layout.llFirstSlot = ioIdx;
                 ioIdx ++;
 

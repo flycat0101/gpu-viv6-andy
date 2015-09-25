@@ -2372,9 +2372,9 @@ gceSTATUS gcoHARDWARE_FilterBlit(
 
     else if (horPass && verPass)
     {
-        gctUINT32 horKernelHalf;
-        gctUINT32 leftExtra;
-        gctUINT32 rightExtra;
+        gctINT32 horKernelHalf;
+        gctINT32 leftExtra;
+        gctINT32 rightExtra;
         gcsPOINT srcOrigin;
         gcsPOINT tmpRectSize;
         gcsSURF_FORMAT_INFO_PTR tempFormat[2];

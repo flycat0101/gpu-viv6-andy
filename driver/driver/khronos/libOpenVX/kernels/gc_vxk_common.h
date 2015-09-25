@@ -86,10 +86,10 @@ typedef struct _gcoVX_Kernel_Context_Object
 {
     gc_vx_object_type_t type;
 
-	void*				obj;
+    void*               obj;
     gcsVX_IMAGE_INFO    info;
     vx_uint32           index;
-    vx_uint32			num;
+    vx_uint32           num;
 }
 gcoVX_Kernel_Context_Object;
 
@@ -101,7 +101,7 @@ typedef struct _gcoVX_Kernel_Context
     gctUINT32                       objects_num;
 
     gcoVX_Kernel_Context_Uniform    uniforms[GC_VX_MAX_ARRAY * GC_VX_MAX_ARRAY];
-    gctUINT32						uniform_num;
+    gctUINT32                       uniform_num;
 }
 gcoVX_Kernel_Context;
 
@@ -112,7 +112,7 @@ gceSTATUS gcfVX_Kernel_ConvertFormat(
 
 gceSTATUS gcfVX_Kernel_Upload(
     IN vx_image Image,
-	IN vx_bool Upload,
+    IN vx_bool Upload,
     OUT gcsVX_IMAGE_INFO_PTR Info
     );
 
@@ -127,11 +127,11 @@ vx_status gcfVX_Flush(
 
 gcoVX_Kernel_Context_Object*
 gcoVX_AddObject(
-	IN OUT gcoVX_Kernel_Context* context,
-	IN gc_vx_object_type_t type,
-	IN void* object,
-	IN gctUINT32 index
-	);
+    IN OUT gcoVX_Kernel_Context* context,
+    IN gc_vx_object_type_t type,
+    IN void* object,
+    IN gctUINT32 index
+    );
 
 /* base kernel function */
 vx_status Convolve(vx_image src, vx_image dst, vx_int16* matrix,  vx_uint32 scale, vx_bool clamp,

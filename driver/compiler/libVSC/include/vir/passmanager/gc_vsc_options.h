@@ -380,6 +380,7 @@ typedef struct _VSC_OPTN_ISOPTIONS
     gctBOOL bandwidth_only;
     gctUINT32 reg_count;                /* 0 is invalid here */
     gctUINT32 dep_gran;
+    gctUINT32 bb_ceiling;
     gctUINT32 algorithm;
     gctUINT32 fw_heuristics;
     gctUINT32 bw_heuristics;
@@ -407,6 +408,8 @@ typedef struct _VSC_OPTN_ISOPTIONS
 #define VSC_OPTN_ISOptions_SetRegCount(option, r)           ((option)->reg_count = (r))
 #define VSC_OPTN_ISOptions_GetDepGran(option)               ((option)->dep_gran)
 #define VSC_OPTN_ISOptions_SetDepGran(option, d)            ((option)->dep_gran = (d))
+#define VSC_OPTN_ISOptions_GetBBCeiling(option)             ((option)->bb_ceiling)
+#define VSC_OPTN_ISOptions_SetBBCeiling(option, b)          ((option)->bb_ceiling = (b))
 #define VSC_OPTN_ISOptions_GetAlgorithm(option)             ((option)->algorithm)
 #define VSC_OPTN_ISOptions_SetAlgorithm(option, d)          ((option)->algorithm = (d))
 #define VSC_OPTN_ISOptions_GetFwHeuristics(option)          ((option)->fw_heuristics)

@@ -140,10 +140,18 @@
 #define gcdNOWARN 0
 #endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION (4, 1, 0)
 #ifdef gcdIRQ_SHARED
-#define gcdIRQF_FLAG   (IRQF_DISABLED | IRQF_SHARED)
+#       define gcdIRQF_FLAG   (IRQF_SHARED)
+#   else
+#       define gcdIRQF_FLAG   (0)
+#   endif
 #else
-#define gcdIRQF_FLAG   (IRQF_DISABLED)
+#ifdef gcdIRQ_SHARED
+#       define gcdIRQF_FLAG   (IRQF_DISABLED | IRQF_SHARED)
+#   else
+#       define gcdIRQF_FLAG   (IRQF_DISABLED)
+#   endif
 #endif
 
 /******************************************************************************\

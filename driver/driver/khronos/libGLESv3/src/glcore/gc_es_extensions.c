@@ -87,6 +87,8 @@ __GLextension __glExtension[] =
     {__GL_EXTID_KHR_texture_compression_astc_ldr, "GL_KHR_texture_compression_astc_ldr", GL_FALSE, GL_FALSE},
     {__GL_EXTID_KHR_blend_equation_advanced, "GL_KHR_blend_equation_advanced", GL_FALSE, GL_TRUE},
     {__GL_EXTID_KHR_debug, "GL_KHR_debug", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_KHR_robustness, "GL_KHR_robustness", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_KHR_robust_buffer_access_behavior, "GL_KHR_robust_buffer_access_behavior", GL_FALSE, GL_FALSE},
 
     {__GL_EXTID_EXT_texture_type_2_10_10_10_REV, "GL_EXT_texture_type_2_10_10_10_REV", GL_FALSE, GL_FALSE},
     {__GL_EXTID_EXT_texture_filter_anisotropic, "GL_EXT_texture_filter_anisotropic", GL_FALSE, GL_FALSE},
@@ -250,6 +252,19 @@ static __GLextProcAlias __glExtProcAlias[] =
 
     /* Extension API alias for GL_KHR_blend_equation_advanced */
     {__GL_EXTID_KHR_blend_equation_advanced, "BlendBarrierKHR", (__GLprocAddr)glBlendBarrier},
+
+    /* Extension API alias for GL_KHR_robustness */
+    {__GL_EXTID_KHR_robustness, "GetGraphicsResetStatusKHR", (__GLprocAddr)glGetGraphicsResetStatus},
+    {__GL_EXTID_KHR_robustness, "ReadnPixelsKHR", (__GLprocAddr)glReadnPixels},
+    {__GL_EXTID_KHR_robustness, "GetnUniformfvKHR", (__GLprocAddr)glGetnUniformfv},
+    {__GL_EXTID_KHR_robustness, "GetnUniformivKHR", (__GLprocAddr)glGetnUniformiv},
+    {__GL_EXTID_KHR_robustness, "GetnUniformuivKHR", (__GLprocAddr)glGetnUniformuiv},
+
+    /* Extension API alias for GL_EXT_robustness */
+    {__GL_EXTID_KHR_robustness, "GetGraphicsResetStatusEXT", (__GLprocAddr)glGetGraphicsResetStatus},
+    {__GL_EXTID_KHR_robustness, "ReadnPixelsEXT", (__GLprocAddr)glReadnPixels},
+    {__GL_EXTID_KHR_robustness, "GetnUniformfvEXT", (__GLprocAddr)glGetnUniformfv},
+    {__GL_EXTID_KHR_robustness, "GetnUniformivEXT", (__GLprocAddr)glGetnUniformiv},
 
     {__GL_EXTID_EXT_LAST, gcvNULL, gcvNULL}
 };

@@ -630,45 +630,45 @@ static void _rectAdjustByWH(gcsRECT_PTR pdst,gcsRECT_PTR psrc, gctUINT32 width, 
 
 static void _srcRect(VIV2DBLITINFOPTR pBlt, gcsRECT_PTR psrcrect)
 {
-		gctINT32 tempINT;
-		if ( pBlt->mSrcBox.x1 < 0)
-		{
-			tempINT = 0 - pBlt->mSrcBox.x1;
-			tempINT = gcmALIGN(tempINT, pBlt->mSrcSurfInfo.mWidth);
-			//psrcrect->left = pBlt->mSrcBox.x1 + pBlt->mSrcSurfInfo.mWidth*tempINT - 1;
+        gctINT32 tempINT;
+        if ( pBlt->mSrcBox.x1 < 0)
+        {
+            tempINT = 0 - pBlt->mSrcBox.x1;
+            tempINT = gcmALIGN(tempINT, pBlt->mSrcSurfInfo.mWidth);
+            //psrcrect->left = pBlt->mSrcBox.x1 + pBlt->mSrcSurfInfo.mWidth*tempINT - 1;
 
-			psrcrect->left = pBlt->mSrcBox.x1 + tempINT - 1;
-		}
-		else
-		psrcrect->left = pBlt->mSrcBox.x1;
+            psrcrect->left = pBlt->mSrcBox.x1 + tempINT - 1;
+        }
+        else
+        psrcrect->left = pBlt->mSrcBox.x1;
 
-		psrcrect->left %= pBlt->mSrcSurfInfo.mWidth;
-		if ( pBlt->mSrcBox.y1 < 0 )
-		{
-			tempINT = 0 - pBlt->mSrcBox.y1;
-			tempINT = gcmALIGN(tempINT, pBlt->mSrcSurfInfo.mHeight);
-		//	psrcrect->top = pBlt->mSrcBox.y1 + pBlt->mSrcSurfInfo.mHeight*tempINT - 1;
+        psrcrect->left %= pBlt->mSrcSurfInfo.mWidth;
+        if ( pBlt->mSrcBox.y1 < 0 )
+        {
+            tempINT = 0 - pBlt->mSrcBox.y1;
+            tempINT = gcmALIGN(tempINT, pBlt->mSrcSurfInfo.mHeight);
+        //  psrcrect->top = pBlt->mSrcBox.y1 + pBlt->mSrcSurfInfo.mHeight*tempINT - 1;
 
-			psrcrect->top = pBlt->mSrcBox.y1 + tempINT - 1;
-		}
-		else
-		psrcrect->top = pBlt->mSrcBox.y1;
+            psrcrect->top = pBlt->mSrcBox.y1 + tempINT - 1;
+        }
+        else
+        psrcrect->top = pBlt->mSrcBox.y1;
 
-		psrcrect->top %= pBlt->mSrcSurfInfo.mHeight;
-		if ( ( psrcrect->left + pBlt->mSrcBox.width ) > pBlt->mSrcTempSurfInfo.mWidth )
-			psrcrect->right = pBlt->mSrcTempSurfInfo.mWidth;
-		else
-			psrcrect->right = psrcrect->left + pBlt->mSrcBox.width;
+        psrcrect->top %= pBlt->mSrcSurfInfo.mHeight;
+        if ( ( psrcrect->left + pBlt->mSrcBox.width ) > pBlt->mSrcTempSurfInfo.mWidth )
+            psrcrect->right = pBlt->mSrcTempSurfInfo.mWidth;
+        else
+            psrcrect->right = psrcrect->left + pBlt->mSrcBox.width;
 
-		if ( ( psrcrect->top + pBlt->mSrcBox.height ) > pBlt->mSrcTempSurfInfo.mHeight )
-			psrcrect->bottom = pBlt->mSrcTempSurfInfo.mHeight;
-		else
-			psrcrect->bottom = psrcrect->top + pBlt->mSrcBox.height;
+        if ( ( psrcrect->top + pBlt->mSrcBox.height ) > pBlt->mSrcTempSurfInfo.mHeight )
+            psrcrect->bottom = pBlt->mSrcTempSurfInfo.mHeight;
+        else
+            psrcrect->bottom = psrcrect->top + pBlt->mSrcBox.height;
 }
 
 #if defined(ENABLE_MASK_OP)
 #define TRACK_MASK_OP 0
-static void _rectPrint(VIV2DBLITINFOPTR pBlt, char *msg, gctUINT32 xNum, gctUINT32 yNum, gcsRECT_PTR	pSrcClip, gcsRECT_PTR	pDstClip)
+static void _rectPrint(VIV2DBLITINFOPTR pBlt, char *msg, gctUINT32 xNum, gctUINT32 yNum, gcsRECT_PTR    pSrcClip, gcsRECT_PTR   pDstClip)
 {
 #if TRACK_MASK_OP
     static int index = 0;
@@ -716,76 +716,76 @@ static void _rectPrint(VIV2DBLITINFOPTR pBlt, char *msg, gctUINT32 xNum, gctUINT
 static gctINT32 _xLEN(gctUINT32 i, gctUINT32 num, gctUINT32 width, gcsRECT_PTR ref)
 {
 
-	if ( num == 1)
-		return ref->right - ref->left;
+    if ( num == 1)
+        return ref->right - ref->left;
 
-	if ( i == 0 )
-		return width - ref->left % width;
+    if ( i == 0 )
+        return width - ref->left % width;
 
-	if ( i == (num - 1) )
-	{
-		if ( ( ref->right % width ) == 0 )
-		return width;
+    if ( i == (num - 1) )
+    {
+        if ( ( ref->right % width ) == 0 )
+        return width;
 
-		return ref ->right % width;
-	}
+        return ref ->right % width;
+    }
 
-	return width;
+    return width;
 }
 
 static gctINT32 _yLEN(gctUINT32 j, gctUINT32 num, gctUINT32 height, gcsRECT_PTR ref)
 {
 
-	if ( num == 1)
-		return ref->bottom- ref->top;
+    if ( num == 1)
+        return ref->bottom- ref->top;
 
-	if ( j == 0 )
-		return height - ref->top % height;
+    if ( j == 0 )
+        return height - ref->top % height;
 
-	if ( j == (num - 1) )
-	{
-		if ( ( ref->bottom% height ) == 0 )
-		return height;
+    if ( j == (num - 1) )
+    {
+        if ( ( ref->bottom% height ) == 0 )
+        return height;
 
-		return ref ->bottom% height;
-	}
+        return ref ->bottom% height;
+    }
 
-	return height;
+    return height;
 }
 
 static void _mskRect(VIV2DBLITINFOPTR pBlt, gcsRECT_PTR pmskrect) {
-		gctINT32 tempINT;
+        gctINT32 tempINT;
 
-		if ( pBlt->mMskBox.x1 < 0)
-		{
-			tempINT = 0 - pBlt->mMskBox.x1;
-			tempINT = gcmALIGN(tempINT, pBlt->mMskSurfInfo.mWidth);
-			//pmskrect->left = pBlt->mMskBox.x1 + pBlt->mMskSurfInfo.mWidth * tempINT - 1;
+        if ( pBlt->mMskBox.x1 < 0)
+        {
+            tempINT = 0 - pBlt->mMskBox.x1;
+            tempINT = gcmALIGN(tempINT, pBlt->mMskSurfInfo.mWidth);
+            //pmskrect->left = pBlt->mMskBox.x1 + pBlt->mMskSurfInfo.mWidth * tempINT - 1;
 
-			pmskrect->left = pBlt->mMskBox.x1 + tempINT - 1;
-		}
-		else
-		pmskrect->left = pBlt->mMskBox.x1;
-		pmskrect->left %= pBlt->mMskSurfInfo.mWidth;
-		if ( pBlt->mMskBox.y1 < 0 )
-		{
-			tempINT = 0 - pBlt->mMskBox.y1;
-			tempINT = gcmALIGN(tempINT, pBlt->mMskSurfInfo.mHeight);
-			//pmskrect->top = pBlt->mMskBox.y1 + pBlt->mMskSurfInfo.mHeight* tempINT - 1;
+            pmskrect->left = pBlt->mMskBox.x1 + tempINT - 1;
+        }
+        else
+        pmskrect->left = pBlt->mMskBox.x1;
+        pmskrect->left %= pBlt->mMskSurfInfo.mWidth;
+        if ( pBlt->mMskBox.y1 < 0 )
+        {
+            tempINT = 0 - pBlt->mMskBox.y1;
+            tempINT = gcmALIGN(tempINT, pBlt->mMskSurfInfo.mHeight);
+            //pmskrect->top = pBlt->mMskBox.y1 + pBlt->mMskSurfInfo.mHeight* tempINT - 1;
 
-			pmskrect->top = pBlt->mMskBox.y1 + tempINT - 1;
-		}
-		else
-		pmskrect->top = pBlt->mMskBox.y1;
-		pmskrect->top %= pBlt->mMskSurfInfo.mHeight;
-		if ( ( pmskrect->left + pBlt->mMskBox.width ) > pBlt->mMskTempSurfInfo.mWidth )
-			pmskrect->right = pBlt->mMskTempSurfInfo.mWidth;
-		else
-			pmskrect->right = pmskrect->left + pBlt->mMskBox.width;
-		if ( ( pmskrect->top + pBlt->mMskBox.height ) > pBlt->mMskTempSurfInfo.mHeight )
-			pmskrect->bottom = pBlt->mMskTempSurfInfo.mHeight;
-		else
-			pmskrect->bottom = pmskrect->top + pBlt->mMskBox.height;
+            pmskrect->top = pBlt->mMskBox.y1 + tempINT - 1;
+        }
+        else
+        pmskrect->top = pBlt->mMskBox.y1;
+        pmskrect->top %= pBlt->mMskSurfInfo.mHeight;
+        if ( ( pmskrect->left + pBlt->mMskBox.width ) > pBlt->mMskTempSurfInfo.mWidth )
+            pmskrect->right = pBlt->mMskTempSurfInfo.mWidth;
+        else
+            pmskrect->right = pmskrect->left + pBlt->mMskBox.width;
+        if ( ( pmskrect->top + pBlt->mMskBox.height ) > pBlt->mMskTempSurfInfo.mHeight )
+            pmskrect->bottom = pBlt->mMskTempSurfInfo.mHeight;
+        else
+            pmskrect->bottom = pmskrect->top + pBlt->mMskBox.height;
 
 }
 static void _vivFormatPrint(unsigned int format, char *msg)
@@ -866,370 +866,370 @@ static void _formatPrint(VIV2DBLITINFOPTR pBlt)
 
 
 static Bool BlendMaskedArbitraryPatternRect(GALINFOPTR galInfo, VivBoxPtr opbox) {
-	TRACE_ENTER();
-	VIVGPUPtr gpuctx = (VIVGPUPtr) galInfo->mGpu;
-	VIV2DBLITINFOPTR pBlt = &(galInfo->mBlitInfo);
-	GenericSurfacePtr dstsurf;
-	GenericSurfacePtr srcsurf;
-	GenericSurfacePtr msksurf;
+    TRACE_ENTER();
+    VIVGPUPtr gpuctx = (VIVGPUPtr) galInfo->mGpu;
+    VIV2DBLITINFOPTR pBlt = &(galInfo->mBlitInfo);
+    GenericSurfacePtr dstsurf;
+    GenericSurfacePtr srcsurf;
+    GenericSurfacePtr msksurf;
 
-	gcsRECT_PTR	pSrcClip = NULL;
-	gcsRECT_PTR	pDstClip = NULL;
-	gcsRECT_PTR	pOSrcClip = NULL;
-	gcsRECT_PTR	pODstClip = NULL;
-	gcsRECT_PTR	pXTempClip = NULL;
-	gcsRECT_PTR	pYTempClip = NULL;
-	gctUINT32 tempXNum = 0;
-	gctUINT32 tempYNum = 0;
+    gcsRECT_PTR pSrcClip = NULL;
+    gcsRECT_PTR pDstClip = NULL;
+    gcsRECT_PTR pOSrcClip = NULL;
+    gcsRECT_PTR pODstClip = NULL;
+    gcsRECT_PTR pXTempClip = NULL;
+    gcsRECT_PTR pYTempClip = NULL;
+    gctUINT32 tempXNum = 0;
+    gctUINT32 tempYNum = 0;
 
 
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
 
-	gcsRECT mskrect;
-	gcsRECT srcrect;
-	gcsRECT dstrect;
+    gcsRECT mskrect;
+    gcsRECT srcrect;
+    gcsRECT dstrect;
 
-	gctUINT32 minW = 0;
-	gctUINT32 minH = 0;
+    gctUINT32 minW = 0;
+    gctUINT32 minH = 0;
 
-	gctUINT32 i = 0;
-	gctUINT32 j = 0;
-	gctINT32 slen = 0;
-	gctINT32 leftclips = 0;
-	gctINT32 curNum = 0;
+    gctUINT32 i = 0;
+    gctUINT32 j = 0;
+    gctINT32 slen = 0;
+    gctINT32 leftclips = 0;
+    gctINT32 curNum = 0;
 
-	srcsurf = (GenericSurfacePtr)pBlt->mSrcTempSurfInfo.mPriv->mVidMemInfo;
-	msksurf = (GenericSurfacePtr)pBlt->mMskSurfInfo.mPriv->mVidMemInfo;
+    srcsurf = (GenericSurfacePtr)pBlt->mSrcTempSurfInfo.mPriv->mVidMemInfo;
+    msksurf = (GenericSurfacePtr)pBlt->mMskSurfInfo.mPriv->mVidMemInfo;
 
 #if TRACK_MASK_OP
-	_formatPrint(pBlt);
+    _formatPrint(pBlt);
 #endif
 
-	status = gco2D_SetGenericSource
-	(
-		gpuctx->mDriver->m2DEngine,
-		&msksurf->mVideoNode.mPhysicalAddr,
-		1,
-		&msksurf->mStride,
-		1,
-		msksurf->mTiling,
-		pBlt->mMskSurfInfo.mFormat.mVivFmt,
-		pBlt->mRotation,
-		msksurf->mAlignedWidth,
-		msksurf->mAlignedHeight
-	);
-
-	if ( status != gcvSTATUS_OK ) {
-		TRACE_ERROR("ERROR SETTING SOURCE SURFACE\n");
-		TRACE_EXIT(FALSE);
-	}
-
-	status = gco2D_SetGenericTarget
-	(
-		gpuctx->mDriver->m2DEngine,
-		&srcsurf->mVideoNode.mPhysicalAddr,
-		1,
-		&srcsurf->mStride,
-		1,
-		srcsurf->mTiling,
-		pBlt->mSrcTempSurfInfo.mFormat.mVivFmt,
-		gcvSURF_0_DEGREE,
-		srcsurf->mAlignedWidth,
-		srcsurf->mAlignedHeight
-	);
-
-	dstrect.top = 0;
-	dstrect.left = 0;
-
-	if ( pBlt->mSrcTempSurfInfo.repeat )
-	{
-		_srcRect(pBlt, &srcrect);
-		dstrect.right = pBlt->mSrcTempSurfInfo.mWidth;
-		dstrect.bottom = pBlt->mSrcTempSurfInfo.mHeight;
-
-	} else {
-
-		srcrect.left = pBlt->mSrcBox.x1;
-		srcrect.right = pBlt->mSrcBox.x2;
-		srcrect.top = pBlt->mSrcBox.y1;
-		srcrect.bottom = pBlt->mSrcBox.y2;
-
-		if ( srcrect.left < 0 )
-		srcrect.left = 0;
-
-		if ( srcrect.top < 0 )
-		srcrect.top = 0;
-
-		if ( srcrect.right > pBlt->mSrcSurfInfo.mWidth )
-			srcrect.right = pBlt->mSrcSurfInfo.mWidth;
-
-		if ( srcrect.bottom > pBlt->mSrcSurfInfo.mHeight )
-			srcrect.bottom = pBlt->mSrcSurfInfo.mHeight;
-
-		dstrect.right = pBlt->mSrcSurfInfo.mWidth;
-		dstrect.bottom = pBlt->mSrcSurfInfo.mHeight;
-	}
-
-	if ( pBlt->mMskTempSurfInfo.repeat )
-	{
-		_mskRect(pBlt, &mskrect);
-
-	} else {
-
-		mskrect.left = pBlt->mMskBox.x1;
-		mskrect.right = pBlt->mMskBox.x2;
-		mskrect.top = pBlt->mMskBox.y1;
-		mskrect.bottom = pBlt->mMskBox.y2;
-
-		if ( mskrect.left < 0 )
-		mskrect.left = 0;
-
-		if ( mskrect.top < 0 )
-		mskrect.top = 0;
-
-		if ( mskrect.right > pBlt->mMskSurfInfo.mWidth )
-			mskrect.right = pBlt->mMskSurfInfo.mWidth;
-
-		if ( mskrect.bottom > pBlt->mMskSurfInfo.mHeight )
-			mskrect.bottom = pBlt->mMskSurfInfo.mHeight;
-
-
-	}
-
-	status = gco2D_SetClipping(gpuctx->mDriver->m2DEngine, &dstrect);
-	if (status != gcvSTATUS_OK) {
-		TRACE_ERROR("gco2D_SetClipping failed\n");
-		TRACE_EXIT(FALSE);
-	}
-
-	/* Cal Min Box */
-
-	minW = V_MIN((mskrect.right - mskrect.left), (srcrect.right - srcrect.left));
-	minH = V_MIN((mskrect.bottom - mskrect.top), (srcrect.bottom - srcrect.top));
-
-	mskrect.right = mskrect.left + minW;
-	srcrect.right = srcrect.left + minW;
-	mskrect.bottom = mskrect.top + minH;
-	srcrect.bottom = srcrect.top + minH;
-
-	if (mskrect.right % pBlt->mMskSurfInfo.mWidth)
-		tempXNum = ( mskrect.right ) / pBlt->mMskSurfInfo.mWidth - mskrect.left / pBlt->mMskSurfInfo.mWidth + 1;
-	else
-		tempXNum = ( mskrect.right ) / pBlt->mMskSurfInfo.mWidth - mskrect.left / pBlt->mMskSurfInfo.mWidth;
-
-	if (mskrect.bottom % pBlt->mMskSurfInfo.mHeight)
-		tempYNum = ( mskrect.bottom ) / pBlt->mMskSurfInfo.mHeight - mskrect.top / pBlt->mMskSurfInfo.mHeight + 1;
-	else
-		tempYNum = ( mskrect.bottom ) / pBlt->mMskSurfInfo.mHeight - mskrect.top / pBlt->mMskSurfInfo.mHeight;
-
-	pSrcClip = (gcsRECT *)malloc(sizeof(gcsRECT) * tempXNum * tempYNum);
-	pDstClip = (gcsRECT *)malloc(sizeof(gcsRECT) * tempXNum * tempYNum);
-
-	pOSrcClip = pSrcClip;
-	pODstClip = pDstClip;
-
-	for ( j = 0 ; j < tempYNum ; j++)
-	{
-		if ( j == 0 ) {
-		pOSrcClip[0].top = mskrect.top % pBlt->mMskSurfInfo.mHeight;
-		pOSrcClip[0].bottom = pOSrcClip[0].top + _yLEN(0, tempYNum, pBlt->mMskSurfInfo.mHeight, &mskrect);
-		} else {
-		pXTempClip = pOSrcClip - tempXNum;
-		pOSrcClip[0].top = pXTempClip[0].bottom % pBlt->mMskSurfInfo.mHeight;
-		pOSrcClip[0].bottom = pOSrcClip[0].top+ _yLEN(j, tempYNum, pBlt->mMskSurfInfo.mHeight, &mskrect);
-		}
-
-		pOSrcClip[0].left = mskrect.left % pBlt->mMskSurfInfo.mWidth;
-		pOSrcClip[0].right = pOSrcClip[0].left + _xLEN(0, tempXNum, pBlt->mMskSurfInfo.mWidth, &mskrect);
-
-		pODstClip[0].left = srcrect.left;
-		if ( j == 0) {
-		pODstClip[0].top = srcrect.top;
-		} else {
-		pYTempClip = pODstClip - tempXNum;
-		pODstClip[0].top = pYTempClip[0].bottom;
-		}
-
-		pODstClip[0].right = pODstClip[0].left + pOSrcClip[0].right - pOSrcClip[0].left;
-		pODstClip[0].bottom = pODstClip[0].top + pOSrcClip[0].bottom - pOSrcClip[0].top;
-
-		for(i = 1; i < tempXNum; i++)
-		{
-			pOSrcClip[i].left = pOSrcClip[i-1].right % pBlt->mMskSurfInfo.mWidth;
-			pOSrcClip[i].right = pOSrcClip[i].left + _xLEN(i, tempXNum,pBlt->mMskSurfInfo.mWidth, &mskrect);
-			pOSrcClip[i].top = pOSrcClip[0].top;
-			pOSrcClip[i].bottom = pOSrcClip[0].bottom;
-
-			pODstClip[i].left = pODstClip[i-1].right;
-			pODstClip[i].right = pODstClip[i].left + pOSrcClip[i].right - pOSrcClip[i].left;
-
-			pODstClip[i].top = pODstClip[0].top;
-			pODstClip[i].bottom = pODstClip[0].bottom;
-		}
-
-		pOSrcClip += tempXNum;
-		pODstClip += tempXNum;
-
-	}
-
-	_rectPrint(pBlt, "Msk to tempSrc",tempXNum,tempYNum,pSrcClip,pDstClip);
-	status = gco2D_SetPorterDuffBlending(gpuctx->mDriver->m2DEngine, gcvPD_DST_IN);
-	if (status != gcvSTATUS_OK) {
-		TRACE_ERROR("gco2D_SetPorterDuffBlending failed\n");
-		TRACE_EXIT(FALSE);
-	}
-
-	if ( (tempYNum*tempXNum) >= (1920))
-	{
-			slen = (1920)/tempXNum;
-			pOSrcClip = pSrcClip;
-			pODstClip = pDstClip;
-			if (slen >= 1)
-			{
-				leftclips = tempYNum * tempXNum;
-
-				while(leftclips){
-
-				if (leftclips > (slen*tempXNum))
-				curNum = slen*tempXNum;
-				else
-				curNum = leftclips;
-				status = gco2D_BatchBlit(
-				gpuctx->mDriver->m2DEngine,
-				curNum,
-				pOSrcClip,
-				pODstClip,
-				0xCC,
-				0xCC,
-				galInfo->mBlitInfo.mSrcTempSurfInfo.mFormat.mVivFmt);
-				pOSrcClip += curNum;
-				pODstClip += curNum;
-				leftclips -= curNum;
-
-				}
-
-			} else {
-				fprintf(stderr,"Too many rects in one line \n");
-			}
-
-	} else {
-
-		status = gco2D_BatchBlit(
-			gpuctx->mDriver->m2DEngine,
-			tempYNum * tempXNum,
-			pSrcClip,
-			pDstClip,
-			0xCC,
-			0xCC,
-			galInfo->mBlitInfo.mSrcTempSurfInfo.mFormat.mVivFmt
-		);
-	}
-
-
-	free(pSrcClip);
-	free(pDstClip);
-
-	/* Need commit(true) ? */
-	/* ???????????????????? */
-
-	status = gco2D_SetGenericSource
-	(
-		gpuctx->mDriver->m2DEngine,
-		&srcsurf->mVideoNode.mPhysicalAddr,
-		1,
-		&srcsurf->mStride,
-		1,
-		srcsurf->mTiling,
-		pBlt->mSrcSurfInfo.mFormat.mVivFmt,
-		pBlt->mRotation,
-		srcsurf->mAlignedWidth,
-		srcsurf->mAlignedHeight
-	);
-
-	if ( status != gcvSTATUS_OK ) {
-		TRACE_ERROR("ERROR SETTING SOURCE SURFACE\n");
-		TRACE_EXIT(FALSE);
-	}
-
-	dstsurf = (GenericSurfacePtr)pBlt->mDstSurfInfo.mPriv->mVidMemInfo;
-
-	status = gco2D_SetGenericTarget
-	(
-		gpuctx->mDriver->m2DEngine,
-		&dstsurf->mVideoNode.mPhysicalAddr,
-		1,
-		&dstsurf->mStride,
-		1,
-		dstsurf->mTiling,
-		pBlt->mDstSurfInfo.mFormat.mVivFmt,
-		gcvSURF_0_DEGREE,
-		dstsurf->mAlignedWidth,
-		dstsurf->mAlignedHeight
-	);
-
-	dstrect.left = 0;
-	dstrect.top = 0;
-	dstrect.right = pBlt->mDstSurfInfo.mWidth;
-	dstrect.bottom = pBlt->mDstSurfInfo.mHeight;
-
-	status = gco2D_SetClipping(gpuctx->mDriver->m2DEngine, &dstrect);
-	if (status != gcvSTATUS_OK) {
-		TRACE_ERROR("gco2D_SetClipping failed\n");
-		TRACE_EXIT(FALSE);
-	}
-
-	dstrect.left = pBlt->mDstBox.x1;
-	if ( dstrect.left < 0 )
-		dstrect.left = 0;
-	dstrect.top = pBlt->mDstBox.y1;
-	if ( dstrect.top < 0 )
-		dstrect.top = 0;
-
-	dstrect.right = pBlt->mDstBox.x2;
-	if ( dstrect.right > pBlt->mDstSurfInfo.mWidth)
-		dstrect.right = pBlt->mDstSurfInfo.mWidth;
-
-	dstrect.bottom = pBlt->mDstBox.y2;
-	if ( dstrect.bottom > pBlt->mDstSurfInfo.mHeight )
-		dstrect.bottom = pBlt->mDstSurfInfo.mHeight;
-
-	minW = V_MIN((dstrect.right - dstrect.left), (srcrect.right - srcrect.left));
-	minH = V_MIN((dstrect.bottom - dstrect.top), (srcrect.bottom - srcrect.top));
-
-
-
-	srcrect.right = srcrect.left + minW;
-	dstrect.right = dstrect.left + minW;
-	srcrect.bottom = srcrect.top + minH;
-	dstrect.bottom = dstrect.top + minH;
-
-	if (!DisableAlphaBlending(galInfo)) {
-		TRACE_ERROR("Error on disabling alpha\n");
-		TRACE_EXIT(FALSE);
-	}
-
-	pBlt->mSrcSurfInfo.alpha = 1;
-
-	if (!EnableAlphaBlending(galInfo)) {
-			TRACE_ERROR("Alpha Blending Factor\n");
-			TRACE_EXIT(FALSE);
-	}
-
-	status = gco2D_BatchBlit(
-		gpuctx->mDriver->m2DEngine,
-		1,
-		&srcrect,
-		&dstrect,
-		0xCC,
-		0xAA,
-		pBlt->mDstSurfInfo.mFormat.mVivFmt
-	);
-	pBlt->mSrcSurfInfo.alpha = 0;
-	if (!DisableAlphaBlending(galInfo)) {
-		TRACE_ERROR("Error on disabling alpha\n");
-		TRACE_EXIT(FALSE);
-	}
-	TRACE_EXIT(TRUE);
+    status = gco2D_SetGenericSource
+    (
+        gpuctx->mDriver->m2DEngine,
+        &msksurf->mVideoNode.mPhysicalAddr,
+        1,
+        &msksurf->mStride,
+        1,
+        msksurf->mTiling,
+        pBlt->mMskSurfInfo.mFormat.mVivFmt,
+        pBlt->mRotation,
+        msksurf->mAlignedWidth,
+        msksurf->mAlignedHeight
+    );
+
+    if ( status != gcvSTATUS_OK ) {
+        TRACE_ERROR("ERROR SETTING SOURCE SURFACE\n");
+        TRACE_EXIT(FALSE);
+    }
+
+    status = gco2D_SetGenericTarget
+    (
+        gpuctx->mDriver->m2DEngine,
+        &srcsurf->mVideoNode.mPhysicalAddr,
+        1,
+        &srcsurf->mStride,
+        1,
+        srcsurf->mTiling,
+        pBlt->mSrcTempSurfInfo.mFormat.mVivFmt,
+        gcvSURF_0_DEGREE,
+        srcsurf->mAlignedWidth,
+        srcsurf->mAlignedHeight
+    );
+
+    dstrect.top = 0;
+    dstrect.left = 0;
+
+    if ( pBlt->mSrcTempSurfInfo.repeat )
+    {
+        _srcRect(pBlt, &srcrect);
+        dstrect.right = pBlt->mSrcTempSurfInfo.mWidth;
+        dstrect.bottom = pBlt->mSrcTempSurfInfo.mHeight;
+
+    } else {
+
+        srcrect.left = pBlt->mSrcBox.x1;
+        srcrect.right = pBlt->mSrcBox.x2;
+        srcrect.top = pBlt->mSrcBox.y1;
+        srcrect.bottom = pBlt->mSrcBox.y2;
+
+        if ( srcrect.left < 0 )
+        srcrect.left = 0;
+
+        if ( srcrect.top < 0 )
+        srcrect.top = 0;
+
+        if ( srcrect.right > pBlt->mSrcSurfInfo.mWidth )
+            srcrect.right = pBlt->mSrcSurfInfo.mWidth;
+
+        if ( srcrect.bottom > pBlt->mSrcSurfInfo.mHeight )
+            srcrect.bottom = pBlt->mSrcSurfInfo.mHeight;
+
+        dstrect.right = pBlt->mSrcSurfInfo.mWidth;
+        dstrect.bottom = pBlt->mSrcSurfInfo.mHeight;
+    }
+
+    if ( pBlt->mMskTempSurfInfo.repeat )
+    {
+        _mskRect(pBlt, &mskrect);
+
+    } else {
+
+        mskrect.left = pBlt->mMskBox.x1;
+        mskrect.right = pBlt->mMskBox.x2;
+        mskrect.top = pBlt->mMskBox.y1;
+        mskrect.bottom = pBlt->mMskBox.y2;
+
+        if ( mskrect.left < 0 )
+        mskrect.left = 0;
+
+        if ( mskrect.top < 0 )
+        mskrect.top = 0;
+
+        if ( mskrect.right > pBlt->mMskSurfInfo.mWidth )
+            mskrect.right = pBlt->mMskSurfInfo.mWidth;
+
+        if ( mskrect.bottom > pBlt->mMskSurfInfo.mHeight )
+            mskrect.bottom = pBlt->mMskSurfInfo.mHeight;
+
+
+    }
+
+    status = gco2D_SetClipping(gpuctx->mDriver->m2DEngine, &dstrect);
+    if (status != gcvSTATUS_OK) {
+        TRACE_ERROR("gco2D_SetClipping failed\n");
+        TRACE_EXIT(FALSE);
+    }
+
+    /* Cal Min Box */
+
+    minW = V_MIN((mskrect.right - mskrect.left), (srcrect.right - srcrect.left));
+    minH = V_MIN((mskrect.bottom - mskrect.top), (srcrect.bottom - srcrect.top));
+
+    mskrect.right = mskrect.left + minW;
+    srcrect.right = srcrect.left + minW;
+    mskrect.bottom = mskrect.top + minH;
+    srcrect.bottom = srcrect.top + minH;
+
+    if (mskrect.right % pBlt->mMskSurfInfo.mWidth)
+        tempXNum = ( mskrect.right ) / pBlt->mMskSurfInfo.mWidth - mskrect.left / pBlt->mMskSurfInfo.mWidth + 1;
+    else
+        tempXNum = ( mskrect.right ) / pBlt->mMskSurfInfo.mWidth - mskrect.left / pBlt->mMskSurfInfo.mWidth;
+
+    if (mskrect.bottom % pBlt->mMskSurfInfo.mHeight)
+        tempYNum = ( mskrect.bottom ) / pBlt->mMskSurfInfo.mHeight - mskrect.top / pBlt->mMskSurfInfo.mHeight + 1;
+    else
+        tempYNum = ( mskrect.bottom ) / pBlt->mMskSurfInfo.mHeight - mskrect.top / pBlt->mMskSurfInfo.mHeight;
+
+    pSrcClip = (gcsRECT *)malloc(sizeof(gcsRECT) * tempXNum * tempYNum);
+    pDstClip = (gcsRECT *)malloc(sizeof(gcsRECT) * tempXNum * tempYNum);
+
+    pOSrcClip = pSrcClip;
+    pODstClip = pDstClip;
+
+    for ( j = 0 ; j < tempYNum ; j++)
+    {
+        if ( j == 0 ) {
+        pOSrcClip[0].top = mskrect.top % pBlt->mMskSurfInfo.mHeight;
+        pOSrcClip[0].bottom = pOSrcClip[0].top + _yLEN(0, tempYNum, pBlt->mMskSurfInfo.mHeight, &mskrect);
+        } else {
+        pXTempClip = pOSrcClip - tempXNum;
+        pOSrcClip[0].top = pXTempClip[0].bottom % pBlt->mMskSurfInfo.mHeight;
+        pOSrcClip[0].bottom = pOSrcClip[0].top+ _yLEN(j, tempYNum, pBlt->mMskSurfInfo.mHeight, &mskrect);
+        }
+
+        pOSrcClip[0].left = mskrect.left % pBlt->mMskSurfInfo.mWidth;
+        pOSrcClip[0].right = pOSrcClip[0].left + _xLEN(0, tempXNum, pBlt->mMskSurfInfo.mWidth, &mskrect);
+
+        pODstClip[0].left = srcrect.left;
+        if ( j == 0) {
+        pODstClip[0].top = srcrect.top;
+        } else {
+        pYTempClip = pODstClip - tempXNum;
+        pODstClip[0].top = pYTempClip[0].bottom;
+        }
+
+        pODstClip[0].right = pODstClip[0].left + pOSrcClip[0].right - pOSrcClip[0].left;
+        pODstClip[0].bottom = pODstClip[0].top + pOSrcClip[0].bottom - pOSrcClip[0].top;
+
+        for(i = 1; i < tempXNum; i++)
+        {
+            pOSrcClip[i].left = pOSrcClip[i-1].right % pBlt->mMskSurfInfo.mWidth;
+            pOSrcClip[i].right = pOSrcClip[i].left + _xLEN(i, tempXNum,pBlt->mMskSurfInfo.mWidth, &mskrect);
+            pOSrcClip[i].top = pOSrcClip[0].top;
+            pOSrcClip[i].bottom = pOSrcClip[0].bottom;
+
+            pODstClip[i].left = pODstClip[i-1].right;
+            pODstClip[i].right = pODstClip[i].left + pOSrcClip[i].right - pOSrcClip[i].left;
+
+            pODstClip[i].top = pODstClip[0].top;
+            pODstClip[i].bottom = pODstClip[0].bottom;
+        }
+
+        pOSrcClip += tempXNum;
+        pODstClip += tempXNum;
+
+    }
+
+    _rectPrint(pBlt, "Msk to tempSrc",tempXNum,tempYNum,pSrcClip,pDstClip);
+    status = gco2D_SetPorterDuffBlending(gpuctx->mDriver->m2DEngine, gcvPD_DST_IN);
+    if (status != gcvSTATUS_OK) {
+        TRACE_ERROR("gco2D_SetPorterDuffBlending failed\n");
+        TRACE_EXIT(FALSE);
+    }
+
+    if ( (tempYNum*tempXNum) >= (1920))
+    {
+            slen = (1920)/tempXNum;
+            pOSrcClip = pSrcClip;
+            pODstClip = pDstClip;
+            if (slen >= 1)
+            {
+                leftclips = tempYNum * tempXNum;
+
+                while(leftclips){
+
+                if (leftclips > (slen*tempXNum))
+                curNum = slen*tempXNum;
+                else
+                curNum = leftclips;
+                status = gco2D_BatchBlit(
+                gpuctx->mDriver->m2DEngine,
+                curNum,
+                pOSrcClip,
+                pODstClip,
+                0xCC,
+                0xCC,
+                galInfo->mBlitInfo.mSrcTempSurfInfo.mFormat.mVivFmt);
+                pOSrcClip += curNum;
+                pODstClip += curNum;
+                leftclips -= curNum;
+
+                }
+
+            } else {
+                fprintf(stderr,"Too many rects in one line \n");
+            }
+
+    } else {
+
+        status = gco2D_BatchBlit(
+            gpuctx->mDriver->m2DEngine,
+            tempYNum * tempXNum,
+            pSrcClip,
+            pDstClip,
+            0xCC,
+            0xCC,
+            galInfo->mBlitInfo.mSrcTempSurfInfo.mFormat.mVivFmt
+        );
+    }
+
+
+    free(pSrcClip);
+    free(pDstClip);
+
+    /* Need commit(true) ? */
+    /* ???????????????????? */
+
+    status = gco2D_SetGenericSource
+    (
+        gpuctx->mDriver->m2DEngine,
+        &srcsurf->mVideoNode.mPhysicalAddr,
+        1,
+        &srcsurf->mStride,
+        1,
+        srcsurf->mTiling,
+        pBlt->mSrcSurfInfo.mFormat.mVivFmt,
+        pBlt->mRotation,
+        srcsurf->mAlignedWidth,
+        srcsurf->mAlignedHeight
+    );
+
+    if ( status != gcvSTATUS_OK ) {
+        TRACE_ERROR("ERROR SETTING SOURCE SURFACE\n");
+        TRACE_EXIT(FALSE);
+    }
+
+    dstsurf = (GenericSurfacePtr)pBlt->mDstSurfInfo.mPriv->mVidMemInfo;
+
+    status = gco2D_SetGenericTarget
+    (
+        gpuctx->mDriver->m2DEngine,
+        &dstsurf->mVideoNode.mPhysicalAddr,
+        1,
+        &dstsurf->mStride,
+        1,
+        dstsurf->mTiling,
+        pBlt->mDstSurfInfo.mFormat.mVivFmt,
+        gcvSURF_0_DEGREE,
+        dstsurf->mAlignedWidth,
+        dstsurf->mAlignedHeight
+    );
+
+    dstrect.left = 0;
+    dstrect.top = 0;
+    dstrect.right = pBlt->mDstSurfInfo.mWidth;
+    dstrect.bottom = pBlt->mDstSurfInfo.mHeight;
+
+    status = gco2D_SetClipping(gpuctx->mDriver->m2DEngine, &dstrect);
+    if (status != gcvSTATUS_OK) {
+        TRACE_ERROR("gco2D_SetClipping failed\n");
+        TRACE_EXIT(FALSE);
+    }
+
+    dstrect.left = pBlt->mDstBox.x1;
+    if ( dstrect.left < 0 )
+        dstrect.left = 0;
+    dstrect.top = pBlt->mDstBox.y1;
+    if ( dstrect.top < 0 )
+        dstrect.top = 0;
+
+    dstrect.right = pBlt->mDstBox.x2;
+    if ( dstrect.right > pBlt->mDstSurfInfo.mWidth)
+        dstrect.right = pBlt->mDstSurfInfo.mWidth;
+
+    dstrect.bottom = pBlt->mDstBox.y2;
+    if ( dstrect.bottom > pBlt->mDstSurfInfo.mHeight )
+        dstrect.bottom = pBlt->mDstSurfInfo.mHeight;
+
+    minW = V_MIN((dstrect.right - dstrect.left), (srcrect.right - srcrect.left));
+    minH = V_MIN((dstrect.bottom - dstrect.top), (srcrect.bottom - srcrect.top));
+
+
+
+    srcrect.right = srcrect.left + minW;
+    dstrect.right = dstrect.left + minW;
+    srcrect.bottom = srcrect.top + minH;
+    dstrect.bottom = dstrect.top + minH;
+
+    if (!DisableAlphaBlending(galInfo)) {
+        TRACE_ERROR("Error on disabling alpha\n");
+        TRACE_EXIT(FALSE);
+    }
+
+    pBlt->mSrcSurfInfo.alpha = 1;
+
+    if (!EnableAlphaBlending(galInfo)) {
+            TRACE_ERROR("Alpha Blending Factor\n");
+            TRACE_EXIT(FALSE);
+    }
+
+    status = gco2D_BatchBlit(
+        gpuctx->mDriver->m2DEngine,
+        1,
+        &srcrect,
+        &dstrect,
+        0xCC,
+        0xAA,
+        pBlt->mDstSurfInfo.mFormat.mVivFmt
+    );
+    pBlt->mSrcSurfInfo.alpha = 0;
+    if (!DisableAlphaBlending(galInfo)) {
+        TRACE_ERROR("Error on disabling alpha\n");
+        TRACE_EXIT(FALSE);
+    }
+    TRACE_EXIT(TRUE);
 }
 #endif
 /**
@@ -1254,12 +1254,12 @@ static Bool BlendArbitraryPatternRect(GALINFOPTR galInfo, VivBoxPtr opbox) {
     VIV2DBLITINFOPTR pBlt = &(galInfo->mBlitInfo);
     VivBoxPtr dstbox = &galInfo->mBlitInfo.mDstBox;
 
-    gcsRECT_PTR	pSrcClip = NULL;
-    gcsRECT_PTR	pDstClip = NULL;
+    gcsRECT_PTR pSrcClip = NULL;
+    gcsRECT_PTR pDstClip = NULL;
 
 
-    gcsRECT_PTR	pOSrcClip = NULL;
-    gcsRECT_PTR	pODstClip = NULL;
+    gcsRECT_PTR pOSrcClip = NULL;
+    gcsRECT_PTR pODstClip = NULL;
 
     gctUINT32 xclipCount = 0;
     gctUINT32 yclipCount = 0;
@@ -1449,12 +1449,12 @@ static void SetTempSurfForRT(GALINFOPTR galInfo, VivBoxPtr opbox)
     gctUINT32 aligned_pitch;
 
     GenericSurfacePtr pinfo;
-    gcsRECT_PTR	pSrcClip = NULL;
-    gcsRECT_PTR	pDstClip = NULL;
+    gcsRECT_PTR pSrcClip = NULL;
+    gcsRECT_PTR pDstClip = NULL;
 
 
-    gcsRECT_PTR	pOSrcClip = NULL;
-    gcsRECT_PTR	pODstClip = NULL;
+    gcsRECT_PTR pOSrcClip = NULL;
+    gcsRECT_PTR pODstClip = NULL;
 
     gctUINT32 xclipCount = 0;
     gctUINT32 yclipCount = 0;

@@ -920,6 +920,8 @@ _addInstructionToLTCList(
         case gcSL_IMAGE_WR:
         case gcSL_IMAGE_RD_3D:
         case gcSL_IMAGE_WR_3D:
+        case gcSL_IMAGE_ADDR:
+        case gcSL_IMAGE_ADDR_3D:
         case gcSL_BARRIER:
         case gcSL_MEM_BARRIER:
         case gcSL_GETEXP:

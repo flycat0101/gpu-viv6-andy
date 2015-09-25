@@ -190,7 +190,7 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     pVscHwCfg->hwFeatureFlags.needCLXFixes           = IS_HW_SUPPORT(gcvFEATURE_NEED_FIX_FOR_CL_X);
     pVscHwCfg->hwFeatureFlags.needCLXEFixes          = IS_HW_SUPPORT(gcvFEATURE_NEED_FIX_FOR_CL_XE);
     pVscHwCfg->hwFeatureFlags.robustAtomic           = IS_HW_SUPPORT(gcvFEATURE_ROBUST_ATOMIC);
-	pVscHwCfg->hwFeatureFlags.flatDual16Fix          = IS_HW_SUPPORT(gcvFEATURE_SH_FLAT_INTERPOLATION_DUAL16_FIX);
+    pVscHwCfg->hwFeatureFlags.flatDual16Fix          = IS_HW_SUPPORT(gcvFEATURE_SH_FLAT_INTERPOLATION_DUAL16_FIX);
 
 
 OnError:

@@ -385,6 +385,10 @@
         glDeleteVertexArraysOES;
         glGenVertexArraysOES;
         glIsVertexArrayOES;
+        glGetGraphicsResetStatusEXT;
+        glReadnPixelsEXT;
+        glGetnUniformfvEXT;
+        glGetnUniformivEXT;
 
     local:
         *;

@@ -1681,7 +1681,7 @@ GLvoid GL_APIENTRY __gles_GetFramebufferAttachmentParameteriv(__GLcontext *gc, G
     switch (pname)
     {
         case GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE:
-            *params = attachPoint->objType;
+            *params = formatInfo ? attachPoint->objType : GL_NONE;
             __GL_EXIT();
 
         case GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME:

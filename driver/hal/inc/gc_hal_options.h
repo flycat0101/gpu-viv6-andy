@@ -1161,7 +1161,11 @@
 */
 #ifndef gcdFRAMEINFO_STATISTIC
 
-#if (defined(DBG) && DBG) || defined(DEBUG) || defined(_DEBUG) || gcdDUMP || gcdPERFORMANCE_ANALYSIS
+#if (defined(DBG) && DBG) || defined(DEBUG)                || \
+     defined(_DEBUG) || gcdDUMP || gcdPERFORMANCE_ANALYSIS || \
+     (defined(WIN32) && !defined(UNDER_CE))                || \
+     gcdFPGA_BUILD
+
 #   define gcdFRAMEINFO_STATISTIC      1
 #else
 #   define gcdFRAMEINFO_STATISTIC      0

@@ -362,6 +362,9 @@ gcoOS_GetDisplay(
             gcmFOOTER();
             return status;
         }
+
+        DirectFBSetOption ("no-sighandler", NULL);
+
         display = (struct _DFBDisplay*) malloc(sizeof (struct _DFBDisplay));
         memset(display, 0, sizeof(struct _DFBDisplay));
 
@@ -1603,6 +1606,17 @@ gcoOS_CopyPixmapBits(
     IN gctINT DstStride,
     IN gceSURF_FORMAT DstFormat,
     OUT gctPOINTER DstBits
+    )
+{
+    return gcvSTATUS_NOT_SUPPORTED;
+}
+
+gceSTATUS
+gcoOS_ResizeWindow(
+    IN gctPOINTER localDisplay,
+    IN HALNativeWindowType Drawable,
+    IN gctUINT Width,
+    IN gctUINT Height
     )
 {
     return gcvSTATUS_NOT_SUPPORTED;

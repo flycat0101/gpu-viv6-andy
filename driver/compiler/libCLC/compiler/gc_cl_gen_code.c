@@ -26634,7 +26634,7 @@ IN OUT clsGEN_CODE_PARAMETERS * Parameters
             clsROPERAND_InitializeUsingIOperand(&Parameters->rOperands[i], intermIOperand);
         }
         if(clmDECL_IsUnderlyingStructOrUnion(&PolynaryExpr->funcName->decl) &&
-			clmNAME_VariableHasMemoryOffset(PolynaryExpr->funcName)) {
+            clmNAME_VariableHasMemoryOffset(PolynaryExpr->funcName)) {
             Parameters->hint = clvGEN_DEREF_CODE;
         }
     }

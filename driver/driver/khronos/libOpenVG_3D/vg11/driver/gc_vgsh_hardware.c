@@ -2211,7 +2211,7 @@ gceSTATUS SetUniform_Scissor(_vgHARDWARE *hardware, gcUNIFORM uniform)
         TempRegister, \
         gcSL_ENABLE_##ComponentEnable, \
         gcSL_FLOAT, \
-        gcSHADER_PRECISION_DEFAULT \
+        vgvDEFAULT_PRECISION \
         ))
 
 #define vgmOPCODE_COND(Opcode, Condition, Target) \
@@ -2270,7 +2270,7 @@ gceSTATUS SetUniform_Scissor(_vgHARDWARE *hardware, gcUNIFORM uniform)
         TempRegister, \
         gcSL_SWIZZLE_##Swizzle, \
         gcSL_FLOAT, \
-        gcSHADER_PRECISION_DEFAULT \
+        vgvDEFAULT_PRECISION \
         ))
 
 #define vgmTEMP_EX(TempRegister, Swizzle) \
@@ -2281,7 +2281,7 @@ gceSTATUS SetUniform_Scissor(_vgHARDWARE *hardware, gcUNIFORM uniform)
         TempRegister, \
         Swizzle, \
         gcSL_FLOAT, \
-        gcSHADER_PRECISION_DEFAULT \
+        vgvDEFAULT_PRECISION \
         ))
 
 #define vgmADD_FUNCTION(FunctionName) \
@@ -2344,7 +2344,7 @@ gctUINT16 _AddOutput(
 
     temp = _AllocateTemp(Shader);
 
-    status = gcSHADER_AddOutput(Shader->binary, Name, Type, Length, temp, gcSHADER_PRECISION_DEFAULT);
+    status = gcSHADER_AddOutput(Shader->binary, Name, Type, Length, temp, vgvDEFAULT_PRECISION);
     if (gcmIS_ERROR(status))
     {
         gcmFOOTER_ARG("return=%u", 0);
@@ -2373,7 +2373,7 @@ gcATTRIBUTE _AddAttribute(
     gcmHEADER_ARG("Shader=0x%x Name=%s NameID=%u Type=%d Length=%u",
         Shader, Name, NameID, Type, (unsigned long)Length);
 
-    status = gcSHADER_AddAttribute(Shader->binary, Name, Type, Length, gcvFALSE, gcSHADER_SHADER_DEFAULT, gcSHADER_PRECISION_DEFAULT, &attribute);
+    status = gcSHADER_AddAttribute(Shader->binary, Name, Type, Length, gcvFALSE, gcSHADER_SHADER_DEFAULT, vgvDEFAULT_PRECISION, &attribute);
 
     if (gcmIS_ERROR(status))
     {
@@ -2404,7 +2404,7 @@ gcATTRIBUTE _AddVarying(
 
     gcmHEADER_ARG("Shader=0x%x Name=%s Type=%d Length=%u", Shader, Name, Type, (unsigned long)Length);
 
-    status = gcSHADER_AddAttribute(Shader->binary, Name, Type, Length, gcvFALSE, gcSHADER_SHADER_DEFAULT, gcSHADER_PRECISION_DEFAULT, &attribute);
+    status = gcSHADER_AddAttribute(Shader->binary, Name, Type, Length, gcvFALSE, gcSHADER_SHADER_DEFAULT, vgvDEFAULT_PRECISION, &attribute);
 
     if (gcmIS_ERROR(status))
     {
@@ -2432,7 +2432,7 @@ gcUNIFORM _AddUniform(
     gcmHEADER_ARG("Shader=0x%x Name=%s Type=%d Length=%u setfunc=0x%x",
         Shader, Name, Type, (unsigned long)Length, setfunc);
 
-    status = gcSHADER_AddUniform(Shader->binary, Name, Type, Length, gcSHADER_PRECISION_DEFAULT, &uniform);
+    status = gcSHADER_AddUniform(Shader->binary, Name, Type, Length, vgvDEFAULT_PRECISION, &uniform);
 
     if (gcmIS_ERROR(status))
     {
@@ -2511,7 +2511,7 @@ gcUNIFORM _AddSampler(
     gcmHEADER_ARG("Shader=0x%x Name=%s Type=%d Length=%u setfunc=0x%x",
         Shader, Name, Type, (unsigned long)Length, setfunc);
 
-    status = gcSHADER_AddUniform(Shader->binary, Name, Type, Length, gcSHADER_PRECISION_DEFAULT, &uniform);
+    status = gcSHADER_AddUniform(Shader->binary, Name, Type, Length, vgvDEFAULT_PRECISION, &uniform);
 
     if (gcmIS_ERROR(status))
     {

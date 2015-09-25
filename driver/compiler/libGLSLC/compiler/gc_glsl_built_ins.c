@@ -904,8 +904,7 @@ static gctUINT VSBuiltInVariableCount =
 
 static slsBUILT_IN_VARIABLE FSBuiltInVariables[] =
 {
-    {slvEXTENSION_NON_HALTI, "gl_FragCoord",        "#Position",    slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_VARYING_IN,    T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {slvEXTENSION_HALTI,     "gl_FragCoord",        "#Position",    slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_VARYING_IN,    T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {slvEXTENSION_NONE,      "gl_FragCoord",        "#Position",    slvPRECISION_QUALIFIER_HIGH,     slvSTORAGE_QUALIFIER_VARYING_IN,    T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NONE,      "gl_FrontFacing",      "#FrontFacing", slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_VARYING_IN,    T_BOOL,     0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NON_HALTI, "gl_FragColor",        "#Color",       slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_FRAGMENT_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_FRAGMENT_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NON_HALTI, "gl_FragData",         "#Color",       slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_FRAGMENT_OUT,  T_VEC4,     1,    slvSTORAGE_QUALIFIER_FRAGMENT_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
@@ -2403,9 +2402,9 @@ _FuncCheckForInterpolate(
     */
     if (slsQUALIFIERS_GET_AUXILIARY(&variable->name->dataType->qualifiers) == slvAUXILIARY_QUALIFIER_CENTROID)
     {
-		gcmVERIFY_OK(sloCOMPILER_GetCompilerFlag(Compiler, &flag));
+        gcmVERIFY_OK(sloCOMPILER_GetCompilerFlag(Compiler, &flag));
         slsCOMPILER_SetPatchForCentroidVarying(flag);
-		gcmVERIFY_OK(sloCOMPILER_SetCompilerFlag(Compiler, flag));
+        gcmVERIFY_OK(sloCOMPILER_SetCompilerFlag(Compiler, flag));
     }
 
     slsQUALIFIERS_SET_FLAG(&variable->name->dataType->qualifiers, slvQUALIFIERS_FLAG_USE_AS_INTERPOLATE_FUNCTION);
@@ -5358,12 +5357,11 @@ _GenClampLod(
     IN gctINT LineNo,
     IN gctINT StringNo,
     IN sloIR_EXPR SamplerOperand,
+    IN slsROPERAND * SamplerROperand,
     IN slsROPERAND * Lod
     )
 {
     gceSTATUS status;
-    gcUNIFORM lodMinMax = gcvNULL;
-    slsLOGICAL_REG logicalReg[1];
     slsROPERAND intermROperand[1];
     slsROPERAND minLevel[1];
     slsROPERAND maxLevel[1];
@@ -5374,28 +5372,48 @@ _GenClampLod(
 
     gcmASSERT(sloIR_OBJECT_GetType(&SamplerOperand->base) == slvIR_VARIABLE);
     sampler = ((sloIR_VARIABLE)SamplerOperand)->name;
-
-    if(sampler->type == slvVARIABLE_NAME && sampler->u.variableInfo.lodMinMax == gcvNULL)
-    {
-        status = slAllocSamplerLodMinMax(Compiler,
-                                    sampler);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-    }
-
     if(sampler->type == slvVARIABLE_NAME)
     {
+        gcUNIFORM lodMinMax = gcvNULL;
+        slsLOGICAL_REG logicalReg[1];
+
+        if(sampler->u.variableInfo.lodMinMax == gcvNULL)
+        {
+            status = slAllocSamplerLodMinMax(Compiler,
+                                        sampler);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        }
+
         lodMinMax = sampler->u.variableInfo.lodMinMax;
+        gcmASSERT(lodMinMax);
+
+        slsLOGICAL_REG_InitializeUniform(logicalReg,
+                                         slvSTORAGE_QUALIFIER_UNIFORM,
+                                         lodMinMax->u.type,
+                                         gcSHADER_PRECISION_MEDIUM,
+                                         lodMinMax,
+                                         0);
+        slsROPERAND_InitializeReg(intermROperand, logicalReg);
     }
-    gcmASSERT(lodMinMax);
+    else
+    {
+        gcSHADER shader = gcvNULL;
 
-    slsLOGICAL_REG_InitializeUniform(logicalReg,
-                                     slvSTORAGE_QUALIFIER_UNIFORM,
-                                     lodMinMax->u.type,
-                                     gcSHADER_PRECISION_MEDIUM,
-                                     lodMinMax,
-                                     0);
-    slsROPERAND_InitializeReg(intermROperand, logicalReg);
+        slsIOPERAND_New(Compiler, intermIOperand, gcSHADER_FLOAT_X3, gcSHADER_PRECISION_MEDIUM);
 
+        status = slGenGenericCode1(Compiler,
+                                   SamplerOperand->base.lineNo,
+                                   SamplerOperand->base.stringNo,
+                                   slvOPCODE_GET_SAMPLER_LMM,
+                                   intermIOperand,
+                                   SamplerROperand);
+
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        sloCOMPILER_GetBinary(Compiler, &shader);
+        SetFunctionUsingSamplerVirtual(shader->currentFunction);
+        slsROPERAND_InitializeUsingIOperand(intermROperand, intermIOperand);
+    }
     slGetVectorROperandSlice(intermROperand,
                              0,
                              1,
@@ -5446,15 +5464,16 @@ _GenSamplerSizeCode(
     IN gctINT LineNo,
     IN gctINT StringNo,
     IN sloIR_EXPR SamplerOperand,
+    IN slsROPERAND * SamplerROperand,
     IN slsROPERAND * Lod,
     IN slsIOPERAND * IOperand
     )
 {
     gceSTATUS status;
     slsNAME *sampler;
-    slsLOGICAL_REG logicalReg[1];
     slsROPERAND rOperand[1];
     gctUINT8 numCoordComponents, numComponents;
+    slsIOPERAND intermIOperandLBS[1];
     slsIOPERAND intermIOperandMax[1];
     slsROPERAND constantOne[1], intermROperandMax[1];
 
@@ -5463,24 +5482,47 @@ _GenSamplerSizeCode(
     gcmASSERT(sloIR_OBJECT_GetType(&SamplerOperand->base) == slvIR_VARIABLE);
     sampler = ((sloIR_VARIABLE)SamplerOperand)->name;
 
-    if(sampler->u.variableInfo.levelBaseSize == gcvNULL) {
-        status = slAllocSamplerLevelBaseSize(Compiler,
-                                             sampler,
-                                             gcSHADER_FLOAT_X4);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+    if(sampler->type == slvVARIABLE_NAME)
+    {
+        slsLOGICAL_REG logicalReg[1];
+        if(sampler->u.variableInfo.levelBaseSize == gcvNULL) {
+            status = slAllocSamplerLevelBaseSize(Compiler,
+                                                 sampler,
+                                                 gcSHADER_FLOAT_X4);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        }
+        gcmASSERT(sampler->u.variableInfo.levelBaseSize);
+
+        slsLOGICAL_REG_InitializeUniform(logicalReg,
+                                         slvSTORAGE_QUALIFIER_UNIFORM,
+                                         IOperand->dataType,
+                                         gcSHADER_PRECISION_MEDIUM,
+                                         sampler->u.variableInfo.levelBaseSize,
+                                         0);
+        slsROPERAND_InitializeReg(rOperand, logicalReg);
     }
-    gcmASSERT(sampler->u.variableInfo.levelBaseSize);
+    else
+    {
+        gcSHADER shader = gcvNULL;
 
-    numCoordComponents = _GetSamplerCoordComponentCount(sampler->dataType);
+        slsIOPERAND_New(Compiler, intermIOperandLBS, gcSHADER_INTEGER_X4, gcSHADER_PRECISION_MEDIUM);
+
+        status = slGenGenericCode1(Compiler,
+                                   SamplerOperand->base.lineNo,
+                                   SamplerOperand->base.stringNo,
+                                   slvOPCODE_GET_SAMPLER_LBS,
+                                   intermIOperandLBS,
+                                   SamplerROperand);
+
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        sloCOMPILER_GetBinary(Compiler, &shader);
+        SetFunctionUsingSamplerVirtual(shader->currentFunction);
+        slsROPERAND_InitializeUsingIOperand(rOperand, intermIOperandLBS);
+    }
+
+    numCoordComponents = _GetSamplerCoordComponentCount(SamplerOperand->dataType);
     numComponents = gcGetDataTypeComponentCount(IOperand->dataType);
-
-    slsLOGICAL_REG_InitializeUniform(logicalReg,
-                                     slvSTORAGE_QUALIFIER_UNIFORM,
-                                     IOperand->dataType,
-                                     gcSHADER_PRECISION_MEDIUM,
-                                     sampler->u.variableInfo.levelBaseSize,
-                                     0);
-    slsROPERAND_InitializeReg(rOperand, logicalReg);
 
     slsIOPERAND_New(Compiler,
                     intermIOperandMax,
@@ -6426,6 +6468,7 @@ static gceSTATUS
 _ComputeOffsetCoords(
     IN sloCOMPILER Compiler,
     IN sloIR_POLYNARY_EXPR PolynaryExpr,
+    IN slsROPERAND *Sampler,
     IN slsROPERAND *TextureCoords,
     IN slsROPERAND *Bias,
     IN slsROPERAND *Lod,
@@ -6750,6 +6793,7 @@ _ComputeOffsetCoords(
                                  PolynaryExpr->exprBase.base.lineNo,
                                  PolynaryExpr->exprBase.base.stringNo,
                                  samplerOperand,
+                                 Sampler,
                                  lod,
                                  intermIOperand);
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
@@ -6864,6 +6908,7 @@ _GenTextureOffsetCode(
                     OperandsParameters[1].rOperands[0].u.reg.precision);
     status = _ComputeOffsetCoords(Compiler,
                                    PolynaryExpr,
+                                   &OperandsParameters[0].rOperands[0],
                                    &OperandsParameters[1].rOperands[0],
                                    OperandCount == 4 ? &OperandsParameters[3].rOperands[0] : gcvNULL,
                                    gcvNULL,
@@ -7267,6 +7312,7 @@ _GenTexelFetchCode(
                           PolynaryExpr->exprBase.base.lineNo,
                           PolynaryExpr->exprBase.base.stringNo,
                           samplerOperand,
+                          &OperandsParameters[0].rOperands[0],
                           &OperandsParameters[2].rOperands[0]);
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
@@ -7278,6 +7324,7 @@ _GenTexelFetchCode(
                                  PolynaryExpr->exprBase.base.lineNo,
                                  PolynaryExpr->exprBase.base.stringNo,
                                  samplerOperand,
+                                 &OperandsParameters[0].rOperands[0],
                                  &OperandsParameters[2].rOperands[0],
                                  intermIOperand);
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
@@ -7421,6 +7468,7 @@ _GenTexelFetchOffsetCode(
                                  PolynaryExpr->exprBase.base.lineNo,
                                  PolynaryExpr->exprBase.base.stringNo,
                                  samplerOperand,
+                                 &OperandsParameters[0].rOperands[0],
                                  &OperandsParameters[2].rOperands[0]);
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
@@ -7432,6 +7480,7 @@ _GenTexelFetchOffsetCode(
                                  PolynaryExpr->exprBase.base.lineNo,
                                  PolynaryExpr->exprBase.base.stringNo,
                                  samplerOperand,
+                                 &OperandsParameters[0].rOperands[0],
                                  &OperandsParameters[2].rOperands[0],
                                  intermIOperand);
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
@@ -7662,6 +7711,7 @@ _GenTextureLodOffsetCode(
                     OperandsParameters[1].rOperands[0].u.reg.precision);
     status = _ComputeOffsetCoords(Compiler,
                                   PolynaryExpr,
+                                  &OperandsParameters[0].rOperands[0],
                                   &OperandsParameters[1].rOperands[0],
                                   gcvNULL,
                                   &OperandsParameters[2].rOperands[0],
@@ -8253,6 +8303,7 @@ _GenTextureGradOffsetCode(
                     OperandsParameters[1].rOperands[0].u.reg.precision);
     status = _ComputeOffsetCoords(Compiler,
                                   PolynaryExpr,
+                                  &OperandsParameters[0].rOperands[0],
                                   &OperandsParameters[1].rOperands[0],
                                   gcvNULL,
                                   lod,

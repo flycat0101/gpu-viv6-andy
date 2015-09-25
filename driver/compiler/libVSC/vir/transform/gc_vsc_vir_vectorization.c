@@ -354,11 +354,11 @@ static VSC_ErrCode _CreateIoVectorizedInfoFromIoPacket(VIR_Shader* pShader,
 
         if (pIoPacket->bOutput)
         {
-            if (VIR_Symbol_isOutput(pIoPacket->pSymIo[i]))
+            if (VIR_Symbol_isOutput(pIoPacket->pSymIo[0]))
             {
                 VIR_IdList_Add(&pShader->outputVregs, virRegId);
             }
-            else if (VIR_Symbol_isPerPatchOutput(pIoPacket->pSymIo[i]))
+            else if (VIR_Symbol_isPerPatchOutput(pIoPacket->pSymIo[0]))
             {
                 VIR_IdList_Add(&pShader->perpatchOutputVregs, virRegId);
             }

@@ -5385,12 +5385,12 @@ gcEncodeSourceImmediate20(
         value20bits = GetFP20Binary(&f20);
         break;
     case gcSL_INT32:
-	case gcSL_INT64:
+    case gcSL_INT64:
         valueType = 0x1 ;
         value20bits = ConstValue->value.i & BitsMask(20);
         break;
     case gcSL_UINT32:
-	case gcSL_UINT64:
+    case gcSL_UINT64:
         valueType = 0x2 ;
         value20bits = ConstValue->value.u & BitsMask(20);
         break;

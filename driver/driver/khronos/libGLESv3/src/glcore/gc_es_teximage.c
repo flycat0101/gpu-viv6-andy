@@ -4614,8 +4614,7 @@ GLboolean __glCheckCopyImageSubDataArg(__GLcontext *gc, GLuint name, GLenum targ
         rbo = (__GLrenderbufferObject *)__glGetObject(gc, gc->frameBuffer.rboShared, name);
 
         if (rbo == gcvNULL ||
-            level != 0 ||
-            depth != 0)
+            level != 0)
         {
             __GL_ERROR_RET_VAL(GL_INVALID_VALUE, GL_FALSE);
         }
@@ -4689,13 +4688,6 @@ GLboolean __glCheckCopyImageSubDataArg(__GLcontext *gc, GLuint name, GLenum targ
             __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
         }
 
-        /* Should we check this base on maxLevelUsed? */
-        if (tex->params.baseLevel > level ||
-            maxLevelUsed < level)
-        {
-            __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
-        }
-
         mipmap = &tex->faceMipmap[0][level];
 
         if (__GL_IS_TEXTURE_ARRAY(tex->targetIndex))
@@ -4733,7 +4725,7 @@ GLboolean __glCheckCopyImageSubDataArg(__GLcontext *gc, GLuint name, GLenum targ
     }
     else if (rbo)
     {
-        if ((rbo->width < x + width) || (rbo->height < y + height) || (depth != 0))
+        if ((rbo->width < x + width) || (rbo->height < y + height))
         {
             __GL_ERROR_RET_VAL(GL_INVALID_VALUE, GL_FALSE);
         }

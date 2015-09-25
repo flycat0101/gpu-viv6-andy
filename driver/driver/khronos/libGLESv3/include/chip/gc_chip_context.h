@@ -257,6 +257,7 @@ struct __GLchipContextRec
     gctHANDLE                   dll;
     gctGLSLCompiler             pfCompile;
     gctGLSLInitCompiler         pfInitCompiler;
+    gctGLSLFinalizeCompiler     pfFinalizeCompiler;
 
     /* Below 3 shortcuts ONLY can be used withine draw validation.
     ** Any places out of there is invalid.

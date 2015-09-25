@@ -277,6 +277,7 @@ struct _gcOPTIMIZER
 
     /* Number of instructons in shader. */
     gctUINT                     codeCount;
+    gctUINT                     jmpCount;
 
     /* Code list. */
     gcOPT_CODE                  codeHead;

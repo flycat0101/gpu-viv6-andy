@@ -28,14 +28,14 @@ vx_status vxMultiply(vx_image in0, vx_image in1, vx_scalar scale_param, vx_scala
     status |= vxAccessScalarValue(opolicy_param, &overflow_policy);
     status |= vxAccessScalarValue(rpolicy_param, &rounding_policy);
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, in0, context.objects_num);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, in0, context.objects_num);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, in1, context.objects_num);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, in1, context.objects_num);
 
-	/*index = 2*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, context.objects_num);
+    /*index = 2*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, context.objects_num);
 
     context.params.policy           = (overflow_policy == VX_CONVERT_POLICY_SATURATE)?gcvTRUE:gcvFALSE;
     context.params.rounding         = (rounding_policy == VX_ROUND_POLICY_TO_NEAREST_EVEN) ? 1 << 6 : 0;

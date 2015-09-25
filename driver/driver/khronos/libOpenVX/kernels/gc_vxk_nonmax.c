@@ -24,14 +24,14 @@ vx_status vxNonMaxSuppression(vx_image i_mag, vx_image i_ang, vx_image i_edge, v
     vxQueryImage(i_edge, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
     vxQueryImage(i_edge, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, i_mag, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, i_mag, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, i_ang, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, i_ang, GC_VX_INDEX_AUTO);
 
-	/*index = 2*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, i_edge, GC_VX_INDEX_AUTO);
+    /*index = 2*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, i_edge, GC_VX_INDEX_AUTO);
 
     gcoOS_MemCopy(&context.uniforms[0].uniform, constantData, sizeof(constantData));
     context.uniforms[0].index = 3;
@@ -66,11 +66,11 @@ vx_status vxEuclideanNonMaxSuppression(vx_image src, vx_scalar thr, vx_scalar ra
 
     if (format == VX_DF_IMAGE_F32)
     {
-		/*index = 0*/
-		gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
+        /*index = 0*/
+        gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
 
-		/*index = 1*/
-		gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, GC_VX_INDEX_AUTO);
+        /*index = 1*/
+        gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, GC_VX_INDEX_AUTO);
 
         context.params.scale      = thresh;
         context.params.volume     = (gctUINT32)radius;

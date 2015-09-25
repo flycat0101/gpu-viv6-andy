@@ -1052,8 +1052,8 @@ cloCOMPILER_Compile(
                                    Options);
         cloCOMPILER_Unlock(Compiler);
         if(gcmIS_ERROR(status)) {
-			break;
-		}
+            break;
+        }
 
 
         gcmONERROR(cloCOMPILER_DumpIR(Compiler));

@@ -1843,7 +1843,7 @@ static gceSTATUS _Assign_vPosition(
         gcSHADER_FLOAT_X4,
         1,
         TempRegister,
-        gcSHADER_PRECISION_DEFAULT
+        gcSHADER_PRECISION_HIGH
         );
     gcmFOOTER();
     return status;
@@ -1981,7 +1981,7 @@ static gceSTATUS _Assign_vPointSize(
         gcSHADER_FLOAT_X1,
         1,
         TempRegister,
-        gcSHADER_PRECISION_DEFAULT
+        gcSHADER_PRECISION_HIGH
         );
     gcmFOOTER();
     return status;

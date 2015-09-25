@@ -352,8 +352,8 @@ gcoVX_Upload(
             gcoOS_MemCopy((gctPOINTER)logical, Point, Size);
             gcmDUMP_BUFFER(gcvNULL, "memory", physical, (gctUINT32*)logical, 0, Size);
         }
-		else
-			gcoOS_ZeroMemory((gctPOINTER)logical, Size);
+        else
+            gcoOS_ZeroMemory((gctPOINTER)logical, Size);
 
      }
 
@@ -395,13 +395,13 @@ gcoVX_AllocateMemory(
     gceSTATUS          status = gcvSTATUS_OK;
     gctUINT32          physical = (gctUINT32)~0U;
     gctPOINTER         logical = gcvNULL;
-	gcsSURF_NODE_PTR   node = gcvNULL;
+    gcsSURF_NODE_PTR   node = gcvNULL;
 
     gcmHEADER_ARG("Size=%d Logical=%p", Size, Logical);
 
     gcoVX_Initialize();
 
-	gcmONERROR(gcoOS_Allocate(gcvNULL,
+    gcmONERROR(gcoOS_Allocate(gcvNULL,
                              gcmSIZEOF(gcsSURF_NODE),
                              (gctPOINTER*)&node));
 
@@ -421,14 +421,14 @@ gcoVX_AllocateMemory(
 
     if (node && node->pool != gcvPOOL_UNKNOWN)
     {
-        *Logical	= *(gctUINT32_PTR)(&logical);
-		*Physical   = physical;
-		*Node		= node;
+        *Logical    = *(gctUINT32_PTR)(&logical);
+        *Physical   = physical;
+        *Node       = node;
     }
 
-	return status;
+    return status;
 OnError:
-	/* Return the status. */
+    /* Return the status. */
     if(node != gcvNULL)
     {
         gcoOS_Free(gcvNULL, node);

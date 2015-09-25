@@ -16,7 +16,7 @@
 /* Zone used for header/footer. */
 #define _GC_OBJ_ZONE    gcdZONE_EGL_API
 
-#if defined(EGL_API_WL)
+#if defined(WL_EGL_PLATFORM)
 #include "wayland-server.h"
 #endif
 
@@ -1050,36 +1050,17 @@ void GL_APIENTRY glTexDirectTiledMapVIV_Entry(EGLenum target, EGLint width, EGLi
     }
 }
 
-#if defined(EGL_API_WL)
-EGLAPI EGLBoolean EGLAPIENTRY
-eglBindWaylandDisplayWL(
-    EGLDisplay Dpy,
-    struct wl_display *display
-    )
+#if defined(WL_EGL_PLATFORM)
+EGLAPI EGLBoolean EGLAPIENTRY eglBindWaylandDisplayWL(EGLDisplay dpy, struct wl_display *display)
 {
-    VEGLDisplay dpy = VEGL_DISPLAY(Dpy);
-    dpy->localInfo = (gctPOINTER) display;
-
-    return veglInitLocalDisplayInfo(dpy);
+    VEGL_DISPLAY(dpy)->localInfo = (gctPOINTER)display;
+    return veglInitLocalDisplayInfo(VEGL_DISPLAY(dpy));
 }
-
-EGLAPI EGLBoolean EGLAPIENTRY
-eglUnbindWaylandDisplayWL(
-    EGLDisplay Dpy,
-    struct wl_display *display
-    )
+EGLAPI EGLBoolean EGLAPIENTRY eglUnbindWaylandDisplayWL(EGLDisplay dpy, struct wl_display *display)
 {
-    VEGLDisplay dpy = VEGL_DISPLAY(Dpy);
-    return veglDeinitLocalDisplayInfo(dpy);
+    return veglDeinitLocalDisplayInfo(VEGL_DISPLAY(dpy));
 }
-
-EGLAPI EGLBoolean EGLAPIENTRY
-eglQueryWaylandBufferWL(
-    EGLDisplay dpy,
-    struct wl_resource *buffer,
-    EGLint attribute,
-    EGLint *value
-    )
+EGLAPI EGLBoolean EGLAPIENTRY eglQueryWaylandBufferWL(EGLDisplay dpy, struct wl_resource *buffer, EGLint attribute, EGLint *value)
 {
     gcsWL_VIV_BUFFER *wl_viv_buffer;
     wl_viv_buffer = wl_resource_get_user_data(buffer);
@@ -1165,7 +1146,7 @@ static veglLOOKUP _veglLookup[] =
     eglMAKE_LOOKUP(eglSignalSyncKHR),
     /* EGL_KHR_wait_sync. */
     eglMAKE_LOOKUP(eglWaitSyncKHR),
-#if defined(EGL_API_WL)
+#if defined(WL_EGL_PLATFORM)
     /* EGL_WL_bind_wayland_display. */
     eglMAKE_LOOKUP(eglBindWaylandDisplayWL),
     eglMAKE_LOOKUP(eglUnbindWaylandDisplayWL),
@@ -1270,8 +1251,7 @@ eglGetProcAddress(const char *procname)
     veglDISPATCH * dispatch;
 #if !gcdSTATIC_LINK
     gctHANDLE library;
-    gctINT32 index = -1;
-    gctUINT32 i;
+    veglAPIINDEX index;
 #endif
     char * name;
     gctSIZE_T nameLen = 0, appendixLen = 0;
@@ -1423,7 +1403,7 @@ eglGetProcAddress(const char *procname)
 #endif
 
     /* Try loading from libEGL. */
-    library = veglGetModule(gcvNULL, EGL_TRUE, gcvNULL, gcvNULL);
+    library = veglGetModule(gcvNULL, vegl_EGL, gcvNULL);
 
     if (library != gcvNULL)
     {
@@ -1474,11 +1454,11 @@ eglGetProcAddress(const char *procname)
         gcmVERIFY_OK(gcoOS_StrCatSafe(name, len, appendix));
     }
 
-    /* Try loading from API library. */
-    for (i = 0; i < 2; i++)
+    /* Try iterate all client library. */
+    for (index = 0; index < vegl_API_LAST; ++index)
     {
-        /* Sending index second time, makes the code switch to next lib. */
-        library = veglGetModule(gcvNULL, EGL_FALSE, gcvNULL, &index);
+        dispatch = gcvNULL;
+        library = veglGetModule(gcvNULL, index, &dispatch);
 
         if (library != gcvNULL)
         {
@@ -1490,14 +1470,33 @@ eglGetProcAddress(const char *procname)
                 goto Done;
             }
 
-            if ((name != gcvNULL)
-            &&  gcmIS_SUCCESS(gcoOS_GetProcAddress(gcvNULL,
-                                                   library,
-                                                   name,
-                                                   &proc.ptr))
-            )
+            if (dispatch && dispatch->getProcAddr)
             {
-                goto Done;
+                proc.func = dispatch->getProcAddr(procname);
+                if (proc.func)
+                {
+                    goto Done;
+                }
+            }
+
+            if (name)
+            {
+                if (gcmIS_SUCCESS(gcoOS_GetProcAddress(gcvNULL,
+                                                       library,
+                                                       name,
+                                                       &proc.ptr)))
+                {
+                    goto Done;
+                }
+
+                if (dispatch && dispatch->getProcAddr)
+                {
+                    proc.func = dispatch->getProcAddr(name);
+                    if (proc.func)
+                    {
+                        goto Done;
+                    }
+                }
             }
         }
     }

@@ -190,6 +190,7 @@
         gcoOS_DestroyDrawable;
         gcoOS_SwapBuffers;
         gcoOS_SetDisplayVirtualEx;
+        gcoOS_ResizeWindow;
 
         gcoOS_CloseFD;
         gcoOS_DupFD;

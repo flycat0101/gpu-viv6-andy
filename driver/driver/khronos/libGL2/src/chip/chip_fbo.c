@@ -215,7 +215,6 @@ GLvoid pickReadBufferForFBO(__GLcontext *gc)
                 __GLtextureObject   *tex = NULL;
                 glsTEXTUREINFO      *texInfo = NULL;
                 gcoSURF surf;
-                GLuint offset;
 
                 tex = (__GLtextureObject*)__glGetObject(gc, gc->texture.shared, attachState->objName);
 
@@ -228,11 +227,9 @@ GLvoid pickReadBufferForFBO(__GLcontext *gc)
                 GL_ASSERT(tex);
                 texInfo = (glsTEXTUREINFO*)(tex->privateData);
 
-                gcoTEXTURE_GetMipMapFace(texInfo->object,
+                gcoTEXTURE_GetMipMap(texInfo->object,
                     attachState->level,
-                    attachState->face,
-                    &surf,
-                    &offset);
+                    &surf);
                 rtSurf = surf;
                 if(!attachState->layered)
                 {
@@ -276,7 +273,6 @@ GLvoid pickReadBufferForFBO(__GLcontext *gc)
             __GLtextureObject       *tex = NULL;
             glsTEXTUREINFO      *texInfo = NULL;
             gcoSURF surf;
-            GLuint offset;
 
             tex = (__GLtextureObject*)__glGetObject(gc, gc->texture.shared, attachState->objName);
 
@@ -290,11 +286,9 @@ GLvoid pickReadBufferForFBO(__GLcontext *gc)
             texInfo = (glsTEXTUREINFO*)(tex->privateData);
 
             GL_ASSERT(texInfo);
-                gcoTEXTURE_GetMipMapFace(texInfo->object,
+                gcoTEXTURE_GetMipMap(texInfo->object,
                     attachState->level,
-                    attachState->face,
-                    &surf,
-                    &offset);
+                    &surf);
             depthSurf = surf;
             if(!attachState->layered)
             {
@@ -399,7 +393,6 @@ GLvoid pickDrawBufferForFBO(__GLcontext *gc)
                     __GLtextureObject       *tex = NULL;
                     glsTEXTUREINFO      *texInfo = NULL;
                     gcoSURF surf;
-                    GLuint offset;
 
                     tex = (__GLtextureObject*)__glGetObject(gc, gc->texture.shared, attachState->objName);
 
@@ -413,11 +406,9 @@ GLvoid pickDrawBufferForFBO(__GLcontext *gc)
                     texInfo = (glsTEXTUREINFO*)(tex->privateData);
 
                     GL_ASSERT(texInfo);
-                    gcoTEXTURE_GetMipMapFace(texInfo->object,
+                    gcoTEXTURE_GetMipMap(texInfo->object,
                         attachState->level,
-                        attachState->face,
-                        &surf,
-                        &offset);
+                        &surf);
 
                     if (chipCtx->renderToTexture)
                     {
@@ -472,7 +463,6 @@ GLvoid pickDrawBufferForFBO(__GLcontext *gc)
             __GLtextureObject   *tex = NULL;
             glsTEXTUREINFO      *texInfo = NULL;
             gcoSURF surf;
-            GLuint offset;
 
             tex = (__GLtextureObject*)__glGetObject(gc, gc->texture.shared, attachState->objName);
 
@@ -486,11 +476,9 @@ GLvoid pickDrawBufferForFBO(__GLcontext *gc)
             texInfo = (glsTEXTUREINFO*)(tex->privateData);
 
             GL_ASSERT(texInfo);
-            gcoTEXTURE_GetMipMapFace(texInfo->object,
+            gcoTEXTURE_GetMipMap(texInfo->object,
             attachState->level,
-            attachState->face,
-            &surf,
-            &offset);
+            &surf);
             depthSurf = surf;
 
             if (chipCtx->renderToTexture)

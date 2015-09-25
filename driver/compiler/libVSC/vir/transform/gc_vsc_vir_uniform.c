@@ -2475,7 +2475,8 @@ VSC_GetUniformIndexingRange(
     VIR_Id      id  = VIR_IdList_GetId(&pShader->uniforms, uniformIndex);
     VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, id);
     VIR_Uniform *symUniform;
-    gctUINT     i, lastIndexingIndex = 0;
+    gctUINT     i;
+    gctINT      lastIndexingIndex = 0;
 
     *LastUniformIndex = uniformIndex;
 
@@ -2523,7 +2524,7 @@ VSC_GetUniformIndexingRange(
             continue;
         }
 
-        if (lastIndexingIndex == symUniform->index)
+        if (lastIndexingIndex == symUniform->gcslIndex)
         {
             *LastUniformIndex = i;
             break;

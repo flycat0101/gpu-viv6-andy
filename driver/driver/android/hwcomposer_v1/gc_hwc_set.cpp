@@ -1436,8 +1436,9 @@ _DetectSource(
         /* Yes, stretch. */
         layer->stretch = gcvTRUE;
 
-        /* Need filter blit if filterStretch or YUV source. */
-        layer->filter  = Context->filterStretch || layer->yuv;
+        /* Need filter blit if filterStretch. */
+        layer->filter  = Context->filterStretch
+                      || (layer->yuv && (Context->opf == gcvFALSE));
 
         /* Record scale factors. */
         layer->xScale = 1.0f / hFactor;
@@ -2198,7 +2199,6 @@ hwc_set(
         ||  !dpy->device.connected
         ||  !dpy->device.actived
         ||  (hwDisplay == NULL)
-        ||  (hwDisplay->numHwLayers <= 1)
         )
         {
             /* Bail out for no display. */

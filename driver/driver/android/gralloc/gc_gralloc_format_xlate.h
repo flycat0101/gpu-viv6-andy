@@ -106,6 +106,14 @@ gc_gralloc_translate_format(
         /* NV12 for Android flexible YUV 420 format. */
         return gcvSURF_NV12;
     }
+
+    if (format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED)
+    {
+        /* TODO: Soc-vendor should defined IMPLEMENTATION_DEFINED. */
+        ALOGW("HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED not defined");
+        ALOGW("Use RGBA_8888");
+        return gcvSURF_A8B8G8R8;
+    }
 #endif
 
     LOGE("Unknown ANDROID format: %d", format);

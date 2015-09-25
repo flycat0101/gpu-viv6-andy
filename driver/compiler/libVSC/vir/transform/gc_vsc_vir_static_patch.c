@@ -245,6 +245,8 @@ static VSC_ErrCode _DoRtLayerPatch(VIR_Shader* pShader)
     /* Add layer output and set its llSlot */
     pOutLayerSym = VIR_Shader_AddBuiltinOutput(pShader, VIR_TYPE_UINT32, gcvFALSE, VIR_NAME_PS_OUT_LAYER);
     VIR_Symbol_SetFirstSlot(pOutLayerSym, nextOutputLlSlot);
+    /* per HW requirement, output layer is highp */
+    VIR_Symbol_SetPrecision(pOutLayerSym, VIR_PRECISION_HIGH);
 
     /* Add following inst at the begin of main routine:
 

@@ -45,7 +45,10 @@ extern gctGLSLCompiler gcGLSLCompiler;
 gcSHADER gcTexFormatConvertLibrary = gcvNULL;
 gctSTRING RecompilerShaderSource   = gcvNULL;
 
-gcSHADER gcBuiltinLibrary = gcvNULL;
+/* Builtin library for HW that can't support IMG instructions.*/
+gcSHADER gcBuiltinLibrary0 = gcvNULL;
+/* Builtin library for HW taht can support IMG instructions. */
+gcSHADER gcBuiltinLibrary1 = gcvNULL;
 gcSHADER gcBlendEquationLibrary = gcvNULL;
 
 extern gctCLCompiler gcCLCompiler;
@@ -4264,10 +4267,16 @@ gcSHADER_FreeRecompilerLibrary(
         }
     }
 
-    if (gcBuiltinLibrary)
+    if (gcBuiltinLibrary0)
     {
-        gcSHADER_Destroy(gcBuiltinLibrary);
-        gcBuiltinLibrary = gcvNULL;
+        gcSHADER_Destroy(gcBuiltinLibrary0);
+        gcBuiltinLibrary0 = gcvNULL;
+    }
+
+    if (gcBuiltinLibrary1)
+    {
+        gcSHADER_Destroy(gcBuiltinLibrary1);
+        gcBuiltinLibrary1 = gcvNULL;
     }
 
     if (gcCLBuiltinLibrary)
@@ -4923,114 +4932,6 @@ _patchAlphaBlending(
     return status;
 }
 
-gceSTATUS
-_findMainFunction(
-    IN   gcSHADER          Shader,
-    OUT  gctINT *          StartCode,
-    OUT  gctINT *          EndCode
-    )
-{
-    gceSTATUS    status    = gcvSTATUS_OK;
-    gctPOINTER * codeOwner = gcvNULL;
-    gctSIZE_T    size      = gcmSIZEOF(gctINT *) * Shader->codeCount;
-    gctUINT      i, f;
-    gctINT       mainStart = -1;
-    gctINT       mainEnd   = -1;
-    gctPOINTER  pointer = gcvNULL;
-
-    if (Shader->lastInstruction == 0)
-    {
-        *StartCode  = 0;
-        *EndCode    = 0;
-        return status;
-    }
-
-    gcmONERROR(gcoOS_Allocate(gcvNULL, size, &pointer));
-    codeOwner = (gctPOINTER *) pointer;
-
-    /* Zero the memory. */
-    gcoOS_ZeroMemory(pointer, size);
-
-    /* Walk through functions to mark the code owner */
-
-    /* Determine ownership of the code for functions. */
-    for (f = 0; f < Shader->functionCount; ++f)
-    {
-        gcFUNCTION function = Shader->functions[f];
-        gctUINT    codeEnd  = function->codeStart + function->codeCount;
-
-        gcmASSERT(function != gcvNULL &&
-                  codeEnd <= Shader->codeCount );
-        for (i = function->codeStart; i < codeEnd; i++)
-        {
-            gcmASSERT(codeOwner[i] == gcvNULL);
-            codeOwner[i] = function;
-        }
-    }
-
-    /* Determine ownership of the code for kernel functions. */
-    for (f = 0; f < Shader->kernelFunctionCount; ++f)
-    {
-        gcKERNEL_FUNCTION kernelFunction = Shader->kernelFunctions[f];
-        gctUINT    codeEnd  = kernelFunction->codeStart + kernelFunction->codeCount;
-
-        if (kernelFunction->isMain)
-        {
-            continue;
-        }
-
-        gcmASSERT(kernelFunction != gcvNULL &&
-                  codeEnd <= Shader->codeCount );
-        for (i = kernelFunction->codeStart; i < codeEnd; i++)
-        {
-            gcmASSERT(codeOwner[i] == gcvNULL);
-            codeOwner[i] = kernelFunction;
-        }
-    }
-
-    /* Walk through all code to find main */
-    for (i = 0; i < Shader->lastInstruction; )
-    {
-        if (codeOwner[i] == gcvNULL)
-        {
-            gcmASSERT(mainStart == -1);
-            mainStart = i;
-            /* find the end of main */
-            for (i = i + 1; i < Shader->lastInstruction; i++)
-            {
-                if (codeOwner[i] != gcvNULL)
-                    break;
-            }
-            mainEnd = i;
-            gcmASSERT(mainStart != -1 && mainEnd != -1);
-            break;
-        }
-        else
-        {
-            i++;
-        }
-    }
-
-    if (StartCode)
-    {
-        *StartCode = mainStart;
-    }
-    if (EndCode)
-    {
-        *EndCode   = mainEnd;
-    }
-
-OnError:
-    if (codeOwner)
-    {
-        /* Free the current code buffer. */
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, codeOwner));
-    }
-
-    /* Return the status. */
-    return status;
-}
-
 gctINT
 _insertNOP2Shader(
     IN OUT gcSHADER          Shader,
@@ -5147,7 +5048,7 @@ _insertNOP2Main(
     gctINT      mainEnd = -1;
 
     /* find the main function start and end code index */
-    _findMainFunction(Shader, &mainStart, &mainEnd);
+    gcSHADER_FindMainFunction(Shader, &mainStart, &mainEnd);
     gcmASSERT(mainStart !=  -1 && mainEnd >= 0);
 
     return _insertNOP2Shader(Shader, mainEnd, Num);
@@ -5167,7 +5068,7 @@ _insertNOP2MainBegin(
     gctINT      mainEnd = -1;
 
     /* find the main function start and end code index */
-    _findMainFunction(Shader, &mainStart, &mainEnd);
+    gcSHADER_FindMainFunction(Shader, &mainStart, &mainEnd);
     gcmASSERT(mainStart !=  -1 && mainEnd >= 0);
 
     return _insertNOP2Shader(Shader, mainStart, Num);
@@ -5954,14 +5855,14 @@ _patchColorKill(
     IN OUT gcsPatchColorKill  *     ColorKill
     )
 {
-    gceSTATUS       	            status = gcvSTATUS_OK;
-    gcOUTPUT        	            output = gcvNULL;
-    gctINT          		        i;
+    gceSTATUS                       status = gcvSTATUS_OK;
+    gcOUTPUT                        output = gcvNULL;
+    gctINT                          i;
     gctINT                          tempCodeIndex = 0;
     gctUINT                         lastInstruction;
     gcSHADER_INSTRUCTION_INDEX      instrIndex    = 0;
-    gctFLOAT 		 	            constZero = 0.0;
-    gctUINT16			            newTempIndex;
+    gctFLOAT                        constZero = 0.0;
+    gctUINT16                       newTempIndex;
 
     if (Shader->type != gcSHADER_TYPE_FRAGMENT)
     {
@@ -6868,7 +6769,7 @@ _patchGlobalWorkSizeCode(
     gcmASSERT(attribCount < Shader->attributeCount);
 
     /* find the beginning of main function. */
-    gcmONERROR(_findMainFunction(Shader, &mainStart, &mainEnd));
+    gcmONERROR(gcSHADER_FindMainFunction(Shader, &mainStart, &mainEnd));
 
     /* Insert nops at the beginning of main function. */
     gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, mainStart, 3));
@@ -6984,7 +6885,7 @@ _patchRealGlobalWorkSizeCode(
     }
 
     /* find the beginning of main function. */
-    gcmONERROR(_findMainFunction(Shader, &mainStart, &mainEnd));
+    gcmONERROR(gcSHADER_FindMainFunction(Shader, &mainStart, &mainEnd));
 
     /* Insert nops at the beginning of main function. */
     gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, mainStart, 3));
@@ -7500,7 +7401,7 @@ _patchLongULong(
         }
         else
         {
-			gcFUNCTION          convertFunction = gcvNULL;
+            gcFUNCTION          convertFunction = gcvNULL;
             gcFUNCTION          stubFunction = gcvNULL;
             gcSL_INSTRUCTION code     = &Shader->code[Patch->instructionIndex];
 
@@ -8203,7 +8104,7 @@ _ConvertIntOrUIntAttribute(
     gctUINT lastInstruction    = 0;
 
     /* find the beginning of main function. */
-    gcmONERROR(_findMainFunction(Shader, &mainStart, &mainEnd));
+    gcmONERROR(gcSHADER_FindMainFunction(Shader, &mainStart, &mainEnd));
     mainEnd -= 1;
 
     /* Count the attribute number that need to convert. */
@@ -8325,7 +8226,7 @@ gcSHADER_CompileBuiltinLibrary(
     gctUINT8_PTR buffer   = gcvNULL;
 
     *Binary = gcvNULL;
-    if (gcBuiltinLibrary == gcvNULL)
+    if (gcBuiltinLibrary0 == gcvNULL)
     {
         gctCHAR     libName[260]    = { 0 };
         gctUINT     libNameOffset   = 0;
@@ -8333,7 +8234,7 @@ gcSHADER_CompileBuiltinLibrary(
         gctUINT32   fileSize        = 0;
         gctSIZE_T   bufferSize      = 0;
 
-        gcmONERROR(gcSHADER_Construct(gcvNULL, gcSHADER_TYPE_FRAGMENT, &gcBuiltinLibrary));
+        gcmONERROR(gcSHADER_Construct(gcvNULL, gcSHADER_TYPE_FRAGMENT, &gcBuiltinLibrary0));
 
         /* Really should be in gcOS layer!!!  Since this functions works with char strings we need
            to explicitly call the ANSI version since Windows driver can build with Unicode as default */
@@ -8360,12 +8261,12 @@ gcSHADER_CompileBuiltinLibrary(
         gcmONERROR(gcoOS_Read(gcvNULL, libFile, fileSize, buffer, &bufferSize));
         gcmASSERT(fileSize == bufferSize);
 
-        gcmONERROR(gcSHADER_Load(gcBuiltinLibrary, buffer, bufferSize));
+        gcmONERROR(gcSHADER_Load(gcBuiltinLibrary0, buffer, bufferSize));
     }
 
-    if (gcBuiltinLibrary != gcvNULL)
+    if (gcBuiltinLibrary0 != gcvNULL)
     {
-        *Binary = gcBuiltinLibrary;
+        *Binary = gcBuiltinLibrary0;
     }
 
 OnError:
@@ -8410,8 +8311,12 @@ gcSHADER_CompileBuiltinLibrary(
     gctBOOL     isHalti5 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI5);
     gctBOOL     isHalti4 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI4);
     gctBOOL     isHalti2 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI2);
+    gctBOOL     isHalti0 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI0);
     gctBOOL     isSupportTextureGather = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TEXTURE_GATHER);
-    gctBOOL     isSupportImgInst = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMG_INSTRUCTION);
+    gctBOOL     isSupportImgAddr = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMG_INSTRUCTION);
+    gctBOOL     isSupportImgInst = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI5) ?
+                                    gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_USC_GOS_ADDR_FIX) :
+                                    isSupportImgAddr;
     gctBOOL     isSupportTexelFetchForMSAA = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_MSAA_TEXTURE);
     /* Use extension string to check extension feature. */
     gctBOOL     isSupportTexMSAA2DArray = gcoOS_StrStr(GetGLExtensionString(), "GL_OES_texture_storage_multisample_2d_array", gcvNULL);
@@ -8799,111 +8704,10 @@ gcSHADER_CompileBuiltinLibrary(
         gcLibImageSize_2DArray_uint,
     };
 
-    gctSTRING TextureBufferLib[] =
-    {
-        gcLibTextureSize_Func_26,
-        gcLibTextureSize_Func_27,
-        gcLibTextureSize_Func_28,
-        gcLibImageSize_Buffer_float,
-        gcLibImageSize_Buffer_int,
-        gcLibImageSize_Buffer_uint,
-    };
-
-    gctSTRING TextureBuffer[] =
-    {
-        gcLibImageLoad_Buffer_int, /* 16i */
-        gcLibImageLoad_Buffer_int_rgba32i,
-        gcLibImageLoad_Buffer_int_rgba8i,
-        gcLibImageLoad_Buffer_int_r32i,
-        gcLibImageLoad_Buffer_uint, /* 16ui */
-        gcLibImageLoad_Buffer_uint_rgba32ui,
-        gcLibImageLoad_Buffer_uint_rgba8ui,
-        gcLibImageLoad_Buffer_uint_r32ui,
-        gcLibImageLoad_Buffer_float, /* 16f */
-        gcLibImageLoad_Buffer_float_rgba8,
-        gcLibImageLoad_Buffer_float_rgba8_snorm,
-        gcLibImageLoad_Buffer_float_rgba32f,
-        gcLibImageLoad_Buffer_float_r32f,
-        gcLibImageStore_Buffer_float, /* 16f */
-        gcLibImageStore_Buffer_float_rgba32f,
-        gcLibImageStore_Buffer_float_r32f,
-        gcLibImageStore_Buffer_float_rgba8,
-        gcLibImageStore_Buffer_float_rgba8_snorm,
-        gcLibImageStore_Buffer_int, /* 16i */
-        gcLibImageStore_Buffer_int_rgba32i,
-        gcLibImageStore_Buffer_int_r32i,
-        gcLibImageStore_Buffer_int_rgba8i,
-        gcLibImageStore_Buffer_uint, /* 16ui */
-        gcLibImageStore_Buffer_uint_rgba32ui,
-        gcLibImageStore_Buffer_uint_r32ui,
-        gcLibImageStore_Buffer_uint_rgba8ui,
-
-        /* imageAtomicXXX. */
-        gcLibImageAtomicAdd_buffer_int,
-        gcLibImageAtomicAdd_buffer_uint,
-
-        gcLibImageAtomicMin_buffer_int,
-        gcLibImageAtomicMin_buffer_uint,
-
-        gcLibImageAtomicMax_buffer_int,
-        gcLibImageAtomicMax_buffer_uint,
-
-        gcLibImageAtomicAnd_buffer_int,
-        gcLibImageAtomicAnd_buffer_uint,
-
-        gcLibImageAtomicOr_buffer_int,
-        gcLibImageAtomicOr_buffer_uint,
-
-        gcLibImageAtomicXor_buffer_int,
-        gcLibImageAtomicXor_buffer_uint,
-
-        gcLibImageAtomicXchg_buffer_int,
-        gcLibImageAtomicXchg_buffer_uint,
-        gcLibImageAtomicXchg_buffer_float,
-
-        gcLibImageAtomicCmpXchg_buffer_int,
-        gcLibImageAtomicCmpXchg_buffer_uint,
-    };
-
-    gctSTRING TextureBuffer_halti4[] =
-    {
-        gcLibImageLoad_Buffer_float_hati4,
-        gcLibImageLoad_Buffer_int_hati4,
-        gcLibImageLoad_Buffer_uint_hati4,
-        gcLibImageStore_Buffer_float_hati4,
-        gcLibImageStore_Buffer_int_hati4,
-        gcLibImageStore_Buffer_uint_hati4,
-
-        /* imageAtomicXXX. */
-        gcLibImageAtomicAdd_buffer_int_hati4,
-        gcLibImageAtomicAdd_buffer_uint_hati4,
-
-        gcLibImageAtomicMin_buffer_int_hati4,
-        gcLibImageAtomicMin_buffer_uint_hati4,
-
-        gcLibImageAtomicMax_buffer_int_hati4,
-        gcLibImageAtomicMax_buffer_uint_hati4,
-
-        gcLibImageAtomicAnd_buffer_int_hati4,
-        gcLibImageAtomicAnd_buffer_uint_hati4,
-
-        gcLibImageAtomicOr_buffer_int_hati4,
-        gcLibImageAtomicOr_buffer_uint_hati4,
-
-        gcLibImageAtomicXor_buffer_int_hati4,
-        gcLibImageAtomicXor_buffer_uint_hati4,
-
-        gcLibImageAtomicXchg_buffer_int_hati4,
-        gcLibImageAtomicXchg_buffer_uint_hati4,
-        gcLibImageAtomicXchg_buffer_float_hati4,
-
-        gcLibImageAtomicCmpXchg_buffer_int_hati4,
-        gcLibImageAtomicCmpXchg_buffer_uint_hati4,
-    };
-
     /* image_load, image_store gc3000/5000 implementation */
     gctSTRING ImageLib[] =
     {
+        /* gcLibImageAddr must be the first element. */
         gcLibImageAddr,
         gcLibImageSwizzle,
         gcLibImageStoreSwizzle,
@@ -9145,7 +8949,114 @@ gcSHADER_CompileBuiltinLibrary(
         gcLibImageAtomicCmpXchg_2DARRAY_uint_hati4,
     };
 
-    gctSTRING ImageLib_cubeMapArray[] =
+    /*--------------------extension built-in support--------------------*/
+    /* texture buffer related built-in functions. */
+    gctSTRING TextureBuffer_general[] =
+    {
+        gcLibTextureSize_Func_26,
+        gcLibTextureSize_Func_27,
+        gcLibTextureSize_Func_28,
+        gcLibImageSize_Buffer_float,
+        gcLibImageSize_Buffer_int,
+        gcLibImageSize_Buffer_uint,
+    };
+
+    gctSTRING TextureBuffer[] =
+    {
+        /* imageLoad/imageStore.*/
+        gcLibImageLoad_Buffer_int, /* 16i */
+        gcLibImageLoad_Buffer_int_rgba32i,
+        gcLibImageLoad_Buffer_int_rgba8i,
+        gcLibImageLoad_Buffer_int_r32i,
+        gcLibImageLoad_Buffer_uint, /* 16ui */
+        gcLibImageLoad_Buffer_uint_rgba32ui,
+        gcLibImageLoad_Buffer_uint_rgba8ui,
+        gcLibImageLoad_Buffer_uint_r32ui,
+        gcLibImageLoad_Buffer_float, /* 16f */
+        gcLibImageLoad_Buffer_float_rgba8,
+        gcLibImageLoad_Buffer_float_rgba8_snorm,
+        gcLibImageLoad_Buffer_float_rgba32f,
+        gcLibImageLoad_Buffer_float_r32f,
+        gcLibImageStore_Buffer_float, /* 16f */
+        gcLibImageStore_Buffer_float_rgba32f,
+        gcLibImageStore_Buffer_float_r32f,
+        gcLibImageStore_Buffer_float_rgba8,
+        gcLibImageStore_Buffer_float_rgba8_snorm,
+        gcLibImageStore_Buffer_int, /* 16i */
+        gcLibImageStore_Buffer_int_rgba32i,
+        gcLibImageStore_Buffer_int_r32i,
+        gcLibImageStore_Buffer_int_rgba8i,
+        gcLibImageStore_Buffer_uint, /* 16ui */
+        gcLibImageStore_Buffer_uint_rgba32ui,
+        gcLibImageStore_Buffer_uint_r32ui,
+        gcLibImageStore_Buffer_uint_rgba8ui,
+
+        /* imageAtomicXXX. */
+        gcLibImageAtomicAdd_buffer_int,
+        gcLibImageAtomicAdd_buffer_uint,
+
+        gcLibImageAtomicMin_buffer_int,
+        gcLibImageAtomicMin_buffer_uint,
+
+        gcLibImageAtomicMax_buffer_int,
+        gcLibImageAtomicMax_buffer_uint,
+
+        gcLibImageAtomicAnd_buffer_int,
+        gcLibImageAtomicAnd_buffer_uint,
+
+        gcLibImageAtomicOr_buffer_int,
+        gcLibImageAtomicOr_buffer_uint,
+
+        gcLibImageAtomicXor_buffer_int,
+        gcLibImageAtomicXor_buffer_uint,
+
+        gcLibImageAtomicXchg_buffer_int,
+        gcLibImageAtomicXchg_buffer_uint,
+        gcLibImageAtomicXchg_buffer_float,
+
+        gcLibImageAtomicCmpXchg_buffer_int,
+        gcLibImageAtomicCmpXchg_buffer_uint,
+    };
+
+    gctSTRING TextureBuffer_support_img_access[] =
+    {
+        /* imageLoad/imageStore.*/
+        gcLibImageLoad_Buffer_float_img_access,
+        gcLibImageLoad_Buffer_int_img_access,
+        gcLibImageLoad_Buffer_uint_img_access,
+        gcLibImageStore_Buffer_float_img_access,
+        gcLibImageStore_Buffer_int_img_access,
+        gcLibImageStore_Buffer_uint_img_access,
+
+        /* imageAtomicXXX. */
+        gcLibImageAtomicAdd_buffer_int_img_access,
+        gcLibImageAtomicAdd_buffer_uint_img_access,
+
+        gcLibImageAtomicMin_buffer_int_img_access,
+        gcLibImageAtomicMin_buffer_uint_img_access,
+
+        gcLibImageAtomicMax_buffer_int_img_access,
+        gcLibImageAtomicMax_buffer_uint_img_access,
+
+        gcLibImageAtomicAnd_buffer_int_img_access,
+        gcLibImageAtomicAnd_buffer_uint_img_access,
+
+        gcLibImageAtomicOr_buffer_int_img_access,
+        gcLibImageAtomicOr_buffer_uint_img_access,
+
+        gcLibImageAtomicXor_buffer_int_img_access,
+        gcLibImageAtomicXor_buffer_uint_img_access,
+
+        gcLibImageAtomicXchg_buffer_int_img_access,
+        gcLibImageAtomicXchg_buffer_uint_img_access,
+        gcLibImageAtomicXchg_buffer_float_img_access,
+
+        gcLibImageAtomicCmpXchg_buffer_int_img_access,
+        gcLibImageAtomicCmpXchg_buffer_uint_img_access,
+    };
+
+    /* cubeMap related built-in functions. */
+    gctSTRING ImageLib_cubeMapArray_general[] =
     {
         gcLibTextureSize_Func_22,
         gcLibTextureSize_Func_23,
@@ -9155,21 +9066,33 @@ gcSHADER_CompileBuiltinLibrary(
         gcLibImageSize_CubeArray_float,
         gcLibImageSize_CubeArray_int,
         gcLibImageSize_CubeArray_uint,
+    };
 
-        gcLibImageLoad_CubeArray_float_hati4,
-        gcLibImageLoad_CubeArray_float_1_hati4,
-        gcLibImageLoad_CubeArray_int_hati4,
-        gcLibImageLoad_CubeArray_int_1_hati4,
-        gcLibImageLoad_CubeArray_uint_hati4,
-        gcLibImageLoad_CubeArray_uint_1_hati4,
+    gctSTRING ImageLib_cubeMapArray[] =
+    {
+        gcLibImageLoad_CubeArray,
+        gcLibImageStore_CubeArray,
+    };
 
-        gcLibImageStore_CubeArray_float_hati4,
-        gcLibImageStore_CubeArray_float_1_hati4,
-        gcLibImageStore_CubeArray_int_hati4,
-        gcLibImageStore_CubeArray_int_1_hati4,
-        gcLibImageStore_CubeArray_uint_hati4,
-        gcLibImageStore_CubeArray_uint_1_hati4,
+    gctSTRING ImageLib_cubeMapArray_img_access[] =
+    {
+        gcLibImageLoad_CubeArray_float_img_access,
+        gcLibImageLoad_CubeArray_float_1_img_access,
+        gcLibImageLoad_CubeArray_int_img_access,
+        gcLibImageLoad_CubeArray_int_1_img_access,
+        gcLibImageLoad_CubeArray_uint_img_access,
+        gcLibImageLoad_CubeArray_uint_1_img_access,
 
+        gcLibImageStore_CubeArray_float_img_access,
+        gcLibImageStore_CubeArray_float_1_img_access,
+        gcLibImageStore_CubeArray_int_img_access,
+        gcLibImageStore_CubeArray_int_1_img_access,
+        gcLibImageStore_CubeArray_uint_img_access,
+        gcLibImageStore_CubeArray_uint_1_img_access,
+    };
+
+    gctSTRING TextureGatherLib_cubeMapArray_halti4[] =
+    {
         gcLibTextureGather_Func_22,
         gcLibTextureGather_Func_23,
         gcLibTextureGather_Func_24,
@@ -9179,6 +9102,7 @@ gcSHADER_CompileBuiltinLibrary(
         gcLibTextureGather_Func_28,
     };
 
+    /* MS shading related built-in functions. */
     gctSTRING MSShadingLib[] =
     {
         gcLibInterpolateCommon,
@@ -9198,6 +9122,17 @@ gcSHADER_CompileBuiltinLibrary(
         gcLibInterpolateAtOffset_vec4,
     };
 
+    if (isSupportImgAddr && !isSupportImgInst &&
+        (GetShaderType(Shader) == gcSHADER_TYPE_COMPUTE || GetShaderType(Shader) == gcSHADER_TYPE_CL))
+    {
+        isSupportImgInst = gcvTRUE;
+    }
+
+    if (isSupportImgAddr && !isSupportImgInst)
+    {
+        ImageLib[0] = gcLibImageAddr_halti4;
+    }
+
     gcmASSERT((LibType == gcLIB_BUILTIN && GetShaderHasIntrinsicBuiltin(Shader)) ||
               (LibType == gcLIB_BLEND_EQUATION &&
                gceLAYOUT_QUALIFIER_HasHWNotSupportingBlendMode(GetShaderOutputBlends(Shader))));
@@ -9209,10 +9144,21 @@ gcSHADER_CompileBuiltinLibrary(
 
     if (LibType == gcLIB_BUILTIN)
     {
-        if (gcBuiltinLibrary != gcvNULL)
+        if (isSupportImgInst)
         {
-            *Binary = gcBuiltinLibrary;
-            return gcvSTATUS_OK;
+            if (gcBuiltinLibrary1 != gcvNULL)
+            {
+                *Binary = gcBuiltinLibrary1;
+                return gcvSTATUS_OK;
+            }
+        }
+        else
+        {
+            if (gcBuiltinLibrary0 != gcvNULL)
+            {
+                *Binary = gcBuiltinLibrary0;
+                return gcvSTATUS_OK;
+            }
         }
     }
     else if (LibType == gcLIB_BLEND_EQUATION)
@@ -9299,7 +9245,19 @@ gcSHADER_CompileBuiltinLibrary(
         else
         {
             gcoOS_StrCatSafe(sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, gcLibASIN_ACOS_Funcs);
+                    __BUILTIN_SHADER_LENGTH__, gcLibASIN_ACOS_Funcs_Common);
+            if (isHalti0)
+            {
+                gcoOS_StrCatSafe(sloBuiltinSource,
+                    __BUILTIN_SHADER_LENGTH__, gcLibASIN_Funcs_halti0);
+            }
+            else
+            {
+                gcoOS_StrCatSafe(sloBuiltinSource,
+                    __BUILTIN_SHADER_LENGTH__, gcLibASIN_Funcs);
+            }
+            gcoOS_StrCatSafe(sloBuiltinSource,
+                    __BUILTIN_SHADER_LENGTH__, gcLibACOS_Funcs);
             gcoOS_StrCatSafe(sloBuiltinSource,
                     __BUILTIN_SHADER_LENGTH__, gcLibATAN_Funcs);
             gcoOS_StrCatSafe(sloBuiltinSource,
@@ -9442,30 +9400,56 @@ gcSHADER_CompileBuiltinLibrary(
 
         if (isSupportCubeMapArray)
         {
-            stringNum = sizeof(ImageLib_cubeMapArray) / sizeof(gctSTRING);
+            stringNum = sizeof(ImageLib_cubeMapArray_general) / sizeof(gctSTRING);
             for (i = 0; i < stringNum; i++)
             {
                 gcoOS_StrCatSafe(sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, ImageLib_cubeMapArray[i]);
+                    __BUILTIN_SHADER_LENGTH__, ImageLib_cubeMapArray_general[i]);
+            }
+
+            stringNum = sizeof(TextureGatherLib_cubeMapArray_halti4) / sizeof(gctSTRING);
+            for (i = 0; i < stringNum; i++)
+            {
+                gcoOS_StrCatSafe(sloBuiltinSource,
+                    __BUILTIN_SHADER_LENGTH__, TextureGatherLib_cubeMapArray_halti4[i]);
+            }
+
+            if (isSupportImgInst)
+            {
+                stringNum = sizeof(ImageLib_cubeMapArray_img_access) / sizeof(gctSTRING);
+                for (i = 0; i < stringNum; i++)
+                {
+                    gcoOS_StrCatSafe(sloBuiltinSource,
+                        __BUILTIN_SHADER_LENGTH__, ImageLib_cubeMapArray_img_access[i]);
+                }
+            }
+            else
+            {
+                stringNum = sizeof(ImageLib_cubeMapArray) / sizeof(gctSTRING);
+                for (i = 0; i < stringNum; i++)
+                {
+                    gcoOS_StrCatSafe(sloBuiltinSource,
+                        __BUILTIN_SHADER_LENGTH__, ImageLib_cubeMapArray[i]);
+                }
             }
         }
 
         if (isSupportTextureBuffer)
         {
-            stringNum = sizeof(TextureBufferLib) / sizeof(gctSTRING);
+            stringNum = sizeof(TextureBuffer_general) / sizeof(gctSTRING);
             for (i = 0; i < stringNum; i++)
             {
                 gcoOS_StrCatSafe(sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, TextureBufferLib[i]);
+                    __BUILTIN_SHADER_LENGTH__, TextureBuffer_general[i]);
             }
 
-            if (isHalti4)
+            if (isSupportImgInst)
             {
-                stringNum = sizeof(TextureBuffer_halti4) / sizeof(gctSTRING);
+                stringNum = sizeof(TextureBuffer_support_img_access) / sizeof(gctSTRING);
                 for (i = 0; i < stringNum; i++)
                 {
                     gcoOS_StrCatSafe(sloBuiltinSource,
-                        __BUILTIN_SHADER_LENGTH__, TextureBuffer_halti4[i]);
+                        __BUILTIN_SHADER_LENGTH__, TextureBuffer_support_img_access[i]);
                 }
             }
             else
@@ -9535,7 +9519,14 @@ gcSHADER_CompileBuiltinLibrary(
     }
     if (LibType == gcLIB_BUILTIN)
     {
-        gcBuiltinLibrary = *Binary;
+        if (isSupportImgInst)
+        {
+            gcBuiltinLibrary1 = *Binary;
+        }
+        else
+        {
+            gcBuiltinLibrary0 = *Binary;
+        }
     }
     else if (LibType == gcLIB_BLEND_EQUATION)
     {
@@ -11320,7 +11311,7 @@ _LinkImageLibFuc(
                                         FunctionName);
                     break;
                 default:
-                    gcmASSERT(gcvFALSE);
+                    length += 1;
                     gcoOS_Allocate(gcvNULL, length, &pointer);
                     gcoOS_ZeroMemory(pointer, length);
                     formatLibName = pointer;
@@ -11522,8 +11513,17 @@ gcSHADER_LinkLibFunction(
     gctINT  paraMapping[gcMAX_BUILT_IN_PARAMETER_COUNT];
     gctBOOL     isSupportTextureGather = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TEXTURE_GATHER);
     gctBOOL     isSupportTexelFetchForMSAA = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_MSAA_TEXTURE);
-    gctBOOL     isSupportImgInst = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMG_INSTRUCTION);
+    gctBOOL     isSupportImgAddr = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMG_INSTRUCTION);
+    gctBOOL     isSupportImgInst = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI5) ?
+                                    gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_USC_GOS_ADDR_FIX) :
+                                    isSupportImgAddr;
     gctSTRING   functionName = (gctSTRING)FunctionName;
+
+    if (isSupportImgAddr && !isSupportImgInst &&
+        (GetShaderType(Shader) == gcSHADER_TYPE_COMPUTE || GetShaderType(Shader) == gcSHADER_TYPE_CL))
+    {
+        isSupportImgInst = gcvTRUE;
+    }
 
     gcmONERROR(gcSHADER_GetFunctionByName(Library, functionName, &libFunction));
     if (libFunction == gcvNULL)

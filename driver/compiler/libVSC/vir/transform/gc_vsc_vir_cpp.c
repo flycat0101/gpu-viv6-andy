@@ -707,42 +707,56 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOV(
                     }
                     else
                     {
-                        /* no call between defInst and inst */
+                        if (cpp->largeCFG)
                         {
-                            VSC_HASH_TABLE  *visitSet = gcvNULL;
-                            visitSet = vscHTBL_Create(VSC_CPP_GetMM(cpp),
-                                vscHFUNC_Default, vscHKCMP_Default, 512);
-                            if (_VSC_CPP_CallInstInBetween(defInst, inst, visitSet))
-                            {
-                                if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
+                            if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
                                                   VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
                                 {
                                     VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                                    VIR_LOG(dumper, "[FW] ==> bail out because of call\n");
+                                    VIR_LOG(dumper, "[FW] ==> bail out because of not same BB\n");
                                     VIR_LOG_FLUSH(dumper);
+                                }
+                                break;
+                        }
+                        else
+                        {
+                            /* no call between defInst and inst */
+                            {
+                                VSC_HASH_TABLE  *visitSet = gcvNULL;
+                                visitSet = vscHTBL_Create(VSC_CPP_GetMM(cpp),
+                                    vscHFUNC_Default, vscHKCMP_Default, 512);
+                                if (_VSC_CPP_CallInstInBetween(defInst, inst, visitSet))
+                                {
+                                    if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
+                                                      VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                                    {
+                                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                                        VIR_LOG(dumper, "[FW] ==> bail out because of call\n");
+                                        VIR_LOG_FLUSH(dumper);
+                                    }
+                                    vscHTBL_Destroy(visitSet);
+                                    break;
                                 }
                                 vscHTBL_Destroy(visitSet);
-                                break;
                             }
-                            vscHTBL_Destroy(visitSet);
-                        }
 
-                        /* no redefine of movSrc between defInst and inst */
-                        {
-                            VIR_Instruction *redefInst = gcvNULL;
-                            if (_VSC_CPP_RedefineBetweenInsts(cpp, VSC_CPP_GetDUInfo(cpp),
-                                    defInst, inst, movSrc, &redefInst))
                             {
-                                if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
-                                                  VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                                /* no redefine of movSrc between defInst and inst */
+                                VIR_Instruction *redefInst = gcvNULL;
+                                if (_VSC_CPP_RedefineBetweenInsts(cpp, VSC_CPP_GetDUInfo(cpp),
+                                        defInst, inst, movSrc, &redefInst))
                                 {
-                                    VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
-                                    VIR_LOG(dumper, "[FW] ==> bail out because of redefine\n");
-                                    VIR_LOG_FLUSH(dumper);
-                                    VIR_Inst_Dump(dumper, redefInst);
-                                    VIR_LOG_FLUSH(dumper);
+                                    if(VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(options),
+                                                      VSC_OPTN_CPPOptions_TRACE_FORWARD_OPT))
+                                    {
+                                        VIR_Dumper* dumper = VSC_CPP_GetDumper(cpp);
+                                        VIR_LOG(dumper, "[FW] ==> bail out because of redefine\n");
+                                        VIR_LOG_FLUSH(dumper);
+                                        VIR_Inst_Dump(dumper, redefInst);
+                                        VIR_LOG_FLUSH(dumper);
+                                    }
+                                    break;
                                 }
-                                break;
                             }
                         }
                     }
@@ -1760,6 +1774,22 @@ VSC_ErrCode VSC_CPP_PerformOnShader(
         VSC_OPTN_CPPOptions_TRACE_INPUT))
     {
         VIR_Shader_Dump(gcvNULL, "Shader before Copy Propagation", shader, gcvTRUE);
+    }
+
+    cpp->largeCFG = gcvFALSE;
+
+    /* skip the global CPP when the cfg has too many nodes*/
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(shader));
+    for(func_node = VIR_FuncIterator_First(&func_iter);
+        func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_Function    *func = func_node->function;
+
+        if (VIR_Function_GetCFG(func)->dgGraph.nodeList.info.count > 1000)
+        {
+            cpp->largeCFG = gcvTRUE;
+            break;
+        }
     }
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(shader));

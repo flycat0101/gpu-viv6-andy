@@ -313,6 +313,11 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_PASS_MANAGER* pPassMnger)
         }
     }
 
+    /* convert hardware specific instructions, like GET_SAMPLER_LMM */
+    {
+        vscVIR_ConvertVirtualInstructions(pShader);
+    }
+
     /* Create CFG */
     vscVIR_BuildCFG(pShader);
 

@@ -37,6 +37,7 @@ struct wl_viv_interface {
      * @height: (none)
      * @stride: (none)
      * @format: (none)
+     * @type: (none)
      * @node: (none)
      * @pool: (none)
      * @bytes: (none)
@@ -48,6 +49,7 @@ struct wl_viv_interface {
                   uint32_t height,
                   uint32_t stride,
                   int32_t format,
+                  int32_t type,
                   int32_t node,
                   int32_t pool,
                   uint32_t bytes);

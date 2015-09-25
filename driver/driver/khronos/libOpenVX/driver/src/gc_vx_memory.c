@@ -42,7 +42,7 @@ VX_INTERNAL_API vx_bool vxoMemory_Allocate(vx_context context, vx_memory memory)
             size *= (vx_size)abs(memory->dims[planeIndex][dimIndex]);
         }
 
-		status = gcoVX_AllocateMemory(size, (gctUINT32_PTR)&memory->logicals[planeIndex],
+        status = gcoVX_AllocateMemory(size, (gctUINT32_PTR)&memory->logicals[planeIndex],
                                         (gctUINT32_PTR)&memory->physicals[planeIndex],
                                         &memory->nodePtrs[planeIndex]);
 
@@ -69,9 +69,9 @@ ErrorExit:
     {
         if (memory->logicals[planeIndex] != VX_NULL)
         {
-			gcoVX_FreeMemory((gcsSURF_NODE_PTR)memory->nodePtrs[planeIndex]);
+            gcoVX_FreeMemory((gcsSURF_NODE_PTR)memory->nodePtrs[planeIndex]);
             memory->logicals[planeIndex]    = VX_NULL;
-			memory->nodePtrs[planeIndex]    = VX_NULL;
+            memory->nodePtrs[planeIndex]    = VX_NULL;
         }
 
         if (memory->writeLocks[planeIndex] != VX_NULL)
@@ -101,9 +101,9 @@ VX_INTERNAL_API vx_bool vxoMemory_Free(vx_context context, vx_memory memory)
     {
         if (memory->logicals[planeIndex] != VX_NULL)
         {
-			gcoVX_FreeMemory((gcsSURF_NODE_PTR)memory->nodePtrs[planeIndex]);
+            gcoVX_FreeMemory((gcsSURF_NODE_PTR)memory->nodePtrs[planeIndex]);
             memory->logicals[planeIndex]    = VX_NULL;
-			memory->nodePtrs[planeIndex]    = VX_NULL;
+            memory->nodePtrs[planeIndex]    = VX_NULL;
         }
 
         if (memory->writeLocks[planeIndex] != VX_NULL)

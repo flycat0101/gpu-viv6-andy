@@ -32,6 +32,9 @@
 
 #define _GC_OBJ_ZONE    gcvZONE_COMPILER
 
+#define SHADER_TOO_MANY_CODE        5000
+#define SHADER_TOO_MANY_JMP         600
+
 /******************************************************************************\
 |*************************** Optimization Functioins **************************|
 |******************************************************************************|
@@ -582,6 +585,14 @@ gcOpt_OptimizeMOVInstructions(
         gcmFOOTER();
         return status;
     }
+
+    if (Optimizer->shader->codeCount > SHADER_TOO_MANY_CODE &&
+        Optimizer->jmpCount > SHADER_TOO_MANY_JMP)
+    {
+        gcmFOOTER();
+        return status;
+    }
+
     gcoHAL_GetPatchID(gcvNULL, &patchID);
     imagePatch = gcdHasOptimization(Optimizer->option, gcvOPTIMIZATION_IMAGE_PATCHING);
     /* Pass 1: Check if a MOV instruction can be removed by replacing the dependant instructions' target
@@ -660,14 +671,18 @@ gcOpt_OptimizeMOVInstructions(
               depOpcode == gcSL_ATTR_ST || depOpcode == gcSL_ATTR_LD ||
               depOpcode == gcSL_TEXLD || depOpcode == gcSL_TEXLDPROJ ||
               depOpcode == gcSL_TEXLDPCF || depOpcode == gcSL_TEXLDPCFPROJ ||
-              depOpcode == gcSL_ARCTRIG0 || depOpcode == gcSL_ARCTRIG1);
+              depOpcode == gcSL_ARCTRIG0 || depOpcode == gcSL_ARCTRIG1 ||
+              depOpcode == gcSL_IMAGE_WR || depOpcode == gcSL_IMAGE_RD ||
+              depOpcode == gcSL_IMAGE_ADDR || depOpcode == gcSL_IMAGE_ADDR_3D);
 
         isdepOpcodeTargetComponentWised =
             !(depOpcode == gcSL_CROSS || depOpcode == gcSL_NORM || depOpcode == gcSL_LOAD ||
               depOpcode == gcSL_ATTR_ST || depOpcode == gcSL_ATTR_LD ||
               depOpcode == gcSL_TEXLD || depOpcode == gcSL_TEXLDPROJ ||
               depOpcode == gcSL_TEXLDPCF || depOpcode == gcSL_TEXLDPCFPROJ ||
-              depOpcode == gcSL_ARCTRIG0 || depOpcode == gcSL_ARCTRIG1);
+              depOpcode == gcSL_ARCTRIG0 || depOpcode == gcSL_ARCTRIG1 ||
+              depOpcode == gcSL_IMAGE_WR || depOpcode == gcSL_IMAGE_RD ||
+              depOpcode == gcSL_IMAGE_ADDR || depOpcode == gcSL_IMAGE_ADDR_3D);
 
         needToChangeSwizzle = (depOpcode != gcSL_GET_SAMPLER_IDX);
 
@@ -2012,6 +2027,13 @@ gcOpt_OptimizeConstantAssignment(
     gcmHEADER_ARG("Optimizer=%p", Optimizer);
 
     if (Optimizer->tempCount == 0)
+    {
+        gcmFOOTER();
+        return status;
+    }
+
+    if (Optimizer->shader->codeCount > SHADER_TOO_MANY_CODE &&
+        Optimizer->jmpCount > SHADER_TOO_MANY_JMP)
     {
         gcmFOOTER();
         return status;
@@ -4246,6 +4268,16 @@ _IsFunctionNeedToBeExpand(
         return gcvTRUE;
     }
 
+    if (IsFunctionParamAsImgSource0(function))
+    {
+        return gcvTRUE;
+    }
+
+    if (IsFunctionUsingSamplerVirtual(function))
+    {
+        return gcvTRUE;
+    }
+
     return gcvFALSE;
 }
 static gceSTATUS
@@ -5933,6 +5965,13 @@ gcOpt_PropagateArgumentConstants(
         return status;
     }
 
+    if (Optimizer->shader->codeCount > SHADER_TOO_MANY_CODE &&
+        Optimizer->jmpCount > SHADER_TOO_MANY_JMP)
+    {
+        gcmFOOTER();
+        return status;
+    }
+
     /* Set round-to-zero mode to match GPU. */
     if (Optimizer->shader->type == gcSHADER_TYPE_CL)
     {
@@ -7171,6 +7210,13 @@ gcOpt_RemoveRedundantCheckings(
 
     gcmHEADER_ARG("Optimizer=0x%x", Optimizer);
 
+    if (Optimizer->shader->codeCount > SHADER_TOO_MANY_CODE &&
+        Optimizer->jmpCount > SHADER_TOO_MANY_JMP)
+    {
+        gcmFOOTER();
+        return status;
+    }
+
     for (code = Optimizer->codeHead; code; code = code->next)
     {
         if (gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) == gcSL_JMP)
@@ -7255,6 +7301,13 @@ gcOpt_MergeVectorInstructions(
     gctUINT16 enable, enable1;
 
     gcmHEADER_ARG("Optimizer=0x%x", Optimizer);
+
+    if (Optimizer->shader->codeCount > SHADER_TOO_MANY_CODE &&
+        Optimizer->jmpCount > SHADER_TOO_MANY_JMP)
+    {
+        gcmFOOTER();
+        return status;
+    }
 
     gcOpt_UpdateCodeId(Optimizer);
 

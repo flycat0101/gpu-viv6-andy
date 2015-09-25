@@ -20,8 +20,8 @@
 vx_status vxConvertDepth(vx_image input, vx_image output, vx_scalar spol, vx_scalar sshf)
 {
     vx_status status = VX_SUCCESS;
-	gcoVX_Kernel_Context context = {{0}};
-	vx_enum policy = 0;
+    gcoVX_Kernel_Context context = {{0}};
+    vx_enum policy = 0;
     vx_int32 shift = 0;
     vx_df_image inputFormat, outputFormat;
     vx_uint32 bin[4];
@@ -29,17 +29,17 @@ vx_status vxConvertDepth(vx_image input, vx_image output, vx_scalar spol, vx_sca
     vxQueryImage(input, VX_IMAGE_ATTRIBUTE_FORMAT, &inputFormat, sizeof(inputFormat));
     vxQueryImage(output, VX_IMAGE_ATTRIBUTE_FORMAT, &outputFormat, sizeof(outputFormat));
 
-	status = vxAccessScalarValue(spol, &policy);
+    status = vxAccessScalarValue(spol, &policy);
     status = vxAccessScalarValue(sshf, &shift);
 
-	/*index = 0*/
-	gcoVX_AddObject(&context,GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context,GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context,GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context,GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
 
-	context.params.kernel		= gcvVX_KERNEL_CONVERTDEPTH;
-	context.params.policy		= (policy == VX_CONVERT_POLICY_SATURATE)?gcvTRUE:gcvFALSE;
+    context.params.kernel       = gcvVX_KERNEL_CONVERTDEPTH;
+    context.params.policy       = (policy == VX_CONVERT_POLICY_SATURATE)?gcvTRUE:gcvFALSE;
     context.params.volume       = shift;
 
     if (outputFormat == VX_DF_IMAGE_S32 || outputFormat == VX_DF_IMAGE_U32)
@@ -63,11 +63,11 @@ vx_status vxConvertDepth(vx_image input, vx_image output, vx_scalar spol, vx_sca
     context.uniforms[0].index = 2;
     context.uniform_num = 1;
 
-	status = gcfVX_Kernel(&context);
+    status = gcfVX_Kernel(&context);
 
-	status = vxCommitScalarValue(spol, &policy);
-	status = vxCommitScalarValue(sshf, &shift);
+    status = vxCommitScalarValue(spol, &policy);
+    status = vxCommitScalarValue(sshf, &shift);
 
-	return status;
+    return status;
 }
 

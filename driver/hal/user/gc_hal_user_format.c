@@ -1292,6 +1292,19 @@ void _ReadPixelFrom_A32B32G32R32I_4_A8R8G8B8(gctPOINTER inAddr[gcdMAX_SURF_LAYER
     outPixel->s = 0;
 }
 
+void _ReadPixelFrom_X32B32G32R32I_2_G32R32I(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctINT32* pI0 = (gctINT32*)inAddr[0];
+    gctINT32* pI1 = (gctINT32*)inAddr[1];
+
+    outPixel->color.i.r = pI0[0];
+    outPixel->color.i.g = pI0[1];
+    outPixel->color.i.b = pI1[0];
+    outPixel->color.i.a = pI1[1];
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
 void _ReadPixelFrom_A32B32G32R32UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
 {
     gctUINT32* pI = (gctUINT32*)inAddr[0];
@@ -1333,7 +1346,18 @@ void _ReadPixelFrom_A32B32G32R32UI_4_A8R8G8B8(gctPOINTER inAddr[gcdMAX_SURF_LAYE
     outPixel->s = 0;
 }
 
+void _ReadPixelFrom_X32B32G32R32UI_2_G32R32UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT32* pI0 = (gctUINT32*)inAddr[0];
+    gctUINT32* pI1 = (gctUINT32*)inAddr[1];
 
+    outPixel->color.ui.r = pI0[0];
+    outPixel->color.ui.g = pI0[1];
+    outPixel->color.ui.b = pI1[0];
+    outPixel->color.ui.a = pI1[1];
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
 
 
 void _ReadPixelFrom_A32B32G32R32F(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
@@ -1732,6 +1756,9 @@ _PFNreadPixel gcoSURF_GetReadPixelFunc(gcoSURF surf)
     case gcvSURF_A32B32G32R32I_4_A8R8G8B8:
         return _ReadPixelFrom_A32B32G32R32I_4_A8R8G8B8;
 
+    case gcvSURF_X32B32G32R32I_2_G32R32I:
+        return _ReadPixelFrom_X32B32G32R32I_2_G32R32I;
+
     case gcvSURF_A32B32G32R32UI:
         return _ReadPixelFrom_A32B32G32R32UI;
     case gcvSURF_A32B32G32R32UI_2_G32R32UI:
@@ -1739,6 +1766,9 @@ _PFNreadPixel gcoSURF_GetReadPixelFunc(gcoSURF surf)
         return _ReadPixelFrom_A32B32G32R32UI_2_G32R32X;
     case gcvSURF_A32B32G32R32UI_4_A8R8G8B8:
         return _ReadPixelFrom_A32B32G32R32UI_4_A8R8G8B8;
+
+    case gcvSURF_X32B32G32R32UI_2_G32R32UI:
+        return _ReadPixelFrom_X32B32G32R32UI_2_G32R32UI;
 
     case gcvSURF_A2B10G10R10UI:
     case gcvSURF_A2B10G10R10UI_1_A8R8G8B8:

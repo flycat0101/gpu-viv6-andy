@@ -3524,6 +3524,7 @@ slParseAsmCreateOpcode(
     else STRING_MATCH_OPCODE(FINDMSB)
     else STRING_MATCH_OPCODE(IMAGE_OFFSET)
     else STRING_MATCH_OPCODE(IMAGE_ADDR)
+    else STRING_MATCH_OPCODE(IMAGE_ADDR_3D)
     else STRING_MATCH_OPCODE(SINPI)
     else STRING_MATCH_OPCODE(COSPI)
     else STRING_MATCH_OPCODE(TANPI)
@@ -3563,6 +3564,8 @@ slParseAsmCreateOpcode(
     else STRING_MATCH_OPCODE(MEM_BARRIER)
     else STRING_MATCH_OPCODE(SAMPLER_ASSIGN)
     else STRING_MATCH_OPCODE(GET_SAMPLER_IDX)
+    else STRING_MATCH_OPCODE(GET_SAMPLER_LMM)
+    else STRING_MATCH_OPCODE(GET_SAMPLER_LBS)
     else STRING_MATCH_OPCODE(IMAGE_RD_3D)
     else STRING_MATCH_OPCODE(IMAGE_WR_3D)
     else STRING_MATCH_OPCODE(FMA_MUL)
@@ -11836,9 +11839,9 @@ slParseFullySpecifiedType(
                 }
              }
              else {
-				gcmVERIFY_OK(sloCOMPILER_GetCompilerFlag(Compiler, &flag));
+                gcmVERIFY_OK(sloCOMPILER_GetCompilerFlag(Compiler, &flag));
                 slsCOMPILER_SetUnspecifiedUniformLocation(flag);
-				gcmVERIFY_OK(sloCOMPILER_SetCompilerFlag(Compiler, flag));
+                gcmVERIFY_OK(sloCOMPILER_SetCompilerFlag(Compiler, flag));
              }
 
              if(TypeQualifier->u.qualifiers.layout.id & slvLAYOUT_IMAGE_FORMAT)
@@ -11986,9 +11989,9 @@ slParseFullySpecifiedType(
        else { /* no layout(especially, no location) specified */
            if(TypeQualifier->u.qualifiers.storage == slvSTORAGE_QUALIFIER_UNIFORM &&
               sloCOMPILER_GetCurrentSpace(Compiler) == sloCOMPILER_GetGlobalSpace(Compiler)) {
-			   gcmVERIFY_OK(sloCOMPILER_GetCompilerFlag(Compiler, &flag));
+               gcmVERIFY_OK(sloCOMPILER_GetCompilerFlag(Compiler, &flag));
                slsCOMPILER_SetUnspecifiedUniformLocation(flag);
-			   gcmVERIFY_OK(sloCOMPILER_SetCompilerFlag(Compiler, flag));
+               gcmVERIFY_OK(sloCOMPILER_SetCompilerFlag(Compiler, flag));
            }
            if(shaderType == slvSHADER_TYPE_FRAGMENT &&
               TypeQualifier->u.qualifiers.storage == slvSTORAGE_QUALIFIER_OUT) {

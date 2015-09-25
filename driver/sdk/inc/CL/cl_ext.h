@@ -281,7 +281,7 @@ typedef struct _cl_mem_ext_host_ptr
     /* Legal values will be defined in layered extensions. */
     cl_uint  allocation_type;
 
-	/* Host cache policy for this external memory allocation. */
+    /* Host cache policy for this external memory allocation. */
     cl_uint  host_cache_policy;
 
 } cl_mem_ext_host_ptr;

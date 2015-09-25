@@ -3725,6 +3725,8 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
        special register channel (location) to hold these info. */
     if (pPsSEP->inputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_SAMPLE_MASK].ioIndexMask != 0 ||
         pPsSEP->outputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_SAMPLE_MASK].ioIndexMask != 0 ||
+        pPsSEP->inputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_SAMPLE_INDEX].ioIndexMask != 0 ||
+        pPsSEP->inputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_SAMPLE_POSITION].ioIndexMask != 0 ||
         bForceSampleFreq)
     {
         pStatesPgmer->pHints->sampleMaskLoc = _GetPSSampleMaskLocation(pPsSEP);

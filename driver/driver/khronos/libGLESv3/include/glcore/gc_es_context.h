@@ -404,6 +404,7 @@ typedef enum __GLApiVersionRec
     __GL_API_VERSION_ES20 = 200,
     __GL_API_VERSION_ES30 = 300,
     __GL_API_VERSION_ES31 = 310,
+    __GL_API_VERSION_ES32 = 320,
 } __GLApiVersion;
 
 

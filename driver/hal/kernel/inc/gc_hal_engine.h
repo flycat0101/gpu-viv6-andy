@@ -86,6 +86,7 @@ typedef struct _gcsSURF_RESOLVE_ARGS
             gctBOOL   directCopy;
             gctBOOL   resample;
             gctBOOL   bUploadTex; /* used for upload tex.*/
+            gctBOOL   visualizeDepth; /* convert depth to visible color */
             gcsPOINT  srcOrigin;
             gcsPOINT  dstOrigin;
             gcsPOINT  rectSize;

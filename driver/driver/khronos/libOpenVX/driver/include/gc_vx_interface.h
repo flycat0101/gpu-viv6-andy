@@ -363,7 +363,7 @@ vx_kernel_description_s basekernel_integral_image = {
     vxoIntegral_ValidateInput,
     vxoIntegral_ValidateOutput,
     gcvNULL,
-	gcvNULL,
+    gcvNULL,
 };
 
 VX_PRIVATE_API vx_status vxoMorphology_ValidateInput(vx_node node, vx_uint32 index);
@@ -820,8 +820,8 @@ vx_kernel_description_s basekernel_fast9 = {
     basekernel_fast9_params, vxmLENGTH_OF(basekernel_fast9_params),
     vxoFast9_ValidateInput,
     vxoFast9_ValidateOutput,
-	vxoFast9_Initializer,
-	vxoFast9_Deinitializer
+    vxoFast9_Initializer,
+    vxoFast9_Deinitializer
 };
 
 static vx_param_description_s basekernel_optpyrlk_params[] = {

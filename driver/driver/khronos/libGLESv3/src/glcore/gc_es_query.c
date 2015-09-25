@@ -1117,7 +1117,13 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *ip++ = gc->debug.msgLogHead ? gc->debug.msgLogHead->length : 0;
         break;
     case GL_DEBUG_GROUP_STACK_DEPTH_KHR:
-        *ip++ = gc->debug.current;
+        *ip++ = gc->debug.current + 1;
+        break;
+    case GL_DEBUG_OUTPUT_KHR:
+        *bp++ = gc->debug.dbgOut;
+        break;
+    case GL_DEBUG_OUTPUT_SYNCHRONOUS_KHR:
+        *bp++ = gc->debug.dbgOutSync;
         break;
 
     /* TS */

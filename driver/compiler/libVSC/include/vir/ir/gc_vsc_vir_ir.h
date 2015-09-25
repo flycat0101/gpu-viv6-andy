@@ -280,6 +280,8 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_Function_GetNameString(Func)    VIR_Shader_GetStringFromId((Func)->hostShader, VIR_Function_GetNameID(Func))
 #define VIR_Function_GetInstList(Func)  ((VIR_InstList*)&((Func)->instList))
 #define VIR_Function_GetInstCount(Func) (VIR_InstList_GetCount(&(Func)->instList))
+#define VIR_Function_GetInstStart(Func) ((Func)->instList.pHead)
+#define VIR_Function_GetInstEnd(Func)   ((Func)->instList.pTail)
 #define VIR_Function_GetShader(Func)    ((Func)->hostShader)
 #define VIR_Function_GetFlags(Func)      ((Func)->flags)
 #define VIR_Function_GetSymTable(Func)  ((VIR_SymTable*)&((Func)->symTable))
@@ -491,6 +493,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Shader_GetPerpatchOutputVregs(Shader)   (&((Shader)->perpatchOutputVregs))
 #define VIR_Shader_GetVaribles(Shader)              (&((Shader)->variables))
 #define VIR_Shader_GetUniforms(Shader)              (&((Shader)->uniforms))
+#define VIR_Shader_GetUniformCount(Shader)          ((Shader)->uniformCount)
 #define VIR_Shader_GetUniformSym(Shader, Uniform)   VIR_Shader_GetSymFromId(Shader, (Uniform)->sym)
 #define VIR_Shader_GetUniformType(Shader, Uniform)  VIR_Symbol_GetType(VIR_Shader_GetUniformSym(Shader, Uniform))
 #define VIR_Shader_GetUniformTypeID(Shader, Uniform)  VIR_Type_GetIndex(VIR_Shader_GetUniformType(Shader, Uniform))
@@ -522,8 +525,8 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Shader_GetSamplerBaseOffset(Shader)     ((Shader)->samplerBaseOffset)
 #define VIR_Shader_SetSamplerBaseOffset(Shader, V)  do { (Shader)->samplerBaseOffset = (V); } while (0)
 
-#define VIR_Shader_GetBaseSamplerId(Shader)     	((Shader)->baseSamplerId)
-#define VIR_Shader_SetBaseSamplerId(Shader, V)  	do { (Shader)->baseSamplerId = (V); } while (0)
+#define VIR_Shader_GetBaseSamplerId(Shader)         ((Shader)->baseSamplerId)
+#define VIR_Shader_SetBaseSamplerId(Shader, V)      do { (Shader)->baseSamplerId = (V); } while (0)
 
 #define VIR_Shader_isPackUnifiedSampler(Shader)     ((Shader)->packUnifiedSampler)
 #define VIR_Shader_SetPackUnifiedSampler(Shader, V) do { (Shader)->packUnifiedSampler = (V); } while (0)
@@ -787,6 +790,8 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Uniform_GetID(Uniform)                      ((Uniform)->index)
 #define VIR_Uniform_GetBlockIndex(Uniform)              ((Uniform)->blockIndex)
 #define VIR_Uniform_GetGLUniformIndex(Uniform)          ((Uniform)->glUniformIndex)
+#define VIR_Uniform_GetVarCategory(Uniform)             ((Uniform)->_varCategory)
+#define VIR_Uniform_SetVarCategory(Uniform, vc)         ((Uniform)->_varCategory = (vc))
 #define VIR_Uniform_GetImageSamplerIndex(Uniform)       ((Uniform)->imageSamplerIndex)
 #define VIR_Uniform_GetMatchIndex(Uniform)              ((Uniform)->matchIndex)
 #define VIR_Uniform_GetPhysical(Uniform)                ((Uniform)->physical)
@@ -797,7 +802,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Uniform_GetAddress(Uniform)                 ((Uniform)->address)
 #define VIR_Uniform_GetOffset(Uniform)                  ((Uniform)->offset)
 #define VIR_Uniform_SetOffset(Uniform, offset)          ((Uniform)->offset = offset)
-#define VIR_Uniform_GetInitializer(Uniform)             ((Uniform)->initializer)
+#define VIR_Uniform_GetInitializer(Uniform)             ((Uniform)->u.initializer)
 
 #define VIR_UniformBlock_GetBlockSize(UB)               ((UB)->blockSize)
 
@@ -2579,7 +2584,8 @@ struct _VIR_UNIFORM
 {
     /* compatible with gcUniform */
     gcsOBJECT               object;
-    VIR_UniformId           index : 16 ;  /* uniform index number: uniform(10) */
+    VIR_UniformId           index : 16 ;   /* uniform index number: uniform(10) */
+    gctINT16                gcslIndex ;    /* corresponding glsl uniform's index */
 
     /* A conservative uniform indexing range check.
        NOTE: we should remove this after using better algorithm for constant RA. Because
@@ -2613,7 +2619,16 @@ struct _VIR_UNIFORM
 
     /*gceUNIFORM_FLAGS        _flags;*/
 
-    VIR_ConstId         initializer;    /* Compile-time constant value, */
+    union
+    {
+        VIR_ConstId         initializer;    /* Compile-time constant value, */
+        struct
+        {
+            VIR_Symbol     *lodMinMax;
+            VIR_Symbol     *levelBaseSize;
+        } samplerOrImageAttr;
+        VIR_Uniform        *parentSampler;
+    } u;
 
     VIR_SymId           sym;    /* the symbol for this uniform */
 };
@@ -3692,6 +3707,12 @@ VIR_Shader_RenumberInstId(
     IN  VIR_Shader *  Shader
     );
 
+VIR_Uniform*
+VIR_Shader_GetUniformFromGCSLIndex(
+    IN  VIR_Shader *  Shader,
+    IN  gctINT        GCSLIndex
+    );
+
 /* setters */
 void
 VIR_Symbol_SetName(
@@ -3740,6 +3761,8 @@ VIR_Symbol_isNameMatch(
     IN VIR_Shader *        Shader2,
     IN VIR_Symbol *        Symbol2
     );
+
+gctUINT VIR_Symbol_GetComponents(VIR_Symbol *pSym);
 
 /* getters */
 gctSTRING VIR_GetSymbolKindName(VIR_SymbolKind  SymbolKind);

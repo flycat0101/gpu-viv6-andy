@@ -345,7 +345,7 @@ gcsPatchTCSInputCountMismatch;
 
 typedef struct _gcsPatchColorKill
 {
-    gctFLOAT	            value;
+    gctFLOAT                value;
 }
 gcsPatchColorKill;
 
@@ -1599,6 +1599,9 @@ typedef gceSTATUS (*gctGLSLCompiler)(IN  gcoHAL Hal,
 
 typedef gceSTATUS (*gctGLSLInitCompiler)(IN gcoHAL Hal,
                                          IN gcsGLSLCaps *Caps);
+
+
+typedef gceSTATUS (*gctGLSLFinalizeCompiler)(IN gcoHAL Hal);
 
 void
 gcSetGLSLCompiler(
@@ -5353,7 +5356,8 @@ gcSHADER_ConvertSamplerAssignForParameter(
 */
 gceSTATUS
 gcSHADER_AnalyzeFunctions(
-    IN gcSHADER Shader
+    IN gcSHADER Shader,
+    IN gctBOOL InFE
     );
 
 /*******************************************************************************

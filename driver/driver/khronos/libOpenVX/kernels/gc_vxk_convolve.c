@@ -19,11 +19,11 @@ vx_status Convolve(vx_image src, vx_image dst, vx_int16* matrix,  vx_uint32 scal
     vx_status status  = VX_SUCCESS;
     gcoVX_Kernel_Context context = {{0}};
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, GC_VX_INDEX_AUTO);
 
     context.params.kernel = gcvVX_KERNEL_CUSTOM_CONVOLUTION;
 

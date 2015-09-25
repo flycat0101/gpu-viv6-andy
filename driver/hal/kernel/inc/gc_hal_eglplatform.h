@@ -94,7 +94,8 @@ typedef struct _DFBPixmap *  HALNativePixmapType;
 /* Wayland platform. */
 #include <wayland-egl.h>
 
-#define WL_EGL_NUM_BACKBUFFERS 2
+
+#define WL_COMPOSITOR_SIGNATURE (0x31415926)
 
 typedef struct _gcsWL_VIV_BUFFER
 {
@@ -111,6 +112,7 @@ typedef struct _gcsWL_EGL_DISPLAY
    struct wl_event_queue    *wl_queue;
    struct wl_event_queue    *wl_swap_queue;
    gctINT swapInterval;
+   gctINT file;
 } gcsWL_EGL_DISPLAY;
 
 typedef struct _gcsWL_EGL_BUFFER_INFO
@@ -119,11 +121,12 @@ typedef struct _gcsWL_EGL_BUFFER_INFO
    gctINT32 height;
    gctINT32 stride;
    gceSURF_FORMAT format;
+   gceSURF_TYPE   type;
    gcuVIDMEM_NODE_PTR node;
    gcePOOL pool;
    gctUINT bytes;
    gcoSURF surface;
-   gcoSURF attached_surface;
+   gcoSURF pendingSurface;
    gctINT32 invalidate;
    gctBOOL locked;
 } gcsWL_EGL_BUFFER_INFO;
@@ -132,6 +135,7 @@ typedef struct _gcsWL_EGL_BUFFER
 {
    struct wl_buffer* wl_buffer;
    gcsWL_EGL_BUFFER_INFO info;
+   struct wl_callback* frame_callback;
 } gcsWL_EGL_BUFFER;
 
 typedef struct _gcsWL_EGL_WINDOW_INFO
@@ -140,20 +144,21 @@ typedef struct _gcsWL_EGL_WINDOW_INFO
    gctINT32 dy;
    gctUINT width;
    gctUINT height;
-   gctINT32 attached_width;
-   gctINT32 attached_height;
    gceSURF_FORMAT format;
    gctUINT bpp;
+   gctINT  bufferCount;
+   gctUINT current;
 } gcsWL_EGL_WINDOW_INFO;
 
 struct wl_egl_window
 {
    gcsWL_EGL_DISPLAY* display;
-   gcsWL_EGL_BUFFER backbuffers[WL_EGL_NUM_BACKBUFFERS];
-   gcsWL_EGL_WINDOW_INFO info;
-   gctUINT current;
+   gcsWL_EGL_BUFFER **backbuffers;
+   gcsWL_EGL_WINDOW_INFO* info;
+   gctINT  noResolve;
+   gctINT32 attached_width;
+   gctINT32 attached_height;
    struct wl_surface* surface;
-   struct wl_callback* frame_callback;
 };
 
 typedef void*   HALNativeDisplayType;
@@ -675,6 +680,15 @@ gcoOS_SwapBuffers(
     OUT gctUINT *Width,
     OUT gctUINT *Height
     );
+
+gceSTATUS
+gcoOS_ResizeWindow(
+    IN gctPOINTER localDisplay,
+    IN HALNativeWindowType Drawable,
+    IN gctUINT Width,
+    IN gctUINT Height
+    );
+
 #ifdef __cplusplus
 }
 #endif

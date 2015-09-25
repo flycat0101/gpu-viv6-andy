@@ -578,6 +578,17 @@ hwc_prepare(
 
         if ((hwDisplay == NULL) || (hwDisplay->numHwLayers <= 1))
         {
+            if (hwDisplay)
+            {
+                dpy->layerCount   = 0;
+
+                dpy->hasG2D       = gcvTRUE;
+                dpy->hasDim       = gcvFALSE;
+                dpy->hasClearHole = gcvFALSE;
+                dpy->hasOverlay   = gcvFALSE;
+                dpy->hasGles      = gcvFALSE;
+            }
+
             /* Bail out for no display. */
             continue;
         }

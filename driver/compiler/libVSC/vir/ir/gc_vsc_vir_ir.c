@@ -1394,7 +1394,7 @@ VIR_Shader_FindUniformByConstantValue(
 
         if (isSymUniformCompiletimeInitialized(sym))
         {
-            VIR_Const *constVal = (VIR_Const *) VIR_GetSymFromId(&Shader->constTable, uniform->initializer);
+            VIR_Const *constVal = (VIR_Const *) VIR_GetSymFromId(&Shader->constTable, VIR_Uniform_GetInitializer(uniform));
             gctINT constCount = VIR_GetTypeComponents(constVal->type);
 
             gcmASSERT(constCount > 0);
@@ -1492,7 +1492,7 @@ VIR_Shader_AddInitializedUniform(
 
     uniform = VIR_Symbol_GetUniform(uniformSym);
     VIR_Shader_AddConstant(Shader, Constant->type, &Constant->value, &cstId);
-    uniform->initializer = cstId;
+    uniform->u.initializer = cstId;
     VIR_Symbol_SetLocation(uniformSym, -1);
     VIR_Symbol_SetFlag(uniformSym, VIR_SYMUNIFORMFLAG_COMPILETIME_INITIALIZED);
     VIR_Symbol_SetFlag(uniformSym, VIR_SYMFLAG_COMPILER_GEN);
@@ -1560,7 +1560,7 @@ VIR_Shader_AddInitializedConstUniform(
     gcmASSERT(VIR_Symbol_isUniform(uniformSym));
 
     uniform = VIR_Symbol_GetUniform(uniformSym);
-    uniform->initializer = Constant->index;
+    uniform->u.initializer = Constant->index;
     VIR_Symbol_SetLocation(uniformSym, -1);
     VIR_Symbol_SetFlag(uniformSym, VIR_SYMUNIFORMFLAG_COMPILETIME_INITIALIZED);
     VIR_Symbol_SetFlag(uniformSym, VIR_SYMFLAG_COMPILER_GEN);
@@ -2031,17 +2031,7 @@ VIR_Symbol_GetRegSize(
         VIR_Symbol_GetPrecision(Sym) == VIR_PRECISION_HIGH
         )
     {
-        gctUINT         components = 0;
-        VIR_Type        *symType = VIR_Symbol_GetType(Sym);
-
-        if (VIR_Type_isPrimitive(symType))
-        {
-            components = VIR_GetTypeComponents(VIR_Type_GetIndex(symType));
-        }
-        else
-        {
-            components = VIR_GetTypeComponents(VIR_Type_GetBaseTypeId(symType));
-        }
+        gctUINT         components = VIR_Symbol_GetComponents(Sym);
 
         if (pHwCfg->hwFeatureFlags.highpVaryingShift)
         {
@@ -3104,14 +3094,19 @@ VIR_Shader_AddSymbol(
                 }
                 memset(uniform, 0, sizeof(VIR_Uniform));
                 VIR_Symbol_SetUniform(sym, uniform);
+                VIR_Symbol_SetLocation(sym, -1);
                 uniform->sym    = sym->index;
                 uniform->index = Shader->uniformCount;
+                uniform->gcslIndex = -1;
                 uniform->blockIndex = -1;
                 uniform->offset = -1;
                 uniform->lastIndexingIndex = -1;
                 uniform->realUseArraySize = -1;
                 uniform->physical = -1;
-                uniform->initializer = VIR_INVALID_ID;
+                if(SymbolKind == VIR_SYM_UNIFORM)
+                {
+                    uniform->u.initializer = VIR_INVALID_ID;
+                }
                 Shader->uniformCount++;
 
                 /* add uniform to shader uniform list */
@@ -3290,6 +3285,44 @@ VIR_Shader_RenumberInstId(
     }
 
     return instId;
+}
+
+VIR_Uniform*
+VIR_Shader_GetUniformFromGCSLIndex(
+    IN  VIR_Shader *  Shader,
+    IN  gctINT        GCSLIndex
+    )
+{
+    VIR_UniformIdList* uniforms = VIR_Shader_GetUniforms(Shader);
+    gctUINT uniformCount = VIR_Shader_GetUniformCount(Shader);
+    gctUINT i;
+
+    for(i = 0; i < uniformCount; i++)
+    {
+        VIR_UniformId uniformID = VIR_IdList_GetId(uniforms, i);
+        VIR_Symbol* uniformSym = VIR_Shader_GetSymFromId(Shader, uniformID);
+        VIR_Uniform* uniform = gcvNULL;
+
+        if(VIR_Symbol_isUniform(uniformSym))
+        {
+            uniform = VIR_Symbol_GetUniform(uniformSym);
+        }
+        else if(VIR_Symbol_isSampler(uniformSym))
+        {
+            uniform = VIR_Symbol_GetSampler(uniformSym);
+        }
+        else if(VIR_Symbol_isImage(uniformSym))
+        {
+            uniform = VIR_Symbol_GetImage(uniformSym);
+        }
+        gcmASSERT(uniform);
+        if(uniform->gcslIndex == GCSLIndex)
+        {
+            return uniform;
+        }
+    }
+
+    return gcvNULL;
 }
 
 /* setters */
@@ -3518,6 +3551,23 @@ VIR_Symbol_isNameMatch(
     }
 
     return gcvFALSE;
+}
+
+gctUINT VIR_Symbol_GetComponents(VIR_Symbol *pSym)
+{
+    gctUINT         components = 0;
+    VIR_Type        *symType = VIR_Symbol_GetType(pSym);
+
+    if (VIR_Type_isPrimitive(symType))
+    {
+        components = VIR_GetTypeComponents(VIR_Type_GetIndex(symType));
+    }
+    else
+    {
+        components = VIR_GetTypeComponents(VIR_Type_GetBaseTypeId(symType));
+    }
+
+    return components;
 }
 
 /* functions */
@@ -7651,6 +7701,80 @@ VIR_Shader_CheckDual16(
     return errCode;
 }
 
+static void _SortAttributesOfDual16Shader(VIR_Shader *pShader, VSC_HW_CONFIG *pHwCfg)
+{
+    VIR_AttributeIdList     *pAttrs = VIR_Shader_GetAttributes(pShader);
+    gctUINT                 attrCount = VIR_IdList_Count(pAttrs);
+    gctUINT                 i, j, tempIdx;
+
+    /* in dual16, we need to put all HP attributes in front of MP attributes,
+       r0/r1: highp position
+       highp varying:
+        1) all vec3 and vec4 at 2 register each
+        2) all vec1 and vec2 at 1 register
+       mediump varying: 1 register each
+    */
+
+    /* put all highp to the front */
+    for (i = 0; i < attrCount; i ++)
+    {
+        VIR_Symbol  *attribute = VIR_Shader_GetSymFromId(
+                           pShader, VIR_IdList_GetId(pAttrs, i));
+
+        if (VIR_Symbol_GetPrecision(attribute) == VIR_PRECISION_HIGH)
+        {
+            continue;
+        }
+        else
+        {
+            for (j = i + 1; j < attrCount; j ++)
+            {
+                VIR_Symbol  *nextAttribute = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pAttrs, j));
+
+                if (VIR_Symbol_GetPrecision(nextAttribute) == VIR_PRECISION_HIGH)
+                {
+                    tempIdx = VIR_IdList_GetId(pAttrs, j);
+                    VIR_IdList_SetId(pAttrs, j, VIR_IdList_GetId(pAttrs, i));
+                    VIR_IdList_SetId(pAttrs, i, tempIdx);
+                    break;
+                }
+            }
+        }
+    }
+
+    if (pHwCfg->hwFeatureFlags.highpVaryingShift)
+    {
+        /* put all highp vec3/vec4 to the front */
+        for (i = 0; i < attrCount; i ++)
+        {
+            VIR_Symbol  *attribute = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pAttrs, i));
+
+            if (VIR_Symbol_GetPrecision(attribute) == VIR_PRECISION_HIGH &&
+                VIR_Symbol_GetComponents(attribute) > 2)
+            {
+                continue;
+            }
+            else
+            {
+                for (j = i + 1; j < attrCount; j ++)
+                {
+                    VIR_Symbol  *nextAttribute = VIR_Shader_GetSymFromId(
+                        pShader, VIR_IdList_GetId(pAttrs, j));
+
+                    if (VIR_Symbol_GetPrecision(nextAttribute) == VIR_PRECISION_HIGH &&
+                        VIR_Symbol_GetComponents(nextAttribute) > 2)
+                    {
+                        tempIdx = VIR_IdList_GetId(pAttrs, j);
+                        VIR_IdList_SetId(pAttrs, j, VIR_IdList_GetId(pAttrs, i));
+                        VIR_IdList_SetId(pAttrs, i, tempIdx);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
 gctBOOL
 VIR_Shader_IsDual16able(
     IN OUT VIR_Shader       *Shader,
@@ -7660,7 +7784,7 @@ VIR_Shader_IsDual16able(
     VIR_ShaderCodeInfo codeInfo;
     gctUINT            dual16Mode = gcmOPT_DualFP16Mode();
     gctBOOL            autoMode = gcvFALSE;
-    gctUINT            i = 0, attrCount = 0;
+    gctUINT            i = 0;
     VIR_Symbol         *pSym = gcvNULL;
 
     /* only fragment shader can be dual16 shader,
@@ -7715,6 +7839,7 @@ VIR_Shader_IsDual16able(
 
     /* dual16 does not support attribute components larger than 60 */
     {
+        gctUINT attrCount = 0, highpAttrCount = 0, totalAttrCount = 0;
         gctUINT components = 0;
         for (i = 0; i < VIR_IdList_Count(VIR_Shader_GetAttributes(Shader)); i++)
         {
@@ -7733,9 +7858,15 @@ VIR_Shader_IsDual16able(
             }
 
             attrCount += VIR_Type_GetVirRegCount(Shader, symType) * components;
+            if (VIR_Symbol_GetPrecision(pSym) == VIR_PRECISION_HIGH)
+            {
+                highpAttrCount += VIR_Type_GetVirRegCount(Shader, symType) * components;
+            }
         }
 
-        if (attrCount >= 60)
+        /* this formula is coming from cmodel */
+        totalAttrCount = ((2 + 4 + attrCount + 3) >> 2) + ((2 + 4 + highpAttrCount + 3) >> 2);
+        if (totalAttrCount > 15)
         {
             return gcvFALSE;
         }
@@ -7758,6 +7889,9 @@ VIR_Shader_IsDual16able(
          1.5 * (codeInfo.runSignleTInstCount + codeInfo.highPInstCount) > codeInfo.estimatedInst)
         )
         return gcvFALSE;
+
+    /* In dual16, we need to put all HP attributes in front of MP attributes */
+    _SortAttributesOfDual16Shader(Shader, pHwCfg);
 
     return gcvTRUE;
 }

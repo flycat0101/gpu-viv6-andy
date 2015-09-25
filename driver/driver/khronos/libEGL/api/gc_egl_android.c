@@ -1856,6 +1856,12 @@ veglSynchronousPost(
             break;
         }
 
+        else if (patchId == gcvPATCH_YOUTUBE_TV)
+        {
+            sync = EGL_TRUE;
+            break;
+        }
+
         /* TODO: not required when fence sync enabled. */
 
         /*

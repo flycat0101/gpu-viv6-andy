@@ -403,7 +403,7 @@ VX_PRIVATE_API void vxoContext_ForceReleaseAllObjects(vx_context context)
         {
             vxoReference_Release(&ref, ref->type, VX_REF_INTERNAL);
 
-			if (ref == VX_NULL) continue;
+            if (ref == VX_NULL) continue;
         }
 
         while (externalCount > 1)
@@ -509,9 +509,9 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
         vxWarning("vxoContext_Release(): the context, %p, still has %u reference count(s) in total",
                     vxoReference_GetTotalCount(&context->base));
 
-		vxReleaseMutex(vxContextGlobalLock);
+        vxReleaseMutex(vxContextGlobalLock);
 
-		return VX_SUCCESS;
+        return VX_SUCCESS;
     }
 }
 

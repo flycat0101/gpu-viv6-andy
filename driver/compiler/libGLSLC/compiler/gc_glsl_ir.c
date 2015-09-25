@@ -1463,7 +1463,6 @@ slsNAME_Construct(
         case slvVARIABLE_NAME:
             name->u.variableInfo.constant                   = gcvNULL;
             name->u.variableInfo.interfaceBlock             = gcvNULL;
-            name->u.variableInfo.matrixArrIndex             = gcvNULL;
             name->u.variableInfo.lodMinMax                  = gcvNULL;
             name->u.variableInfo.levelBaseSize              = gcvNULL;
             name->u.variableInfo.isLocal                    = gcvFALSE;
@@ -1766,11 +1765,6 @@ slsNAME_Dump(
                                     slvDUMP_IR,
                                     " interfaceBlock=\"0x%x\" />",
                                     Name->u.variableInfo.interfaceBlock));
-        gcmVERIFY_OK(sloCOMPILER_Dump(
-                                    Compiler,
-                                    slvDUMP_IR,
-                                    " matrixArrIndex=\"0x%x\" />",
-                                    Name->u.variableInfo.matrixArrIndex));
         gcmVERIFY_OK(sloCOMPILER_Dump(
                                     Compiler,
                                     slvDUMP_IR,

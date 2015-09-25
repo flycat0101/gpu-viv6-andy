@@ -496,6 +496,9 @@ static gctCONST_STRING OpName[] =
     "gcSL_MOV_LONG",                      /* 0x87 */
     "gcSL_MADSAT",                        /* 0x88 */
     "gcSL_COPY",                          /* 0x89 */
+    "gcSL_IMAGE_ADDR_3D",                 /* 0x8A */
+    "gcSL_GET_SAMPLER_LMM",               /* 0x8B */
+    "gcSL_GET_SAMPLER_LBS",               /* 0x8C */
 };
 char _checkOpName_size[sizeof(OpName)/sizeof(OpName[0]) == gcSL_MAXOPCODE];
 
@@ -5112,8 +5115,11 @@ _ConvOpcode(
     case slvOPCODE_IMAGE_WRITE:             return gcSL_IMAGE_WR;
     case slvOPCODE_IMAGE_READ:              return gcSL_IMAGE_RD;
     case slvOPCODE_IMAGE_ADDRESS:           return gcSL_IMAGE_ADDR;
+    case slvOPCODE_IMAGE_ADDRESS_3D:        return gcSL_IMAGE_ADDR_3D;
 
     case slvOPCODE_GET_SAMPLER_IDX:         return gcSL_GET_SAMPLER_IDX;
+    case slvOPCODE_GET_SAMPLER_LMM:         return gcSL_GET_SAMPLER_LMM;
+    case slvOPCODE_GET_SAMPLER_LBS:         return gcSL_GET_SAMPLER_LBS;
     case slvOPCODE_IMAGE_READ_3D:           return gcSL_IMAGE_RD_3D;
     case slvOPCODE_IMAGE_WRITE_3D:          return gcSL_IMAGE_WR_3D;
     case slvOPCODE_CLAMP0MAX:               return gcSL_CLAMP0MAX;

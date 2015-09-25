@@ -36,7 +36,8 @@ typedef enum
     __GL_DEBUG_TYPE_PERFORMANCE,
     __GL_DEBUG_TYPE_OTHER,
     __GL_DEBUG_TYPE_MARKER,
-    __GL_DEBUG_TYPE_PUSHPOP,
+    __GL_DEBUG_TYPE_PUSH,
+    __GL_DEBUG_TYPE_POP,
 
     __GL_DEBUG_TYPE_NUM
 } __GLdbgType;
@@ -69,10 +70,9 @@ typedef struct __GLdbgMsgCtrlRec
 {
     GLenum src;
     GLenum type;
-    GLenum severity;
     GLuint id;
 
-    GLboolean enable;
+    GLboolean enables[__GL_DEBUG_SEVERITY_NUM];
 
     struct __GLdbgMsgCtrlRec *next;
 } __GLdbgMsgCtrl;

@@ -1323,8 +1323,9 @@ _DetectSource(
         /* Yes, stretch. */
         layer->stretch = gcvTRUE;
 
-        /* Need filter blit if filterStretch or YUV source. */
-        layer->filter  = Context->filterStretch || layer->yuv;
+        /* Need filter blit if filterStretch. */
+        layer->filter  = Context->filterStretch
+                      || (layer->yuv && (Context->opf == gcvFALSE));
     }
 
     else

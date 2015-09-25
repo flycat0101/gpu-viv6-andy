@@ -15,7 +15,7 @@ Files layout
     |    |    |
     |    |    +---libGLESv11         : OpenGL ES1.1 driver
     |    |    |
-    |    |    +---libGLESv3          : OpenGL ES3.0 driver
+    |    |    +---libGLESv3          : OpenGL ES3.x driver
     |    |    |
     |    |    +---libOpenVG          : OpenVG driver for 2D VG
     |    |    |

@@ -1155,7 +1155,7 @@ VX_PRIVATE_API vx_status vxoHistogram_Initializer(vx_node node, vx_reference *pa
     vx_size numBins = 0;
     vx_uint32 window_size = 0;
     vx_uint32* dist_src = NULL;
-	vx_distribution dist = (vx_distribution)parameters[1];
+    vx_distribution dist = (vx_distribution)parameters[1];
 
     vxQueryDistribution(dist, VX_DISTRIBUTION_ATTRIBUTE_BINS, &numBins, sizeof(numBins));
     vxQueryDistribution(dist, VX_DISTRIBUTION_ATTRIBUTE_WINDOW, &window_size, sizeof(window_size));
@@ -1172,7 +1172,7 @@ VX_PRIVATE_API vx_status vxoHistogram_Deinitializer(vx_node node, vx_reference *
 {
     vx_status status = VX_SUCCESS;
 
-	status |= vxReleaseDistribution((vx_distribution*)&node->kernelAttributes.stagings[0]);
+    status |= vxReleaseDistribution((vx_distribution*)&node->kernelAttributes.stagings[0]);
 
     return status;
 }
@@ -1225,17 +1225,17 @@ VX_PRIVATE_API vx_status vxoEqualizeHist_Initializer(vx_node node, vx_reference 
 {
     vx_status status = VX_SUCCESS;
     vx_uint32 width = 0, height = 0;
-	vx_image src = (vx_image)parameters[0];
+    vx_image src = (vx_image)parameters[0];
 
     vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
     vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
 
-	node->kernelAttributes.stagings[0] = (vx_reference)vxCreateImage(vxGetContext((vx_reference)src), 256 * 2, 1, VX_DF_IMAGE_U16);
+    node->kernelAttributes.stagings[0] = (vx_reference)vxCreateImage(vxGetContext((vx_reference)src), 256 * 2, 1, VX_DF_IMAGE_U16);
     node->kernelAttributes.stagings[1] = (vx_reference)vxCreateImage(vxGetContext((vx_reference)src), 256 * 2, 1, VX_DF_IMAGE_U16);
 
-	if (!vxoImage_AllocateMemory((vx_image)node->kernelAttributes.stagings[0])
-		|| !vxoImage_AllocateMemory((vx_image)node->kernelAttributes.stagings[1]))
-		status |= VX_ERROR_NO_MEMORY;
+    if (!vxoImage_AllocateMemory((vx_image)node->kernelAttributes.stagings[0])
+        || !vxoImage_AllocateMemory((vx_image)node->kernelAttributes.stagings[1]))
+        status |= VX_ERROR_NO_MEMORY;
 
     return status;
 }
@@ -1244,8 +1244,8 @@ VX_PRIVATE_API vx_status vxoEqualizeHist_Deinitializer(vx_node node, vx_referenc
 {
     vx_status status = VX_SUCCESS;
 
-	status |= vxReleaseImage((vx_image*)&node->kernelAttributes.stagings[0]);
-	status |= vxReleaseImage((vx_image*)&node->kernelAttributes.stagings[1]);
+    status |= vxReleaseImage((vx_image*)&node->kernelAttributes.stagings[0]);
+    status |= vxReleaseImage((vx_image*)&node->kernelAttributes.stagings[1]);
 
     return status;
 }
@@ -1449,7 +1449,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_IntegralImage(vx_node node, vx_reference 
 
     /* To clean up - Cannot support multipass yet. Need deal with the staging resources */
     node->kernelAttributes.isAllGPU = vx_false_e;
-	return vxIntegralImage(srcImage, dstImage);
+    return vxIntegralImage(srcImage, dstImage);
 }
 
 VX_PRIVATE_API vx_status vxoIntegral_ValidateInput(vx_node node, vx_uint32 index)
@@ -2116,7 +2116,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_MinMaxLoc(vx_node node, vx_reference *par
     maxCount   = (vx_scalar)parameters[6];
 
     node->kernelAttributes.isAllGPU = vx_false_e;
-	return vxMinMaxLoc(inputImage, minVal, maxVal, minLoc, maxLoc, minCount, maxCount, node->kernelAttributes.stagings);
+    return vxMinMaxLoc(inputImage, minVal, maxVal, minLoc, maxLoc, minCount, maxCount, node->kernelAttributes.stagings);
 }
 
 VX_PRIVATE_API vx_status vxoMinMaxLoc_ValidateInput(vx_node node, vx_uint32 index)
@@ -2198,10 +2198,10 @@ VX_PRIVATE_API vx_status vxoMinMaxLoc_Initializer(vx_node node, vx_reference *pa
 {
     vx_status status = VX_SUCCESS;
     vx_uint32 width = 0, height = 0;
-	vx_int32 value[2];
+    vx_int32 value[2];
     vx_df_image format;
     vx_enum itemType;
-	vx_image src = (vx_image)parameters[0];
+    vx_image src = (vx_image)parameters[0];
     vx_array min_loc = (vx_array)parameters[3];
     vx_array max_loc = (vx_array)parameters[4];
 
@@ -2209,15 +2209,15 @@ VX_PRIVATE_API vx_status vxoMinMaxLoc_Initializer(vx_node node, vx_reference *pa
     vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
     vxQueryImage(src, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(format));
 
-	value[0] = (format == VX_DF_IMAGE_S16)? 0x7fff: 0xff;
-	value[1] = (format == VX_DF_IMAGE_S16)? -0x7fff: 0;
+    value[0] = (format == VX_DF_IMAGE_S16)? 0x7fff: 0xff;
+    value[1] = (format == VX_DF_IMAGE_S16)? -0x7fff: 0;
 
-	node->kernelAttributes.stagings[0] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)src), VX_TYPE_INT32, &value[0]);
-	node->kernelAttributes.stagings[1] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)src), VX_TYPE_INT32, &value[1]);
+    node->kernelAttributes.stagings[0] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)src), VX_TYPE_INT32, &value[0]);
+    node->kernelAttributes.stagings[1] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)src), VX_TYPE_INT32, &value[1]);
     node->kernelAttributes.stagings[2] = (vx_reference)vxCreateImage(vxGetContext((vx_reference)src), 2, height, VX_DF_IMAGE_U16);
 
-	if (!vxoImage_AllocateMemory((vx_image)node->kernelAttributes.stagings[2]))
-		status |= VX_ERROR_NO_MEMORY;
+    if (!vxoImage_AllocateMemory((vx_image)node->kernelAttributes.stagings[2]))
+        status |= VX_ERROR_NO_MEMORY;
 
     if (min_loc)
     {
@@ -2237,11 +2237,11 @@ VX_PRIVATE_API vx_status vxoMinMaxLoc_Initializer(vx_node node, vx_reference *pa
 
         if ( !vxoArray_AllocateMemory((vx_array)node->kernelAttributes.stagings[4]))
         {
-		    status |= VX_ERROR_NO_MEMORY;
+            status |= VX_ERROR_NO_MEMORY;
         }
     }
-	vxCommitScalarValue((vx_scalar)node->kernelAttributes.stagings[0], &value[0]);
-	vxCommitScalarValue((vx_scalar)node->kernelAttributes.stagings[1], &value[1]);
+    vxCommitScalarValue((vx_scalar)node->kernelAttributes.stagings[0], &value[0]);
+    vxCommitScalarValue((vx_scalar)node->kernelAttributes.stagings[1], &value[1]);
 
     return status;
 }
@@ -2250,8 +2250,8 @@ VX_PRIVATE_API vx_status vxoMinMaxLoc_Deinitializer(vx_node node, vx_reference *
 {
     vx_status status = VX_SUCCESS;
 
-	status |= vxReleaseScalar((vx_scalar*)&node->kernelAttributes.stagings[0]);
-	status |= vxReleaseScalar((vx_scalar*)&node->kernelAttributes.stagings[1]);
+    status |= vxReleaseScalar((vx_scalar*)&node->kernelAttributes.stagings[0]);
+    status |= vxReleaseScalar((vx_scalar*)&node->kernelAttributes.stagings[1]);
     status |= vxReleaseImage((vx_image*)&node->kernelAttributes.stagings[2]);
     if (node->kernelAttributes.stagings[3])
     {
@@ -3237,7 +3237,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Fast9Corners(vx_node node, vx_reference p
 
     if (vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &bordermode, sizeof(bordermode)) == VX_SUCCESS)
     {
-		return vxFast9Corners(inputImage, sens, nonm, points, numCorners, &bordermode, node->kernelAttributes.stagings);
+        return vxFast9Corners(inputImage, sens, nonm, points, numCorners, &bordermode, node->kernelAttributes.stagings);
     }
 
     return VX_FAILURE;
@@ -3309,18 +3309,18 @@ VX_PRIVATE_API vx_status vxoFast9_Initializer(vx_node node, vx_reference *parame
     vx_status status = VX_SUCCESS;
     vx_rectangle_t rect;
     vx_enum itemType;
-	vx_image src = (vx_image)parameters[0];
+    vx_image src = (vx_image)parameters[0];
     vx_array arrays = (vx_array)parameters[3];
     status |= vxGetValidRegionImage(src, &rect);
 
-	node->kernelAttributes.stagings[0] = (vx_reference)vxCreateImage(vxGetContext((vx_reference)src), rect.end_x, rect.end_y, VX_DF_IMAGE_U8);
+    node->kernelAttributes.stagings[0] = (vx_reference)vxCreateImage(vxGetContext((vx_reference)src), rect.end_x, rect.end_y, VX_DF_IMAGE_U8);
     node->kernelAttributes.stagings[1] = (vx_reference)vxCreateImage(vxGetContext((vx_reference)src), rect.end_x, rect.end_y, VX_DF_IMAGE_U8);
     node->kernelAttributes.stagings[2] = (vx_reference)vxCreateImage(vxGetContext((vx_reference)src), 2, rect.end_y, VX_DF_IMAGE_U16);
 
-	if (!vxoImage_AllocateMemory((vx_image)node->kernelAttributes.stagings[0])
-		|| !vxoImage_AllocateMemory((vx_image)node->kernelAttributes.stagings[1])
+    if (!vxoImage_AllocateMemory((vx_image)node->kernelAttributes.stagings[0])
+        || !vxoImage_AllocateMemory((vx_image)node->kernelAttributes.stagings[1])
         || !vxoImage_AllocateMemory((vx_image)node->kernelAttributes.stagings[2]))
-		status |= VX_ERROR_NO_MEMORY;
+        status |= VX_ERROR_NO_MEMORY;
 
     if (arrays)
     {
@@ -3341,8 +3341,8 @@ VX_PRIVATE_API vx_status vxoFast9_Deinitializer(vx_node node, vx_reference *para
 {
     vx_status status = VX_SUCCESS;
 
-	status |= vxReleaseImage((vx_image*)&node->kernelAttributes.stagings[0]);
-	status |= vxReleaseImage((vx_image*)&node->kernelAttributes.stagings[1]);
+    status |= vxReleaseImage((vx_image*)&node->kernelAttributes.stagings[0]);
+    status |= vxReleaseImage((vx_image*)&node->kernelAttributes.stagings[1]);
     status |= vxReleaseImage((vx_image*)&node->kernelAttributes.stagings[2]);
     if (node->kernelAttributes.stagings[3])
     {
@@ -3550,8 +3550,8 @@ VX_PRIVATE_API vx_status vxoOpticalFlowPyrLK_Deinitializer(vx_node node, vx_refe
 
     for(level=maxLevel; level>0; level--)
     {
-	    status |= vxReleaseImage((vx_image*)&(node->kernelAttributes.stagings[level*2-2]));
-	    status |= vxReleaseImage((vx_image*)&(node->kernelAttributes.stagings[level*2-1]));
+        status |= vxReleaseImage((vx_image*)&(node->kernelAttributes.stagings[level*2-2]));
+        status |= vxReleaseImage((vx_image*)&(node->kernelAttributes.stagings[level*2-1]));
     }
 
     return status;
@@ -3884,7 +3884,7 @@ VX_PRIVATE_API vx_status vxoLister_Initializer(vx_node node, vx_reference *param
     vx_status status = VX_SUCCESS;
     vx_uint32 width = 0, height = 0;
     vx_enum itemType;
-	vx_image src = (vx_image)parameters[0];
+    vx_image src = (vx_image)parameters[0];
     vx_array arrays = (vx_array)parameters[1];
 
     vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
@@ -3892,9 +3892,9 @@ VX_PRIVATE_API vx_status vxoLister_Initializer(vx_node node, vx_reference *param
 
     node->kernelAttributes.stagings[0] = (vx_reference)vxCreateImage(vxGetContext((vx_reference)src), 2, height, VX_DF_IMAGE_U16);
 
-	if (!vxoImage_AllocateMemory((vx_image)node->kernelAttributes.stagings[0]))
+    if (!vxoImage_AllocateMemory((vx_image)node->kernelAttributes.stagings[0]))
     {
-		status |= VX_ERROR_NO_MEMORY;
+        status |= VX_ERROR_NO_MEMORY;
     }
 
     if (arrays)
@@ -3916,7 +3916,7 @@ VX_PRIVATE_API vx_status vxoLister_Deinitializer(vx_node node, vx_reference *par
 {
     vx_status status = VX_SUCCESS;
 
-	status |= vxReleaseImage((vx_image*)&node->kernelAttributes.stagings[0]);
+    status |= vxReleaseImage((vx_image*)&node->kernelAttributes.stagings[0]);
     if (node->kernelAttributes.stagings[1])
     {
         status |= vxReleaseArray((vx_array*)&node->kernelAttributes.stagings[1]);
@@ -4126,7 +4126,7 @@ VX_PRIVATE_API vx_status vxoInternalKernel_EdgeTrace(vx_node node, vx_reference 
     threshold = (vx_threshold)parameters[1];
     output    = (vx_image)parameters[2];
 
-	return vxEdgeTrace(norm, threshold, output, node->kernelAttributes.stagings);
+    return vxEdgeTrace(norm, threshold, output, node->kernelAttributes.stagings);
 }
 
 VX_PRIVATE_API vx_status vxoEdgeTrace_ValidateInput(vx_node node, vx_uint32 index)
@@ -4175,17 +4175,17 @@ VX_PRIVATE_API vx_status vxoEdgeTrace_Initializer(vx_node node, vx_reference *pa
     vx_status status = VX_SUCCESS;
     vx_rectangle_t rect;
     vx_uint32 count = 0;
-	vx_image output = (vx_image)parameters[2];
+    vx_image output = (vx_image)parameters[2];
 
     status |= vxGetValidRegionImage(output, &rect);
 
-	node->kernelAttributes.stagings[0] = (vx_reference)vxCreateImage(vxGetContext((vx_reference)output), rect.end_x, rect.end_y, VX_DF_IMAGE_U8);
+    node->kernelAttributes.stagings[0] = (vx_reference)vxCreateImage(vxGetContext((vx_reference)output), rect.end_x, rect.end_y, VX_DF_IMAGE_U8);
     node->kernelAttributes.stagings[1] = (vx_reference)vxCreateImage(vxGetContext((vx_reference)output), rect.end_x, rect.end_y, VX_DF_IMAGE_U8);
     node->kernelAttributes.stagings[2] = (vx_reference)vxCreateScalar(vxGetContext((vx_reference)output), VX_TYPE_UINT32, &count);
 
-	if (!vxoImage_AllocateMemory((vx_image)node->kernelAttributes.stagings[0])
-		|| !vxoImage_AllocateMemory((vx_image)node->kernelAttributes.stagings[1]))
-		status |= VX_ERROR_NO_MEMORY;
+    if (!vxoImage_AllocateMemory((vx_image)node->kernelAttributes.stagings[0])
+        || !vxoImage_AllocateMemory((vx_image)node->kernelAttributes.stagings[1]))
+        status |= VX_ERROR_NO_MEMORY;
     vxCommitScalarValue((vx_scalar)node->kernelAttributes.stagings[2], &count);
 
     return status;
@@ -4195,8 +4195,8 @@ VX_PRIVATE_API vx_status vxoEdgeTrace_Deinitializer(vx_node node, vx_reference *
 {
     vx_status status = VX_SUCCESS;
 
-	status |= vxReleaseImage((vx_image*)&node->kernelAttributes.stagings[0]);
-	status |= vxReleaseImage((vx_image*)&node->kernelAttributes.stagings[1]);
+    status |= vxReleaseImage((vx_image*)&node->kernelAttributes.stagings[0]);
+    status |= vxReleaseImage((vx_image*)&node->kernelAttributes.stagings[1]);
     status |= vxReleaseScalar((vx_scalar*)&node->kernelAttributes.stagings[2]);
 
     return status;

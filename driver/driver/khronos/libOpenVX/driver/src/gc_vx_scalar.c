@@ -229,8 +229,8 @@ VX_PUBLIC_API vx_scalar vxCreateScalar(vx_context context, vx_enum dataType, voi
 
     scalar->dataType = dataType;
 
-	gcoVX_AllocateMemory(sizeof(vx_scalar_data), (gctUINT32_PTR)&scalar->value, (gctUINT32_PTR)&scalar->physical, (gcsSURF_NODE_PTR*)&scalar->node);
-	memset(scalar->value, 0, sizeof(vx_scalar_data));
+    gcoVX_AllocateMemory(sizeof(vx_scalar_data), (gctUINT32_PTR)&scalar->value, (gctUINT32_PTR)&scalar->physical, (gcsSURF_NODE_PTR*)&scalar->node);
+    memset(scalar->value, 0, sizeof(vx_scalar_data));
 
     vxoScalar_CommitValue(scalar, ptr);
 

@@ -15,9 +15,9 @@
 
 vx_status vxChannelCombine(vx_image inputs[4], vx_image output)
 {
-	vx_status status = VX_SUCCESS;
-	gcoVX_Kernel_Context context = {{0}};
-	vx_df_image format = 0;
+    vx_status status = VX_SUCCESS;
+    gcoVX_Kernel_Context context = {{0}};
+    vx_df_image format = 0;
     vx_uint32 constantData[8] = {0, 8, 16, 24, 0, 0, 0, 0};
     vx_uint32 width;
     vx_uint32 height;
@@ -25,86 +25,86 @@ vx_status vxChannelCombine(vx_image inputs[4], vx_image output)
     vxQueryImage(output, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
     vxQueryImage(output, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(format));
 
-	switch (format)
-	{
-	    case VX_DF_IMAGE_RGB:
-			/*index = 0*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[0], GC_VX_INDEX_AUTO);
+    switch (format)
+    {
+        case VX_DF_IMAGE_RGB:
+            /*index = 0*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[0], GC_VX_INDEX_AUTO);
 
-			/*index = 1*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[1], GC_VX_INDEX_AUTO);
+            /*index = 1*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[1], GC_VX_INDEX_AUTO);
 
-			/*index = 2*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[2], GC_VX_INDEX_AUTO);
+            /*index = 2*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[2], GC_VX_INDEX_AUTO);
 
-			/*index = 3*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+            /*index = 3*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
 
-			gcoOS_MemCopy(&context.uniforms[0].uniform, constantData, sizeof(constantData));
-	        context.uniforms[0].index = 4;
+            gcoOS_MemCopy(&context.uniforms[0].uniform, constantData, sizeof(constantData));
+            context.uniforms[0].index = 4;
             context.uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
             context.uniform_num = 1;
-			context.params.outputFormat = gcvSURF_R8G8B8;
+            context.params.outputFormat = gcvSURF_R8G8B8;
             context.params.xstep = 4;
             break;
         case VX_DF_IMAGE_RGBX:
-			/*index = 0*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[0], GC_VX_INDEX_AUTO);
+            /*index = 0*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[0], GC_VX_INDEX_AUTO);
 
-			/*index = 1*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[1], GC_VX_INDEX_AUTO);
+            /*index = 1*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[1], GC_VX_INDEX_AUTO);
 
-			/*index = 2*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[2], GC_VX_INDEX_AUTO);
+            /*index = 2*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[2], GC_VX_INDEX_AUTO);
 
-			/*index = 3*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[3], GC_VX_INDEX_AUTO);
+            /*index = 3*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[3], GC_VX_INDEX_AUTO);
 
-			/*index = 4*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
-
-			gcoOS_MemCopy(&context.uniforms[0].uniform, constantData, sizeof(constantData));
-	        context.uniforms[0].index = 5;
-            context.uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
-            context.uniform_num = 1;
-			context.params.outputFormat = gcvSURF_X8R8G8B8;
-            context.params.xstep = 4;
-			break;
-		case VX_DF_IMAGE_UYVY:
-			/*index = 0*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[0], GC_VX_INDEX_AUTO);
-
-			/*index = 1*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[1], GC_VX_INDEX_AUTO);
-
-			/*index = 2*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[2], GC_VX_INDEX_AUTO);
-
-			/*index = 3*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+            /*index = 4*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
 
             gcoOS_MemCopy(&context.uniforms[0].uniform, constantData, sizeof(constantData));
-	        context.uniforms[0].index = 4;
+            context.uniforms[0].index = 5;
+            context.uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
+            context.uniform_num = 1;
+            context.params.outputFormat = gcvSURF_X8R8G8B8;
+            context.params.xstep = 4;
+            break;
+        case VX_DF_IMAGE_UYVY:
+            /*index = 0*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[0], GC_VX_INDEX_AUTO);
+
+            /*index = 1*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[1], GC_VX_INDEX_AUTO);
+
+            /*index = 2*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[2], GC_VX_INDEX_AUTO);
+
+            /*index = 3*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+
+            gcoOS_MemCopy(&context.uniforms[0].uniform, constantData, sizeof(constantData));
+            context.uniforms[0].index = 4;
             context.uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
             context.uniform_num = 1;
             context.params.outputFormat = gcvSURF_UYVY;
             context.params.xstep = 8;
-			break;
+            break;
         case VX_DF_IMAGE_YUYV:
-			/*index = 0*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[0], GC_VX_INDEX_AUTO);
+            /*index = 0*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[0], GC_VX_INDEX_AUTO);
 
-			/*index = 1*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[1], GC_VX_INDEX_AUTO);
+            /*index = 1*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[1], GC_VX_INDEX_AUTO);
 
-			/*index = 2*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[2], GC_VX_INDEX_AUTO);
+            /*index = 2*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[2], GC_VX_INDEX_AUTO);
 
-			/*index = 3*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+            /*index = 3*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
 
             gcoOS_MemCopy(&context.uniforms[0].uniform, constantData, sizeof(constantData));
-	        context.uniforms[0].index = 4;
+            context.uniforms[0].index = 4;
             context.uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
             context.uniform_num = 1;
 
@@ -112,123 +112,123 @@ vx_status vxChannelCombine(vx_image inputs[4], vx_image output)
             context.params.xstep = 8;
             break;
         case VX_DF_IMAGE_NV12:
-			/*index = 0*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[0], GC_VX_INDEX_AUTO);
+            /*index = 0*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[0], GC_VX_INDEX_AUTO);
 
-			/*index = 1*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[1], GC_VX_INDEX_AUTO);
+            /*index = 1*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[1], GC_VX_INDEX_AUTO);
 
-			/*index = 2*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[2], GC_VX_INDEX_AUTO);
+            /*index = 2*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[2], GC_VX_INDEX_AUTO);
 
-			/*index = 3*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+            /*index = 3*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
 
             gcoOS_MemCopy(&context.uniforms[0].uniform, constantData, sizeof(constantData));
-	        context.uniforms[0].index = 5;
+            context.uniforms[0].index = 5;
             context.uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
             context.uniform_num = 1;
             context.params.outputFormat = gcvSURF_NV12;
             context.params.xstep = 16;
             break;
         case VX_DF_IMAGE_NV21:
-			/*index = 0*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[0], GC_VX_INDEX_AUTO);
+            /*index = 0*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[0], GC_VX_INDEX_AUTO);
 
-			/*index = 1*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[1], GC_VX_INDEX_AUTO);
+            /*index = 1*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[1], GC_VX_INDEX_AUTO);
 
-			/*index = 2*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[2], GC_VX_INDEX_AUTO);
+            /*index = 2*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[2], GC_VX_INDEX_AUTO);
 
-			/*index = 3*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+            /*index = 3*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
 
             gcoOS_MemCopy(&context.uniforms[0].uniform, constantData, sizeof(constantData));
-	        context.uniforms[0].index = 5;
+            context.uniforms[0].index = 5;
             context.uniforms[0].num = sizeof(constantData) / sizeof(vx_uint32);
             context.uniform_num = 1;
             context.params.outputFormat = gcvSURF_NV21;
             context.params.xstep = 16;
             break;
         case VX_DF_IMAGE_IYUV:
-			/*index = 0*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[0], GC_VX_INDEX_AUTO);
+            /*index = 0*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[0], GC_VX_INDEX_AUTO);
 
-			/*index = 1*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[1], GC_VX_INDEX_AUTO);
+            /*index = 1*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[1], GC_VX_INDEX_AUTO);
 
-			/*index = 2*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[2], GC_VX_INDEX_AUTO);
+            /*index = 2*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[2], GC_VX_INDEX_AUTO);
 
-			/*index = 3*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+            /*index = 3*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
 
             context.params.outputFormat = gcvSURF_I420;
             context.params.xstep = 16;
             break;
         case VX_DF_IMAGE_YUV4:
-			/*index = 0*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[0], GC_VX_INDEX_AUTO);
+            /*index = 0*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[0], GC_VX_INDEX_AUTO);
 
-			/*index = 1*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[1], GC_VX_INDEX_AUTO);
+            /*index = 1*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[1], GC_VX_INDEX_AUTO);
 
-			/*index = 2*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[2], GC_VX_INDEX_AUTO);
+            /*index = 2*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputs[2], GC_VX_INDEX_AUTO);
 
-			/*index = 3*/
-			gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+            /*index = 3*/
+            gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
 
             context.params.outputFormat = gcvSURF_AYUV;
             context.params.xstep = 16;
             break;
-	    default:
-		    status = VX_ERROR_INVALID_FORMAT;
-		    break;
-	}
-	if (status != VX_SUCCESS)
-	    return status;
+        default:
+            status = VX_ERROR_INVALID_FORMAT;
+            break;
+    }
+    if (status != VX_SUCCESS)
+        return status;
 
 
-	context.params.kernel = gcvVX_KERNEL_CHANNEL_COMBINE;
-	context.params.borders = VX_BORDER_MODE_CONSTANT;
-	context.params.constant_value = 0;
+    context.params.kernel = gcvVX_KERNEL_CHANNEL_COMBINE;
+    context.params.borders = VX_BORDER_MODE_CONSTANT;
+    context.params.constant_value = 0;
     context.params.row = width;
     context.params.col = height;
 
-	status = gcfVX_Kernel(&context);
-	return status;
+    status = gcfVX_Kernel(&context);
+    return status;
 
 }
 
 vx_status vxChannelExtract(vx_image src, vx_scalar channel, vx_image dst)
 {
-	vx_status status = VX_SUCCESS;
-	gcoVX_Kernel_Context context = {{0}};
-	vx_uint8 constantData[16] = {0, 32, 64, 96, 0, 0, 0, 0, 8, 8, 8, 8, 0, 0, 0, 0};
-	vx_df_image format = 0;
+    vx_status status = VX_SUCCESS;
+    gcoVX_Kernel_Context context = {{0}};
+    vx_uint8 constantData[16] = {0, 32, 64, 96, 0, 0, 0, 0, 8, 8, 8, 8, 0, 0, 0, 0};
+    vx_df_image format = 0;
     vx_enum chan = -1;
-	vx_uint32 width;
+    vx_uint32 width;
     vx_uint32 height;
-	vxAccessScalarValue(channel, &chan);
+    vxAccessScalarValue(channel, &chan);
     vxQueryImage(src, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(format));
     vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
     vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
 
-	if (format == VX_DF_IMAGE_RGB)
-	{
+    if (format == VX_DF_IMAGE_RGB)
+    {
         switch (chan)
         {
              case VX_CHANNEL_0:
-			    context.params.volume = 0;
+                context.params.volume = 0;
                 constantData[0] = 0;
                 constantData[1] = 24;
                 constantData[2] = 48;
                 constantData[3] = 72;
                 break;
             case VX_CHANNEL_1:
-			    context.params.volume = 1;
+                context.params.volume = 1;
                 constantData[0] = 8;
                 constantData[1] = 32;
                 constantData[2] = 56;
@@ -243,21 +243,21 @@ vx_status vxChannelExtract(vx_image src, vx_scalar channel, vx_image dst)
                 break;
             default:
                 return VX_ERROR_INVALID_PARAMETERS;
-		}
-		context.params.inputFormat = gcvSURF_R8G8B8;
+        }
+        context.params.inputFormat = gcvSURF_R8G8B8;
         context.params.inputMultipleWidth = 3;
         context.params.xmax = width * 3;
         context.params.xstep = 12;
     }
-	else if (format == VX_DF_IMAGE_RGBX)
-	{
+    else if (format == VX_DF_IMAGE_RGBX)
+    {
         switch (chan)
         {
             case VX_CHANNEL_0:
-			    context.params.volume = 0;
+                context.params.volume = 0;
                 break;
             case VX_CHANNEL_1:
-			    context.params.volume = 1;
+                context.params.volume = 1;
                 break;
             case VX_CHANNEL_2:
                 context.params.volume = 2;
@@ -267,20 +267,20 @@ vx_status vxChannelExtract(vx_image src, vx_scalar channel, vx_image dst)
                 break;
             default:
                 return VX_ERROR_INVALID_PARAMETERS;
-		}
+        }
         constantData[0] += (vx_uint8)(8*context.params.volume);
         constantData[1] += (vx_uint8)(8*context.params.volume);
         constantData[2] += (vx_uint8)(8*context.params.volume);
         constantData[3] += (vx_uint8)(8*context.params.volume);
-		context.params.inputFormat = gcvSURF_X8R8G8B8;
+        context.params.inputFormat = gcvSURF_X8R8G8B8;
         context.params.xstep = 4;
-	}
+    }
     else if (format == VX_DF_IMAGE_UYVY)
     {
         switch (chan)
         {
             case VX_CHANNEL_Y:
-			    context.params.volume = 0;
+                context.params.volume = 0;
                 constantData[0] = 8;
                 constantData[1] = 24;
                 constantData[2] = 40;
@@ -294,11 +294,11 @@ vx_status vxChannelExtract(vx_image src, vx_scalar channel, vx_image dst)
                 constantData[14] += 8;
                 constantData[15] += 8;
                 context.params.xstep = 8;
-			    break;
+                break;
             case VX_CHANNEL_U:
-			    context.params.volume = 1;
+                context.params.volume = 1;
                 context.params.xstep = 8;
-			    break;
+                break;
             case VX_CHANNEL_V:
                 context.params.volume = 2;
                 constantData[0] += 16;
@@ -309,7 +309,7 @@ vx_status vxChannelExtract(vx_image src, vx_scalar channel, vx_image dst)
                 break;
             default:
                 return VX_ERROR_INVALID_PARAMETERS;
-		}
+        }
         context.params.inputFormat = gcvSURF_UYVY;
     }
      else if (format == VX_DF_IMAGE_YUYV)
@@ -317,7 +317,7 @@ vx_status vxChannelExtract(vx_image src, vx_scalar channel, vx_image dst)
         switch (chan)
         {
             case VX_CHANNEL_Y:
-			    context.params.volume = 0;
+                context.params.volume = 0;
                 constantData[1] = 16;
                 constantData[2] = 32;
                 constantData[3] = 48;
@@ -330,15 +330,15 @@ vx_status vxChannelExtract(vx_image src, vx_scalar channel, vx_image dst)
                 constantData[14] += 8;
                 constantData[15] += 8;
                 context.params.xstep = 8;
-			    break;
+                break;
             case VX_CHANNEL_U:
-			    context.params.volume = 1;
+                context.params.volume = 1;
                 constantData[0] += 8;
                 constantData[1] += 8;
                 constantData[2] += 8;
                 constantData[3] += 8;
                 context.params.xstep = 8;
-			    break;
+                break;
             case VX_CHANNEL_V:
                 context.params.volume = 2;
                 constantData[0] += 24;
@@ -346,10 +346,10 @@ vx_status vxChannelExtract(vx_image src, vx_scalar channel, vx_image dst)
                 constantData[2] += 24;
                 constantData[3] += 24;
                 context.params.xstep = 8;
-			    break;
+                break;
             default:
                 return VX_ERROR_INVALID_PARAMETERS;
-		}
+        }
         context.params.inputFormat = gcvSURF_YUY2;
     }
     else if (format == VX_DF_IMAGE_NV12)
@@ -474,24 +474,24 @@ vx_status vxChannelExtract(vx_image src, vx_scalar channel, vx_image dst)
     }
 
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
 
-	/*index = 3*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, 3);
+    /*index = 3*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, 3);
 
-	context.params.kernel = gcvVX_KERNEL_CHANNEL_EXTRACT;
+    context.params.kernel = gcvVX_KERNEL_CHANNEL_EXTRACT;
 
-	gcoOS_MemCopy(&context.uniforms[0].uniform, constantData, sizeof(constantData));
-	context.uniforms[0].index = 4;
+    gcoOS_MemCopy(&context.uniforms[0].uniform, constantData, sizeof(constantData));
+    context.uniforms[0].index = 4;
     context.uniforms[0].num = sizeof(constantData) / sizeof(vx_uint8);
     context.uniform_num = 1;
 
-	context.params.borders = VX_BORDER_MODE_CONSTANT;
-	context.params.constant_value = 0;
+    context.params.borders = VX_BORDER_MODE_CONSTANT;
+    context.params.constant_value = 0;
     context.params.row = width;
     context.params.col = height;
 
-	status = gcfVX_Kernel(&context);
-	return status;
+    status = gcfVX_Kernel(&context);
+    return status;
 }

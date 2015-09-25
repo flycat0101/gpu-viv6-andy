@@ -58,8 +58,7 @@ LOCAL_SHARED_LIBRARIES := \
 	liblog \
 	libdl \
 	libGAL \
-	libVSC \
-	libEGL_$(TAG)
+	libVSC
 
 LOCAL_MODULE        := libOpenVG
 LOCAL_MODULE_TAGS   := optional

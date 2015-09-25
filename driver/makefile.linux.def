@@ -297,8 +297,8 @@ ifeq ($(EGL_API_FB), 1)
 endif
 
 ifeq ($(EGL_API_WL), 1)
-  CFLAGS            += -DEGL_API_WL -Wno-deprecated-declarations
-  LFLAGS            += -L$(ROOTFS_USR)/lib
+  CFLAGS            += -DEGL_API_WL -DWL_EGL_PLATFORM -Wno-deprecated-declarations
+  LFLAGS             += -L$(SDK_DIR)/drivers -L$(ROOTFS_USR)/lib
 endif
 
 ifeq ($(EGL_API_DRI),1)

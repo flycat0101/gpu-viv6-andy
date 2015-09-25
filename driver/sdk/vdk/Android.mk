@@ -60,7 +60,7 @@ LOCAL_SHARED_LIBRARIES := \
 	libutils \
 	libcutils \
 	libbinder \
-	libEGL_$(TAG)
+	libEGL
 
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 14),1)
   LOCAL_SHARED_LIBRARIES += \

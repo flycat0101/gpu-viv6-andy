@@ -78,15 +78,15 @@ VX_PUBLIC_API vx_parameter vxGetParameterByIndex(vx_node node, vx_uint32 index)
 
 VX_PUBLIC_API vx_status vxReleaseParameter(vx_parameter *parameter)
 {
-	if((*parameter)->base.type == VX_TYPE_SCALAR)
-	{
-		vx_scalar scalar = (vx_scalar)(*parameter);
-		if(scalar->node != NULL && ((scalar->base.externalCount == 1) && (scalar->base.internalCount == 0)))
-		{
-			gcoVX_FreeMemory((gcsSURF_NODE_PTR)scalar->node);
-			scalar->node = NULL;
-		}
-	}
+    if((*parameter)->base.type == VX_TYPE_SCALAR)
+    {
+        vx_scalar scalar = (vx_scalar)(*parameter);
+        if(scalar->node != NULL && ((scalar->base.externalCount == 1) && (scalar->base.internalCount == 0)))
+        {
+            gcoVX_FreeMemory((gcsSURF_NODE_PTR)scalar->node);
+            scalar->node = NULL;
+        }
+    }
 
     return vxoReference_Release((vx_reference_ptr)parameter, VX_TYPE_PARAMETER, VX_REF_EXTERNAL);
 }

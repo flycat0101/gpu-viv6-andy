@@ -538,28 +538,15 @@ _DebugFSPrint (
  **                     LINUX SYSTEM FUNCTIONS (START)
  **
  *******************************************************************************/
-
-/*******************************************************************************
- **
- **  find the vivlog structure associated with an inode.
- **      returns a    pointer to the structure if found, NULL if not found
- **
- *******************************************************************************/
-static gcsDEBUGFS_Node*
-_GetNodeInfo (
-               IN struct inode *Inode
-               )
+static int
+_DebugFSOpen (
+    struct inode* inode,
+    struct file* filp
+    )
 {
-    gcsDEBUGFS_Node* node ;
+    filp->private_data = inode->i_private;
 
-    if ( Inode == NULL )
-        return NULL ;
-
-    for ( node = gc_dbgfs.linkedlist ; node != NULL ; node = node->next )
-        if ( node->filen->d_inode->i_ino == Inode->i_ino )
-            return node ;
-
-    return NULL ;
+    return 0;
 }
 
 /*******************************************************************************
@@ -577,9 +564,9 @@ _DebugFSRead (
 {
     int retval ;
     caddr_t data_to_return ;
-    gcsDEBUGFS_Node* node ;
-    /* get the metadata about this emlog */
-    if ( ( node = _GetNodeInfo ( file->f_dentry->d_inode ) ) == NULL )
+    gcsDEBUGFS_Node* node = file->private_data;
+
+    if (node == NULL)
     {
         printk ( "debugfs_read: record not found\n" ) ;
         return - EIO ;
@@ -643,10 +630,10 @@ _DebugFSWrite (
 {
     caddr_t message = NULL ;
     int n ;
-    gcsDEBUGFS_Node*node ;
+    gcsDEBUGFS_Node* node = file->private_data;
 
     /* get the metadata about this log */
-    if ( ( node = _GetNodeInfo ( file->f_dentry->d_inode ) ) == NULL )
+    if (node == NULL)
     {
         return - EIO ;
     }
@@ -698,6 +685,7 @@ _DebugFSWrite (
  *******************************************************************************/
 static const struct file_operations debugfs_operations = {
                                                           .owner = THIS_MODULE ,
+                                                          .open = _DebugFSOpen ,
                                                           .read = _DebugFSRead ,
                                                           .write = _DebugFSWrite ,
 } ;
@@ -839,7 +827,7 @@ gckDEBUGFS_CreateNode (
         node->temp = NULL;
 
         /*creating the file*/
-        node->filen = debugfs_create_file(NodeName, S_IRUGO|S_IWUSR, node->parent, NULL,
+        node->filen = debugfs_create_file(NodeName, S_IRUGO|S_IWUSR, node->parent, node,
                                           &debugfs_operations);
     }
 

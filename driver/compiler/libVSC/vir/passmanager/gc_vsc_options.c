@@ -876,6 +876,7 @@ void VSC_OPTN_ISOptions_SetDefault(
     VSC_OPTN_ISOptions_SetBandwidthOnly(options, gcvFALSE);
     VSC_OPTN_ISOptions_SetRegCount(options, 0);         /* 0 is invalid number here */
     VSC_OPTN_ISOptions_SetDepGran(options, VSC_OPTN_ISOptions_DEPGRAN_GROSS);
+    VSC_OPTN_ISOptions_SetBBCeiling(options, 500);
     VSC_OPTN_ISOptions_SetAlgorithm(options, VSC_OPTN_ISOptions_ALGORITHM_LISTSCHEDULING
                                            /*, VSC_OPTN_ISOptions_ALGORITHM_BUBBLESCHEDULING*/);
     /*VSC_OPTN_ISOptions_SetDepGran(options, VSC_OPTN_ISOptions_DEPGRAN_DU_PER_CHANNAL);*/
@@ -978,6 +979,17 @@ void VSC_OPTN_ISOptions_GetOptionFromString(
             len = _VSC_OPTN_GetSubOptionLength(str);
             dep_gran = vscSTR_StrToUint32(str, len);
             VSC_OPTN_ISOptions_SetDepGran(options, dep_gran);
+            str += len;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "bb_ceiling:", sizeof("bb_ceiling:") - 1))
+        {
+            gctUINT32 bb_ceiling;
+            gctUINT32 len;
+
+            str += sizeof("bb_ceiling:") - 1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            bb_ceiling = vscSTR_StrToUint32(str, len);
+            VSC_OPTN_ISOptions_SetBBCeiling(options, bb_ceiling);
             str += len;
         }
         else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "algorithm:", sizeof("algorithm:") - 1))
@@ -1214,6 +1226,7 @@ void VSC_OPTN_ISOptions_Dump(
     VIR_LOG(dumper, "    bandwidth_only: %s\n", VSC_OPTN_ISOptions_GetBandwidthOnly(options) ? "true" : "false");
     VIR_LOG(dumper, "    reg_count: %d\n", VSC_OPTN_ISOptions_GetRegCount(options));
     VIR_LOG(dumper, "    depandency granularity: %d\n", VSC_OPTN_ISOptions_GetDepGran(options));
+    VIR_LOG(dumper, "    bb ceiling: %d\n", VSC_OPTN_ISOptions_GetBBCeiling(options));
     VIR_LOG(dumper, "    fw_heuristics: 0x%x\n", VSC_OPTN_ISOptions_GetFwHeuristics(options));
     VIR_LOG(dumper, "    bw_heuristics: 0x%x\n", VSC_OPTN_ISOptions_GetBwHeuristics(options));
     VIR_LOG(dumper, "    trace: 0x%x\n", VSC_OPTN_ISOptions_GetTrace(options));
@@ -1243,6 +1256,7 @@ void VSC_OPTN_ISOptions_Usage(
         "    reg_count           force the count of used registers. Numbers greater than 0 are valid\n"
         "    dep_gran:           0       gross dependency, only compares symbol name or temp register number\n"
         "                        1       uses DU info and compares per channel\n"
+        "    bb_ceiling:         n       when bb has more other n instructions, skip it\n"
         "    heuristics:         0x1     prefer range\n"
         "                        0x2     prefer texld\n"
         "                        0x4     prefer memld\n"

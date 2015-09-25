@@ -19077,6 +19077,31 @@ const gcsSL_PATTERN patterns_COPY[] =
     { 0 }
 };
 
+/* 0x8A gcSL_IMAGE_ADDR_3D */
+const gcsSL_PATTERN patterns_IMAGE_ADDR_3D[] =
+{
+    /*
+        IMAGE_ADDR    1, 2, 3
+            img_addr_3d   1, 2, 3
+    */
+    { 1, gcSL_IMAGE_ADDR_3D, 1, 2, 3, 0, 0, _hasHalti4 },
+        { -1, 0x38, 1, 2, 3, 0, 0, value_types_u32},
+
+    { 0 }
+};
+
+/* 0x8B  Get sampler's lodminmax */
+const gcsSL_PATTERN patterns_GET_SAMPLER_LMM[] =
+{
+    { 0 }
+};
+
+/* 0x8C  Get sampler's levelbasesize */
+const gcsSL_PATTERN patterns_GET_SAMPLER_LBS[] =
+{
+    { 0 }
+};
+
 const gcsSL_PATTERN_PTR  patterns[] =
 {
     patterns_NOP, /* 0x00 gcSL_NOP */
@@ -19217,6 +19242,9 @@ const gcsSL_PATTERN_PTR  patterns[] =
     patterns_MOV_LONG, /* 0x87 gcSL_MOV_LONG */
     patterns_MADSAT, /* 0x88 gcSL_MADSAT */
     patterns_COPY, /* 0x89 gcSL_COPY */
+    patterns_IMAGE_ADDR_3D, /* 0x8A gcSL_IMAGE_ADDR_3D */
+    patterns_GET_SAMPLER_LMM,/* 0x8B gcSL_GET_SAMPLER_LMM */
+    patterns_GET_SAMPLER_LBS,/* 0x8C gcSL_GET_SAMPLER_LBS */
 };
 
 #ifdef WIN32

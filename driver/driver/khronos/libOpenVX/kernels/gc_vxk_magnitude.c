@@ -21,16 +21,16 @@ vx_status vxMagnitude(vx_image grad_x, vx_image grad_y, vx_image output)
     vxQueryImage(grad_x, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
     vxQueryImage(grad_x, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, grad_x, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, grad_x, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, grad_y, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, grad_y, GC_VX_INDEX_AUTO);
 
-	/*index = 2*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+    /*index = 2*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
 
-	context.params.kernel = gcvVX_KERNEL_MAGNITUDE;
+    context.params.kernel = gcvVX_KERNEL_MAGNITUDE;
     context.params.xstep = 8;
 
     context.params.xmax = width;

@@ -984,7 +984,7 @@ GLvoid __glInitDebugState(__GLcontext *gc)
         {
             for (severityIdx = 0; severityIdx < __GL_DEBUG_SEVERITY_NUM; ++severityIdx)
             {
-                groupCtrl->spaces[srcIdx][typeIdx].enables[severityIdx] = severityIdx < __GL_DEBUG_SEVERITY_LOW
+                groupCtrl->spaces[srcIdx][typeIdx].enables[severityIdx] = severityIdx != __GL_DEBUG_SEVERITY_LOW
                                                                         ? GL_TRUE
                                                                         : GL_FALSE;
             }
@@ -1081,8 +1081,10 @@ __GL_INLINE __GLdbgType __glDebugGetTypeIdx(GLenum type)
         typeIdx = __GL_DEBUG_TYPE_MARKER;
         break;
     case GL_DEBUG_TYPE_PUSH_GROUP_KHR:
+        typeIdx = __GL_DEBUG_TYPE_PUSH;
+        break;
     case GL_DEBUG_TYPE_POP_GROUP_KHR:
-        typeIdx = __GL_DEBUG_TYPE_PUSHPOP;
+        typeIdx = __GL_DEBUG_TYPE_POP;
         break;
     default:
         break;
@@ -1141,7 +1143,7 @@ GLboolean __glDebugIsLogEnabled(__GLcontext *gc, GLenum source, GLenum type, GLe
 
         if (msgCtrl)
         {
-            enabled = msgCtrl->enable;
+            enabled = msgCtrl->enables[severityIdx];
         }
         else
         {
@@ -1161,13 +1163,18 @@ GLvoid __glDebugInsertLogMessage(__GLcontext *gc, GLenum source, GLenum type, GL
         return;
     }
 
+    if (!__glDebugIsLogEnabled(gc, source, type, severity, id))
+    {
+        return;
+    }
+
     if (dbgMachine->callback)
     {
-        dbgMachine->callback(source, type, id, severity, length, message, dbgMachine->userParam);
+        GLsizei msgLen = (length < 0) ? (GLsizei)strlen(message) : length;
+        dbgMachine->callback(source, type, id, severity, msgLen, message, dbgMachine->userParam);
     }
-    /* If the message log is enabled and not full */
-    else if (__glDebugIsLogEnabled(gc, source, type, severity, id) &&
-             dbgMachine->loggedMsgs < dbgMachine->maxLogMsgs)
+    /* If the message log is not full */
+    else if (dbgMachine->loggedMsgs < dbgMachine->maxLogMsgs)
     {
         __GLdbgMsgLog *msgLog = (__GLdbgMsgLog*)gc->imports.malloc(gc, sizeof(__GLdbgMsgLog));
         GLsizei msgLen = (length < 0 || needCopy) ? (GLsizei)strlen(message) : length;
@@ -1236,6 +1243,11 @@ GLvoid GL_APIENTRY __gles_DebugMessageControl(__GLcontext *gc, GLenum source, GL
 
     __GL_HEADER();
 
+    if (count < 0)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+
     srcIdx = __glDebugGetSourceIdx(source);
     if (srcIdx == __GL_DEBUG_SRC_NUM && source != GL_DONT_CARE)
     {
@@ -1270,6 +1282,7 @@ GLvoid GL_APIENTRY __gles_DebugMessageControl(__GLcontext *gc, GLenum source, GL
         {
             __GLdbgMsgCtrl *msgCtrl = NULL;
             __GLdbgMsgCtrl *iter = spaceCtrl->msgs;
+            __GLdbgSeverity severityIdx;
 
             while (iter)
             {
@@ -1289,15 +1302,15 @@ GLvoid GL_APIENTRY __gles_DebugMessageControl(__GLcontext *gc, GLenum source, GL
                 msgCtrl->src = source;
                 msgCtrl->type = type;
 
-                /* TODO: ctrlMsg->severity is predefined by implementation */;
-                msgCtrl->severity = GL_DEBUG_SEVERITY_NOTIFICATION_KHR;
-
                 /* Insert it to head */
                 msgCtrl->next = spaceCtrl->msgs;
                 spaceCtrl->msgs = msgCtrl;
             }
 
-            msgCtrl->enable = enabled;
+            for (severityIdx = 0; severityIdx < __GL_DEBUG_SEVERITY_NUM; ++severityIdx)
+            {
+                msgCtrl->enables[severityIdx] = enabled;
+            }
         }
     }
     else if (count == 0 && ids == NULL)
@@ -1320,9 +1333,9 @@ GLvoid GL_APIENTRY __gles_DebugMessageControl(__GLcontext *gc, GLenum source, GL
                 /* Mark all msgCtrl already created */
                 while (msgCtrl)
                 {
-                    if (severity == msgCtrl->severity || severity == GL_DONT_CARE)
+                    for (severityIdx = severityIdxBegin; severityIdx < severityIdxEnd; ++severityIdx)
                     {
-                        msgCtrl->enable = enabled;
+                        msgCtrl->enables[severityIdx] = enabled;
                     }
                     msgCtrl = msgCtrl->next;
                 }
@@ -1357,7 +1370,7 @@ GLvoid GL_APIENTRY __gles_DebugMessageInsert(__GLcontext *gc, GLenum source, GLe
         __GL_EXIT();
     }
 
-    if (source != GL_DEBUG_SOURCE_THIRD_PARTY_KHR && source != GL_DEBUG_SOURCE_THIRD_PARTY_KHR)
+    if (source != GL_DEBUG_SOURCE_THIRD_PARTY_KHR && source != GL_DEBUG_SOURCE_APPLICATION_KHR)
     {
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
@@ -1374,12 +1387,9 @@ GLvoid GL_APIENTRY __gles_DebugMessageInsert(__GLcontext *gc, GLenum source, GLe
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
-    if (length < 0)
+    if ((length < 0 ? (GLsizei)strlen(buf) : length) >= dbgMachine->maxMsgLen)
     {
-        if ((GLsizei)strlen(buf) >= dbgMachine->maxMsgLen)
-        {
-            __GL_ERROR_EXIT(GL_INVALID_VALUE);
-        }
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
     __glDebugInsertLogMessage(gc, source, type, id, severity, length, buf, GL_TRUE);
@@ -1522,12 +1532,9 @@ GLvoid GL_APIENTRY __gles_PushDebugGroup(__GLcontext *gc, GLenum source, GLuint 
         break;
     }
 
-    if (length < 0)
+    if ((length < 0 ? (GLsizei)strlen(message) : length) >= dbgMachine->maxMsgLen)
     {
-        if ((GLsizei)strlen(message) >= dbgMachine->maxMsgLen)
-        {
-            __GL_ERROR_EXIT(GL_INVALID_VALUE);
-        }
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
     if (dbgMachine->current >= dbgMachine->maxStackDepth - 1)
@@ -1626,9 +1633,9 @@ GLvoid GL_APIENTRY __gles_ObjectLabel(__GLcontext *gc, GLenum identifier, GLuint
 
     __GL_HEADER();
 
-    if (length < 0)
+    if (label)
     {
-        if ((GLsizei)strlen(label) >= gc->debug.maxMsgLen)
+        if ((length < 0 ? (GLsizei)strlen(label) : length) >= gc->debug.maxMsgLen)
         {
             __GL_ERROR_EXIT(GL_INVALID_VALUE);
         }
@@ -1698,7 +1705,16 @@ GLvoid GL_APIENTRY __gles_ObjectLabel(__GLcontext *gc, GLenum identifier, GLuint
             pLabel = &queryObj->label;
         }
         break;
-
+    case GL_PROGRAM_PIPELINE_KHR:
+        {
+            __GLprogramPipelineObject *ppo = (__GLprogramPipelineObject*)__glGetObject(gc, gc->shaderProgram.ppNoShare, name);
+            if (!ppo)
+            {
+                __GL_ERROR_EXIT(GL_INVALID_VALUE);
+            }
+            pLabel = &ppo->label;
+        }
+        break;
     case GL_TRANSFORM_FEEDBACK:
         {
             __GLxfbObject *xfb = (__GLxfbObject*)__glGetObject(gc, gc->xfb.noShare, name);
@@ -1780,7 +1796,7 @@ OnError:
 
 GLvoid GL_APIENTRY __gles_GetObjectLabel(__GLcontext *gc, GLenum identifier, GLuint name, GLsizei bufSize, GLsizei *length, GLchar *label)
 {
-    GLsizei len;
+    GLsizei len = 0;
     GLchar *objLabel = NULL;
 
     __GL_HEADER();
@@ -1854,6 +1870,16 @@ GLvoid GL_APIENTRY __gles_GetObjectLabel(__GLcontext *gc, GLenum identifier, GLu
             objLabel = queryObj->label;
         }
         break;
+    case GL_PROGRAM_PIPELINE_KHR:
+        {
+            __GLprogramPipelineObject *ppo = (__GLprogramPipelineObject*)__glGetObject(gc, gc->shaderProgram.ppNoShare, name);
+            if (!ppo)
+            {
+                __GL_ERROR_EXIT(GL_INVALID_VALUE);
+            }
+            objLabel = ppo->label;
+        }
+        break;
     case GL_TRANSFORM_FEEDBACK:
         {
             __GLxfbObject *xfb = (__GLxfbObject*)__glGetObject(gc, gc->xfb.noShare, name);
@@ -1916,15 +1942,14 @@ GLvoid GL_APIENTRY __gles_GetObjectLabel(__GLcontext *gc, GLenum identifier, GLu
     }
 
     len = objLabel ? (GLsizei)strlen(objLabel) : 0;
-
     if (label && bufSize > 0)
     {
-        GLsizei copySize = __GL_MIN(len, bufSize - 1);
-        if (copySize > 0)
+        len = __GL_MIN(len, bufSize - 1);
+        if (len > 0)
         {
-            __GL_MEMCOPY(label, objLabel, copySize);
+            __GL_MEMCOPY(label, objLabel, len);
         }
-        label[copySize] = '\0';
+        label[len] = '\0';
     }
 
     if (length)
@@ -1941,6 +1966,14 @@ GLvoid GL_APIENTRY __gles_ObjectPtrLabel(__GLcontext *gc, const GLvoid* ptr, GLs
      __GLsyncObject *syncObj = (__GLsyncObject*)__glGetObject(gc, gc->sync.shared, __GL_PTR2UINT(ptr));
 
     __GL_HEADER();
+
+    if (label)
+    {
+        if ((length < 0 ? (GLsizei)strlen(label) : length) >= gc->debug.maxMsgLen)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_VALUE);
+        }
+    }
 
     if (!syncObj)
     {
@@ -1969,7 +2002,7 @@ OnError:
 
 GLvoid GL_APIENTRY __gles_GetObjectPtrLabel(__GLcontext *gc, const GLvoid* ptr, GLsizei bufSize, GLsizei *length, GLchar *label)
 {
-    GLsizei len;
+    GLsizei len = 0;
     __GLsyncObject *syncObj = (__GLsyncObject*)__glGetObject(gc, gc->sync.shared, __GL_PTR2UINT(ptr));
 
     __GL_HEADER();
@@ -1985,15 +2018,14 @@ GLvoid GL_APIENTRY __gles_GetObjectPtrLabel(__GLcontext *gc, const GLvoid* ptr, 
     }
 
     len = syncObj->label ? (GLsizei)strlen(syncObj->label) : 0;
-
     if (label && bufSize > 0)
     {
-        GLsizei copySize = __GL_MIN(len, bufSize - 1);
-        if (copySize > 0)
+        len = __GL_MIN(len, bufSize - 1);
+        if (len > 0)
         {
-            __GL_MEMCOPY(label, syncObj->label, copySize);
+            __GL_MEMCOPY(label, syncObj->label, len);
         }
-        label[copySize] = '\0';
+        label[len] = '\0';
     }
 
     if (length)

@@ -62,37 +62,37 @@ vx_status VLKTracker(const vx_image prevImg[], const vx_image nextImg[], vx_refe
     context.params.maxLevel = (gctINT32)maxLevel;
     context.params.winSize = (gctINT32)winSize;
 
-	/* prevPts - index = 0 */
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_ARRAY, prevPts, GC_VX_INDEX_AUTO);
+    /* prevPts - index = 0 */
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_ARRAY, prevPts, GC_VX_INDEX_AUTO);
 
-	/* nextPts - index = 1 */
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_ARRAY, nextPts, GC_VX_INDEX_AUTO);
+    /* nextPts - index = 1 */
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_ARRAY, nextPts, GC_VX_INDEX_AUTO);
 
-	/* estimatedPts - index = 2 */
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_ARRAY, estimatedPts, GC_VX_INDEX_AUTO);
+    /* estimatedPts - index = 2 */
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_ARRAY, estimatedPts, GC_VX_INDEX_AUTO);
 
- 	/* prevImg[] - index = 3 ~ 3+maxLevel-1 */
+    /* prevImg[] - index = 3 ~ 3+maxLevel-1 */
     for(level=maxLevel; level>0; level--)
     {
- 	    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, prevImg[level-1], GC_VX_INDEX_AUTO);
+        gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, prevImg[level-1], GC_VX_INDEX_AUTO);
     }
 
-	/* nextImg[] - index = 3+maxLevel ~ 3+maxLevel*2-1 */
+    /* nextImg[] - index = 3+maxLevel ~ 3+maxLevel*2-1 */
     for(level=maxLevel; level>0; level--)
     {
-	    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, nextImg[level-1], GC_VX_INDEX_AUTO);
+        gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, nextImg[level-1], GC_VX_INDEX_AUTO);
     }
 
-	/* prevDerivIx[] - index = 3+maxLevel*2 ~ 3+maxLevel*3-1 */
+    /* prevDerivIx[] - index = 3+maxLevel*2 ~ 3+maxLevel*3-1 */
     for(level=maxLevel; level>0; level--)
     {
-	    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT,  (vx_image)(stagings[level*2-2]), GC_VX_INDEX_AUTO);
+        gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT,  (vx_image)(stagings[level*2-2]), GC_VX_INDEX_AUTO);
     }
 
-	/* prevDerivIy[] - index = 3+maxLevel*3 ~ 3+maxLevel*4-1 */
+    /* prevDerivIy[] - index = 3+maxLevel*3 ~ 3+maxLevel*4-1 */
     for(level=maxLevel; level>0; level--)
     {
-	    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, (vx_image)(stagings[level*2-1]), GC_VX_INDEX_AUTO);
+        gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, (vx_image)(stagings[level*2-1]), GC_VX_INDEX_AUTO);
     }
 
     {

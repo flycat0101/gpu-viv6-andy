@@ -20,6 +20,7 @@
 
 #if gcdFRAMEINFO_STATISTIC
 extern GLboolean g_dbgPerDrawKickOff;
+extern GLboolean g_dbgDumpImagePerDraw;
 #endif
 
 /***************************************************************************/
@@ -462,13 +463,19 @@ __glChipClearEnd(
         }
     }
 
-#if (defined(DEBUG) || defined(_DEBUG))
+#if gcdFRAMEINFO_STATISTIC
     if (g_dbgPerDrawKickOff)
     {
         gcmONERROR(gcoSURF_Flush(gcvNULL));
         /* Commit command buffer. */
         gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
     }
+    if (g_dbgDumpImagePerDraw == 3)
+    {
+        gcmONERROR(gcChipUtilsDumpRT(gc, 1));
+    }
+
+
 #endif
 
 OnError:

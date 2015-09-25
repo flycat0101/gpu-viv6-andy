@@ -841,9 +841,7 @@ readRGBAPixels(__GLcontext *gc,
     GLint dx, dy, sx, sy, w, h;
     gceSTATUS status = gcvSTATUS_OK;
     gceSURF_FORMAT wrapformat = gcvSURF_UNKNOWN;
-    gcsSURF_VIEW srcView = {gcvNULL, 0, 1};
-    gcsSURF_VIEW dstView = {gcvNULL, 0, 1};
-    gcsSURF_RESOLVE_ARGS rlvArgs = {0};
+    gcsSURF_BLIT_ARGS arg;
 
     if (source == gcvNULL)
     {
@@ -914,18 +912,21 @@ readRGBAPixels(__GLcontext *gc,
                                 buf,
                                 gcvINVALID_ADDRESS));
 
-    srcView.surf = source;
-    dstView.surf = target;
-    rlvArgs.version = gcvHAL_ARG_VERSION_V2;
-    rlvArgs.uArgs.v2.srcOrigin.x = sx;
-    rlvArgs.uArgs.v2.srcOrigin.x = sy;
-    rlvArgs.uArgs.v2.dstOrigin.x = dx;
-    rlvArgs.uArgs.v2.dstOrigin.x = dy;
-    rlvArgs.uArgs.v2.rectSize.x  = w;
-    rlvArgs.uArgs.v2.rectSize.x  = h;
-    rlvArgs.uArgs.v2.numSlices   = 1;
-    rlvArgs.uArgs.v2.dump        = gcvTRUE;
-    gcmONERROR(gcoSURF_CopyPixels_v2(&srcView, &dstView, &rlvArgs));
+
+    gcoOS_ZeroMemory(&arg, sizeof(arg));
+
+    arg.srcSurface = source;
+    arg.srcX       = sx;
+    arg.srcY       = sy;
+    arg.srcZ       = 0;
+    arg.dstSurface = target;
+    arg.dstX       = dx;
+    arg.dstY       = dy;
+    arg.dstZ       = 0;
+    arg.srcWidth   = arg.dstWidth  = w;
+    arg.srcHeight  = arg.dstHeight = h;
+    arg.srcDepth   = arg.dstDepth  = 1;
+    gcmONERROR(gcoSURF_BlitCPU(&arg));
 
 OnError:
     if (target != gcvNULL)

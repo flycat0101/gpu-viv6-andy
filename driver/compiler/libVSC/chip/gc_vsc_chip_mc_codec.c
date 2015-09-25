@@ -3212,6 +3212,9 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
         if (pCodecHelperInst->baseOpcode != 0x72 &&
             pCodecHelperInst->baseOpcode != 0x32 &&
             pCodecHelperInst->baseOpcode != 0x33 &&
+            pCodecHelperInst->baseOpcode != MC_AUXILIARY_OP_CODE_USC_STORE &&
+            pCodecHelperInst->baseOpcode != MC_AUXILIARY_OP_CODE_USC_IMG_STORE &&
+            pCodecHelperInst->baseOpcode != MC_AUXILIARY_OP_CODE_USC_IMG_STORE_3D &&
             pCodecHelperInst->baseOpcode != 0x79 &&
             pCodecHelperInst->baseOpcode != 0x34 &&
             pCodecHelperInst->baseOpcode != 0x7A &&

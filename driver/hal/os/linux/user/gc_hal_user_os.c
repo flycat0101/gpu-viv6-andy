@@ -6680,7 +6680,7 @@ ParseSymbol(
         free(symNameTab);
         symNameTab = gcvNULL;
         close(fp);
-        return gcvSTATUS_SKIP;
+        return gcvSTATUS_MISMATCH;
     }
 
     lseek(fp, (off_t)offset_dynsym, SEEK_SET);
@@ -6809,7 +6809,9 @@ gcoOS_DetectProgrameByEncryptedSymbols(
 
             gcmONERROR(ParseSymbol(buf, Symbols));
 
-            if (status)
+            if (status == gcvSTATUS_MISMATCH)
+                continue;
+            else if (status)
                 break;
         }
     }

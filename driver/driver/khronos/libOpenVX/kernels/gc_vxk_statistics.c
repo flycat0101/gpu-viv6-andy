@@ -27,14 +27,14 @@ static vx_status vxVivMeanStdDev(vx_image input, vx_scalar mean, vx_scalar stdde
     vxQueryImage(input, VX_IMAGE_ATTRIBUTE_HEIGHT, &inputHeight, sizeof(vx_uint32));
     rect[0] = inputHeight;
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_SCALAR, mean, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_SCALAR, mean, GC_VX_INDEX_AUTO);
 
-	/* index = 2 */
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_SCALAR, stddev, GC_VX_INDEX_AUTO);
+    /* index = 2 */
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_SCALAR, stddev, GC_VX_INDEX_AUTO);
 
     context.params.kernel = gcvVX_KERNEL_MEAN_STDDEV;
     context.params.xstep  = 16;
@@ -193,10 +193,10 @@ static vx_status getLocation(vx_image img, vx_image countImg, vx_int32 value, vx
     {
         vxQueryArray(arrays, VX_ARRAY_ATTRIBUTE_ITEMSIZE, &itemSize, sizeof(itemSize));
         return_loc = vx_true_e;
-	}
+    }
 
     /*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, img, GC_VX_INDEX_AUTO);
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, img, GC_VX_INDEX_AUTO);
     /*index = 1*/
     gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, countImg, GC_VX_INDEX_AUTO);
     if (tempArray)
@@ -248,21 +248,21 @@ static vx_status vxVivMinMaxLoc_filter(vx_image input, vx_scalar filter_min, vx_
 {
     vx_status                status = VX_SUCCESS;
     gcoVX_Kernel_Context   context  = {{0}};
-	gctUINT32 i = 0;
+    gctUINT32 i = 0;
     gcoVX_Index indexs[]                = {
         /* index,  num,             shift0,         shift1,      mask0,    mask1 */
-        {    3,   4 * 4, {FV4(3*8,(16+3)*8,0,0),		FV4(0,0,0, 0),		FV4(4*8,4*8,0,0),	FV4(0,0,0,0)}  }, /*  */
-        {    4,   4 * 4, {FV4(6*8,(16+6)*8,0,0),		FV4(0,0,0, 0),		FV4(4*8,4*8,0,0),	FV4(0,0,0,0)}  }, /*  */
-	};
+        {    3,   4 * 4, {FV4(3*8,(16+3)*8,0,0),        FV4(0,0,0, 0),      FV4(4*8,4*8,0,0),   FV4(0,0,0,0)}  }, /*  */
+        {    4,   4 * 4, {FV4(6*8,(16+6)*8,0,0),        FV4(0,0,0, 0),      FV4(4*8,4*8,0,0),   FV4(0,0,0,0)}  }, /*  */
+    };
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_SCALAR, filter_min, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_SCALAR, filter_min, GC_VX_INDEX_AUTO);
 
-	/* index = 2 */
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_SCALAR, filter_max, GC_VX_INDEX_AUTO);
+    /* index = 2 */
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_SCALAR, filter_max, GC_VX_INDEX_AUTO);
 
     context.params.step             = MML_FILTER;
     context.params.borders          = VX_BORDER_MODE_REPLICATE;
@@ -309,8 +309,8 @@ vx_status vxMinMaxLoc(vx_image input, vx_scalar minVal, vx_scalar maxVal, vx_arr
     /* To Clean up */
     status |= gcfVX_Flush(gcvTRUE);
 
-	status |= vxAccessScalarValue(filter_min, &min);
-	status |= vxAccessScalarValue(filter_max, &max);
+    status |= vxAccessScalarValue(filter_min, &min);
+    status |= vxAccessScalarValue(filter_max, &max);
 
     status |= vxCommitScalarValue(filter_min, &min);
     status |= vxCommitScalarValue(filter_max, &max);

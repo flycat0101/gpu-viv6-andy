@@ -257,7 +257,7 @@ VX_INTERNAL_API vx_status vxoArray_CommitRange(vx_array array, vx_size start, vx
 
             vxoReference_IncrementWriteCount(&array->base);
 
-			vxReleaseMutex(array->memory.writeLocks[0]);
+            vxReleaseMutex(array->memory.writeLocks[0]);
         }
     }
 

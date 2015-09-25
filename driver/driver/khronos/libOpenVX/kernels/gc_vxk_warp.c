@@ -29,11 +29,11 @@ static vx_status vxVivWarpGeneric(vx_image src_image, vx_matrix matrix, vx_scala
     status |= vxAccessMatrix(matrix, m);
     status |= vxAccessScalarValue(stype, &type);
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src_image, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src_image, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst_image, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst_image, GC_VX_INDEX_AUTO);
 
     context.params.kernel           = kernel;
 
@@ -62,7 +62,7 @@ static vx_status vxVivWarpGeneric(vx_image src_image, vx_matrix matrix, vx_scala
     if(kernel == gcvVX_KERNEL_WARP_PERSPECTIVE)
     {
         gcoOS_MemCopy(&context.uniforms[1].uniform, m, 3*sizeof(vx_float32));
-		gcoOS_MemCopy(&context.uniforms[1].uniform.termConfig + 4, &m[3], 3*sizeof(vx_float32));
+        gcoOS_MemCopy(&context.uniforms[1].uniform.termConfig + 4, &m[3], 3*sizeof(vx_float32));
         gcoOS_MemCopy(&context.uniforms[1].uniform.termConfig + 8, &m[6], 3*sizeof(vx_float32));
     }
     else

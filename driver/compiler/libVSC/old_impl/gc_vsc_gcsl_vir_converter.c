@@ -205,7 +205,7 @@ conv2VirsVirOpcodeMap _virOpcodeMap[] =
     {OPCODE_TEXU_LOD, /* gcSL_TEXU_LOD, 0x74 */ VIR_MOD_NONE, EXTERN_TEXU_LOD, -1},
     {VIR_OP_MEM_BARRIER, /* gcS_BARRIER, 0x75 */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_NOP, /* gcSL_SAMPLER_ASSIGN, 0x76 */ VIR_MOD_NONE, 0, 0},
-    {VIR_OP_GET_SAMPLER_IDX,/* gcSL_GET_SAMPLER_IDX,0x77 */ VIR_MOD_NONE, 0, 0},
+    {VIR_OP_GET_SAMPLER_IDX,/* gcSL_GET_SAMPLER_IDX, 0x77 */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_IMG_LOAD_3D, /* gcSL_IMAGE_RD_3D, 0x78 */ VIR_MOD_NONE, 0, 0},
     {OPCODE_IMG_STORE_3D, /* gcSL_IMAGE_WR_3D, 0x79 */ VIR_MOD_NONE, EXTERN_IMG_STORE_3D, 0},
     {VIR_OP_CLAMP0MAX, /* gcSL_CLAMP0MAX, 0x7A */ VIR_MOD_NONE, 0, 0},
@@ -224,6 +224,9 @@ conv2VirsVirOpcodeMap _virOpcodeMap[] =
     {VIR_OP_MOV_LONG, /* gcSL_MOV_LONG, 0x87 */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_MADSAT, /* gcSL_MADSAT, 0x88 */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_COPY, /* gcSL_COPY, 0x89 */ VIR_MOD_NONE, 0, 0},
+    {VIR_OP_IMG_ADDR_3D, /* gcSL_IMAGE_ADDR_3D, 0x8A */ VIR_MOD_NONE, 0, 0},
+    {VIR_OP_GET_SAMPLER_LMM,/* gcSL_GET_SAMPLER_LMM, 0x8B */ VIR_MOD_NONE, 0, 0},
+    {VIR_OP_GET_SAMPLER_LBS,/* gcSL_GET_SAMPLER_LBS, 0x8C */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_MAXOPCODE, /* gcSL_MAXOPCODE */                    VIR_MOD_NONE, 0, 0},
 };
 
@@ -1503,7 +1506,7 @@ _ConvShaderUniformIdx2Vir(
 
             virUniform->sym = symId;
             virUniform->blockIndex = uniform->blockIndex;
-            virUniform->index      = uniform->index;
+            virUniform->gcslIndex = uniform->index;
             virUniform->lastIndexingIndex = (gctINT16)lastIndexingIndex;
             virUniform->glUniformIndex = uniform->glUniformIndex;
             VIR_Uniform_SetOrigPhysical(virUniform, GetUniformPhysical(uniform));
@@ -1514,13 +1517,17 @@ _ConvShaderUniformIdx2Vir(
             virUniform->offset = uniform->offset;
             virUniform->baseBindingUniform = gcvNULL;
 
-            _gcmConvConstVal2VirConstValue(&uniform->initializer, value);
-            virErrCode = VIR_Shader_AddConstant(VirShader,
-                                                VIR_Type_GetIndex(sym->type),
-                                                value,
-                                                &virUniform->initializer);
-            CHECK_ERROR(virErrCode, "Failed to add constant");
-            if(virErrCode != VSC_ERR_NONE) return virErrCode;
+            if(gcmType_Kind(uniform->u.type) != gceTK_SAMPLER &&
+               gcmType_Kind(uniform->u.type) != gceTK_IMAGE)
+            {
+                _gcmConvConstVal2VirConstValue(&uniform->initializer, value);
+                virErrCode = VIR_Shader_AddConstant(VirShader,
+                                                    VIR_Type_GetIndex(sym->type),
+                                                    value,
+                                                    &virUniform->u.initializer);
+                CHECK_ERROR(virErrCode, "Failed to add constant");
+                if (virErrCode != VSC_ERR_NONE) return virErrCode;
+            }
 
             {
                 /* set layout info */
@@ -3200,7 +3207,7 @@ _ConvShaderAttribute2Vir(
     IN gctUINT*             AttrVirRegCount,
     IN VIR_Shader*          VirShader,
     IN VIR_SymId            IoBlockIndex,
-	IN VSC_HW_CONFIG		*hwCfg,
+    IN VSC_HW_CONFIG        *hwCfg,
     OUT VIR_Symbol**        AttributeSymbol
     )
 {
@@ -3272,25 +3279,25 @@ _ConvShaderAttribute2Vir(
 
     VIR_Symbol_SetPrecision(sym, _gcmConvPrecision2Vir(Attribute->precision));
     /* HW has bug on conversion for flat varying, thus promote it to highp */
-	if (hwCfg != gcvNULL &&
+    if (hwCfg != gcvNULL &&
         !hwCfg->hwFeatureFlags.flatDual16Fix &&
-		GetATTRShaderMode(Attribute) == gcSHADER_SHADER_FLAT &&
-		(GetATTRType(Attribute) == gcSHADER_FLOAT_X1 ||
-		 GetATTRType(Attribute) == gcSHADER_FLOAT_X2 ||
-		 GetATTRType(Attribute) == gcSHADER_FLOAT_X3 ||
-		 GetATTRType(Attribute) == gcSHADER_FLOAT_X4 ||
-		 GetATTRType(Attribute) == gcSHADER_FLOAT_2X2 ||
-		 GetATTRType(Attribute) == gcSHADER_FLOAT_2X3 ||
-		 GetATTRType(Attribute) == gcSHADER_FLOAT_2X4 ||
-		 GetATTRType(Attribute) == gcSHADER_FLOAT_3X2 ||
-		 GetATTRType(Attribute) == gcSHADER_FLOAT_3X3 ||
-		 GetATTRType(Attribute) == gcSHADER_FLOAT_3X4 ||
-		 GetATTRType(Attribute) == gcSHADER_FLOAT_4X2 ||
-		 GetATTRType(Attribute) == gcSHADER_FLOAT_4X3 ||
-		 GetATTRType(Attribute) == gcSHADER_FLOAT_4X4))
-	{
-		VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
-	}
+        GetATTRShaderMode(Attribute) == gcSHADER_SHADER_FLAT &&
+        (GetATTRType(Attribute) == gcSHADER_FLOAT_X1 ||
+         GetATTRType(Attribute) == gcSHADER_FLOAT_X2 ||
+         GetATTRType(Attribute) == gcSHADER_FLOAT_X3 ||
+         GetATTRType(Attribute) == gcSHADER_FLOAT_X4 ||
+         GetATTRType(Attribute) == gcSHADER_FLOAT_2X2 ||
+         GetATTRType(Attribute) == gcSHADER_FLOAT_2X3 ||
+         GetATTRType(Attribute) == gcSHADER_FLOAT_2X4 ||
+         GetATTRType(Attribute) == gcSHADER_FLOAT_3X2 ||
+         GetATTRType(Attribute) == gcSHADER_FLOAT_3X3 ||
+         GetATTRType(Attribute) == gcSHADER_FLOAT_3X4 ||
+         GetATTRType(Attribute) == gcSHADER_FLOAT_4X2 ||
+         GetATTRType(Attribute) == gcSHADER_FLOAT_4X3 ||
+         GetATTRType(Attribute) == gcSHADER_FLOAT_4X4))
+    {
+        VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
+    }
     VIR_Symbol_SetTyQualifier(sym, VIR_TYQUAL_CONST);
 
     sym->flags = VIR_SYMFLAG_ENABLED |
@@ -3430,7 +3437,7 @@ _ConvIOBlock2Vir(
     IN conv2VirsVirRegMap*  VirRegMapArr,
     IN gctUINT*             AttrVirRegCount,
     IN VIR_Shader*          VirShader,
-	IN VSC_HW_CONFIG		*hwCfg,
+    IN VSC_HW_CONFIG        *hwCfg,
     IN OUT VIR_IOBlock**    VirIOBlock
     )
 {
@@ -3631,7 +3638,7 @@ _ConvIOBlock2Vir(
                                                   AttrVirRegCount,
                                                   VirShader,
                                                   symId,
-												  hwCfg,
+                                                  hwCfg,
                                                   gcvNULL);
             if (virErrCode != VSC_ERR_NONE) return virErrCode;
 
@@ -5040,7 +5047,7 @@ _CmpInstuction(
 gceSTATUS
 gcSHADER_Conv2VIR(
     IN gcSHADER Shader,
-	IN VSC_HW_CONFIG	*hwCfg,
+    IN VSC_HW_CONFIG    *hwCfg,
     IN OUT VIR_Shader *VirShader
     )
 {
@@ -5327,7 +5334,7 @@ gcSHADER_Conv2VIR(
                                               &attrVirRegCount,
                                               VirShader,
                                               VIR_INVALID_ID,
-											  hwCfg,
+                                              hwCfg,
                                               gcvNULL);
         ON_ERROR2STATUS(virErrCode, "Failed to normal attributes: _ConvShaderAttribute2Vir");
     }
@@ -5404,6 +5411,27 @@ gcSHADER_Conv2VIR(
         {
             VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_STATICALLY_USED);
         }
+        if (isUniformLodMinMax(uniform) || isUniformLevelBaseSize(uniform))
+        {
+            gcUNIFORM gcslSampler = gcvNULL;
+            VIR_Uniform* child = VIR_Symbol_GetUniform(sym);
+            VIR_Uniform* virSampler;
+
+            gcmASSERT(uniform->parent != -1);
+
+            gcSHADER_GetUniform(Shader, uniform->parent, &gcslSampler);
+            virSampler = VIR_Shader_GetUniformFromGCSLIndex(VirShader, gcslSampler->index);
+            gcmASSERT(virSampler);
+            if(isUniformLodMinMax(uniform))
+            {
+                virSampler->u.samplerOrImageAttr.lodMinMax = sym;
+            }
+            if(isUniformLevelBaseSize(uniform))
+            {
+                virSampler->u.samplerOrImageAttr.levelBaseSize = sym;
+            }
+            child->u.parentSampler = virSampler;
+        }
     }
     VirShader->uniformCount = Shader->uniformCount;
 
@@ -5428,7 +5456,7 @@ gcSHADER_Conv2VIR(
                 virUniformID  = VIR_IdList_GetId(&VirShader->uniforms, k);
                 virUniformSym = VIR_Shader_GetSymFromId(VirShader, virUniformID);
 
-                if (uniform->index == (gctINT16)virUniformSym->u2.uniform->index)
+                if (uniform->index == (gctINT16)virUniformSym->u2.uniform->gcslIndex)
                 {
                     virUniform = virUniformSym->u2.uniform;
                     break;
@@ -5440,7 +5468,7 @@ gcSHADER_Conv2VIR(
                 virBaseUniformID  = VIR_IdList_GetId(&VirShader->uniforms, k);
                 virBaseUniformSym = VIR_Shader_GetSymFromId(VirShader, virBaseUniformID);
 
-                if (uniform->baseBindingIdx == (gctINT16)virBaseUniformSym->u2.uniform->index)
+                if (uniform->baseBindingIdx == (gctINT16)virBaseUniformSym->u2.uniform->gcslIndex)
                 {
                     virUniform->baseBindingUniform = virBaseUniformSym->u2.uniform;
                     break;
@@ -5484,7 +5512,7 @@ gcSHADER_Conv2VIR(
                             virUniformID  = VIR_IdList_GetId(&VirShader->uniforms, k);
                             virUniformSym = VIR_Shader_GetSymFromId(VirShader, virUniformID);
 
-                            if (sampler->index == (gctINT16)virUniformSym->u2.uniform->index)
+                            if (sampler->index == (gctINT16)virUniformSym->u2.uniform->gcslIndex)
                             {
                                 break;
                             }
@@ -5511,7 +5539,7 @@ gcSHADER_Conv2VIR(
                 virSamplerUniformID  = VIR_IdList_GetId(&VirShader->uniforms, k);
                 virSamplerUniformSym = VIR_Shader_GetSymFromId(VirShader, virSamplerUniformID);
 
-                if (sampler->index == (gctINT16)virSamplerUniformSym->u2.uniform->index)
+                if (sampler->index == (gctINT16)virSamplerUniformSym->u2.uniform->gcslIndex)
                 {
                     VIR_Symbol_SetFlag(virSamplerUniformSym, VIR_SYMUNIFORMFLAG_SAMPLER_CALCULATE_TEX_SIZE);
                     break;
@@ -5558,7 +5586,7 @@ gcSHADER_Conv2VIR(
                                       virRegMapArr,
                                       &attrVirRegCount,
                                       VirShader,
-									  hwCfg,
+                                      hwCfg,
                                       &virIOBlock);
         ON_ERROR2STATUS(virErrCode, "Failed to _ConvUniformBlock2Vir");
     }

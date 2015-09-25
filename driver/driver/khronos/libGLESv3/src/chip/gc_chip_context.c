@@ -492,6 +492,11 @@ gcChipInitExtension(
         }
 
         __glExtension[__GL_EXTID_OES_texture_half_float].bEnabled = GL_TRUE;
+
+        if (chipCtx->patchId == gcvPATCH_3DMARKSS)
+        {
+            __glExtension[__GL_EXTID_EXT_color_buffer_float].bEnabled = GL_TRUE;
+        }
     }
 
     /* extension enabled only for context 3.0 and later */
@@ -551,9 +556,8 @@ gcChipInitExtension(
         __glExtension[__GL_EXTID_KHR_blend_equation_advanced].bEnabled = GL_TRUE;
         __glExtension[__GL_EXTID_OES_texture_storage_multisample_2d_array].bEnabled = GL_TRUE;
         __glExtension[__GL_EXTID_OES_shader_image_atomic].bEnabled = GL_TRUE;
-        __glExtension[__GL_EXTID_EXT_primitive_bounding_box].bEnabled = GL_TRUE;
-        __glExtension[__GL_EXTID_OES_primitive_bounding_box].bEnabled = GL_TRUE;
-        __glExtension[__GL_EXTID_KHR_debug].bEnabled = GL_FALSE;
+        __glExtension[__GL_EXTID_KHR_debug].bEnabled = GL_TRUE;
+        __glExtension[__GL_EXTID_KHR_robustness].bEnabled = GL_TRUE;
 
         if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_GEOMETRY_SHADER) == gcvSTATUS_TRUE)
         {
@@ -566,7 +570,6 @@ gcChipInitExtension(
         if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_CUBEMAP_ARRAY) == gcvSTATUS_TRUE)
         {
             __glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled = gcvTRUE;
-
             __glExtension[__GL_EXTID_OES_texture_cube_map_array].bEnabled = gcvTRUE;
         }
 
@@ -588,7 +591,6 @@ gcChipInitExtension(
         if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_BUFFER) == gcvSTATUS_TRUE)
         {
             __glExtension[__GL_EXTID_EXT_texture_buffer].bEnabled = gcvTRUE;
-
             __glExtension[__GL_EXTID_OES_texture_buffer].bEnabled = gcvTRUE;
         }
 
@@ -599,12 +601,21 @@ gcChipInitExtension(
 
             __glExtension[__GL_EXTID_OES_tessellation_shader].bEnabled = gcvTRUE;
             __glExtension[__GL_EXTID_OES_tessellation_point_size].bEnabled = gcvTRUE;
+
+            __glExtension[__GL_EXTID_EXT_primitive_bounding_box].bEnabled = GL_TRUE;
+            __glExtension[__GL_EXTID_OES_primitive_bounding_box].bEnabled = GL_TRUE;
+
         }
 
         if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_DRAW_ELEMENTS_BASE_VERTEX) == gcvSTATUS_TRUE)
         {
             __glExtension[__GL_EXTID_EXT_draw_elements_base_vertex].bEnabled = GL_TRUE;
             __glExtension[__GL_EXTID_OES_draw_elements_base_vertex].bEnabled = GL_TRUE;
+        }
+
+        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_ROBUSTNESS) == gcvSTATUS_TRUE)
+        {
+            __glExtension[__GL_EXTID_KHR_robust_buffer_access_behavior].bEnabled = GL_TRUE;
         }
     }
 
@@ -930,24 +941,20 @@ __glChipMakeCurrent(
     __GLcontext *gc
     )
 {
+    gceSTATUS status = gcvSTATUS_OK;
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-
-    gceSTATUS status;
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
     gcmONERROR(gco3D_Set3DEngine(chipCtx->engine));
-
     gcmONERROR(chipCtx->pfInitCompiler(chipCtx->hal, &gc->constants.shaderCaps));
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
-
     return GL_TRUE;
 
 OnError:
     gcChipSetError(chipCtx, status);
     gcmFOOTER_ARG("return=%d", GL_FALSE);
-
     return GL_FALSE;
 }
 
@@ -957,15 +964,20 @@ __glChipLoseCurrent(
     GLboolean bkickoffcmd
     )
 {
+    gceSTATUS status = gcvSTATUS_OK;
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-    gco3D_UnSet3DEngine(chipCtx->engine);
+    gcmONERROR(chipCtx->pfFinalizeCompiler(chipCtx->hal));
+    gcmONERROR(gco3D_UnSet3DEngine(chipCtx->engine));
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
-
     return GL_TRUE;
+
+OnError:
+    gcmFOOTER_ARG("return=%d", GL_FALSE);
+    return GL_FALSE;
 }
 
 
@@ -1032,16 +1044,7 @@ __glChipGetDeviceConstants(
     tsAvailable = (gcvSTATUS_TRUE == gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TESSELLATION));
     gsAvailable = (gcvSTATUS_TRUE == gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_GEOMETRY_SHADER));
 
-    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_HALTI5) &&
-        tsAvailable &&
-        gsAvailable)
-    {
-        gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION32);
-        constants->GLSLVersion =__GL_GLSL_VERSION32;
-        constants->majorVersion = 3;
-        constants->minorVersion = 2;
-    }
-    else if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI2) ||
+    if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI2) ||
         (chipModel == gcv900 && chipRevision == 0x5250))
     {
         gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION31);

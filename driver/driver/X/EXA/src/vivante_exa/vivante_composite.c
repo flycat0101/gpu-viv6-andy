@@ -143,7 +143,7 @@ VivCheckComposite(int op, PicturePtr pSrc, PicturePtr pMsk, PicturePtr pDst) {
 
     }
 
-    if ( pBlt->mDstSurfInfo.mFormat.mBpp < 8 || pBlt->mSrcSurfInfo.mFormat.mBpp < 8 ) 	{
+    if ( pBlt->mDstSurfInfo.mFormat.mBpp < 8 || pBlt->mSrcSurfInfo.mFormat.mBpp < 8 )   {
         TRACE_ERROR("Src or Dst pixel is not wide enough\n");
         TRACE_EXIT(FALSE);
     }
@@ -698,6 +698,7 @@ ReCalBoxByStretchInfoWithMask(VIV2DBLITINFOPTR pBlt, VivBox *opBox) {
  * This call is required if PrepareComposite() ever succeeds.
  */
 #define MAX_COMPOSITE_SUB_SIZE IMX_EXA_MIN_PIXEL_AREA_COMPOSITE
+static int  _last_hw_composite = 0;
 void
 VivComposite(PixmapPtr pxDst, int srcX, int srcY, int maskX, int maskY,
     int dstX, int dstY, int width, int height) {
@@ -720,6 +721,11 @@ VivComposite(PixmapPtr pxDst, int srcX, int srcY, int maskX, int maskY,
     /* otherwise disable it, it is not meaningful when the size is big */
     if ( ( width * height ) < MAX_COMPOSITE_SUB_SIZE && (IMX_EXA_NONCACHESURF_SIZE > MAX_COMPOSITE_SUB_SIZE))
     {
+
+        if (_last_hw_composite > 0)
+            VIV2DGPUBlitComplete(&pViv->mGrCtx,TRUE);
+            _last_hw_composite = 0;
+
         pBlt->mSwcmp = TRUE;
         VIVSWComposite(pxDst, srcX, srcY, maskX, maskY, dstX, dstY, width, height);
         return ;
@@ -771,6 +777,8 @@ VivComposite(PixmapPtr pxDst, int srcX, int srcY, int maskX, int maskY,
     if (!DoCompositeBlit(&pViv->mGrCtx, &opBox)) {
         TRACE_ERROR("Copy Blit Failed\n");
     }
+
+    _last_hw_composite = 1;
 
     TRACE_EXIT();
 }

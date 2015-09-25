@@ -31,6 +31,13 @@ _ClearWormHole(
     IN hwcDisplay * Display
     );
 
+/* Clear full screen */
+static gceSTATUS
+_ClearFullScreen(
+    IN hwcContext * Context,
+    IN hwcDisplay * Display
+    );
+
 /* Setup blit source. */
 static gceSTATUS
 _Blit(
@@ -118,6 +125,13 @@ hwcComposeG2D(
     {
         LOGD("COMPOSE of dpy=%d: target=0x%08x tsConfig=%d",
              Display->disp, target->physical, target->tsConfig);
+    }
+
+    if (Display->layerCount == 0)
+    {
+        /* Do a full-screen 2D clear if no layers. */
+        _ClearFullScreen(Context, Display);
+        return gcvSTATUS_OK;
     }
 
 #if ENABLE_SWAP_RECTANGLE
@@ -568,7 +582,7 @@ hwcComposeG2D(
             {
                 if (layer->stretch
                 && (  !Context->multiSourceBltV2
-                   || layer->xScale > 2 ||  layer->yScale > 2)
+                   || layer->xScale < 2 ||  layer->yScale < 2)
                 )
                 {
                     /*
@@ -631,10 +645,11 @@ hwcComposeG2D(
 
             if (layer->compositionType != HWC_DIM)
             {
-                gctINT res   = Display->res.right * Display->res.bottom;
-                gctINT ratio = res / layer->width / layer->height;
+                gctINT res     = Display->res.right * Display->res.bottom;
+                gctINT acreage = (layer->dstRect.right  - layer->dstRect.left)
+                               * (layer->dstRect.bottom - layer->dstRect.top);
 
-                if (ratio > 10)
+                if ((acreage > 0) && (res / acreage > 10))
                 {
                     /* Too small area. */
                     break;
@@ -1611,6 +1626,62 @@ _CopySwapRect(
     }
 
     return gcvSTATUS_OK;
+
+OnError:
+    LOGE("Failed in %s: status=%d", __FUNCTION__, status);
+    return status;
+}
+
+static gceSTATUS
+_ClearFullScreen(
+    IN hwcContext * Context,
+    IN hwcDisplay * Display
+    )
+{
+    gceSTATUS status;
+    hwcBuffer * target = Display->target;
+
+    /* Disable alpha blending. */
+    gcmONERROR(gco2D_DisableAlphaBlend(Context->engine));
+
+    /* No premultiply. */
+    gcmONERROR(
+        gco2D_SetPixelMultiplyModeAdvanced(Context->engine,
+                                           gcv2D_COLOR_MULTIPLY_DISABLE,
+                                           gcv2D_COLOR_MULTIPLY_DISABLE,
+                                           gcv2D_GLOBAL_COLOR_MULTIPLY_DISABLE,
+                                           gcv2D_COLOR_MULTIPLY_DISABLE));
+
+    /* Setup Target. */
+    gcmONERROR(
+        gco2D_SetGenericTarget(Context->engine,
+                               &target->physical,
+                               1U,
+                               &Display->stride,
+                               1U,
+                               Display->tiling,
+                               Display->format,
+                               gcvSURF_0_DEGREE,
+                               Display->res.right,
+                               Display->res.bottom));
+
+    /* Target display buffer tile status. */
+    gcmONERROR(
+        gco2D_SetTargetTileStatus(Context->engine,
+                                  target->tsConfig,
+                                  Display->format,
+                                  0,
+                                  target->tsPhysical));
+
+    /* Perform a full-screen Clear. */
+    gcmONERROR(
+        gco2D_Clear(Context->engine,
+                    1U,
+                    &Display->res,
+                    0x00000000,
+                    0xCC,
+                    0xCC,
+                    Display->format));
 
 OnError:
     LOGE("Failed in %s: status=%d", __FUNCTION__, status);

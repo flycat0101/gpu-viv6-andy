@@ -101,7 +101,7 @@ OnError:
      (opcode == gcSL_LEADZERO) ||\
      (opcode == gcSL_MAX) ||\
      (opcode == gcSL_MIN)\
-	)
+    )
 static gctUINT
 _countbits(gctUINT bits, gctINT n)
 {

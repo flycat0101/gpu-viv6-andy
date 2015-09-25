@@ -81,7 +81,7 @@ static gctSTRING gcLibFunc_BlendEquationHeader =
 "\n";
 
 /* To meet the dQEP asin/acos/acosh/atan/atan2 accuracy, we have to use the following builtint function */
-static gctSTRING gcLibASIN_ACOS_Funcs =
+static gctSTRING gcLibASIN_ACOS_Funcs_Common =
 "float _viv_asin_base_1(float a)\n"
 "{\n"
 "   float temp  = a * a;\n"
@@ -116,7 +116,9 @@ static gctSTRING gcLibASIN_ACOS_Funcs =
 "       result = (3.14159265358979323846f/2.0f - _viv_asin_base_1(sqrt(1.0f - a * a))) * sign(a);\n"
 "   }\n"
 "   return result;\n"
-"}\n"
+"}\n";
+
+static gctSTRING gcLibASIN_Funcs_halti0 =
 "vec2 _viv_asin_2(vec2 a)\n"
 "{\n"
 "   vec2 result, result1;\n"
@@ -140,7 +142,50 @@ static gctSTRING gcLibASIN_ACOS_Funcs =
 "   result1 = (vec4(3.14159265358979323846f/2.0f) - _viv_asin_base_4(sqrt(vec4(1.0f) - a * a))) * sign(a);\n"
 "   result = mix(result1, _viv_asin_base_4(a), sel);\n"
 "   return result;\n"
+"}\n";
+
+static gctSTRING gcLibASIN_Funcs =
+"vec2 _viv_asin_2(vec2 a)\n"
+"{\n"
+"   vec2 result, result1;\n"
+"   result = (vec2(3.14159265358979323846f/2.0f) - _viv_asin_base_2(sqrt(vec2(1.0f) - a * a))) * sign(a);\n"
+"   result1 = _viv_asin_base_2(a);\n"
+"   if (abs(a.x) < 0.7072f)\n"
+"       result.x = result1.x;\n"
+"   if (abs(a.y) < 0.7072f)\n"
+"       result.y = result1.y;\n"
+"   return result;\n"
 "}\n"
+"vec3 _viv_asin_3(vec3 a)\n"
+"{\n"
+"   vec3 result, result1;\n"
+"   result = (vec3(3.14159265358979323846f/2.0f) - _viv_asin_base_3(sqrt(vec3(1.0f) - a * a))) * sign(a);\n"
+"   result1 = _viv_asin_base_3(a);\n"
+"   if (abs(a.x) < 0.7072f)\n"
+"       result.x = result1.x;\n"
+"   if (abs(a.y) < 0.7072f)\n"
+"       result.y = result1.y;\n"
+"   if (abs(a.z) < 0.7072f)\n"
+"       result.z = result1.z;\n"
+"   return result;\n"
+"}\n"
+"vec4 _viv_asin_4(vec4 a)\n"
+"{\n"
+"   vec4 result, result1;\n"
+"   result = (vec4(3.14159265358979323846f/2.0f) - _viv_asin_base_4(sqrt(vec4(1.0f) - a * a))) * sign(a);\n"
+"   result1 = _viv_asin_base_4(a);\n"
+"   if (abs(a.x) < 0.7072f)\n"
+"       result.x = result1.x;\n"
+"   if (abs(a.y) < 0.7072f)\n"
+"       result.y = result1.y;\n"
+"   if (abs(a.z) < 0.7072f)\n"
+"       result.z = result1.z;\n"
+"   if (abs(a.w) < 0.7072f)\n"
+"       result.w = result1.w;\n"
+"   return result;\n"
+"}\n";
+
+static gctSTRING gcLibACOS_Funcs =
 "float _viv_acos_1(float a)\n"
 "{\n"
 "   float result = 3.14159265358979323846f/2.0f - _viv_asin_1(a);\n"
@@ -5021,6 +5066,39 @@ static gctSTRING gcLibImageAddr =
 "   return uvec2(0u, address);\n"
 "}\n";
 
+static gctSTRING gcLibImageAddr_halti4 =
+"highp uvec2 _viv_image_computeImgAddr(highp uvec4 img_desc, ivec3 p, bool img3D)\n"
+"{\n"
+"   uint addressing = _viv_bitfieldExtract_uint_const(img_desc.w, 4, 2);\n"
+"   if (addressing == 0u) { addressing = 1u; } \n"
+"   uint xCoord = uint(p.x);\n"
+"   uint yCoord = uint(p.y);\n"
+"   uint width = _viv_bitfieldExtract_uint_const(img_desc.z, 0, 16);\n"
+"   uint height = _viv_bitfieldExtract_uint_const(img_desc.z, 16, 16);\n"
+"   if ((xCoord >= width) || (yCoord >= height)) { return uvec2(addressing, 0u); } \n"
+"   uint address;\n"
+"   if (img3D) \n"
+"   {\n"
+"       _viv_asm(IMAGE_ADDR_3D, address, img_desc, p);\n"
+"   }\n"
+"   else \n"
+"   {\n"
+"       _viv_asm(IMAGE_ADDR, address, img_desc, p);\n"
+"   }\n"
+"   return uvec2(0u, address);\n"
+"}\n"
+"highp uvec2 _viv_image_computeImgAddr2D(highp uvec4 img_desc, ivec2 p)\n"
+"{\n"
+"   uint xCoord = uint(p.x);\n"
+"   uint yCoord = uint(p.y);\n"
+"   uint width = _viv_bitfieldExtract_uint_const(img_desc.z, 0, 16);\n"
+"   uint height = _viv_bitfieldExtract_uint_const(img_desc.z, 16, 16);\n"
+"   if ((xCoord >= width) || (yCoord >= height)) { return uvec2(1u, 0u); } \n"
+"   uint address;\n"
+"   _viv_asm(IMAGE_ADDR, address, img_desc, p);\n"
+"   return uvec2(0u, address);\n"
+"}\n";
+
 static gctSTRING gcLibImageSwizzle =
 "highp vec4 _viv_image_swizzle(highp uvec4 img_desc, highp vec4 raw)\n"
 "{\n"
@@ -5346,7 +5424,7 @@ static gctSTRING gcLibImageLoad_2D_int_rgba8i =
 "highp ivec4 _viv_image_load_2D_int_rgba8i(highp uvec4 img_desc, ivec2 p)\n"
 "{\n"
 "   ivec4 result = ivec4(0);\n"
-"   uvec2 addrRet = _viv_image_computeImgAddr(img_desc, ivec3(p, 0), false);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
 "   uint inBorder = addrRet.x;\n"
 "   uint address = addrRet.y;\n"
 "   if (inBorder > 0u) { result.w = (inBorder == 2u) ? 1 : 0; } \n"
@@ -5938,6 +6016,71 @@ static gctSTRING gcLibImageLoad_2DArray =
 "}\n";
 
 /****************************imageLoad for a buffer image****************************/
+static gctSTRING gcLibImageLoad_CubeArray =
+"highp uvec4 _viv_image_load_CubeArray_uint_rgba8ui(highp uvec4 img_desc, ivec3 p)\n"
+"{\n"
+"   return _viv_image_load_3Dcommon_uint_rgba8ui(img_desc, p);\n"
+"}\n"
+"\n"
+"highp ivec4 _viv_image_load_CubeArray_int_rgba8i(highp uvec4 img_desc, ivec3 p)\n"
+"{\n"
+"   return _viv_image_load_3Dcommon_int_rgba8i(img_desc, p);\n"
+"}\n"
+"\n"
+"highp vec4 _viv_image_load_CubeArray_float(highp uvec4 img_desc, ivec3 p)\n"
+"{\n"
+"    return _viv_image_load_3Dcommon_float(img_desc, p);\n"
+"}\n"
+"\n"
+"highp vec4 _viv_image_load_CubeArray_float_rgba8(highp uvec4 img_desc, ivec3 p)\n"
+"{\n"
+"   return _viv_image_load_3Dcommon_float_rgba8(img_desc, p);\n"
+"}\n"
+"\n"
+"highp vec4 _viv_image_load_CubeArray_float_rgba8_snorm(highp uvec4 img_desc, ivec3 p)\n"
+"{\n"
+"   return _viv_image_load_3Dcommon_float_rgba8_snorm(img_desc, p);\n"
+"}\n"
+"highp vec4 _viv_image_load_CubeArray_float_rgba32f(highp uvec4 img_desc, highp uvec4 img_desc_1, ivec3 p)\n"
+"{\n"
+"   return _viv_image_load_3Dcommon_float_rgba32f(img_desc, img_desc_1, p);\n"
+"}\n"
+"\n"
+"highp vec4 _viv_image_load_CubeArray_float_r32f(highp uvec4 img_desc, ivec3 p)\n"
+"{\n"
+"   return _viv_image_load_3Dcommon_float_r32f(img_desc, p);\n"
+"}\n"
+"\n"
+"highp ivec4 _viv_image_load_CubeArray_int(highp uvec4 img_desc, ivec3 p)\n"
+"{\n"
+"   return _viv_image_load_3Dcommon_int(img_desc, p);\n"
+"}\n"
+"\n"
+"highp ivec4 _viv_image_load_CubeArray_int_rgba32i(highp uvec4 img_desc, highp uvec4 img_desc_1, ivec3 p)\n"
+"{\n"
+"   return _viv_image_load_3Dcommon_int_rgba32i(img_desc, img_desc_1, p);\n"
+"}\n"
+"\n"
+"highp ivec4 _viv_image_load_CubeArray_int_r32i(highp uvec4 img_desc, ivec3 p)\n"
+"{\n"
+"   return _viv_image_load_3Dcommon_int_r32i(img_desc, p);\n"
+"}\n"
+"highp uvec4 _viv_image_load_CubeArray_uint(highp uvec4 img_desc, ivec3 p)\n"
+"{\n"
+"   return _viv_image_load_3Dcommon_uint(img_desc, p);\n"
+"}\n"
+"\n"
+"highp uvec4 _viv_image_load_CubeArray_uint_rgba32ui(highp uvec4 img_desc, highp uvec4 img_desc_1, ivec3 p)\n"
+"{\n"
+"   return _viv_image_load_3Dcommon_uint_rgba32ui(img_desc, img_desc_1, p);\n"
+"}\n"
+"\n"
+"highp uvec4 _viv_image_load_CubeArray_uint_r32ui(highp uvec4 img_desc, ivec3 p)\n"
+"{\n"
+"   return _viv_image_load_3Dcommon_uint_r32ui(img_desc, p);\n"
+"}\n";
+
+/****************************imageLoad for a buffer image****************************/
 static gctSTRING gcLibImageLoad_Buffer_float =
 "highp vec4 _viv_image_load_buffer_float(highp uvec4 img_desc, int coord)\n"
 "{\n"
@@ -6064,7 +6207,7 @@ static gctSTRING gcLibImageLoad_Buffer_int_rgba32i =
 "{\n"
 "   ivec4 result = ivec4(0);\n"
 "   ivec2 p = ivec2(coord%MAX_TEXTURE_BUFFER_SIZE, coord/MAX_TEXTURE_BUFFER_SIZE);\n"
-"   uvec2 addrRet = _viv_image_computeImgAddr(img_desc, ivec3(p, 0), false);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
 "   uint address = addrRet.y;\n"
 "   if (addrRet.x <= 0u) {\n"
 "       highp ivec4 raw;\n"
@@ -6134,7 +6277,7 @@ static gctSTRING gcLibImageLoad_Buffer_uint_rgba32ui =
 "{\n"
 "   uvec4 result = uvec4(0u);\n"
 "   ivec2 p = ivec2(coord%MAX_TEXTURE_BUFFER_SIZE, coord/MAX_TEXTURE_BUFFER_SIZE);\n"
-"   uvec2 addrRet = _viv_image_computeImgAddr(img_desc, ivec3(p, 0), false);\n"
+"   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
 "   uint address = addrRet.y;\n"
 "   if (addrRet.x <= 0u) {\n"
 "       highp uvec4 raw;\n"
@@ -6473,7 +6616,7 @@ static gctSTRING gcLibImageLoad_2DArray_uint_1_hati4 =
 "    return result1;\n"
 "}\n";
 
-static gctSTRING gcLibImageLoad_CubeArray_float_hati4 =
+static gctSTRING gcLibImageLoad_CubeArray_float_img_access =
 "highp vec4 _viv_image_load_CubeArray_float(highp uvec4 img_desc, ivec3 p)\n"
 "{\n"
 "    highp vec4 result;\n"
@@ -6484,7 +6627,7 @@ static gctSTRING gcLibImageLoad_CubeArray_float_hati4 =
 "    return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageLoad_CubeArray_float_1_hati4 =
+static gctSTRING gcLibImageLoad_CubeArray_float_1_img_access =
 "highp vec4 _viv_image_load_CubeArray_float_1(highp uvec4 img_desc, highp uvec4 img_desc_1, ivec3 p)\n"
 "{\n"
 "    highp vec4 result1, result2;\n"
@@ -6500,7 +6643,7 @@ static gctSTRING gcLibImageLoad_CubeArray_float_1_hati4 =
 "    return result1;\n"
 "}\n";
 
-static gctSTRING gcLibImageLoad_CubeArray_int_hati4 =
+static gctSTRING gcLibImageLoad_CubeArray_int_img_access =
 "highp ivec4 _viv_image_load_CubeArray_int(highp uvec4 img_desc, ivec3 p)\n"
 "{\n"
 "    highp ivec4 result;\n"
@@ -6511,7 +6654,7 @@ static gctSTRING gcLibImageLoad_CubeArray_int_hati4 =
 "    return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageLoad_CubeArray_int_1_hati4 =
+static gctSTRING gcLibImageLoad_CubeArray_int_1_img_access =
 "highp ivec4 _viv_image_load_CubeArray_int_1(highp uvec4 img_desc, highp uvec4 img_desc_1, ivec3 p)\n"
 "{\n"
 "    highp ivec4 result1, result2;\n"
@@ -6527,7 +6670,7 @@ static gctSTRING gcLibImageLoad_CubeArray_int_1_hati4 =
 "    return result1;\n"
 "}\n";
 
-static gctSTRING gcLibImageLoad_CubeArray_uint_hati4 =
+static gctSTRING gcLibImageLoad_CubeArray_uint_img_access =
 "highp uvec4 _viv_image_load_CubeArray_uint(highp uvec4 img_desc, ivec3 p)\n"
 "{\n"
 "    highp uvec4 result;\n"
@@ -6538,7 +6681,7 @@ static gctSTRING gcLibImageLoad_CubeArray_uint_hati4 =
 "    return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageLoad_CubeArray_uint_1_hati4 =
+static gctSTRING gcLibImageLoad_CubeArray_uint_1_img_access =
 "highp uvec4 _viv_image_load_CubeArray_uint_1(highp uvec4 img_desc, highp uvec4 img_desc_1, ivec3 p)\n"
 "{\n"
 "    highp uvec4 result1, result2;\n"
@@ -6554,7 +6697,7 @@ static gctSTRING gcLibImageLoad_CubeArray_uint_1_hati4 =
 "    return result1;\n"
 "}\n";
 
-static gctSTRING gcLibImageLoad_Buffer_float_hati4 =
+static gctSTRING gcLibImageLoad_Buffer_float_img_access =
 "highp vec4 _viv_image_load_buffer_float(highp uvec4 img_desc, int p)\n"
 "{\n"
 "    highp vec4 result;\n"
@@ -6563,7 +6706,7 @@ static gctSTRING gcLibImageLoad_Buffer_float_hati4 =
 "    return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageLoad_Buffer_int_hati4 =
+static gctSTRING gcLibImageLoad_Buffer_int_img_access =
 "highp ivec4 _viv_image_load_buffer_int(highp uvec4 img_desc, int p)\n"
 "{\n"
 "    highp ivec4 result;\n"
@@ -6572,7 +6715,7 @@ static gctSTRING gcLibImageLoad_Buffer_int_hati4 =
 "    return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageLoad_Buffer_uint_hati4 =
+static gctSTRING gcLibImageLoad_Buffer_uint_img_access =
 "highp uvec4 _viv_image_load_buffer_uint(highp uvec4 img_desc, int p)\n"
 "{\n"
 "    highp uvec4 result;\n"
@@ -7167,10 +7310,74 @@ static gctSTRING gcLibImageStore_2DArray =
 "   _viv_image_store_3Dcommon_uint_r32ui(img_desc, p, data);\n"
 "}\n";
 
+static gctSTRING gcLibImageStore_CubeArray =
+"void _viv_image_store_CubeArray_float_rgba32f(highp uvec4 img_desc, highp uvec4 img_desc_1, ivec3 p, vec4 data)\n"
+"{\n"
+"   _viv_image_store_3Dcommon_float_rgba32f(img_desc, img_desc_1, p, data);\n"
+"}\n"
+"\n"
+"void _viv_image_store_CubeArray_float(highp uvec4 img_desc, ivec3 p, vec4 data)\n"
+"{\n"
+"   _viv_image_store_3Dcommon_float(img_desc, p, data);\n"
+"}\n"
+"\n"
+"void _viv_image_store_CubeArray_float_r32f(highp uvec4 img_desc, ivec3 p, vec4 data)\n"
+"{\n"
+"   _viv_image_store_3Dcommon_float_r32f(img_desc, p, data);\n"
+"}\n"
+"\n"
+"void _viv_image_store_CubeArray_float_rgba8(highp uvec4 img_desc, ivec3 p, vec4 data)\n"
+"{\n"
+"   _viv_image_store_3Dcommon_float_rgba8(img_desc, p, data);\n"
+"}\n"
+"\n"
+"void _viv_image_store_CubeArray_float_rgba8_snorm(highp uvec4 img_desc, ivec3 p, vec4 data)\n"
+"{\n"
+"   _viv_image_store_3Dcommon_float_rgba8_snorm(img_desc, p, data);\n"
+"}\n"
+"\n"
+"void _viv_image_store_CubeArray_int_rgba32i(highp uvec4 img_desc, highp uvec4 img_desc_1, ivec3 p, ivec4 data)\n"
+"{\n"
+"   _viv_image_store_3Dcommon_int_rgba32i(img_desc, img_desc_1, p, data);\n"
+"}\n"
+"\n"
+"void _viv_image_store_CubeArray_int(highp uvec4 img_desc, ivec3 p, ivec4 data)\n"
+"{\n"
+"   _viv_image_store_3Dcommon_int(img_desc, p, data);\n"
+"}\n"
+"\n"
+"void _viv_image_store_CubeArray_int_rgba8i(highp uvec4 img_desc, ivec3 p, ivec4 data)\n"
+"{\n"
+"   _viv_image_store_3Dcommon_int_rgba8i(img_desc, p, data);\n"
+"}\n"
+"\n"
+"void _viv_image_store_CubeArray_int_r32i(highp uvec4 img_desc, ivec3 p, ivec4 data)\n"
+"{\n"
+"   _viv_image_store_3Dcommon_int_r32i(img_desc, p, data);\n"
+"}\n"
+"void _viv_image_store_CubeArray_uint_rgba32ui(highp uvec4 img_desc, highp uvec4 img_desc_1, ivec3 p, uvec4 data)\n"
+"{\n"
+"   _viv_image_store_3Dcommon_uint_rgba32ui(img_desc, img_desc_1, p, data);\n"
+"}\n"
+"\n"
+"void _viv_image_store_CubeArray_uint(highp uvec4 img_desc, ivec3 p, uvec4 data)\n"
+"{\n"
+"   _viv_image_store_3Dcommon_uint(img_desc, p, data);\n"
+"}\n"
+"\n"
+"void _viv_image_store_CubeArray_uint_rgba8ui(highp uvec4 img_desc, ivec3 p, uvec4 data)\n"
+"{\n"
+"   _viv_image_store_3Dcommon_uint_rgba8ui(img_desc, p, data);\n"
+"}\n"
+"void _viv_image_store_CubeArray_uint_r32ui(highp uvec4 img_desc, ivec3 p, uvec4 data)\n"
+"{\n"
+"   _viv_image_store_3Dcommon_uint_r32ui(img_desc, p, data);\n"
+"}\n";
+
 static gctSTRING gcLibImageStore_Buffer_float_rgba32f =
 "void _viv_image_store_buffer_float_rgba32f(highp uvec4 img_desc, int coord, vec4 data)\n"
 "{\n"
-"   vec2 result;\n"
+"   vec4 result;\n"
 "   ivec2 p = ivec2(coord%MAX_TEXTURE_BUFFER_SIZE, coord/MAX_TEXTURE_BUFFER_SIZE);\n"
 "   uvec4 img_desc_u = img_desc;\n"
 "   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc_u, p);\n"
@@ -7243,7 +7450,7 @@ static gctSTRING gcLibImageStore_Buffer_float_rgba8_snorm =
 static gctSTRING gcLibImageStore_Buffer_int_rgba32i =
 "void _viv_image_store_buffer_int_rgba32i(highp uvec4 img_desc, int coord, ivec4 data)\n"
 "{\n"
-"   ivec2 result;\n"
+"   ivec4 result;\n"
 "   ivec2 p = ivec2(coord%MAX_TEXTURE_BUFFER_SIZE, coord/MAX_TEXTURE_BUFFER_SIZE);\n"
 "   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
 "   uint address = addrRet.y;\n"
@@ -7295,7 +7502,7 @@ static gctSTRING gcLibImageStore_Buffer_int_r32i =
 static gctSTRING gcLibImageStore_Buffer_uint_rgba32ui =
 "void _viv_image_store_buffer_uint_rgba32ui(highp uvec4 img_desc, int coord, uvec4 data)\n"
 "{\n"
-"   uvec2 result;\n"
+"   uvec4 result;\n"
 "   ivec2 p = ivec2(coord%MAX_TEXTURE_BUFFER_SIZE, coord/MAX_TEXTURE_BUFFER_SIZE);\n"
 "   uvec2 addrRet = _viv_image_computeImgAddr2D(img_desc, p);\n"
 "   uint address = addrRet.y;\n"
@@ -7640,7 +7847,7 @@ static gctSTRING gcLibImageStore_2DArray_uint_1_hati4 =
 "    _viv_asm(IMAGE_WR_3D, result, img_desc_1, p1);\n"
 "}\n";
 
-static gctSTRING gcLibImageStore_CubeArray_float_hati4 =
+static gctSTRING gcLibImageStore_CubeArray_float_img_access =
 "void _viv_image_store_CubeArray_float(highp uvec4 img_desc, ivec3 p, vec4 data)\n"
 "{\n"
 "    vec4 result;\n"
@@ -7651,7 +7858,7 @@ static gctSTRING gcLibImageStore_CubeArray_float_hati4 =
 "    _viv_asm(IMAGE_WR_3D, result, img_desc, p1);\n"
 "}\n";
 
-static gctSTRING gcLibImageStore_CubeArray_float_1_hati4 =
+static gctSTRING gcLibImageStore_CubeArray_float_1_img_access =
 "void _viv_image_store_CubeArray_float_1(highp uvec4 img_desc, highp uvec4 img_desc_1, ivec3 p, vec4 data)\n"
 "{\n"
 "    vec2 result;\n"
@@ -7667,7 +7874,7 @@ static gctSTRING gcLibImageStore_CubeArray_float_1_hati4 =
 "    _viv_asm(IMAGE_WR_3D, result, img_desc_1, p1);\n"
 "}\n";
 
-static gctSTRING gcLibImageStore_CubeArray_int_hati4 =
+static gctSTRING gcLibImageStore_CubeArray_int_img_access =
 "void _viv_image_store_CubeArray_int(highp uvec4 img_desc, ivec3 p, ivec4 data)\n"
 "{\n"
 "    ivec4 result;\n"
@@ -7678,7 +7885,7 @@ static gctSTRING gcLibImageStore_CubeArray_int_hati4 =
 "    _viv_asm(IMAGE_WR_3D, result, img_desc, p1);\n"
 "}\n";
 
-static gctSTRING gcLibImageStore_CubeArray_int_1_hati4 =
+static gctSTRING gcLibImageStore_CubeArray_int_1_img_access =
 "void _viv_image_store_CubeArray_int_1(highp uvec4 img_desc, highp uvec4 img_desc_1, ivec3 p, ivec4 data)\n"
 "{\n"
 "    ivec2 result;\n"
@@ -7694,7 +7901,7 @@ static gctSTRING gcLibImageStore_CubeArray_int_1_hati4 =
 "    _viv_asm(IMAGE_WR_3D, result, img_desc_1, p1);\n"
 "}\n";
 
-static gctSTRING gcLibImageStore_CubeArray_uint_hati4 =
+static gctSTRING gcLibImageStore_CubeArray_uint_img_access =
 "void _viv_image_store_CubeArray_uint(highp uvec4 img_desc, ivec3 p, uvec4 data)\n"
 "{\n"
 "    uvec4 result;\n"
@@ -7705,7 +7912,7 @@ static gctSTRING gcLibImageStore_CubeArray_uint_hati4 =
 "    _viv_asm(IMAGE_WR_3D, result, img_desc, p1);\n"
 "}\n";
 
-static gctSTRING gcLibImageStore_CubeArray_uint_1_hati4 =
+static gctSTRING gcLibImageStore_CubeArray_uint_1_img_access =
 "void _viv_image_store_CubeArray_uint_1(highp uvec4 img_desc, highp uvec4 img_desc_1, ivec3 p, uvec4 data)\n"
 "{\n"
 "    uvec2 result;\n"
@@ -7721,7 +7928,7 @@ static gctSTRING gcLibImageStore_CubeArray_uint_1_hati4 =
 "    _viv_asm(IMAGE_WR_3D, result, img_desc_1, p1);\n"
 "}\n";
 
-static gctSTRING gcLibImageStore_Buffer_float_hati4 =
+static gctSTRING gcLibImageStore_Buffer_float_img_access =
 "void _viv_image_store_buffer_float(highp uvec4 img_desc, int p, vec4 data)\n"
 "{\n"
 "    vec4 result;\n"
@@ -7730,7 +7937,7 @@ static gctSTRING gcLibImageStore_Buffer_float_hati4 =
 "    _viv_asm(IMAGE_WR, result, img_desc, newCoord);\n"
 "}\n";
 
-static gctSTRING gcLibImageStore_Buffer_int_hati4 =
+static gctSTRING gcLibImageStore_Buffer_int_img_access =
 "void _viv_image_store_buffer_int(highp uvec4 img_desc, int p, ivec4 data)\n"
 "{\n"
 "    ivec4 result;\n"
@@ -7739,7 +7946,7 @@ static gctSTRING gcLibImageStore_Buffer_int_hati4 =
 "    _viv_asm(IMAGE_WR, result, img_desc, newCoord);\n"
 "}\n";
 
-static gctSTRING gcLibImageStore_Buffer_uint_hati4 =
+static gctSTRING gcLibImageStore_Buffer_uint_img_access =
 "void _viv_image_store_buffer_uint(highp uvec4 img_desc, int p, uvec4 data)\n"
 "{\n"
 "    uvec4 result;\n"
@@ -8880,7 +9087,7 @@ static gctSTRING gcLibImageAtomicAdd_2DARRAY_uint_hati4 =
 "   return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageAtomicAdd_buffer_int_hati4 =
+static gctSTRING gcLibImageAtomicAdd_buffer_int_img_access =
 "int _viv_image_atomic_add_buffer_int(highp uvec4 img_desc, int p, int data)\n"
 "{\n"
 "   int result;\n"
@@ -8891,7 +9098,7 @@ static gctSTRING gcLibImageAtomicAdd_buffer_int_hati4 =
 "   return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageAtomicAdd_buffer_uint_hati4 =
+static gctSTRING gcLibImageAtomicAdd_buffer_uint_img_access =
 "uint _viv_image_atomic_add_buffer_uint(highp uvec4 img_desc, int p, uint data)\n"
 "{\n"
 "   uint result;\n"
@@ -9000,7 +9207,7 @@ static gctSTRING gcLibImageAtomicMin_2DARRAY_uint_hati4 =
 "   return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageAtomicMin_buffer_int_hati4 =
+static gctSTRING gcLibImageAtomicMin_buffer_int_img_access =
 "int _viv_image_atomic_min_buffer_int(highp uvec4 img_desc, int p, int data)\n"
 "{\n"
 "   int result;\n"
@@ -9011,7 +9218,7 @@ static gctSTRING gcLibImageAtomicMin_buffer_int_hati4 =
 "   return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageAtomicMin_buffer_uint_hati4 =
+static gctSTRING gcLibImageAtomicMin_buffer_uint_img_access =
 "uint _viv_image_atomic_min_buffer_uint(highp uvec4 img_desc, int p, uint data)\n"
 "{\n"
 "   uint result;\n"
@@ -9120,7 +9327,7 @@ static gctSTRING gcLibImageAtomicMax_2DARRAY_uint_hati4 =
 "   return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageAtomicMax_buffer_int_hati4 =
+static gctSTRING gcLibImageAtomicMax_buffer_int_img_access =
 "int _viv_image_atomic_max_buffer_int(highp uvec4 img_desc, int p, int data)\n"
 "{\n"
 "   int result;\n"
@@ -9131,7 +9338,7 @@ static gctSTRING gcLibImageAtomicMax_buffer_int_hati4 =
 "   return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageAtomicMax_buffer_uint_hati4 =
+static gctSTRING gcLibImageAtomicMax_buffer_uint_img_access =
 "uint _viv_image_atomic_max_buffer_uint(highp uvec4 img_desc, int p, uint data)\n"
 "{\n"
 "   uint result;\n"
@@ -9240,7 +9447,7 @@ static gctSTRING gcLibImageAtomicAnd_2DARRAY_uint_hati4 =
 "   return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageAtomicAnd_buffer_int_hati4 =
+static gctSTRING gcLibImageAtomicAnd_buffer_int_img_access =
 "int _viv_image_atomic_and_buffer_int(highp uvec4 img_desc, int p, int data)\n"
 "{\n"
 "   int result;\n"
@@ -9251,7 +9458,7 @@ static gctSTRING gcLibImageAtomicAnd_buffer_int_hati4 =
 "   return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageAtomicAnd_buffer_uint_hati4 =
+static gctSTRING gcLibImageAtomicAnd_buffer_uint_img_access =
 "uint _viv_image_atomic_and_buffer_uint(highp uvec4 img_desc, int p, uint data)\n"
 "{\n"
 "   uint result;\n"
@@ -9360,7 +9567,7 @@ static gctSTRING gcLibImageAtomicOr_2DARRAY_uint_hati4 =
 "   return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageAtomicOr_buffer_int_hati4 =
+static gctSTRING gcLibImageAtomicOr_buffer_int_img_access =
 "int _viv_image_atomic_or_buffer_int(highp uvec4 img_desc, int p, int data)\n"
 "{\n"
 "   int result;\n"
@@ -9371,7 +9578,7 @@ static gctSTRING gcLibImageAtomicOr_buffer_int_hati4 =
 "   return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageAtomicOr_buffer_uint_hati4 =
+static gctSTRING gcLibImageAtomicOr_buffer_uint_img_access =
 "uint _viv_image_atomic_or_buffer_uint(highp uvec4 img_desc, int p, uint data)\n"
 "{\n"
 "   uint result;\n"
@@ -9480,7 +9687,7 @@ static gctSTRING gcLibImageAtomicXor_2DARRAY_uint_hati4 =
 "   return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageAtomicXor_buffer_int_hati4 =
+static gctSTRING gcLibImageAtomicXor_buffer_int_img_access =
 "int _viv_image_atomic_xor_buffer_int(highp uvec4 img_desc, int p, int data)\n"
 "{\n"
 "   int result;\n"
@@ -9491,7 +9698,7 @@ static gctSTRING gcLibImageAtomicXor_buffer_int_hati4 =
 "   return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageAtomicXor_buffer_uint_hati4 =
+static gctSTRING gcLibImageAtomicXor_buffer_uint_img_access =
 "uint _viv_image_atomic_xor_buffer_uint(highp uvec4 img_desc, int p, uint data)\n"
 "{\n"
 "   uint result;\n"
@@ -9649,7 +9856,7 @@ static gctSTRING gcLibImageAtomicXchg_2DARRAY_float_hati4 =
 "   return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageAtomicXchg_buffer_int_hati4 =
+static gctSTRING gcLibImageAtomicXchg_buffer_int_img_access =
 "int _viv_image_atomic_xchg_buffer_int(highp uvec4 img_desc, int p, int data)\n"
 "{\n"
 "   int result;\n"
@@ -9660,7 +9867,7 @@ static gctSTRING gcLibImageAtomicXchg_buffer_int_hati4 =
 "   return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageAtomicXchg_buffer_uint_hati4 =
+static gctSTRING gcLibImageAtomicXchg_buffer_uint_img_access =
 "uint _viv_image_atomic_xchg_buffer_uint(highp uvec4 img_desc, int p, uint data)\n"
 "{\n"
 "   uint result;\n"
@@ -9671,7 +9878,7 @@ static gctSTRING gcLibImageAtomicXchg_buffer_uint_hati4 =
 "   return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageAtomicXchg_buffer_float_hati4 =
+static gctSTRING gcLibImageAtomicXchg_buffer_float_img_access =
 "float _viv_image_atomic_xchg_buffer_float(highp uvec4 img_desc, int p, uint data)\n"
 "{\n"
 "   float result;\n"
@@ -9804,7 +10011,7 @@ static gctSTRING gcLibImageAtomicCmpXchg_2DARRAY_uint_hati4 =
 "   return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageAtomicCmpXchg_buffer_int_hati4 =
+static gctSTRING gcLibImageAtomicCmpXchg_buffer_int_img_access =
 "int _viv_image_atomic_cmpxchg_buffer_int(highp uvec4 img_desc, int p, int data0, int data1)\n"
 "{\n"
 "   int result;\n"
@@ -9818,7 +10025,7 @@ static gctSTRING gcLibImageAtomicCmpXchg_buffer_int_hati4 =
 "   return result;\n"
 "}\n";
 
-static gctSTRING gcLibImageAtomicCmpXchg_buffer_uint_hati4 =
+static gctSTRING gcLibImageAtomicCmpXchg_buffer_uint_img_access =
 "uint _viv_image_atomic_cmpxchg_buffer_uint(highp uvec4 img_desc, int p, uint data0, uint data1)\n"
 "{\n"
 "   uint result;\n"

@@ -17,14 +17,14 @@ vx_status vxSobel3x3(vx_image input, vx_image grad_x, vx_image grad_y, vx_border
 {
     gcoVX_Kernel_Context context = {{0}};
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, grad_x, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, grad_x, GC_VX_INDEX_AUTO);
 
-	/* index = 2 */
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, grad_y, GC_VX_INDEX_AUTO);
+    /* index = 2 */
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, grad_y, GC_VX_INDEX_AUTO);
 
     context.params.kernel = gcvVX_KERNEL_SOBEL_3x3;
     /* RTL limit. Output bin# <= 6 */
@@ -35,15 +35,15 @@ vx_status vxSobel3x3(vx_image input, vx_image grad_x, vx_image grad_y, vx_border
     {
         vx_uint32 bin[4];
 
-		bin[0] =
-		bin[1] =
-		bin[2] =
-		bin[3] = FORMAT_VALUE(bordermode->constant_value);
+        bin[0] =
+        bin[1] =
+        bin[2] =
+        bin[3] = FORMAT_VALUE(bordermode->constant_value);
 
-		gcoOS_MemCopy(&context.uniforms[0].uniform, bin, sizeof(bin));
-		context.uniforms[0].num         = 4 * 4;
-		context.uniforms[0].index       = 4;
-		context.uniform_num             = 1;
+        gcoOS_MemCopy(&context.uniforms[0].uniform, bin, sizeof(bin));
+        context.uniforms[0].num         = 4 * 4;
+        context.uniforms[0].index       = 4;
+        context.uniform_num             = 1;
     }
 
     return gcfVX_Kernel(&context);
@@ -57,14 +57,14 @@ vx_status vxScharr3x3(vx_image input, vx_image grad_x, vx_image grad_y, vx_borde
     vxQueryImage(input, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
     vxQueryImage(input, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
 
-	/*index = 0*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
+    /*index = 0*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, grad_x, GC_VX_INDEX_AUTO);
+    /*index = 1*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, grad_x, GC_VX_INDEX_AUTO);
 
-	/*index = 2*/
-	gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, grad_y, GC_VX_INDEX_AUTO);
+    /*index = 2*/
+    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, grad_y, GC_VX_INDEX_AUTO);
 
     context.params.kernel = gcvVX_KERNEL_SCHARR_3x3;
 

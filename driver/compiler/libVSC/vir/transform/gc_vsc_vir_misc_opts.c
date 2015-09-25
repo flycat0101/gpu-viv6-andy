@@ -592,7 +592,8 @@ _Inst_RequireHPSrc(
     VIR_Instruction     *pInst,
     gctUINT             sourceIdx,
     VIR_DEF_USAGE_INFO  *pDuInfo,
-    gctBOOL             *forceChange)
+    gctBOOL             *forceChange,
+    gctBOOL             *skipLowp)
 {
     VIR_OpCode      opcode = VIR_Inst_GetOpcode(pInst);
     VIR_Operand     *srcOpnd = VIR_Inst_GetSource(pInst, sourceIdx);
@@ -656,10 +657,19 @@ _Inst_RequireHPSrc(
         }
     }
 
+    /* Sample mask should always be in HIGHP. So sample ID and sample position should always be in HIGHP as well.
+       Because,
+       o   Medium position mode doesn’t support mask LOCATION_W  (can’t)and LOCATION_Z (make it simple).
+       o   Sample depth is always high precision. So LOCATION_SUB_Z is also high precision. */
     if (srcSym &&
         (VIR_Symbol_GetName(srcSym) == VIR_NAME_POSITION ||
-         VIR_Symbol_GetName(srcSym) == VIR_NAME_SUBSAMPLE_DEPTH))
+         VIR_Symbol_GetName(srcSym) == VIR_NAME_SUBSAMPLE_DEPTH ||
+         VIR_Symbol_GetName(srcSym) == VIR_NAME_SAMPLE_ID ||
+         VIR_Symbol_GetName(srcSym) == VIR_NAME_SAMPLE_POSITION ||
+         VIR_Symbol_GetName(srcSym) == VIR_NAME_SAMPLE_MASK_IN ||
+         VIR_Symbol_GetName(srcSym) == VIR_NAME_SAMPLE_MASK))
     {
+        *skipLowp = gcvFALSE;
         return gcvTRUE;
     }
 
@@ -959,9 +969,9 @@ VSC_ErrCode vscVIR_AdjustPrecision(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuI
 
                 for (i = 0; i < VIR_Inst_GetSrcNum(inst); ++i)
                 {
-                    if (_Inst_RequireHPSrc(inst, i, pDuInfo, &forceChange))
+                    if (_Inst_RequireHPSrc(inst, i, pDuInfo, &forceChange, &skipLowp))
                     {
-                        _Inst_ChangeOpnd2HP(inst, VIR_Inst_GetSource(inst, i), gcvFALSE, gcvTRUE, pDuInfo);
+                        _Inst_ChangeOpnd2HP(inst, VIR_Inst_GetSource(inst, i), gcvFALSE, skipLowp, pDuInfo);
                     }
                 }
 
@@ -1259,6 +1269,158 @@ VSC_ErrCode vscVIR_PatchDual16Shader(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pD
     }
 
 OnError:
+    return errCode;
+}
+
+VIR_Symbol* _vscVIR_FindSamplerFromIndex(VIR_Instruction* inst, VIR_Operand* index)
+{
+    VIR_Instruction* prev;
+
+    for(prev = VIR_Inst_GetPrev(inst); prev; prev = VIR_Inst_GetPrev(prev))
+    {
+        VIR_Operand* dest;
+
+        dest = VIR_Inst_GetDest(prev);
+        if(dest->u1.sym->u1.vregIndex == index->u1.sym->u1.vregIndex &&
+           VIR_Operand_GetEnable(dest) == VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(index)))
+        {
+            VIR_OpCode op = VIR_Inst_GetOpcode(prev);
+
+            if(op == VIR_OP_LDARR)
+            {
+                return _vscVIR_FindSamplerFromIndex(prev, VIR_Inst_GetSource(prev, 1));
+            }
+            else if(op == VIR_OP_MOVA)
+            {
+                return _vscVIR_FindSamplerFromIndex(prev, VIR_Inst_GetSource(prev, 0));
+            }
+            else if(op == VIR_OP_GET_SAMPLER_IDX)
+            {
+                VIR_Operand* src = VIR_Inst_GetSource(prev, 0);
+                return src->u1.sym;
+            }
+        }
+    }
+
+    return gcvNULL;
+}
+
+VSC_ErrCode vscVIR_ConvertVirtualInstructions(VIR_Shader* pShader)
+{
+    VSC_ErrCode errCode  = VSC_ERR_NONE;
+    VIR_FuncIterator funcIter;
+    VIR_FunctionNode* funcNode;
+
+    VIR_FuncIterator_Init(&funcIter, VIR_Shader_GetFunctions(pShader));
+    for(funcNode = VIR_FuncIterator_First(&funcIter);
+        funcNode != gcvNULL; funcNode = VIR_FuncIterator_Next(&funcIter))
+    {
+        VIR_Function* func = funcNode->function;
+        VIR_Instruction* inst;
+
+        for(inst = VIR_Function_GetInstStart(func); inst != gcvNULL; inst = VIR_Inst_GetNext(inst))
+        {
+            VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
+            switch(opcode)
+            {
+                case VIR_OP_GET_SAMPLER_LMM:
+                {
+                    VIR_Operand* samplerSrc = VIR_Inst_GetSource(inst, 0);
+                    VIR_Symbol* samplerSym;
+                    VIR_Uniform* samplerUniform;
+
+                    gcmASSERT(VIR_Operand_isSymbol(samplerSrc));
+                    samplerSym = VIR_Operand_GetSymbol(samplerSrc);
+                    if(!VIR_Symbol_isSampler(samplerSym))
+                    {
+                        samplerSym = _vscVIR_FindSamplerFromIndex(inst, samplerSrc);
+                    }
+                    gcmASSERT(samplerSym && VIR_Symbol_isSampler(samplerSym));
+                    samplerUniform = VIR_Symbol_GetSampler(samplerSym);
+                    if(samplerUniform->u.samplerOrImageAttr.lodMinMax == gcvNULL)
+                    {
+                        VIR_Uniform* lodMinMaxUniform;
+                        VIR_NameId nameId;
+                        VIR_SymId llmSymID = VIR_INVALID_ID;
+                        gctCHAR name[128] = "#";
+
+                        gcoOS_StrCatSafe(name, gcmSIZEOF(name), VIR_Shader_GetSymNameString(pShader, samplerSym));
+                        gcoOS_StrCatSafe(name, gcmSIZEOF(name), "$LodMinMax");
+                        errCode = VIR_Shader_AddString(pShader,
+                                                       name,
+                                                       &nameId);
+                        errCode = VIR_Shader_AddSymbol(pShader,
+                                                       VIR_SYM_UNIFORM,
+                                                       nameId,
+                                                       VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_FLOAT_X3),
+                                                       VIR_STORAGE_UNKNOWN,
+                                                       &llmSymID);
+                        samplerUniform->u.samplerOrImageAttr.lodMinMax = VIR_Shader_GetSymFromId(pShader, llmSymID);
+                        VIR_Symbol_SetFlag(samplerUniform->u.samplerOrImageAttr.lodMinMax, VIR_SYMFLAG_COMPILER_GEN);
+                        lodMinMaxUniform = VIR_Symbol_GetUniform(samplerUniform->u.samplerOrImageAttr.lodMinMax);
+                        VIR_Symbol_SetUniformKind(samplerUniform->u.samplerOrImageAttr.lodMinMax, VIR_UNIFORM_LOD_MIN_MAX);
+                        VIR_Symbol_SetAddrSpace(samplerUniform->u.samplerOrImageAttr.lodMinMax, VIR_AS_CONSTANT);
+                        VIR_Symbol_SetTyQualifier(samplerUniform->u.samplerOrImageAttr.lodMinMax, VIR_TYQUAL_CONST);
+                        lodMinMaxUniform->u.parentSampler = samplerUniform;
+                    }
+                    VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
+                    VIR_Inst_SetSrcNum(inst, 1);
+                    VIR_Operand_SetSym(samplerSrc, samplerUniform->u.samplerOrImageAttr.lodMinMax);
+                    VIR_Operand_SetType(samplerSrc, VIR_TYPE_FLOAT_X3);
+                    break;
+                }
+                case VIR_OP_GET_SAMPLER_LBS:
+                {
+                    VIR_Operand* samplerSrc = VIR_Inst_GetSource(inst, 0);
+                    VIR_Symbol* samplerSym;
+                    VIR_Uniform* samplerUniform;
+
+                    gcmASSERT(VIR_Operand_isSymbol(samplerSrc));
+                    samplerSym = VIR_Operand_GetSymbol(samplerSrc);
+                    if(!VIR_Symbol_isSampler(samplerSym))
+                    {
+                        samplerSym = _vscVIR_FindSamplerFromIndex(inst, samplerSrc);
+                    }
+                    gcmASSERT(samplerSym && VIR_Symbol_isSampler(samplerSym));
+                    samplerUniform = VIR_Symbol_GetSampler(samplerSym);
+                    if(samplerUniform->u.samplerOrImageAttr.levelBaseSize == gcvNULL)
+                    {
+                        VIR_Uniform* levelBaseSizeUniform;
+                        VIR_NameId nameId;
+                        VIR_SymId lbsSymID = VIR_INVALID_ID;
+                        gctCHAR name[128] = "#";
+
+                        gcoOS_StrCatSafe(name, gcmSIZEOF(name), VIR_Shader_GetSymNameString(pShader, samplerSym));
+                        gcoOS_StrCatSafe(name, gcmSIZEOF(name), "$LevelBaseSize");
+                        errCode = VIR_Shader_AddString(pShader,
+                                                       name,
+                                                       &nameId);
+                        errCode = VIR_Shader_AddSymbol(pShader,
+                                                       VIR_SYM_UNIFORM,
+                                                       nameId,
+                                                       VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_INTEGER_X4),
+                                                       VIR_STORAGE_UNKNOWN,
+                                                       &lbsSymID);
+                        samplerUniform->u.samplerOrImageAttr.levelBaseSize = VIR_Shader_GetSymFromId(pShader, lbsSymID);
+                        VIR_Symbol_SetFlag(samplerUniform->u.samplerOrImageAttr.levelBaseSize, VIR_SYMFLAG_COMPILER_GEN);
+                        levelBaseSizeUniform = VIR_Symbol_GetUniform(samplerUniform->u.samplerOrImageAttr.levelBaseSize);
+                        VIR_Symbol_SetUniformKind(samplerUniform->u.samplerOrImageAttr.levelBaseSize, VIR_UNIFORM_LEVEL_BASE_SIZE);
+                        VIR_Symbol_SetAddrSpace(samplerUniform->u.samplerOrImageAttr.levelBaseSize, VIR_AS_CONSTANT);
+                        VIR_Symbol_SetTyQualifier(samplerUniform->u.samplerOrImageAttr.levelBaseSize, VIR_TYQUAL_CONST);
+                        levelBaseSizeUniform->u.parentSampler = samplerUniform;
+                    }
+                    VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
+                    VIR_Inst_SetSrcNum(inst, 1);
+                    VIR_Operand_SetSym(samplerSrc, samplerUniform->u.samplerOrImageAttr.levelBaseSize);
+                    VIR_Operand_SetType(samplerSrc, VIR_TYPE_INTEGER_X4);
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+    }
+
     return errCode;
 }
 

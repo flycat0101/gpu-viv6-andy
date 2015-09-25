@@ -34,7 +34,7 @@ extern gctFILE ApiTimeFile;
 /* Zone used for header/footer. */
 #define _GC_OBJ_ZONE    gcdZONE_EGL_SWAP
 
-#if gcdDUMP_FRAME_TGA || defined(EMULATOR)
+#if gcdDUMP_FRAME_TGA || defined(EMULATOR) || gcdFPGA_BUILD
 
 #ifdef ANDROID
 #    include <cutils/properties.h>
@@ -1256,6 +1256,14 @@ _SwapBuffersRegionNew(
         dpy    = VEGL_DISPLAY(Dpy);
         draw   = VEGL_SURFACE(Draw);
 
+        if (draw->backBuffer.surface == gcvNULL)
+        {
+            /* Requires back buffer surface in this swap mode. */
+            veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
+            result = EGL_FALSE;
+            break;
+        }
+
 #if defined(ANDROID) && (ANDROID_SDK_VERSION < 17)
         if (draw->skipResolve)
         {
@@ -1718,7 +1726,11 @@ _SwapBuffersRegionNew(
             /* Cannot get window back buffer. */
             veglSetEGLerror(thread,  EGL_BAD_NATIVE_WINDOW);
             result = EGL_FALSE;
-            break;
+
+            /*
+             * Do not break here, need update client drawable if
+             * direct rendering mode is enabled. See below.
+             */
         }
 
         /* Switch render target in no-resolve mode. */
@@ -1746,19 +1758,22 @@ _SwapBuffersRegionNew(
             /* Get renderTarget from new window back buffer. */
             draw->renderTarget = draw->backBuffer.surface;
 
-            /* Reference new window back buffer. */
-            gcoSURF_ReferenceSurface(draw->renderTarget);
+            if (draw->renderTarget)
+            {
+                /* Reference new window back buffer. */
+                gcoSURF_ReferenceSurface(draw->renderTarget);
+
+                /* Update preserved flag for next renderTarget. */
+                gcmVERIFY_OK(gcoSURF_SetFlags(
+                    draw->renderTarget,
+                    gcvSURF_FLAG_CONTENT_PRESERVED,
+                    (draw->swapBehavior == EGL_BUFFER_PRESERVED)
+                    ));
+            }
 
             /* Sync drawable with renderTarget. */
             draw->drawable.rtHandle = draw->renderTarget;
             draw->drawable.prevRtHandle = draw->prevRenderTarget;
-
-            /* Update preserved flag for next renderTarget. */
-            gcmVERIFY_OK(gcoSURF_SetFlags(
-                draw->renderTarget,
-                gcvSURF_FLAG_CONTENT_PRESERVED,
-                (draw->swapBehavior == EGL_BUFFER_PRESERVED)
-                ));
 
             /* Update drawable to api. */
             if (!_SetDrawable(thread,
@@ -1770,6 +1785,12 @@ _SwapBuffersRegionNew(
                 result = EGL_FALSE;
                 break;
             }
+        }
+
+        if (result == EGL_FALSE)
+        {
+            /* Error. */
+            break;
         }
 
         /* Success. */
@@ -2064,14 +2085,14 @@ _SwapBuffersRegion(
         }
 #endif
 
-#if gcdDUMP_FRAME_TGA || defined(EMULATOR)
+#if gcdDUMP_FRAME_TGA || defined(EMULATOR) || gcdFPGA_BUILD
         {
             gcsPOINT origin = {0, 0};
             gcsPOINT size   = {draw->config.width, draw->config.height};
 
 #if gcdDUMP_FRAME_TGA
             _SaveFrameTga(thread, draw, &origin, &size);
-#   elif defined(EMULATOR)
+#   elif (defined(EMULATOR) || gcdFPGA_BUILD)
             {
                 static EGLint checkStatus = -1;
 

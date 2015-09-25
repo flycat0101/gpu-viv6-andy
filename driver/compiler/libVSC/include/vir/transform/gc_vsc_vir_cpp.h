@@ -29,6 +29,8 @@ typedef struct VIR_CPP_COPYPROPAGATION
     gctINT                  fwOptCount;
     gctINT                  bwOptCount;
 
+    gctBOOL                 largeCFG;
+
     VSC_PRIMARY_MEM_POOL    pmp;
 
 } VSC_CPP_CopyPropagation;

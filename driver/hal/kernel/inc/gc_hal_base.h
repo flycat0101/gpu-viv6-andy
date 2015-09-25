@@ -164,6 +164,7 @@ typedef enum _gcePATCH_ID
     gcvPATCH_GFXBENCH,
     gcvPATCH_ANTUTU,        /* Antutu 3.x */
     gcvPATCH_ANTUTU4X,      /* Antutu 4.x */
+    gcvPATCH_ANTUTU5X,      /* Antutu 5.x */
     gcvPATCH_QUADRANT,
     gcvPATCH_GPUBENCH,
     gcvPATCH_DUOKAN,
@@ -239,13 +240,16 @@ typedef enum _gcePATCH_ID
     gcvPATCH_WATER2_CHUKONG,
     gcvPATCH_GOOGLEEARTH,
     gcvPATCH_LEANBACK,
+    gcvPATCH_YOUTUBE_TV,
+    gcvPATCH_NETFLIX,
     gcvPATCH_ANGRYBIRDS,
     gcvPATCH_REALRACING,
     gcvPATCH_TEMPLERUN,
     gcvPATCH_SBROWSER,
     gcvPATCH_CLASHOFCLAN,
-	gcvPATCH_YOUILABS_SHADERTEST,
+    gcvPATCH_YOUILABS_SHADERTEST,
     gcvPATCH_AXX_SAMPLE,
+    gcvPATCH_3DMARKSS,
 
     gcvPATCH_COUNT
 } gcePATCH_ID;
@@ -3948,7 +3952,7 @@ gcoOS_ProfileDB(
     gcmTRACE_ZONE(gcdHEADER_LEVEL, _GC_OBJ_ZONE, \
                   "--%s(%d): status=%d(%s)", \
                   __FUNCTION__, __LINE__, \
-                  status, gcoOS_DebugStatus2Name(status)); \
+                  status, gcmSTATUS2NAME(status)); \
     *__user_ptr__ -= 1
 #else
     gcmINLINE static void
@@ -4057,7 +4061,7 @@ gcoOS_ProfileDB(
     gcmkBINARY_TRACE(__FUNCTION__, __LINE__, gcvNULL, status); \
     gcmkTRACE_ZONE(gcdHEADER_LEVEL, _GC_OBJ_ZONE, \
                    "--%s(%d): status=%d(%s)", \
-                   __FUNCTION__, __LINE__, status, gckOS_DebugStatus2Name(status)); \
+                   __FUNCTION__, __LINE__, status, gcmkSTATUS2NAME(status)); \
     *__kernel_ptr__ -= 1
 #else
     gcmINLINE static void
@@ -4792,6 +4796,14 @@ gckOS_DebugStatus2Name(
     gceSTATUS status
     );
 
+#if gcmIS_DEBUG(gcdDEBUG)
+#   define gcmSTATUS2NAME             gcoOS_DebugStatus2Name
+#   define gcmkSTATUS2NAME            gckOS_DebugStatus2Name
+#else
+#   define gcmSTATUS2NAME(status)     status
+#   define gcmkSTATUS2NAME(status)    status
+#endif
+
 /*******************************************************************************
 **
 **  gcmERR_BREAK
@@ -4813,7 +4825,7 @@ gckOS_DebugStatus2Name(
         prefix##PRINT_VERSION(); \
         prefix##TRACE(gcvLEVEL_ERROR, \
             #prefix "ERR_BREAK: status=%d(%s) @ %s(%d)", \
-            status, gcoOS_DebugStatus2Name(status), __FUNCTION__, __LINE__); \
+            status, gcmSTATUS2NAME(status), __FUNCTION__, __LINE__); \
         break; \
     } \
     do { } while (gcvFALSE)
@@ -4852,7 +4864,7 @@ gckOS_DebugStatus2Name(
         prefix##PRINT_VERSION(); \
         prefix##TRACE(gcvLEVEL_ERROR, \
             #prefix "ERR_RETURN: status=%d(%s) @ %s(%d)", \
-            status, gcoOS_DebugStatus2Name(status), __FUNCTION__, __LINE__); \
+            status, gcmSTATUS2NAME(status), __FUNCTION__, __LINE__); \
         prefix##FOOTER(); \
         return status; \
     } \
@@ -4864,7 +4876,7 @@ gckOS_DebugStatus2Name(
         prefix##PRINT_VERSION(); \
         prefix##TRACE(gcvLEVEL_ERROR, \
             #prefix "ERR_RETURN: status=%d(%s) @ %s(%d)", \
-            status, gckOS_DebugStatus2Name(status), __FUNCTION__, __LINE__); \
+            status, gcmkSTATUS2NAME(status), __FUNCTION__, __LINE__); \
         prefix##FOOTER(); \
         return status; \
     } \
@@ -4896,7 +4908,7 @@ gckOS_DebugStatus2Name(
             prefix##PRINT_VERSION(); \
             prefix##TRACE(gcvLEVEL_ERROR, \
                 #prefix "ONERROR: status=%d(%s) @ %s(%d)", \
-                status, gcoOS_DebugStatus2Name(status), __FUNCTION__, __LINE__); \
+                status, gcmSTATUS2NAME(status), __FUNCTION__, __LINE__); \
             goto OnError; \
         } \
     } \
@@ -4910,7 +4922,7 @@ gckOS_DebugStatus2Name(
             prefix##PRINT_VERSION(); \
             prefix##TRACE(gcvLEVEL_ERROR, \
                 #prefix "ONERROR: status=%d(%s) @ %s(%d)", \
-                status, gckOS_DebugStatus2Name(status), __FUNCTION__, __LINE__); \
+                status, gcmkSTATUS2NAME(status), __FUNCTION__, __LINE__); \
             goto OnError; \
         } \
     } \
@@ -5091,7 +5103,7 @@ gckOS_DebugStatus2Name(
         { \
             prefix##TRACE(gcvLEVEL_ERROR, \
                 #prefix "CHECK_STATUS: status=%d(%s) @ %s(%d)", \
-                last, gcoOS_DebugStatus2Name(last), __FUNCTION__, __LINE__); \
+                last, gcmSTATUS2NAME(last), __FUNCTION__, __LINE__); \
             status = last; \
         } \
     } \
@@ -5104,7 +5116,7 @@ gckOS_DebugStatus2Name(
         { \
             prefix##TRACE(gcvLEVEL_ERROR, \
                 #prefix "CHECK_STATUS: status=%d(%s) @ %s(%d)", \
-                last, gckOS_DebugStatus2Name(last), __FUNCTION__, __LINE__); \
+                last, gcmkSTATUS2NAME(last), __FUNCTION__, __LINE__); \
             status = last; \
         } \
     } \

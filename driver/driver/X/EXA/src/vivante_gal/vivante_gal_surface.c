@@ -745,12 +745,12 @@ void UnmapUserMem(GALINFOPTR galInfo, MemMapInfoPtr mmInfo) {
     TRACE_EXIT();
 }
 
-#define  MAX_WIDTH		1024
-#define  MAX_HEIGHT		1024
+#define  MAX_WIDTH      1024
+#define  MAX_HEIGHT     1024
 
 typedef struct _IVSURF {
-gcoSURF	surf;
-long		lineaddr;
+gcoSURF surf;
+long        lineaddr;
 }IVSURF,*PIVSURF;
 
 

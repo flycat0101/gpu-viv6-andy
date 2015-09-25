@@ -424,10 +424,10 @@ typedef struct _vx_scalar
 
     vx_enum                                 dataType;
 
-    vx_scalar_data*							value;
+    vx_scalar_data*                         value;
 
-	void*									node;
-	void*									physical;
+    void*                                   node;
+    void*                                   physical;
 }
 vx_scalar_s;
 
@@ -479,7 +479,7 @@ typedef struct _vx_kernel_attribute_s
     vx_size                                 tileMemorySize;
     vx_ptr                                  tileMemoryPtr;
 #endif
-	vx_reference							stagings[10];
+    vx_reference                            stagings[10];
 }
 vx_kernel_attribute_s;
 
@@ -782,7 +782,7 @@ typedef struct _vx_memory_s
 
     vx_uint8_ptr                            logicals[VX_MAX_PLANES];
     vx_uint32                               physicals[VX_MAX_PLANES];
-	gcsSURF_NODE_PTR			            nodePtrs[VX_MAX_PLANES];
+    gcsSURF_NODE_PTR                        nodePtrs[VX_MAX_PLANES];
 
     vx_mutex                                writeLocks[VX_MAX_PLANES];
 }

@@ -146,7 +146,7 @@ endif
 endif
 endif
 ifeq ($(EGL_API_WL), 1)
-CFLAGS += -fPIC -Werror -MD -ansi
+CFLAGS += -fPIC -Wno-deprecated-declarations -MD -ansi
 endif
 ifeq ($(EGL_API_DFB), 1)
 CFLAGS  += -DPIC

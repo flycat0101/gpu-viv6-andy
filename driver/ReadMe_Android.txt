@@ -35,9 +35,9 @@ Contents
         |   |
         |   +---libEGL               : Make file for EGL driver
         |   |
-        |   +---libGLESv11           : Make file for OES11 driver
+        |   +---libGLESv11           : Make file for OpenGL ES1.1 driver
         |   |
-        |   +---libGLESv3            : Make file for OES30 driver
+        |   +---libGLESv3            : Make file for OpenGL ES3.x driver
         |   |
         |   +---libOpenVG            : Make file for 2D OVG driver
         |   |

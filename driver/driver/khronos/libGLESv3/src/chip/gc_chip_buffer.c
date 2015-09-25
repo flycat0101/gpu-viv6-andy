@@ -219,11 +219,20 @@ gcChipSetFmtMapAttribs(
     {
         if (__glFormatInfoTable[glFormat].renderable)
         {
-            if ((__glFormatInfoTable[glFormat].dataFormat == GL_RED_INTEGER    ||
-                 __glFormatInfoTable[glFormat].dataFormat == GL_RG_INTEGER     ||
-                 __glFormatInfoTable[glFormat].dataFormat == GL_RGB_INTEGER    ||
-                 __glFormatInfoTable[glFormat].dataFormat == GL_RGBA_INTEGER ) &&
-                 gc->apiVersion <= __GL_API_VERSION_ES30)
+            if ((glFormat == __GL_FMT_RGBA32F) ||
+                (glFormat == __GL_FMT_RGBA16F) ||
+                (glFormat == __GL_FMT_RG32F)   ||
+                (glFormat == __GL_FMT_R32F)    ||
+                (glFormat == __GL_FMT_RGB16F))
+            {
+                fmtMapInfo->numSamples = 0;
+                fmtMapInfo->samples[0] = 0;
+            }
+            else if (((__glFormatInfoTable[glFormat].dataFormat == GL_RED_INTEGER)    ||
+                      (__glFormatInfoTable[glFormat].dataFormat == GL_RG_INTEGER)     ||
+                      (__glFormatInfoTable[glFormat].dataFormat == GL_RGB_INTEGER)    ||
+                      (__glFormatInfoTable[glFormat].dataFormat == GL_RGBA_INTEGER))  &&
+                     (gc->apiVersion <= __GL_API_VERSION_ES30))
             {
                 fmtMapInfo->numSamples = 0;
                 fmtMapInfo->samples[0] = 0;
@@ -267,7 +276,7 @@ gcChipInitFormatMapInfo(
     GLuint patch8bitMsaaCount        = 0;
     GLuint patchD32FCount            = 0;
     GLuint patchFmtMapInfoCount      = 0;
-	static __GLApiVersion initializedVer = __GL_API_VERSION_INVALID;
+    static __GLApiVersion initializedVer = __GL_API_VERSION_INVALID;
 
     typedef struct __GLChipPatchFmtRec
     {

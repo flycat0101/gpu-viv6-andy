@@ -303,6 +303,7 @@ struct _DRIWindow
     gceSURF_FORMAT     format;
 };
 
+
 static halKeyMap keys[] =
 {
     /* 00 */ { HAL_UNKNOWN,         HAL_UNKNOWN },
@@ -402,38 +403,47 @@ static halKeyMap keys[] =
     /* 5E */ { HAL_UNKNOWN,         HAL_UNKNOWN },
     /* 5F */ { HAL_F11,             HAL_UNKNOWN },
     /* 60 */ { HAL_F12,             HAL_UNKNOWN },
-    /* 61 */ { HAL_HOME,            HAL_UNKNOWN },
-    /* 62 */ { HAL_UP,              HAL_UNKNOWN },
-    /* 63 */ { HAL_PGUP,            HAL_UNKNOWN },
-    /* 64 */ { HAL_LEFT,            HAL_UNKNOWN },
+    /* 61 */ { HAL_UNKNOWN,         HAL_UNKNOWN },
+    /* 62 */ { HAL_UNKNOWN,         HAL_UNKNOWN },
+    /* 63 */ { HAL_UNKNOWN,         HAL_UNKNOWN },
+    /* 64 */ { HAL_UNKNOWN,         HAL_UNKNOWN },
     /* 65 */ { HAL_UNKNOWN,         HAL_UNKNOWN },
-    /* 66 */ { HAL_RIGHT,           HAL_UNKNOWN },
-    /* 67 */ { HAL_END,             HAL_UNKNOWN },
-    /* 68 */ { HAL_DOWN,            HAL_UNKNOWN },
-    /* 69 */ { HAL_PGDN,            HAL_UNKNOWN },
-    /* 6A */ { HAL_INSERT,          HAL_UNKNOWN },
-    /* 6B */ { HAL_DELETE,          HAL_UNKNOWN },
-    /* 6C */ { HAL_PAD_ENTER,       HAL_UNKNOWN },
-    /* 6D */ { HAL_RCTRL,           HAL_UNKNOWN },
-    /* 6E */ { HAL_BREAK,           HAL_UNKNOWN },
-    /* 6F */ { HAL_PRNTSCRN,        HAL_UNKNOWN },
-    /* 70 */ { HAL_PAD_SLASH,       HAL_UNKNOWN },
-    /* 71 */ { HAL_RALT,            HAL_UNKNOWN },
-    /* 72 */ { HAL_UNKNOWN,         HAL_UNKNOWN },
-    /* 73 */ { HAL_LWINDOW,         HAL_UNKNOWN },
-    /* 74 */ { HAL_RWINDOW,         HAL_UNKNOWN },
-    /* 75 */ { HAL_MENU,            HAL_UNKNOWN },
-    /* 76 */ { HAL_UNKNOWN,         HAL_UNKNOWN },
-    /* 77 */ { HAL_UNKNOWN,         HAL_UNKNOWN },
+    /* 66 */ { HAL_UNKNOWN,         HAL_UNKNOWN },
+    /* 67 */ { HAL_UNKNOWN,         HAL_UNKNOWN },
+    /* 68 */ { HAL_PAD_ENTER,       HAL_UNKNOWN },
+    /* 69 */ { HAL_RCTRL,           HAL_UNKNOWN },
+    /* 6a */ { HAL_PAD_SLASH,       HAL_UNKNOWN },
+    /* 6b */ { HAL_PRNTSCRN,        HAL_UNKNOWN },
+    /* 6c */ { HAL_RALT,            HAL_UNKNOWN },
+    /* 6d */ { HAL_UNKNOWN,         HAL_UNKNOWN },
+    /* 6e */ { HAL_HOME,            HAL_UNKNOWN },
+    /* 6f  */ { HAL_UP,              HAL_UNKNOWN },
+    /* 70 */ { HAL_PGUP,            HAL_UNKNOWN },
+    /* 71 */ { HAL_LEFT,            HAL_UNKNOWN },
+    /* 72 */ { HAL_RIGHT,           HAL_UNKNOWN },
+    /* 73 */ { HAL_END,             HAL_UNKNOWN },
+    /* 74 */ { HAL_DOWN,            HAL_UNKNOWN },
+    /* 75 */ { HAL_PGDN,            HAL_UNKNOWN },
+    /* 76 */ { HAL_INSERT,          HAL_UNKNOWN },
+    /* 77 */ { HAL_DELETE,          HAL_UNKNOWN },
     /* 78 */ { HAL_UNKNOWN,         HAL_UNKNOWN },
     /* 79 */ { HAL_UNKNOWN,         HAL_UNKNOWN },
-    /* 7A */ { HAL_UNKNOWN,         HAL_UNKNOWN },
-    /* 7B */ { HAL_UNKNOWN,         HAL_UNKNOWN },
-    /* 7C */ { HAL_UNKNOWN,         HAL_UNKNOWN },
-    /* 7D */ { HAL_UNKNOWN,         HAL_UNKNOWN },
-    /* 7E */ { HAL_UNKNOWN,         HAL_UNKNOWN },
-    /* 7F */ { HAL_UNKNOWN,         HAL_UNKNOWN },
+    /* 7a */ { HAL_UNKNOWN,         HAL_UNKNOWN },
+    /* 7b */ { HAL_UNKNOWN,         HAL_UNKNOWN },
+    /* 7c */ { HAL_UNKNOWN,         HAL_UNKNOWN },
+    /* 7d */ { HAL_UNKNOWN,         HAL_UNKNOWN },
+    /* 7e */ { HAL_UNKNOWN,         HAL_UNKNOWN },
+    /* 7f  */ { HAL_BREAK,           HAL_UNKNOWN },
+    /* 80 */ { HAL_UNKNOWN,         HAL_UNKNOWN },
+    /* 81 */ { HAL_UNKNOWN,         HAL_UNKNOWN },
+    /* 82 */ { HAL_UNKNOWN,         HAL_UNKNOWN },
+    /* 83 */ { HAL_UNKNOWN,         HAL_UNKNOWN },
+    /* 84 */ { HAL_UNKNOWN,         HAL_UNKNOWN },
+    /* 85 */ { HAL_LWINDOW,         HAL_UNKNOWN },
+    /* 86 */ { HAL_RWINDOW,         HAL_UNKNOWN },
+    /* 87 */ { HAL_MENU,            HAL_UNKNOWN },
 };
+
 
 #define VIV_EXT
 #if defined(VIV_EXT)
@@ -4554,6 +4564,17 @@ gcoOS_CopyPixmapBits(
     if (img) XDestroyImage(img);
 
     return status;
+}
+
+gceSTATUS
+gcoOS_ResizeWindow(
+    IN gctPOINTER localDisplay,
+    IN HALNativeWindowType Drawable,
+    IN gctUINT Width,
+    IN gctUINT Height
+    )
+{
+    return gcvSTATUS_NOT_SUPPORTED;
 }
 
 #endif

@@ -50,6 +50,53 @@ BEGIN_EXTERN_C()
 #define MC_AUXILIARY_OP_CODE_USC_IMG_STORE_3D  0xFFFF0032
 #define MC_AUXILIARY_OP_CODE_USC_STORE_ATTR    0xFFFF0033
 
+#define IS_ATOMIC_MC_OPCODE(opcode)                          \
+    (((opcode) == 0x65)               || \
+     ((opcode) == 0x66)              || \
+     ((opcode) == 0x67)          || \
+     ((opcode) == 0x68)               || \
+     ((opcode) == 0x69)               || \
+     ((opcode) == 0x6A)                || \
+     ((opcode) == 0x6B)               || \
+     ((opcode) == 0x6C))
+
+#define IS_IMG_ATOMIC_MC_OPCODE(opcode)                      \
+     ((opcode) == 0x46)
+
+#define IS_NORMAL_LOAD_MC_OPCODE(opcode)                     \
+    ((opcode) == 0x32)
+
+#define IS_NORMAL_STORE_MC_OPCODE(opcode)                    \
+    (((opcode) == 0x33)                  || \
+     ((opcode) == MC_AUXILIARY_OP_CODE_USC_STORE))
+
+#define IS_NORMAL_LOAD_STORE_MC_OPCODE(opcode)               \
+    (IS_NORMAL_LOAD_MC_OPCODE(opcode)                     || \
+     IS_NORMAL_STORE_MC_OPCODE(opcode))
+
+#define IS_IMG_LOAD_MC_OPCODE(opcode)                        \
+    (((opcode) == 0x79)               || \
+     ((opcode) == 0x34))
+
+#define IS_IMG_STORE_MC_OPCODE(opcode)                       \
+    (((opcode) == 0x7A)              || \
+     ((opcode) == 0x35)           || \
+     ((opcode) == MC_AUXILIARY_OP_CODE_USC_IMG_STORE)     || \
+     ((opcode) == MC_AUXILIARY_OP_CODE_USC_IMG_STORE_3D))
+
+#define IS_IMG_LOAD_STORE_MC_OPCODE(opcode)                  \
+    (IS_IMG_LOAD_MC_OPCODE((opcode))                      || \
+     IS_IMG_STORE_MC_OPCODE((opcode)))
+
+#define IS_BARRIER_MC_OPCODE(opcode)                         \
+     ((opcode) == 0x2A)
+
+#define IS_MEM_ACCESS_MC_OPCODE(opcode)                      \
+    (IS_ATOMIC_MC_OPCODE((opcode))                        || \
+     IS_NORMAL_LOAD_STORE_MC_OPCODE((opcode))             || \
+     IS_IMG_LOAD_STORE_MC_OPCODE((opcode))                || \
+     IS_IMG_ATOMIC_MC_OPCODE((opcode)))
+
 /* Codec helper structures */
 typedef struct _VSC_MC_CODEC_DST
 {

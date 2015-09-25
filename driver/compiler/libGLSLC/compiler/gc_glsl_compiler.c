@@ -994,7 +994,7 @@ sloCOMPILER_Compile(
         if (gcmIS_ERROR(status)) break;
 
         /* Analyze functions. */
-        status = gcSHADER_AnalyzeFunctions(Compiler->binary);
+        status = gcSHADER_AnalyzeFunctions(Compiler->binary, gcvTRUE);
 
         if (gcmIS_ERROR(status))
         {
@@ -3717,9 +3717,8 @@ sloCOMPILER_CheckAssignmentForGlFragData(
         gcSL_INSTRUCTION code = &shader->code[i];
         gcSL_OPCODE opcode = gcmSL_OPCODE_GET(code->opcode, Opcode);
         gcSL_INDEXED indexed = gcmSL_TARGET_GET(code->temp, Indexed);
-        gcSL_SWIZZLE swizzle;
+        gcSL_ENABLE  enable;
         gctUINT16 tempIndex = code->tempIndexed;
-        gctUINT label;
         gctFLOAT constZero = 0.0;
 
         /* Skip call and jmp. */
@@ -3743,29 +3742,26 @@ sloCOMPILER_CheckAssignmentForGlFragData(
         switch(indexed)
         {
         case gcSL_INDEXED_X:
-            swizzle = gcSL_SWIZZLE_XXXX;
+            enable = gcSL_ENABLE_X;
             break;
 
         case gcSL_INDEXED_Y:
-            swizzle = gcSL_SWIZZLE_YYYY;
+            enable = gcSL_ENABLE_Y;
             break;
 
         case gcSL_INDEXED_Z:
-            swizzle = gcSL_SWIZZLE_ZZZZ;
+            enable = gcSL_ENABLE_Z;
             break;
 
         default:
-            swizzle = gcSL_SWIZZLE_WWWW;
+            enable = gcSL_ENABLE_W;
             break;
         }
-        label = gcSHADER_FindNextUsedLabelId(shader);
 
-        gcmONERROR(gcSHADER_AddOpcodeConditional(shader, gcSL_JMP, gcSL_NOT_EQUAL, label));
-        gcmONERROR(gcSHADER_AddSource(shader, gcSL_TEMP, tempIndex, swizzle, gcSL_FLOAT, gcSHADER_PRECISION_ANY));
+        gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_MOV, tempIndex, enable, gcSL_FLOAT, gcSHADER_PRECISION_ANY));
         gcmONERROR(gcSHADER_AddSourceConstantFormatted(shader, &constZero, gcSL_FLOAT));
 
         shader->lastInstruction = i + 2;
-        gcmONERROR(gcSHADER_AddLabel(shader, label));
 
         lastInst++;
         shader->lastInstruction = lastInst;
