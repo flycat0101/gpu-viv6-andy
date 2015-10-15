@@ -945,6 +945,7 @@ gcoCL_CreateTexture(
 
     /*gcmSWITCHHARDWARE();*/
 
+    gcoCL_SetHardware();
     gcmASSERT(gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_LINEAR));
 
     /* Try to map host memory first. */
@@ -980,11 +981,14 @@ gcoCL_CreateTexture(
                                      (gctPOINTER) Memory,
                                      gcvINVALID_ADDRESS));
 
-                gcmERR_BREAK(gcoSURF_SetWindow(surface,
+                 gcmERR_BREAK(gcoSURF_SetImage(surface,
                                      0,
                                      0,
                                      Width,
-                                     Height));
+                                     Height,
+                                     Depth));
+
+                gcoSURF_Lock(surface, gcvNULL, gcvNULL);
             } while (gcvFALSE);
 
             if (gcmIS_ERROR(status))
@@ -1364,22 +1368,6 @@ gcoCL_QueryDeviceInfo(
                                      &DeviceInfo->maxReadImageArgs,
                                      gcvNULL,
                                      gcvNULL));
-
-#if !BUILD_OPENCL_FP
-    {
-        gceCHIPMODEL  chipModel;
-        gctUINT32 chipRevision;
-
-        gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
-
-        if((chipModel == gcv3000) && ((chipRevision == 0x5435) || (chipRevision == 0x5450) || (chipRevision == 0x5512)))
-        {
-            DeviceInfo->image3DMaxWidth = 2048;
-            DeviceInfo->image3DMaxHeight = 2048;
-            DeviceInfo->image3DMaxDepth = 2048;
-        }
-    }
-#endif
 
     DeviceInfo->image2DMaxWidth       = DeviceInfo->image3DMaxWidth;
     DeviceInfo->image2DMaxHeight      = DeviceInfo->image3DMaxHeight;

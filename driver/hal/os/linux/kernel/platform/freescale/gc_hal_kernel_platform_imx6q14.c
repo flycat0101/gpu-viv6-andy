@@ -93,9 +93,14 @@
 #include <linux/regulator/consumer.h>
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
+#ifdef CONFIG_DEVICE_THERMAL
 #include <linux/device_cooling.h>
 #define REG_THERMAL_NOTIFIER(a) register_devfreq_cooling_notifier(a);
 #define UNREG_THERMAL_NOTIFIER(a) unregister_devfreq_cooling_notifier(a);
+#else
+#define REG_THERMAL_NOTIFIER(a) (void)a;
+#define UNREG_THERMAL_NOTIFIER(a) (void)a;
+#endif
 #else
 extern int register_thermal_notifier(struct notifier_block *nb);
 extern int unregister_thermal_notifier(struct notifier_block *nb);

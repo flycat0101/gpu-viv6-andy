@@ -11570,6 +11570,262 @@ OnError:
     return status;
 }
 
+/*******************************************************************************
+**
+**  gcoSURF_SetImage
+**
+**  Set the size of the surface in pixels and map the underlying buffer set by
+**  gcoSURF_SetBuffer if necessary.
+**
+**  INPUT:
+**
+**      gcoSURF Surface
+**          Pointer to gcoSURF object.
+**
+**      gctINT X, Y
+**          The origin of the surface.
+**
+**      gctINT Width, Height, Depth
+**          Size of the surface in pixels.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcoSURF_SetImage(
+    IN gcoSURF Surface,
+    IN gctUINT X,
+    IN gctUINT Y,
+    IN gctUINT Width,
+    IN gctUINT Height,
+    IN gctUINT Depth
+    )
+{
+    gceSTATUS status;
+    gctUINT32 offsetX;
+    gctUINT32 offsetY;
+    gctUINT   userStride;
+    gctUINT   halStride;
+    gctINT    bytesPerPixel;
+#if gcdSECURE_USER
+    gcsHAL_INTERFACE iface;
+#endif
+#if gcdENABLE_VG
+    gceHARDWARE_TYPE currentHW = gcvHARDWARE_INVALID;
+#endif
+    gcsSURF_FORMAT_INFO_PTR formatInfo;
+    gcsUSER_MEMORY_DESC desc;
+
+    gcmHEADER_ARG("Surface=0x%x X=%u Y=%u Width=%u Height=%u",
+                  Surface, X, Y, Width, Height);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
+
+#if gcdENABLE_VG
+    gcmGETCURRENTHARDWARE(currentHW);
+#endif
+
+    /* Unmap the current buffer if any. */
+    gcmONERROR(
+        _UnmapUserBuffer(Surface, gcvTRUE));
+
+    /* Make sure at least one of the surface pointers is set. */
+    if ((Surface->logical == gcvNULL) && (Surface->physical == ~0U))
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ADDRESS);
+    }
+
+    /* Set the size. */
+    Surface->info.requestW = Width;
+    Surface->info.requestH = Height;
+    Surface->info.requestD = Depth;
+    Surface->info.allocedW = Width;
+    Surface->info.allocedH = Height;
+    Surface->info.alignedW = Width;
+    Surface->info.alignedH = Height;
+
+    /* Stride is the same as the width? */
+    if (Surface->autoStride)
+    {
+        /* Compute the stride. */
+        Surface->info.stride = Width * Surface->info.bitsPerPixel / 8;
+    }
+    else
+    {
+#if gcdENABLE_VG
+        if (currentHW == gcvHARDWARE_VG)
+        {
+            gcmONERROR(
+                gcoVGHARDWARE_AlignToTile(gcvNULL,
+                                          Surface->info.type,
+                                          &Surface->info.alignedW,
+                                          &Surface->info.alignedH));
+        }
+        else
+#endif
+        {
+            /* Align the surface size. */
+#if gcdENABLE_3D
+            gcmONERROR(
+                gcoHARDWARE_AlignToTileCompatible(gcvNULL,
+                                                  Surface->info.type,
+                                                  0,
+                                                  Surface->info.format,
+                                                  &Surface->info.alignedW,
+                                                  &Surface->info.alignedH,
+                                                  Surface->info.requestD,
+                                                  &Surface->info.tiling,
+                                                  &Surface->info.superTiled,
+                                                  &Surface->info.hAlignment));
+#else
+            gcmONERROR(
+                gcoHARDWARE_AlignToTileCompatible(gcvNULL,
+                                                  Surface->info.type,
+                                                  0,
+                                                  Surface->info.format,
+                                                  &Surface->info.alignedW,
+                                                  &Surface->info.alignedH,
+                                                  Surface->info.requestD,
+                                                  &Surface->info.tiling,
+                                                  gcvNULL,
+                                                  gcvNULL));
+#endif /* gcdENABLE_3D */
+        }
+    }
+
+#if gcdENABLE_VG
+    if (currentHW != gcvHARDWARE_VG)
+#endif
+    {
+
+    /* Get shortcut. */
+    formatInfo = &Surface->info.formatInfo;
+
+    /* bytes per pixel of first plane. */
+    switch (Surface->info.format)
+    {
+    case gcvSURF_YV12:
+    case gcvSURF_I420:
+    case gcvSURF_NV12:
+    case gcvSURF_NV21:
+    case gcvSURF_NV16:
+    case gcvSURF_NV61:
+        bytesPerPixel = 1;
+        halStride = Surface->info.alignedW;
+        break;
+
+    default:
+        bytesPerPixel = Surface->info.bitsPerPixel / 8;
+        halStride = (Surface->info.alignedW / formatInfo->blockWidth)
+                  * (formatInfo->blockSize / formatInfo->layers) / 8;
+        break;
+    }
+
+    /* Backup user stride. */
+    userStride = Surface->info.stride;
+
+    if (userStride != halStride)
+    {
+        if ((Surface->info.type != gcvSURF_BITMAP)
+        ||  (Surface->info.stride < Width * bytesPerPixel)
+        ||  (Surface->info.stride & (4 * bytesPerPixel - 1))
+        )
+        {
+            /*
+             * 1. For Vivante internal surfaces types, user buffer placement
+             * must be the same as what defined in HAL, otherwise the user
+             * buffer is not compatible with HAL.
+             * 2. For bitmap surface, user buffer stride may be larger than
+             * least stride defined in HAL, and should be aligned.
+             */
+            gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+        }
+
+        /* Calculte alignedWidth from user stride. */
+        Surface->info.alignedW = userStride / bytesPerPixel;
+    }
+
+    /* Compute the surface placement parameters. */
+    _ComputeSurfacePlacement(Surface);
+
+    if (userStride != Surface->info.stride)
+    {
+        /*
+         * Still not equal, which means user stride is not pixel aligned, ie,
+         * userStride != alignedWidth(user) * bytesPerPixel
+         */
+        Surface->info.stride = userStride;
+
+        /* Re-calculate slice size. */
+        Surface->info.sliceSize = userStride * (Surface->info.alignedH / formatInfo->blockHeight);
+    }
+
+    /* Restore alignedWidth. */
+    Surface->info.alignedW = halStride / bytesPerPixel;
+    }
+
+    offsetX = X * Surface->info.bitsPerPixel / 8;
+    offsetY = Y * Surface->info.stride;
+
+    /* Compute the surface sliceSize and size. */
+    Surface->info.sliceSize = (Surface->info.alignedW / Surface->info.formatInfo.blockWidth)
+                            * (Surface->info.alignedH / Surface->info.formatInfo.blockHeight)
+                            * Surface->info.formatInfo.blockSize / 8;
+
+    Surface->info.layerSize = Surface->info.sliceSize
+                            * Surface->info.requestD;
+
+    /* Always single layer for user surface */
+    gcmASSERT(Surface->info.formatInfo.layers == 1);
+
+    Surface->info.size      = Surface->info.layerSize
+                            * Surface->info.formatInfo.layers;
+
+    /* Set user pool node size. */
+    Surface->info.node.size = Surface->info.size;
+
+    /* Need to map logical pointer? */
+    if (Surface->logical == gcvNULL)
+    {
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+    else
+    {
+        Surface->info.node.logical = (gctUINT8_PTR) Surface->logical + offsetY;
+    }
+
+    if (offsetX || offsetY)
+    {
+        gcmASSERT(0);
+    }
+
+    desc.physical = Surface->physical;
+    desc.logical = gcmPTR_TO_UINT64(Surface->info.node.logical);
+    desc.size = Surface->info.size;
+    desc.flag = gcvALLOC_FLAG_USERMEMORY;
+
+    gcmONERROR(gcoHAL_WrapUserMemory(
+        &desc,
+        &Surface->info.node.u.normal.node
+        ));
+
+    Surface->info.node.u.wrapped.physical = Surface->physical;
+    Surface->info.node.logical = Surface->logical;
+    Surface->info.pfGetAddr = gcoHARDWARE_GetProcCalcPixelAddr(gcvNULL, &Surface->info);
+
+    Surface->info.node.lockCount = 1;
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
 
 /*******************************************************************************
 **

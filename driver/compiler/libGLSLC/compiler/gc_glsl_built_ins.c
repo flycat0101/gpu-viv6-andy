@@ -1013,6 +1013,9 @@ static slsBUILT_IN_VARIABLE GSBuiltInVariables[] =
     {slvEXTENSION_NONE,  "gl_in.gl_PointSize",       "#In_PointSize",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,   T_FLOAT,   0,   slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NONE,  "gl_PrimitiveIDIn",         "#PrimitiveIDIn",      slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_IN,   T_INT,      0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NONE,  "gl_InvocationID",          "#InvocationID",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_IN,   T_INT,      0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
+    /* a special patch input for GL_EXT_primitive_bounding_box. */
+    {slvEXTENSION_EXT_PRIMITIVE_BOUNDING_BOX,  "gl_BoundingBoxEXT",           "#BoundingBox",        slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_PATCH_IN,   T_VEC4,    2,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {slvEXTENSION_EXT_PRIMITIVE_BOUNDING_BOX,  "gl_BoundingBox",              "#BoundingBox",        slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_PATCH_IN,   T_VEC4,    2,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
     /* output. */
     {slvEXTENSION_NONE,  "gl_Position",              "#Position",           slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NONE,  "gl_PointSize",             "#PointSize",          slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},

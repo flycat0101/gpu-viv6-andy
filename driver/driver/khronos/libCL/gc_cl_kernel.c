@@ -1770,6 +1770,7 @@ clCreateKernel(
     kernel->preferredWorkGroupSizeMultiple = Program->devices[0]->deviceInfo.maxComputeUnits * 4;
     kernel->patchNeeded       = gcvTRUE;    /* Force to check patch instructions for the moment. May hurt compiler performance. */
     kernel->states.binary     = gcvNULL;
+    kernel->isPatched         = gcvFALSE;
 
     /* Create a reference count object and set it to 1. */
     clmONERROR(gcoOS_AtomConstruct(gcvNULL, &kernel->referenceCount),

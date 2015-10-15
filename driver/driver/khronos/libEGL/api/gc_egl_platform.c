@@ -1997,12 +1997,31 @@ veglConnectPixmap(
             needShadow = gcvTRUE;
             break;
         }
+
+        /* Check pixmap format. */
+        switch (pixmapFormat)
+        {
+        case gcvSURF_A8R8G8B8:
+        case gcvSURF_A8B8G8R8:
+        case gcvSURF_X8R8G8B8:
+        case gcvSURF_X8B8G8R8:
+        case gcvSURF_R5G6B5:
+        case gcvSURF_A4R4G4B4:
+        case gcvSURF_A4B4G4R4:
+        case gcvSURF_X4R4G4B4:
+        case gcvSURF_X4B4G4R4:
+            break;
+
+        default:
+            /* Resolve can not support such format. */
+            return EGL_FALSE;
+        }
     }
     while (gcvFALSE);
 
     do
     {
-        if (!pixmapBits)
+        if (needShadow)
         {
             /* No pixmap wrapper. */
             status = gcvSTATUS_OK;

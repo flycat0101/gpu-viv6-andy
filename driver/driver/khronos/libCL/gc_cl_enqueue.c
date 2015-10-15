@@ -307,6 +307,207 @@ OnError:
     return status;
 }
 
+static gceSTATUS clfUpdateKernelArgs(
+    cl_kernel               Kernel,
+    gctUINT *               NumArgs,
+    clsArgument_PTR *       Args,
+    clsPatchDirective_PTR   RecompilePatchDirectives)
+{
+    gceSTATUS               status = gcvSTATUS_OK;
+    clsPatchDirective_PTR   patchDirective, prePatchDirective;
+    gctUINT                 numToUpdate = *NumArgs, i;
+    struct _imageData {
+        gctUINT             physical;   /* GPU address is 32-bit. */
+        gctUINT             pitch;
+        gctUINT             slice;      /* 3D/2D array. */
+    } imageData;
+
+    for (patchDirective = RecompilePatchDirectives, prePatchDirective = Kernel->patchedStates->patchDirective;
+         patchDirective;
+         patchDirective = patchDirective->next, prePatchDirective = prePatchDirective->next)
+    {
+        clsPatchReadImage *     readImage;
+        clsPatchWriteImage *    writeImage;
+        clsImageHeader_PTR      imageHeader;
+        clsArgument_PTR         argument;
+        gctSIZE_T               bytes;
+        gcUNIFORM               gcUniform1, gcUniform2;
+        gctUINT                 dstFormat;
+        gctUINT                 opcode;
+        gctUINT                 oldNumArgs;
+
+        switch (patchDirective->kind)
+        {
+        case gceRK_PATCH_READ_IMAGE:
+            readImage = patchDirective->patchValue.readImage;
+            imageHeader = readImage->imageHeader;
+
+            /* Add new uniforms. */
+            oldNumArgs = *NumArgs;
+            *NumArgs += 2;
+            clmONERROR(clfReallocateKernelArgs(oldNumArgs,
+                                               *NumArgs,
+                                               Args),
+                       CL_OUT_OF_HOST_MEMORY);
+            gcoOS_ZeroMemory(*Args + oldNumArgs, 2 * gcmSIZEOF(clsArgument));
+
+            clmONERROR(gcSHADER_GetUniform((gcSHADER) Kernel->patchedStates->binary, prePatchDirective->patchValue.readImage->imageDataIndex, &gcUniform1), CL_INVALID_VALUE);
+            argument = &((*Args)[oldNumArgs]);
+            bytes = sizeof(struct _imageData);
+            imageData.physical = imageHeader->physical;
+            imageData.pitch    = imageHeader->rowPitch;
+            imageData.slice    = imageHeader->slicePitch;
+            clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
+            gcoOS_MemCopy(argument->data, &imageData, bytes);
+            argument->uniform    = gcUniform1;
+            argument->size       = bytes;
+            argument->set        = gcvTRUE;
+
+            /* Image's size. */
+            clmONERROR(gcSHADER_GetUniform((gcSHADER) Kernel->patchedStates->binary, prePatchDirective->patchValue.readImage->imageSizeIndex, &gcUniform2), CL_INVALID_VALUE);
+            argument = &((*Args)[oldNumArgs + 1]);
+            bytes = gcmSIZEOF(cl_uint) * 3;
+            clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
+#if BUILD_OPENCL_12
+            if ((imageHeader->imageType != CL_MEM_OBJECT_IMAGE1D_ARRAY) && (imageHeader->imageType != CL_MEM_OBJECT_IMAGE2D_ARRAY))
+            {
+                gcoOS_MemCopy(argument->data, &imageHeader->width, bytes);
+            }
+            else if (imageHeader->imageType == CL_MEM_OBJECT_IMAGE1D_ARRAY)
+            {
+                cl_uint* p = (cl_uint*)argument->data;
+                gcoOS_MemCopy(p++, &imageHeader->width, gcmSIZEOF(cl_uint));
+                gcoOS_MemCopy(p++, &imageHeader->arraySize, gcmSIZEOF(cl_uint));
+                gcoOS_MemCopy(p, &imageHeader->depth, gcmSIZEOF(cl_uint));
+            }
+            else if (imageHeader->imageType == CL_MEM_OBJECT_IMAGE2D_ARRAY)
+            {
+                cl_uint* p = (cl_uint*)argument->data;
+                gcoOS_MemCopy(p++, &imageHeader->width, gcmSIZEOF(cl_uint));
+                gcoOS_MemCopy(p++, &imageHeader->height, gcmSIZEOF(cl_uint));
+                gcoOS_MemCopy(p, &imageHeader->arraySize, gcmSIZEOF(cl_uint));
+            }
+#else
+            gcoOS_MemCopy(argument->data, &imageHeader->width, bytes);
+#endif
+            argument->uniform    = gcUniform2;
+            argument->size       = bytes;
+            argument->set        = gcvTRUE;
+
+            break;
+
+        case gceRK_PATCH_WRITE_IMAGE:
+            writeImage = patchDirective->patchValue.writeImage;
+            imageHeader = writeImage->imageHeader;
+
+            /* Add new uniforms. */
+            oldNumArgs = *NumArgs;
+            *NumArgs += 2;
+            clmONERROR(clfReallocateKernelArgs(oldNumArgs,
+                                               *NumArgs,
+                                               Args),
+                       CL_OUT_OF_HOST_MEMORY);
+            gcoOS_ZeroMemory(*Args + oldNumArgs, 2 * gcmSIZEOF(clsArgument));
+
+            /* TODO - Need to handle image3D. */
+
+            clmONERROR(gcSHADER_GetUniform((gcSHADER) Kernel->patchedStates->binary, prePatchDirective->patchValue.writeImage->imageDataIndex, &gcUniform1), CL_INVALID_VALUE);
+            argument = &((*Args)[oldNumArgs]);
+            bytes = sizeof(struct _imageData);
+            imageData.physical = imageHeader->physical;
+            imageData.pitch    = imageHeader->rowPitch;
+            imageData.slice    = imageHeader->slicePitch;
+            clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
+            gcoOS_MemCopy(argument->data, &imageData, bytes);
+            argument->uniform    = gcUniform1;
+            argument->size       = bytes;
+            argument->set        = gcvTRUE;
+
+            /* Image's size. */
+            clmONERROR(gcSHADER_GetUniform((gcSHADER) Kernel->patchedStates->binary, prePatchDirective->patchValue.writeImage->imageSizeIndex, &gcUniform2), CL_INVALID_VALUE);
+            argument++;
+            bytes = gcmSIZEOF(cl_uint) * 3;
+            clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
+#if BUILD_OPENCL_12
+            if ((imageHeader->imageType != CL_MEM_OBJECT_IMAGE1D_ARRAY) && (imageHeader->imageType != CL_MEM_OBJECT_IMAGE2D_ARRAY))
+            {
+                gcoOS_MemCopy(argument->data, &imageHeader->width, bytes);
+            }
+            else if (imageHeader->imageType == CL_MEM_OBJECT_IMAGE1D_ARRAY)
+            {
+                cl_uint* p = (cl_uint*)argument->data;
+                gcoOS_MemCopy(p++, &imageHeader->width, gcmSIZEOF(cl_uint));
+                gcoOS_MemCopy(p++, &imageHeader->arraySize, gcmSIZEOF(cl_uint));
+                gcoOS_MemCopy(p, &imageHeader->depth, gcmSIZEOF(cl_uint));
+            }
+            else if (imageHeader->imageType == CL_MEM_OBJECT_IMAGE2D_ARRAY)
+            {
+                cl_uint* p = (cl_uint*)argument->data;
+                gcoOS_MemCopy(p++, &imageHeader->width, gcmSIZEOF(cl_uint));
+                gcoOS_MemCopy(p++, &imageHeader->height, gcmSIZEOF(cl_uint));
+                gcoOS_MemCopy(p, &imageHeader->arraySize, gcmSIZEOF(cl_uint));
+            }
+#else
+            gcoOS_MemCopy(argument->data, &imageHeader->width, bytes);
+#endif
+            gcoOS_MemCopy(argument->data, &imageHeader->width, bytes);
+            argument->uniform    = gcUniform2;
+            argument->size       = bytes;
+            argument->set        = gcvTRUE;
+
+            break;
+
+        case gceRK_PATCH_CL_LONGULONG:
+            {
+                dstFormat = gcmSL_TARGET_GET(GetInstTemp(patchDirective->patchValue.longULong->instruction), Format);
+                opcode = gcmSL_OPCODE_GET(patchDirective->patchValue.longULong->instruction->opcode, Opcode);
+                if (NEED_PATCH_LONGULONG(patchDirective->patchValue.longULong->instruction, opcode, dstFormat))
+                {
+                    /* Add a patch argument. */
+                    oldNumArgs = *NumArgs;
+                    *NumArgs += 1;
+                    clmONERROR(clfReallocateKernelArgs(oldNumArgs,
+                                                       *NumArgs,
+                                                       Args),
+                               CL_OUT_OF_HOST_MEMORY);
+                    gcoOS_ZeroMemory(*Args + oldNumArgs, gcmSIZEOF(clsArgument));
+
+                    clmONERROR(gcSHADER_GetUniform((gcSHADER) Kernel->patchedStates->binary, prePatchDirective->patchValue.longULong->channelCountIndex, &gcUniform1), CL_INVALID_VALUE);
+                    argument = &((*Args)[oldNumArgs]);
+                    bytes = gcmSIZEOF(cl_uint);
+                    clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
+
+                    *((gctUINT*)argument->data) = patchDirective->patchValue.longULong->channelCount;
+                    argument->uniform    = gcUniform1;
+                    argument->size       = bytes;
+                    argument->set        = gcvTRUE;
+                }
+            }
+            break;
+
+        default:
+            gcmASSERT(gcvFALSE);  /* not implemented yet */
+            break;
+        }
+    }
+
+    for (i = 0; i < numToUpdate; i++)
+    {
+        gcUNIFORM uniform = gcvNULL;
+        clsArgument_PTR tmpArgs = *Args;
+
+        clmONERROR(gcSHADER_GetUniform((gcSHADER) Kernel->patchedStates->binary, i, &uniform), CL_INVALID_VALUE);
+
+        if(uniform && tmpArgs[i].uniform && (uniform->index == tmpArgs[i].uniform->index))
+        {
+            tmpArgs[i].uniform = uniform;
+        }
+    }
+
+OnError:
+    return status;
+}
+
 static gceSTATUS
 clfDynamicPatchKernel(
     cl_kernel               Kernel,
@@ -4593,6 +4794,9 @@ clEnqueueNDRangeKernel(
                         patchRealGlobalWorkSize, &patchDirective),
                        CL_INVALID_GLOBAL_WORK_SIZE);
         }
+
+        /* for type of globalworksize patch, always do recompile */
+        Kernel->isPatched = gcvFALSE;
     }
 
     for (i = 0; i < WorkDim; i++)
@@ -4835,6 +5039,28 @@ clEnqueueNDRangeKernel(
                                                             imageHeader->tiling,
                                                             &patchDirective),
                                CL_OUT_OF_HOST_MEMORY);
+
+                    if((Kernel->patchedStates) && (Kernel->isPatched == gcvTRUE))
+                    {
+                        clsPatchDirective_PTR tmpPatchDirective = gcvNULL;
+                        gctBOOL needPatch= gcvTRUE;
+                        for(tmpPatchDirective = Kernel->patchedStates->patchDirective; tmpPatchDirective != gcvNULL; tmpPatchDirective = tmpPatchDirective->next)
+                        {
+                            if(tmpPatchDirective->kind == gceRK_PATCH_WRITE_IMAGE)
+                            {
+                                if((tmpPatchDirective->patchValue.writeImage->channelDataType == patchDirective->patchValue.writeImage->channelDataType)
+                                    && (tmpPatchDirective->patchValue.writeImage->channelOrder == patchDirective->patchValue.writeImage->channelOrder))
+                                {
+                                    needPatch = gcvFALSE;
+                                    break;
+                                }
+                            }
+                        }
+                        if(needPatch)
+                        {
+                            Kernel->isPatched = gcvFALSE;
+                        }
+                    }
                 }
             }
         }
@@ -5018,12 +5244,34 @@ clEnqueueNDRangeKernel(
                                                            imageHeader->tiling,
                                                            &patchDirective),
                                CL_OUT_OF_HOST_MEMORY);
+
+                    if((Kernel->patchedStates) && (Kernel->isPatched == gcvTRUE))
+                    {
+                        clsPatchDirective_PTR tmpPatchDirective = gcvNULL;
+                        gctBOOL needPatch= gcvTRUE;
+                        for(tmpPatchDirective = Kernel->patchedStates->patchDirective; tmpPatchDirective != gcvNULL; tmpPatchDirective = tmpPatchDirective->next)
+                        {
+                            if(tmpPatchDirective->kind == gceRK_PATCH_READ_IMAGE)
+                            {
+                                if((tmpPatchDirective->patchValue.readImage->channelDataType == patchDirective->patchValue.readImage->channelDataType)
+                                    && (tmpPatchDirective->patchValue.readImage->channelOrder == patchDirective->patchValue.readImage->channelOrder))
+                                {
+                                    needPatch = gcvFALSE;
+                                    break;
+                                }
+                            }
+                        }
+                        if(needPatch)
+                        {
+                            Kernel->isPatched = gcvFALSE;
+                        }
+                    }
                 }
             }
         }
     }
 
-    if (patchDirective)
+    if (patchDirective && (Kernel->isPatched == gcvFALSE))
     {
         /* Patch shader */
         clmONERROR(clfDynamicPatchKernel(Kernel,
@@ -5033,6 +5281,15 @@ clEnqueueNDRangeKernel(
                    status);
 
         NDRangeKernel->states = Kernel->patchedStates;
+        Kernel->isPatched = gcvTRUE;
+    }
+    else if(patchDirective && (Kernel->isPatched == gcvTRUE))
+    {
+        clmONERROR(clfUpdateKernelArgs(Kernel, &NDRangeKernel->numArgs,
+                                        &NDRangeKernel->args,
+                                        patchDirective), status);
+        NDRangeKernel->states = Kernel->patchedStates;
+        if(patchDirective) clfDestroyPatchDirective(&patchDirective);
     }
     else
     {

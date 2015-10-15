@@ -5674,6 +5674,7 @@ gcoHARDWARE_FlushTarget(
         if (Hardware->PEStates->singlePEpipe != enableSinglePipe)
         {
             Hardware->PEStates->singlePEpipe = enableSinglePipe;
+            Hardware->PEDirty->alphaDirty = gcvTRUE;
             flushNeeded = !Hardware->flushedColor;
             flushDepthNeeded = !Hardware->flushedDepth;
         }
@@ -6434,6 +6435,7 @@ gcoHARDWARE_FlushDepth(
     gctUINT32 surfaceBase = 0, surfaceBottom = 0;
 
     gctBOOL raDepth = gcvFALSE;
+    gctBOOL depthPipeSwitched = gcvFALSE;
 
     /* Define state buffer variables. */
     gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);
@@ -6499,6 +6501,7 @@ gcoHARDWARE_FlushDepth(
                 }
                 Hardware->preRADepth = raDepth;
                 Hardware->previousPEDepth = peDepth;
+                depthPipeSwitched = gcvTRUE;
             }
         }
 
@@ -7128,6 +7131,68 @@ gcoHARDWARE_FlushDepth(
 
     }
 
+    if (Hardware->features[gcvFEATURE_RA_DEPTH_WRITE] &&
+        (Hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION] == gcvQUERY_Enabled))
+    {
+        if (depthPipeSwitched)
+        {
+            gcmONERROR(gcoHARDWARE_SetQuery(Hardware,
+                                            0,
+                                            gcvQUERY_OCCLUSION,
+                                            gcvQUERYCMD_PAUSE,
+                                            (gctPOINTER *)&memory));
+
+            /* If Z Mode changed, OQ Mode should also be changed. */
+            if(raDepth)
+            {
+                gcmONERROR(gcoHARDWARE_LoadState32NEW(
+                    Hardware,
+                    0x03860,
+                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) (0x7 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))),
+                    (gctPOINTER *)&memory
+                    ));
+            }
+            else
+            {
+                gcmONERROR(gcoHARDWARE_LoadState32NEW(
+                    Hardware,
+                    0x03860,
+                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) (0x6 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))),
+                    (gctPOINTER *)&memory
+                    ));
+            }
+
+            gcmONERROR(gcoHARDWARE_SetQuery(Hardware,
+                                            0,
+                                            gcvQUERY_OCCLUSION,
+                                            gcvQUERYCMD_RESUME,
+                                            (gctPOINTER *)&memory));
+        }
+        else
+        {
+            gcmONERROR(gcoHARDWARE_LoadState32NEW(
+                Hardware,
+                0x03860,
+                (raDepth ?
+                     ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) (0x7 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
+                   : ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) (0x6 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))),
+                (gctPOINTER *)&memory
+                ));
+
+        }
+    }
     {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)depthBatchCount  <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -8668,310 +8733,6 @@ _ResizeTempRT(
     IN gcsSURF_INFO_PTR dSurface
     );
 
-gceSTATUS
-gcoHARDWARE_FlushQuery(
-    IN gcoHARDWARE Hardware,
-    INOUT gctPOINTER *Memory
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gctBOOL raDepth  = !Hardware->MsaaStates->disableRAWriteDepth &&
-                       !Hardware->PEStates->alphaStates.test &&
-                       !Hardware->MsaaStates->MsaaFragmentOp &&
-                       gcoHAL_GetOption(gcvNULL, gcvOPTION_PREFER_RA_DEPTH_WRITE);
-    gctINT32 type;
-
-    /* Define state buffer variables. */
-    gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);
-
-    gcmHEADER_ARG("Hardware=0x%x", Hardware);
-
-    /* Reserve space in the command buffer. */
-    gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
-
-    for (type = gcvQUERY_OCCLUSION; type < gcvQUERY_MAX_NUM; type++)
-    {
-        if (type == gcvQUERY_OCCLUSION)
-        {
-            if (Hardware->QUERYDirty->queryDirty[type])
-            {
-                switch(Hardware->QUERYStates->queryCmd[type])
-                {
-                case gcvQUERYCMD_BEGIN:
-                    if (Hardware->QUERYStates->queryStatus[type] == gcvQUERY_Disabled)
-                    {
-                        gcmONERROR(gcoHARDWARE_SelectPipe(Hardware, gcvPIPE_3D, (gctPOINTER *)&memory));
-
-                        /* Before start OQ, should set OQ Mode firstly. */
-                        if(Hardware->features[gcvFEATURE_RA_DEPTH_WRITE])
-                        {
-                            if(raDepth)
-                            {
-                                gcmONERROR(gcoHARDWARE_LoadState32NEW(
-                                    Hardware,
-                                    0x03860,
-                                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) (0x7 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))),
-                                    (gctPOINTER *)&memory));
-                            }
-                            else
-                            {
-                                gcmONERROR(gcoHARDWARE_LoadState32NEW(
-                                    Hardware,
-                                    0x03860,
-                                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) (0x6 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))),
-                                    (gctPOINTER*)&memory));
-                            }
-                        }
-                        gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW(
-                            Hardware,
-                            0x03824,
-                            (gctUINT32)((gctUINTPTR_T)(Hardware->QUERYStates->queryHeaderPhysical[type])),
-                            (gctPOINTER *)&memory
-                            ));
-                        Hardware->QUERYStates->queryStatus[type] = gcvQUERY_Enabled;
-                        Hardware->QUERYStates->queryHeaderIndex[type] = 0;
-                    }
-                    break;
-
-                case gcvQUERYCMD_RESUME_DELAY:
-                    {
-                        gcmONERROR(gcoHARDWARE_SetQuery(Hardware, 0, gcvQUERY_OCCLUSION, gcvQUERYCMD_RESUME_IMMEDIATE, (gctPOINTER *)&memory));
-                    }
-                    break;
-
-                default:
-                    break;
-                }
-                Hardware->QUERYDirty->queryDirty[type] = gcvFALSE;
-            }
-            else if(Hardware->preRADepth != raDepth && Hardware->features[gcvFEATURE_RA_DEPTH_WRITE])
-            {
-                /* If switch between RAZ and PEZ, OQ mode should be changed. */
-                if((Hardware->preRADepth || Hardware->previousPEDepth) && Hardware->QUERYStates->queryStatus[type] == gcvQUERY_Enabled)
-                {
-                    if (!Hardware->features[gcvFEATURE_HALTI0])
-                    {
-                        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-                    }
-
-                    gcmONERROR(gcoHARDWARE_SetQuery(Hardware, 0, gcvQUERY_OCCLUSION, gcvQUERYCMD_PAUSE, (gctPOINTER *)&memory));
-
-                    gcmASSERT(Hardware->QUERYStates->queryStatus[type] == gcvQUERY_Paused);
-
-                    /* If Z Mode changed, OQ Mode should also be changed. */
-                    if(raDepth)
-                    {
-                        gcmONERROR(gcoHARDWARE_LoadState32NEW(
-                            Hardware,
-                            0x03860,
-                            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) (0x7 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))),
-                            (gctPOINTER *)&memory
-                            ));
-                    }
-                    else
-                    {
-                        gcmONERROR(gcoHARDWARE_LoadState32NEW(
-                            Hardware,
-                            0x03860,
-                            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) (0x6 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))),
-                            (gctPOINTER *)&memory
-                            ));
-                    }
-
-                    gcmONERROR(gcoHARDWARE_SetQuery(Hardware, 0, gcvQUERY_OCCLUSION, gcvQUERYCMD_RESUME_IMMEDIATE, (gctPOINTER *)&memory));
-                }
-            }
-            /* RA OQ checks */
-            if (Hardware->QUERYStates->queryStatus[type] == gcvQUERY_Enabled && !Hardware->features[gcvFEATURE_BUG_FIXES18])
-            {
-                /* RA OQ heavily depends on accurate RA depth, need to flush PE depth before each such draw. */
-                if (Hardware->PEStates->depthStates.mode != gcvDEPTH_NONE)
-                {
-                    Hardware->flushedDepth = gcvTRUE;
-
-                    gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW(
-                        Hardware,
-                        0x0380C,
-                        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 0:0) - (0 ? 0:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))),
-                        (gctPOINTER *)&memory
-                        ));
-                }
-            }
-        }
-        else if (Hardware->QUERYDirty->queryDirty[type])
-        {
-            gcmASSERT(Hardware->features[gcvFEATURE_HW_TFB]);
-
-            switch (Hardware->QUERYStates->queryCmd[type])
-            {
-            case gcvQUERYCMD_BEGIN:
-                if (Hardware->QUERYStates->queryStatus[type] != gcvQUERY_Enabled)
-                {
-                    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x7005) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x7005, Hardware->QUERYStates->queryHeaderPhysical[type]);
-    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-
-                    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x7004) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x7004, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 7:4) - (0 ? 7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
- 7:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 7:4) - (0 ?
- 7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
- 7:4))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 11:8) - (0 ?
- 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
- 11:8))) | (((gctUINT32) ((gctUINT32) ((type == gcvQUERY_XFB_WRITTEN) ?
- 0x0 : 0x1) & ((gctUINT32) ((((1 ? 11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ?
- 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8))));    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-
-                    Hardware->QUERYStates->queryStatus[type] = gcvQUERY_Enabled;
-                    Hardware->QUERYStates->queryHeaderIndex[type] = 0;
-                    if (type == gcvQUERY_PRIM_GENERATED)
-                    {
-                        Hardware->XFBDirty->s.internalXFBDirty = gcvTRUE;
-                    }
-                }
-                break;
-            case gcvQUERYCMD_RESUME_DELAY:
-                if (Hardware->QUERYStates->queryStatus[type] == gcvQUERY_Paused)
-                {
-                    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x7005) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x7005, Hardware->QUERYStates->queryHeaderPhysical[type]);
-    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-
-                    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x7004) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x7004, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) (0x4 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 7:4) - (0 ? 7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
- 7:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 7:4) - (0 ?
- 7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
- 7:4))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 11:8) - (0 ?
- 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
- 11:8))) | (((gctUINT32) ((gctUINT32) ((type == gcvQUERY_XFB_WRITTEN) ?
- 0x0 : 0x1) & ((gctUINT32) ((((1 ? 11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ?
- 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8))));    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-
-                    Hardware->QUERYStates->queryStatus[type] = gcvQUERY_Enabled;
-                    if (type == gcvQUERY_PRIM_GENERATED)
-                    {
-                        Hardware->XFBDirty->s.internalXFBDirty = gcvTRUE;
-                    }
-                }
-                break;
-            default:
-                break;
-            }
-        }
-    }
-
-    stateDelta = stateDelta;
-
-    /* Validate the state buffer. */
-    gcmENDSTATEBUFFER_NEW(Hardware, reserve, memory, Memory);
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
 
 gceSTATUS
 gcoHARDWARE_FlushDepthOnly(
@@ -10579,7 +10340,7 @@ gcoHARDWARE_FlushShaders(
  15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0E22, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0E22, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  6:0) - (0 ? 6:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
  6:0))) | (((gctUINT32) ((gctUINT32) (hints->ptSzAttrIndex * 4) & ((gctUINT32) ((((1 ?
  6:0) - (0 ? 6:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
@@ -11090,6 +10851,7 @@ OnError:
 
 }
 
+
 gceSTATUS
 gcoHARDWARE_SetQuery(
     IN gcoHARDWARE Hardware,
@@ -11100,7 +10862,6 @@ gcoHARDWARE_SetQuery(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gctUINT32_PTR memory;
 
     gcmHEADER_ARG("Hardware=0x%x QueryHeader = 0x%x, Type = %u, QueryCmd = %u, Memory=0x%x",
                   Hardware, QueryHeader, Type, QueryCmd, Memory);
@@ -11115,146 +10876,122 @@ gcoHARDWARE_SetQuery(
     if ((Type == gcvQUERY_OCCLUSION && !Hardware->features[gcvFEATURE_HALTI0]) ||
         ((Type == gcvQUERY_XFB_WRITTEN || Type == gcvQUERY_PRIM_GENERATED) && !Hardware->features[gcvFEATURE_HW_TFB]))
     {
-        gcmFOOTER();
-        return status;
+        goto OnError;
     }
 
+    /* query pause/resuem is always from internal and never
+    ** from application side, either from command submit
+    ** or RA/PE depth write switch.
+    ** For query state change, we will generate command immediately,
+    ** won't delay to next draw.
+    ** A resume will be appended right after pause, so we don't
+    ** need a PAUSED state for query.
+    */
     switch (QueryCmd)
     {
     case gcvQUERYCMD_BEGIN:
-        if (Hardware->QUERYStates->queryStatus[Type] == gcvQUERY_Disabled)
-        {
-            Hardware->QUERYStates->queryCmd[Type] = QueryCmd;
-            Hardware->QUERYDirty->queryDirty[Type] = gcvTRUE;
-            Hardware->QUERYStates->queryHeaderPhysical[Type] = QueryHeader;
+        gcmASSERT(Hardware->QUERYStates->queryStatus[Type] == gcvQUERY_Disabled);
+        gcmASSERT(QueryHeader != ~0U);
+        gcmASSERT(Memory == gcvNULL);
 
-            /* OQ state change could affect current depth HZ status,
-            which depend on depth config dirty and Target dirty now,
-            TO_DO, refine*/
-            if (Type == gcvQUERY_OCCLUSION)
-            {
-                Hardware->PEDirty->depthConfigDirty = gcvTRUE;
-                Hardware->PEDirty->depthTargetDirty = gcvTRUE;
-            }
+        Hardware->QUERYStates->queryHeaderPhysical[Type] = QueryHeader;
+
+        if (Type == gcvQUERY_OCCLUSION)
+        {
+            gcmONERROR(gcoHARDWARE_LoadCtrlState(
+                Hardware,
+                0x03824,
+                (gctUINT32)((gctUINTPTR_T)(Hardware->QUERYStates->queryHeaderPhysical[gcvQUERY_OCCLUSION]))
+                ));
+
+            Hardware->PEDirty->depthConfigDirty = gcvTRUE;
+
         }
-        /* delay it to following draw */
-        break;
-
-    case gcvQUERYCMD_PAUSE:
-        if (Type == gcvQUERY_OCCLUSION && Hardware->QUERYStates->statusInCmd[Type] == gcvQUERY_Enabled && Memory)
+        else if ((Type == gcvQUERY_XFB_WRITTEN) || (Type == gcvQUERY_PRIM_GENERATED))
         {
-            memory = (gctUINT32_PTR) *Memory;
+            gcmONERROR(gcoHARDWARE_LoadState32(Hardware,
+                                             0x1C014,
+                                             Hardware->QUERYStates->queryHeaderPhysical[Type]));
 
-            memory[0] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
-                       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 26:26) - (0 ?
- 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))
-                       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))
-                       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E0C) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));
-            memory[1] = 31415926;
-
-            *Memory = (memory + 2);
-
-            Hardware->QUERYStates->queryStatus[Type] =
-            Hardware->QUERYStates->statusInCmd[Type] = gcvQUERY_Paused;
-            Hardware->QUERYDirty->queryDirty[Type]  = gcvTRUE;
-        }
-        else if ((Type == gcvQUERY_XFB_WRITTEN || Type == gcvQUERY_PRIM_GENERATED)
-                 && Hardware->QUERYStates->statusInCmd[Type] == gcvQUERY_Enabled && Memory)
-        {
-            memory = (gctUINT32_PTR) *Memory;
-
-            memory[0] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
-                       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 26:26) - (0 ?
- 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))
-                       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))
-                       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x7005) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));
-
-            memory[1] = Hardware->QUERYStates->queryHeaderPhysical[Type];
-
-            memory[2] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
-                       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 26:26) - (0 ?
- 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))
-                       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))
-                       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x7004) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));
-
-            memory[3] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            gcmONERROR(gcoHARDWARE_LoadCtrlState(Hardware,
+                                                 0x1C010,
+                                                 ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
+ 2:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                                               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  7:4) - (0 ? 7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
  7:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 7:4) - (0 ?
  7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
  7:4)))
-                       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                                               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
  11:8))) | (((gctUINT32) ((gctUINT32) ((Type == gcvQUERY_XFB_WRITTEN) ?
  0x0 : 0x1) & ((gctUINT32) ((((1 ? 11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ?
- 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8)));
+ 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8)))
+                                                 ));
 
-            *Memory = (memory + 4);
+        }
+        else
+        {
+            gcmASSERT(0);
+        }
+        Hardware->QUERYStates->queryStatus[Type] = gcvQUERY_Enabled;
+        Hardware->QUERYStates->queryHeaderIndex[Type] = 0;
+        break;
 
-            Hardware->QUERYStates->queryStatus[Type] =
-            Hardware->QUERYStates->statusInCmd[Type] = gcvQUERY_Paused;
-            Hardware->QUERYDirty->queryDirty[Type] = gcvTRUE;
+    case gcvQUERYCMD_PAUSE:
+        gcmASSERT(Memory);
+        if (Hardware->QUERYStates->queryStatus[Type] == gcvQUERY_Enabled)
+        {
+            if (Type == gcvQUERY_OCCLUSION)
+            {
+                gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW(
+                    Hardware,
+                    0x03830,
+                    31415926,
+                    Memory
+                    ));
+            }
+            else if ((Type == gcvQUERY_XFB_WRITTEN) || (Type == gcvQUERY_PRIM_GENERATED))
+            {
+                gcmONERROR(gcoHARDWARE_LoadState32NEW(Hardware,
+                                                      0x1C014,
+                                                      Hardware->QUERYStates->queryHeaderPhysical[Type],
+                                                      Memory));
+
+                gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW(Hardware,
+                                                        0x1C010,
+                                                        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
+                                                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:4) - (0 ? 7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
+ 7:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 7:4) - (0 ?
+ 7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
+ 7:4)))
+                                                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
+ 11:8))) | (((gctUINT32) ((gctUINT32) ((Type == gcvQUERY_XFB_WRITTEN) ?
+ 0x0 : 0x1) & ((gctUINT32) ((((1 ? 11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ?
+ 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8))),
+                                                        Memory));
+
+            }
+            else
+            {
+                gcmASSERT(0);
+            }
         }
         break;
 
-    case gcvQUERYCMD_RESUME_DELAY:
-        if (Hardware->QUERYStates->queryStatus[Type] == gcvQUERY_Paused)
+    case gcvQUERYCMD_RESUME:
+        gcmASSERT(Memory);
+        gcmASSERT(Hardware->QUERYStates->queryStatus[Type] == gcvQUERY_Enabled);
+        if (Type == gcvQUERY_OCCLUSION)
         {
-            Hardware->QUERYStates->queryCmd[Type] = QueryCmd;
-            Hardware->QUERYDirty->queryDirty[Type]  = gcvTRUE;
-        }
-        /* delay it to following draw */
-        break;
-
-    case gcvQUERYCMD_RESUME_IMMEDIATE:
-        if (Type == gcvQUERY_OCCLUSION && Hardware->QUERYStates->queryStatus[Type] == gcvQUERY_Paused && Memory)
-        {
-            memory = (gctUINT32_PTR) *Memory;
+            gctUINT32 nextOQSlot;
 
             Hardware->QUERYStates->queryHeaderIndex[Type]++;
 
@@ -11263,67 +11000,75 @@ gcoHARDWARE_SetQuery(
                 gcmFATAL("commit 64 time, when OQ enable!!!!");
                 Hardware->QUERYStates->queryHeaderIndex[Type] = 63;
             }
-
-            memory[0] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
-                               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 26:26) - (0 ?
- 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))
-                               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))
-                               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E09) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));
-
-            memory[1] = gcmALL_TO_UINT32(Hardware->QUERYStates->queryHeaderPhysical[Type])
+            nextOQSlot = gcmALL_TO_UINT32(Hardware->QUERYStates->queryHeaderPhysical[Type])
                       + (Hardware->QUERYStates->queryHeaderIndex[Type]) * gcmSIZEOF(gctUINT64);
 
-            *Memory = (memory + 2);
-
-            Hardware->QUERYStates->queryStatus[Type] = gcvQUERY_Enabled;
+            gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW(
+                Hardware,
+                0x03824,
+                nextOQSlot,
+                Memory
+                ));
+        }
+        else if ((Type == gcvQUERY_XFB_WRITTEN) || (Type == gcvQUERY_PRIM_GENERATED))
+        {
+            gcmONERROR(gcoHARDWARE_LoadState32NEW(Hardware,
+                                                  0x1C014,
+                                                  Hardware->QUERYStates->queryHeaderPhysical[Type],
+                                                  Memory));
+            gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW(Hardware,
+                                                    0x1C010,
+                                                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) (0x4 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
+                                                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:4) - (0 ? 7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
+ 7:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 7:4) - (0 ?
+ 7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
+ 7:4)))
+                                                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
+ 11:8))) | (((gctUINT32) ((gctUINT32) ((Type == gcvQUERY_XFB_WRITTEN) ?
+ 0x0 : 0x1) & ((gctUINT32) ((((1 ? 11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ?
+ 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8))),
+                                                    Memory));
+        }
+        else
+        {
+            gcmASSERT(0);
         }
         break;
 
     case gcvQUERYCMD_END:
+        gcmASSERT(Hardware->QUERYStates->queryStatus[Type] == gcvQUERY_Enabled);
+        gcmASSERT(Memory == gcvNULL);
+
         if (Type == gcvQUERY_OCCLUSION)
         {
-            if (Hardware->QUERYStates->queryStatus[Type] != gcvQUERY_Disabled)
+            gctBOOL hzTSEnabled = gcvFALSE;
+
+            gcmONERROR(gcoHARDWARE_InvalidateCache(Hardware));
+
+            hzTSEnabled = (((((gctUINT32) (Hardware->MCStates->memoryConfig)) >> (0 ? 12:12)) & ((gctUINT32) ((((1 ? 12:12) - (0 ? 12:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 12:12) - (0 ? 12:12) + 1)))))) );
+            /* pause HZ TS */
+            if (hzTSEnabled)
             {
-                gctBOOL hzTSEnabled = gcvFALSE;
-
-                gcmONERROR(gcoHARDWARE_InvalidateCache(Hardware));
-
-                hzTSEnabled = (((((gctUINT32) (Hardware->MCStates->memoryConfig)) >> (0 ? 12:12)) & ((gctUINT32) ((((1 ? 12:12) - (0 ? 12:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 12:12) - (0 ? 12:12) + 1)))))) );
-
-                /* pause HZ TS */
-                if (hzTSEnabled)
-                {
-                    gcoHARDWARE_PauseTileStatus(Hardware,gcvTILE_STATUS_PAUSE);
-                }
-
-                if (Hardware->QUERYStates->queryStatus[Type] == gcvQUERY_Enabled)
-                {
-                    gcmONERROR(gcoHARDWARE_LoadCtrlState(
-                        Hardware, 0x03830, 31415926
-                        ));
-                }
-
-                if (hzTSEnabled)
-                {
-                    gcoHARDWARE_PauseTileStatus(Hardware,gcvTILE_STATUS_RESUME);
-                }
-                Hardware->QUERYStates->statusInCmd[Type] = gcvQUERY_Disabled;
+                gcoHARDWARE_PauseTileStatus(Hardware,gcvTILE_STATUS_PAUSE);
             }
-            Hardware->QUERYDirty->queryDirty[Type] = gcvTRUE;
+
+            if (Hardware->QUERYStates->queryStatus[Type] == gcvQUERY_Enabled)
+            {
+                gcmONERROR(gcoHARDWARE_LoadCtrlState(
+                    Hardware, 0x03830, 31415926
+                    ));
+            }
+
+            if (hzTSEnabled)
+            {
+                gcoHARDWARE_PauseTileStatus(Hardware,gcvTILE_STATUS_RESUME);
+            }
+
             /* OQ state change could affect current depth HZ status,
             which depend on depth config dirty and Target dirty now,
             TO_DO, refine*/
@@ -11331,14 +11076,13 @@ gcoHARDWARE_SetQuery(
             Hardware->PEDirty->depthTargetDirty = gcvTRUE;
 
             Hardware->QUERYStates->queryStatus[Type] = gcvQUERY_Disabled;
-            Hardware->QUERYStates->queryCmd[Type] = QueryCmd;
         }
-        else if ((Type == gcvQUERY_XFB_WRITTEN || Type == gcvQUERY_PRIM_GENERATED)
-                 && Hardware->QUERYStates->queryStatus[Type] != gcvQUERY_Disabled)
+        else if ((Type == gcvQUERY_XFB_WRITTEN || Type == gcvQUERY_PRIM_GENERATED))
         {
             gcmONERROR(gcoHARDWARE_LoadCtrlState(Hardware,
                                                  0x1C014,
                                                  Hardware->QUERYStates->queryHeaderPhysical[Type]));
+
             gcmONERROR(gcoHARDWARE_LoadCtrlState(Hardware,
                                                  0x1C010,
                                                  ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -11356,9 +11100,11 @@ gcoHARDWARE_SetQuery(
  0x0 : 0x1) & ((gctUINT32) ((((1 ? 11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ?
  11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8)))));
 
-            Hardware->QUERYStates->statusInCmd[Type] =
             Hardware->QUERYStates->queryStatus[Type] = gcvQUERY_Disabled;
-            Hardware->QUERYStates->queryCmd[Type] = QueryCmd;
+        }
+        else
+        {
+            gcmASSERT(0);
         }
         break;
 
@@ -11369,6 +11115,7 @@ gcoHARDWARE_SetQuery(
     }
 
 OnError:
+
     /* Return the status. */
     gcmFOOTER();
     return status;
@@ -11438,205 +11185,6 @@ OnError:
     return status;
 }
 
-gceSTATUS gcoHARDWARE_FastDrawIndexedPrimitive(
-    IN gcoHARDWARE Hardware,
-    IN gcsFAST_FLUSH_PTR FastFlushInfo,
-    INOUT gctPOINTER *Memory)
-{
-    gceSTATUS status;
-    gctUINT primCount = FastFlushInfo->drawCount / 3;
-
-    gcmHEADER_ARG("Hardware=0x%x FastFlushInfo=0x%x", Hardware, FastFlushInfo);
-
-    /* Verify the arguments. */
-    gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
-
-    /* Send command */
-    if (FastFlushInfo->hasHalti)
-    {
-        gctSIZE_T vertexCount;
-        gctUINT32 drawCommand;
-        gctUINT32 drawCount;
-        gctUINT32 drawMode = (FastFlushInfo->indexCount != 0) ?
-                0x1 :
-                0x0;
-
-        /* Define state buffer variables. */
-        gcmDEFINESTATEBUFFER_NEW_FAST(reserve, memory);
-
-        if (!Hardware->features[gcvFEATURE_HALTI2])
-        {
-            vertexCount = FastFlushInfo->drawCount - (FastFlushInfo->drawCount % 3);
-        }
-        else
-        {
-            vertexCount = FastFlushInfo->drawCount;
-        }
-
-        /* Determine draw command. */
-        drawCommand = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x0C & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 22:20) - (0 ? 22:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ?
- 22:20))) | (((gctUINT32) ((gctUINT32) (drawMode) & ((gctUINT32) ((((1 ?
- 22:20) - (0 ? 22:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ?
- 22:20)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (FastFlushInfo->instanceCount) & ((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 19:16) - (0 ? 19:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ?
- 19:16))) | (((gctUINT32) ((gctUINT32) (0x4) & ((gctUINT32) ((((1 ? 19:16) - (0 ?
- 19:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ?
- 19:16)));
-
-        drawCount = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 23:0) - (0 ? 23:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 23:0) - (0 ? 23:0) + 1))))))) << (0 ?
- 23:0))) | (((gctUINT32) ((gctUINT32) (vertexCount) & ((gctUINT32) ((((1 ?
- 23:0) - (0 ? 23:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 23:0) - (0 ? 23:0) + 1))))))) << (0 ?
- 23:0)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:24) - (0 ? 31:24) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:24) - (0 ? 31:24) + 1))))))) << (0 ?
- 31:24))) | (((gctUINT32) ((gctUINT32) ((FastFlushInfo->instanceCount >> 16)) & ((gctUINT32) ((((1 ?
- 31:24) - (0 ? 31:24) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:24) - (0 ? 31:24) + 1))))))) << (0 ?
- 31:24)));
-
-        /* Reserve space in the command buffer. */
-        gcmBEGINSTATEBUFFER_NEW_FAST(Hardware, reserve, memory, Memory);
-
-        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E05) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETSTATEDATA_NEW_FAST(stateDelta, reserve, memory, gcvFALSE, 0x0E05, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 1:0) - (0 ? 1:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
- 1:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 1:0) - (0 ? 1:0) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ? 1:0))) );    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-
-        /* Program the AQCommandDX8Primitive.Command data. */
-        *memory++ = drawCommand;
-        *memory++ = drawCount;
-
-        if (Hardware->features[gcvFEATURE_HALTI2])
-        {
-            *memory++ = 0;
-            *memory++ = 0;
-        }
-        else
-        {
-            /* start index is not set */
-            *memory++ = 0;
-
-            gcmSETFILLER_NEW(
-                reserve,
-                memory
-                );
-        }
-
-        /* Validate the state buffer. */
-        gcmENDSTATEBUFFER_NEW_FAST(Hardware, reserve, memory, Memory);
-    }
-    else
-    {
-        gcmDEFINESTATEBUFFER_NEW_FAST(reserve, memory);
-
-        /* Reserve space in the command buffer. */
-        gcmBEGINSTATEBUFFER_NEW_FAST(Hardware, reserve, memory, Memory);
-
-        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E05) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETSTATEDATA_NEW_FAST(stateDelta, reserve, memory, gcvFALSE, 0x0E05, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 1:0) - (0 ? 1:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
- 1:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 1:0) - (0 ? 1:0) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ? 1:0))) );    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-
-        /* Program the AQCommandDX8IndexPrimitive.Command data. */
-        memory[0] =
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 31:27) - (0 ?
- 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x06 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)));
-
-        /* Program the AQCommandDX8IndexPrimitive.Primtype data. */
-        memory[1] =
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 3:0) - (0 ?
- 3:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
- 3:0))) | (((gctUINT32) ((gctUINT32) (0x4) & ((gctUINT32) ((((1 ? 3:0) - (0 ?
- 3:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
- 3:0)));
-
-        /* Program the AQCommandDX8IndexPrimitive.Start data. */
-        memory[2] = 0;
-
-        /* Program the AQCommandDX8IndexPrimitive.Primcount data. */
-        gcmSAFECASTSIZET(memory[3], primCount);
-
-        /* Program the AQCommandDX8IndexPrimitive.Basevertex data. */
-        memory[4] = 0;
-
-        memory += 5;
-
-        if (5 & 1)
-        {
-            gcmSETFILLER_NEW(
-                reserve,
-                memory
-                );
-        }
-
-        /* Validate the state buffer. */
-        gcmENDSTATEBUFFER_NEW_FAST(Hardware, reserve, memory, Memory);
-    }
-
-    /* Success */
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
-
-OnError:
-    /* Return the status */
-    gcmFOOTER();
-    return status;
-}
 
 gceSTATUS gcoHARDWARE_FastFlushDepthCompare(
     IN gcoHARDWARE Hardware,
@@ -13917,61 +13465,89 @@ gcoHARDWARE_SetXfbCmd(
     switch (Cmd)
     {
     case gcvXFBCMD_BEGIN:
+        gcmASSERT(Memory == gcvNULL);
         /* delay it to following draw */
         Hardware->XFBStates->cmd = Cmd;
         Hardware->XFBDirty->s.cmdDirty = gcvTRUE;
         break;
 
-    case gcvXFBCMD_PAUSE:
-        /* pause xfb in commit */
-        if ((Hardware->XFBStates->statusInCmd == gcvXFB_Enabled || Hardware->XFBStates->internalXFB) && Memory)
+    case gcvXFBCMD_PAUSE_INCOMMIT:
+        gcmASSERT(Memory);
+        if (Hardware->XFBStates->statusInCmd == gcvXFB_Enabled)
         {
-            gcoHARDWARE_LoadCtrlStateNEW(Hardware, 0x1C004,
-                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            gcoHARDWARE_LoadCtrlStateNEW(Hardware,
+                                         0x1C004,
+                                         ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
  2:0))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))), Memory);
-
-            Hardware->XFBStates->status =
-            Hardware->XFBStates->statusInCmd = gcvXFB_Paused;
-            Hardware->XFBStates->cmd = Cmd;
-            Hardware->XFBDirty->s.cmdDirty = gcvTRUE;
-        }
-        /* pause xfb by application */
-        else if (Memory == gcvNULL)
-        {
-            if (Hardware->XFBStates->status == gcvXFB_Enabled)
-            {
-                gcoHARDWARE_LoadCtrlStateNEW(Hardware, 0x1C004,
-                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))), Memory);
-
-                Hardware->XFBStates->status =
-                Hardware->XFBStates->statusInCmd = gcvXFB_Paused;
-            }
-            Hardware->XFBStates->cmd = Cmd;
-            Hardware->XFBDirty->s.cmdDirty = gcvTRUE;
+ ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))),
+                                         Memory);
         }
         break;
 
-    case gcvXFBCMD_RESUME:
-        /* delay it to following draw */
+    case gcvXFBCMD_PAUSE:
+        gcmASSERT(Memory == gcvNULL);
+        if (Hardware->XFBStates->status == gcvXFB_Enabled)
+        {
+            gcmASSERT(Hardware->XFBStates->statusInCmd == gcvXFB_Enabled);
+            gcoHARDWARE_LoadCtrlStateNEW(Hardware,
+                                         0x1C004,
+                                         ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))),
+                                         Memory);
+
+            Hardware->XFBStates->statusInCmd =
+            Hardware->XFBStates->status = gcvXFB_Paused;
+        }
+
         Hardware->XFBStates->cmd = Cmd;
+        Hardware->XFBDirty->s.cmdDirty = gcvTRUE;
+        break;
+
+    case gcvXFBCMD_RESUME_INCOMMIT:
+        gcmASSERT(Memory);
+        gcmASSERT(Hardware->XFBStates->statusInCmd == gcvXFB_Enabled);
+
+        gcoHARDWARE_LoadCtrlStateNEW(Hardware,
+                                     0x1C004,
+                                     ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) (0x4 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))),
+                                     Memory);
+        break;
+
+    case gcvXFBCMD_RESUME:
+        gcmASSERT(Memory == gcvNULL);
+        if (Hardware->XFBStates->status == gcvXFB_Paused)
+        {
+            Hardware->XFBStates->cmd = gcvXFBCMD_RESUME;
+        }
+        else
+        {
+            gcmASSERT(Hardware->XFBStates->status == gcvXFB_Disabled);
+            gcmASSERT(Hardware->XFBStates->statusInCmd == gcvXFB_Disabled);
+            Hardware->XFBStates->cmd = gcvXFBCMD_BEGIN;
+        }
+
         Hardware->XFBDirty->s.cmdDirty = gcvTRUE;
         break;
 
     case gcvXFBCMD_END:
+        gcmASSERT(Memory == gcvNULL);
         if (Hardware->XFBStates->status == gcvXFB_Enabled)
         {
-            gcoHARDWARE_LoadCtrlState(Hardware, 0x1C004,
-                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            gcoHARDWARE_LoadCtrlStateNEW(Hardware,
+                                         0x1C004,
+                                         ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
  2:0))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))));
-            Hardware->XFBStates->statusInCmd = gcvXFB_Disabled;
+ ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))),
+                                         Memory);
         }
+        Hardware->XFBStates->statusInCmd =
         Hardware->XFBStates->status = gcvXFB_Disabled;
         Hardware->XFBStates->cmd = Cmd;
         Hardware->XFBDirty->s.cmdDirty = gcvTRUE;
@@ -14037,7 +13613,7 @@ gcoHARDWARE_FlushXfb(
 
     if (Hardware->XFBDirty->s.headerDirty)
     {
-        gcmASSERT((Hardware->XFBStates->status != gcvXFB_Enabled) || Hardware->XFBStates->internalXFB);
+        gcmASSERT(Hardware->XFBStates->status != gcvXFB_Enabled);
 
         {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
@@ -14146,7 +13722,6 @@ gcoHARDWARE_FlushXfb(
         }
     }
 
-
     if (Hardware->XFBDirty->s.cmdDirty)
     {
         switch (Hardware->XFBStates->cmd)
@@ -14180,12 +13755,6 @@ gcoHARDWARE_FlushXfb(
 
 
                 Hardware->XFBStates->status = gcvXFB_Enabled;
-
-                if (Hardware->XFBStates->internalXFB)
-                {
-                    Hardware->XFBStates->internalXFB = gcvFALSE;
-                    gcmASSERT(Hardware->XFBDirty->s.bufferDirty);
-                }
             }
             break;
 
@@ -14289,169 +13858,6 @@ gcoHARDWARE_FlushXfb(
  5:4))));    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
-    }
-
-    if (Hardware->XFBDirty->s.internalXFBDirty && Hardware->QUERYStates->queryStatus[gcvQUERY_PRIM_GENERATED] == gcvQUERY_Enabled)
-    {
-        if (Hardware->XFBStates->status != gcvXFB_Enabled)
-        {
-            gctUINT32  physical;
-
-            if (gcvNULL == Hardware->XFBStates->internalXFBNode)
-            {
-                gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsSURF_NODE), (gctPOINTER *)&Hardware->XFBStates->internalXFBNode);
-                gcoOS_ZeroMemory((gctPOINTER)Hardware->XFBStates->internalXFBNode, gcmSIZEOF(gcsSURF_NODE));
-                gcmONERROR(gcsSURF_NODE_Construct(Hardware->XFBStates->internalXFBNode,
-                                                  64,
-                                                  64,
-                                                  gcvSURF_TFBHEADER,
-                                                  0,
-                                                  gcvPOOL_DEFAULT
-                                                  ));
-
-                gcmONERROR(gcoSURF_LockNode(Hardware->XFBStates->internalXFBNode, gcvNULL, &Hardware->XFBStates->internalXFBLocked));
-
-                gcoOS_ZeroMemory(Hardware->XFBStates->internalXFBLocked, 64);
-
-                gcmASSERT(Hardware->XFBStates->internalXFBLocked);
-
-            }
-
-            gcmGETHARDWAREADDRESSP(Hardware->XFBStates->internalXFBNode, physical);
-
-            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x7002) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x7002, physical);
-    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-
-            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x7020) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x7020, 0);
-    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-
-            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x7030) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x7030, 16);
-    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-
-            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x7001) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x7001, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))));    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-
-            Hardware->XFBStates->internalXFB = gcvTRUE;
-        }
-    }
-    else if (Hardware->QUERYStates->queryStatus[gcvQUERY_PRIM_GENERATED] != gcvQUERY_Enabled)
-    {
-        if (Hardware->XFBStates->internalXFB)
-        {
-            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x7001) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x7001, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))));    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-
-            Hardware->XFBStates->internalXFB = gcvFALSE;
-        }
     }
 
     gcmENDSTATEBUFFER_NEW(Hardware, reserve, memory, Memory);

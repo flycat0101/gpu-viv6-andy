@@ -1683,6 +1683,8 @@ _ClearFullScreen(
                     0xCC,
                     Display->format));
 
+    return gcvSTATUS_OK;
+
 OnError:
     LOGE("Failed in %s: status=%d", __FUNCTION__, status);
     return status;

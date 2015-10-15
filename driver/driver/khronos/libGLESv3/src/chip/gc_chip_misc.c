@@ -102,23 +102,21 @@ __glChipBeginQuery(
         }
     }
 
-    gcmONERROR(gcsSURF_NODE_Construct(&queryHeader->headerNode,
-                                      queryHeader->headerSize,
-                                      64,
-                                      queryHeader->headerSurfType,
-                                      0,
-                                      gcvPOOL_DEFAULT));
-
-    gcoSURF_LockNode(&queryHeader->headerNode, gcvNULL, &queryHeader->headerLocked);
-
-    gcoOS_ZeroMemory(queryHeader->headerLocked, queryHeader->headerSize);
-
-    gcoSURF_UnLockNode(&queryHeader->headerNode, queryHeader->headerSurfType);
-
-    if (queryHeader->headerLocked == gcvNULL)
+    if (gcvNULL == queryHeader->headerLocked)
     {
+        gcmONERROR(gcsSURF_NODE_Construct(&queryHeader->headerNode,
+                                          queryHeader->headerSize,
+                                          64,
+                                          queryHeader->headerSurfType,
+                                          0,
+                                          gcvPOOL_DEFAULT));
+
         gcoSURF_LockNode(&queryHeader->headerNode, gcvNULL, &queryHeader->headerLocked);
     }
+
+    gcmASSERT(queryHeader->headerLocked);
+
+    gcoOS_ZeroMemory(queryHeader->headerLocked, queryHeader->headerSize);
 
     gcmGETHARDWAREADDRESS(queryHeader->headerNode, physical);
 
@@ -228,9 +226,8 @@ __glChipGetQueryObject(
 
     if (gcmIS_SUCCESS(status))
     {
-        gctUINT32 physical = 0;
         queryHeader = chipQuery->queryHeader;
-        gcoSURF_LockNode(&queryHeader->headerNode, &physical, &queryHeader->headerLocked);
+        gcmASSERT(queryHeader->headerLocked);
 
         gcmONERROR(gco3D_GetQuery(chipCtx->engine,
                                   chipQuery->type,
@@ -246,6 +243,7 @@ __glChipGetQueryObject(
 
 #if gcdDUMP
         {
+            gctUINT32 physical = 0;
             gcmDUMP(gcvNULL, "#verify occlusion/xfb/prim query");
             gcmDUMP_BUFFER(gcvNULL,
                            "verify",
@@ -256,8 +254,6 @@ __glChipGetQueryObject(
                            );
         }
 #endif
-        gcoSURF_UnLockNode(&queryHeader->headerNode, queryHeader->headerSurfType);
-        queryHeader->headerLocked = 0;
         queryObj->resultAvailable = GL_TRUE;
     }
 

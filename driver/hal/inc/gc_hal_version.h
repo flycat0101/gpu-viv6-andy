@@ -20,8 +20,8 @@
 
 #define gcvVERSION_PATCH        2
 
-#define gcvVERSION_BUILD     47660
+#define gcvVERSION_BUILD     49403
 
-#define gcvVERSION_STRING    "6.0.2.47660"
+#define gcvVERSION_STRING    "6.0.2.p1.49403"
 
 #endif /* __gc_hal_version_h_ */

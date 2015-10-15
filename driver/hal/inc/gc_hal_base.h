@@ -208,6 +208,7 @@ typedef enum _gcePATCH_ID
     gcvPATCH_YOUILABS_SHADERTEST,
     gcvPATCH_AXX_SAMPLE,
     gcvPATCH_3DMARKSS,
+    gcvPATCH_GFXBENCH4,
 
     gcvPATCH_COUNT
 } gcePATCH_ID;
@@ -2829,6 +2830,17 @@ gcoSURF_SetWindow(
     IN gctUINT Y,
     IN gctUINT Width,
     IN gctUINT Height
+    );
+
+/* Set the size of the surface in pixels and map the underlying buffer. */
+gceSTATUS
+gcoSURF_SetImage(
+    IN gcoSURF Surface,
+    IN gctUINT X,
+    IN gctUINT Y,
+    IN gctUINT Width,
+    IN gctUINT Height,
+    IN gctUINT Depth
     );
 
 /* Set width/height alignment of the surface directly and calculate stride/size. This is only for dri backend now. Please be careful before use. */

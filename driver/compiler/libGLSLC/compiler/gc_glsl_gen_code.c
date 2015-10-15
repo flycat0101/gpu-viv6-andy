@@ -16844,7 +16844,19 @@ _CheckArraySizeForTS(
             {
                 continue;
             }
+
             arrayLength = outLayout.maxVerticesNumber;
+
+#if defined(ANDROID) && (ANDROID_SDK_VERSION <= 22)
+            {
+                gcePATCH_ID patchId = sloCOMPILER_GetPatchID(Compiler);
+
+                if (patchId == gcvPATCH_DEQP)
+                {
+                    arrayLength = outLayout.verticesNumber;
+                }
+            }
+#endif
             maxArrayLength = outLayout.maxVerticesNumber;
             isInput = gcvFALSE;
         }

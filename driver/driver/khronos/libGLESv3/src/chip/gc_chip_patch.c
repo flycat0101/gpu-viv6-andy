@@ -21958,7 +21958,7 @@ gcChipPatchDrawIndex(
         __GLchipSLProgram *program = progObj ? (__GLchipSLProgram*)progObj->privateData : gcvNULL;
 
         if (chipCtx->patchInfo.patchFlags.isNavi &&
-            (chipCtx->patchInfo.patchFlags.naviNormal == 0 || chipCtx->drawRTSamples)
+            (chipCtx->patchInfo.patchFlags.naviNormal == 0 || chipCtx->drawRTSamples > 1)
            )
         {
             /* Enable patch for AA or "high quality" navigation test. */

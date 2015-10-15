@@ -1042,6 +1042,7 @@ _InitializeContextBuffer(
     gctBOOL hasICache;
     gctBOOL hasICachePrefetch;
     gctUINT numRT = 0;
+    gctBOOL hasTXdesc;
 #endif
 
     gckHARDWARE hardware;
@@ -1082,6 +1083,7 @@ _InitializeContextBuffer(
     hasTS  = gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_TESSELLATION);
     genericAttrib = gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_GENERIC_ATTRIB);
     hasICache = gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_SHADER_HAS_INSTRUCTION_CACHE);
+    hasTXdesc = gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_TX_DESCRIPTOR);
 
     /* After we have I$ prefetch, all clients uses I$, hence remove all
     ** instruction registers in state map
@@ -1488,7 +1490,7 @@ if (halti5){    vsConstBase  = 0xD000;
     index += _CLOSE_RANGE();
 
     /* Texture states. */
-    if (halti5)
+    if (hasTXdesc)
     {
         /* Texture descriptor states */
         index += _State(Context, index, 0x14C40 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);

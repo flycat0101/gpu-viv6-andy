@@ -13659,6 +13659,69 @@ _converrtImageReadToTexld(
         gcmASSERT(inst->source0 == instNext->source0);
         gcmASSERT(inst->source0Index == instNext->source0Index);
         gcmASSERT(inst->source0Indexed == instNext->source0Indexed);
+
+        if(gcmSL_SOURCE_GET(inst->source0, Type) != gcSL_UNIFORM) {
+            gctSOURCE_t *uniformSrc = gcvNULL;
+            gctUINT16 uniformSrcIndex;
+            gctUINT tempIndex;
+
+            gcmASSERT(gcmSL_SOURCE_GET(inst->source0, Type) == gcSL_TEMP);
+
+            tempIndex = gcmSL_INDEX_GET(inst->source0Index, Index);
+            /* find image uniform */
+            for (j = i - 1; j >= 0; j--)
+            {
+                gcSL_INSTRUCTION prevInst;
+
+                prevInst = &Shader->code[j];
+                if (prevInst->tempIndex == tempIndex)
+                {
+                    gcSL_TYPE srcType;
+
+                    gcmASSERT(gcmSL_OPCODE_GET(prevInst->opcode, Opcode) == gcSL_MOV);
+
+                    srcType = gcmSL_SOURCE_GET(prevInst->source0, Type);
+                    if(srcType != gcSL_NONE)
+                    {
+                        if(srcType == gcSL_UNIFORM)
+                        {
+                            uniformSrc = &prevInst->source0;
+                            uniformSrcIndex = prevInst->source0Index;
+                        }
+                        else if(srcType == gcSL_TEMP)
+                        {
+                            tempIndex = gcmSL_INDEX_GET(prevInst->source0Index, Index);
+                            continue;
+                        }
+                        else break;
+                    }
+                    else
+                    {
+                        srcType = gcmSL_SOURCE_GET(prevInst->source1, Type);
+                        if(srcType == gcSL_UNIFORM)
+                        {
+                            uniformSrc = &prevInst->source1;
+                            uniformSrcIndex = prevInst->source1Index;
+                        }
+                        else if(srcType == gcSL_TEMP)
+                        {
+                            tempIndex = gcmSL_INDEX_GET(prevInst->source1Index, Index);
+                            continue;
+                        }
+                        else break;
+                    }
+                    if(uniformSrc)
+                    {
+                         inst->source0 = *uniformSrc;
+                         inst->source0Index = uniformSrcIndex;
+                         instNext->source0 = *uniformSrc;
+                         instNext->source0Index = uniformSrcIndex;
+                    }
+                    break;
+                }
+            }
+        }
+
         gcmASSERT(gcmSL_SOURCE_GET(inst->source0, Type) == gcSL_UNIFORM);
 
         imageNum = (gctUINT8) inst->source0Index;

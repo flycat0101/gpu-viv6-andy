@@ -874,7 +874,7 @@ gcoOS_CreatePixmap(
         break;
 
     case 24:
-        screen_format = SCREEN_FORMAT_RGB888;
+        screen_format = SCREEN_FORMAT_RGBX8888;
         break;
 
     case 32:

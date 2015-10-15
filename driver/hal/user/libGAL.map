@@ -394,6 +394,7 @@
         gcoSURF_SetRotation;
         gcoSURF_SetSamples;
         gcoSURF_SetWindow;
+        gcoSURF_SetImage;
         gcoSURF_SetAlignment;
         gcoSURF_Unlock;
         gcoSURF_AlignResolveRect;

@@ -384,6 +384,7 @@ typedef enum _gceFEATURE
     gcvFEATURE_ROBUSTNESS,
     gcvFEATURE_SECURITY,
     gcvFEATURE_USC_GOS_ADDR_FIX,
+    gcvFEATURE_TX_DESC_CACHE_CLOCKGATE_FIX,
 
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */

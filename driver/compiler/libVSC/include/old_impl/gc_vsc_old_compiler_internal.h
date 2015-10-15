@@ -231,7 +231,7 @@ typedef struct _gcBuiltinsTempIndex
    gctINT       SampleMaskTempIndex;
    gctINT       InPositionTempIndex;
    gctINT       InPointSizeTempIndex;
-   gctINT       BoundingBox;
+   gctINT       BoundingBoxTempIndex;
 } gcBuiltinsTempIndex;
 
 typedef struct _gcShaderCodeInfo

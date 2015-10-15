@@ -62,13 +62,8 @@ BANK_CHANNEL_BIT             ?= 0
 DEBUG                        ?= 0
 
 # Build OpenCL
-USE_OPENCL ?= 1
-ifeq ($(USE_OPENCL),1)
-BUILD_OPENCL_ICD             ?= 1
-BUILD_OPENCL_FP              ?= 0
-else
+USE_OPENCL ?= 0
 BUILD_OPENCL_ICD             ?= 0
-endif
 
 USE_OPENVX                   ?= 0
 

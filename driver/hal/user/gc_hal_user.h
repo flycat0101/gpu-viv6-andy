@@ -2354,6 +2354,7 @@ gcoHARDWARE_QueryUniformBase(
     OUT gctUINT32 * FragmentBase
     );
 
+
 gceSTATUS
 gcoHARDWARE_SetQuery(
     IN gcoHARDWARE Hardware,
@@ -2362,6 +2363,7 @@ gcoHARDWARE_SetQuery(
     IN gceQueryCmd QueryCmd,
     IN gctPOINTER *Memory
     );
+
 
 gceSTATUS
 gcoHARDWARE_GetQueryIndex(
@@ -2472,6 +2474,14 @@ gcoHARDWARE_SetXfbCmd(
     IN gceXfbCmd Cmd,
     IN gctPOINTER *Memory
     );
+
+gceSTATUS
+gcoHARDWARE_SetXfbCmd(
+    IN gcoHARDWARE Hardware,
+    IN gceXfbCmd Cmd,
+    IN gctPOINTER *Memory
+    );
+
 
 gceSTATUS
 gcoHARDWARE_SetRasterDiscard(

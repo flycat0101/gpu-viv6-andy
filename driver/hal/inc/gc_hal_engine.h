@@ -1451,23 +1451,15 @@ gco3D_SetLogicOp(
     IN gctUINT8 Rop
     );
 
-typedef enum _gceOqCmd
-{
-    gcvOQCMD_BEGIN  = 0,
-    gcvOQCMD_PAUSE  = 1,
-    gcvOQCMD_RESUME_DELAY = 2,
-    gcvOQCMD_RESUME_IMMEDIATE = 3,
-    gcvOQCMD_END    = 4,
-}
-gceOqCmd;
-
 typedef enum _gceXfbCmd
 {
-    gcvXFBCMD_BEGIN  = 0,
-    gcvXFBCMD_PAUSE  = 1,
-    gcvXFBCMD_RESUME = 2,
-    gcvXFBCMD_END    = 3,
-    gcvXFBCMD_INVALID = 4,
+    gcvXFBCMD_BEGIN           = 0,
+    gcvXFBCMD_PAUSE           = 1,
+    gcvXFBCMD_RESUME          = 2,
+    gcvXFBCMD_END             = 3,
+    gcvXFBCMD_PAUSE_INCOMMIT  = 4,
+    gcvXFBCMD_RESUME_INCOMMIT = 5,
+    gcvXFBCMD_INVALID         = 6,
 }
 gceXfbCmd;
 
@@ -1489,12 +1481,11 @@ gceQueryStatus;
 
 typedef enum _gceQueryCmd
 {
-    gcvQUERYCMD_BEGIN  = 0,
-    gcvQUERYCMD_PAUSE  = 1,
-    gcvQUERYCMD_RESUME_DELAY = 2,
-    gcvQUERYCMD_RESUME_IMMEDIATE = 3,
-    gcvQUERYCMD_END    = 4,
-    gcvQUERYCMD_INVALID = 5,
+    gcvQUERYCMD_BEGIN   = 0,
+    gcvQUERYCMD_PAUSE   = 1,
+    gcvQUERYCMD_RESUME  = 2,
+    gcvQUERYCMD_END     = 3,
+    gcvQUERYCMD_INVALID = 4,
 }
 gceQueryCmd;
 

@@ -67,13 +67,20 @@ extern "C" {
 /* The number of context buffers per user. */
 #define gcdCONTEXT_BUFFER_COUNT 2
 
-#define gcdRENDER_FENCE_LENGTH         (6 * gcmSIZEOF(gctUINT32))
-#define gcdBLT_FENCE_LENGTH            (10 * gcmSIZEOF(gctUINT32))
-#define gcdRESERVED_FLUSHCACHE_LENGTH  (2 * gcmSIZEOF(gctUINT32))
-#define gcdRESERVED_OQ_LENGTH          (2 * gcmSIZEOF(gctUINT32))
-#define gcdRESERVED_XFBQUERY_LENGTH    (8 * gcmSIZEOF(gctUINT32))
-#define gcdRESERVED_XFB_LENGTH         (2 * gcmSIZEOF(gctUINT32))
-#define gcdRESERVED_HW_FENCE           (4 * gcmSIZEOF(gctUINT32))
+#define gcdRENDER_FENCE_LENGTH                      (6 * gcmSIZEOF(gctUINT32))
+#define gcdBLT_FENCE_LENGTH                         (10 * gcmSIZEOF(gctUINT32))
+#define gcdRESERVED_FLUSHCACHE_LENGTH               (2 * gcmSIZEOF(gctUINT32))
+#define gcdRESERVED_PAUSE_OQ_LENGTH                 (2 * gcmSIZEOF(gctUINT32))
+#define gcdRESERVED_PAUSE_XFBWRITTEN_QUERY_LENGTH   (4 * gcmSIZEOF(gctUINT32))
+#define gcdRESERVED_PAUSE_PRIMGEN_QUERY_LENGTH      (4 * gcmSIZEOF(gctUINT32))
+#define gcdRESERVED_PAUSE_XFB_LENGTH                (2 * gcmSIZEOF(gctUINT32))
+#define gcdRESERVED_HW_FENCE                        (4 * gcmSIZEOF(gctUINT32))
+
+#define gcdRESUME_OQ_LENGTH                         (2 * gcmSIZEOF(gctUINT32))
+#define gcdRESUME_XFBWRITTEN_QUERY_LENGTH           (4 * gcmSIZEOF(gctUINT32))
+#define gcdRESUME_PRIMGEN_QUERY_LENGTH              (4 * gcmSIZEOF(gctUINT32))
+#define gcdRESUME_XFB_LENGH                         (2 * gcmSIZEOF(gctUINT32))
+
 
 /* State delta record. */
 typedef struct _gcsSTATE_DELTA_RECORD * gcsSTATE_DELTA_RECORD_PTR;

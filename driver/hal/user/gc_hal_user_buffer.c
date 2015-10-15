@@ -76,6 +76,13 @@ struct _gcoBUFFER
 
     struct _gcsTEMPCMDBUF       tempCMDBUF;
 
+#if gcdENABLE_3D
+    gctBOOL                     queryPaused[gcvQUERY_MAX_NUM];
+    gctBOOL                     xfbPaused;
+#endif
+
+    gctBOOL                     inRerserved;
+
 };
 
 /******************************************************************************\
@@ -687,6 +694,9 @@ gcoBUFFER_Construct(
     */
 
     gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(struct _gcoBUFFER), &pointer));
+
+    gcoOS_ZeroMemory(pointer, gcmSIZEOF(struct _gcoBUFFER));
+
     buffer = (gcoBUFFER) pointer;
 
     /* Initialize the gcoBUFFER object. */
@@ -822,6 +832,43 @@ _GetPatchList(
     /* Succees. */
     gcmFOOTER_NO();
     return patchList;
+}
+
+#if gcdENABLE_3D
+static gctUINT32 resumeSizeInBytes[gcvQUERY_MAX_NUM] =
+    {
+        gcdRESUME_OQ_LENGTH,
+        gcdRESUME_XFBWRITTEN_QUERY_LENGTH,
+        gcdRESUME_PRIMGEN_QUERY_LENGTH,
+    };
+#endif
+
+static gctUINT32
+_GetResumeCommandLength(
+    IN gcoBUFFER Buffer
+    )
+{
+    gctUINT sizeInBytes = 0;
+
+#if gcdENABLE_3D
+
+    gctINT32 type;
+
+    for (type = gcvQUERY_OCCLUSION; type < gcvQUERY_MAX_NUM; type++)
+    {
+        if (Buffer->queryPaused[type])
+        {
+            sizeInBytes += resumeSizeInBytes[type];
+        }
+    }
+
+    if (Buffer->xfbPaused)
+    {
+        sizeInBytes += gcdRESUME_XFB_LENGH;
+    }
+#endif
+
+    return sizeInBytes;
 }
 
 gceSTATUS
@@ -1094,9 +1141,14 @@ gcoBUFFER_Reserve(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcoCMDBUF commandBuffer;
-    gctUINT32 alignBytes, bytes, offset, reserveBytes, oldBytes;
+    gctUINT32 alignBytes, finalBytes = 0, originalBytes, resumeBytes, reserveBytes, alignedBytes;
+    gctUINT32 offset;
     gcsHAL_INTERFACE iface;
     gctBOOL notInSamePage = gcvFALSE;
+
+#if gcdENABLE_3D
+    gctINT32 queryType;
+#endif
 
     gcmHEADER_ARG("Buffer=0x%x Bytes=%lu Aligned=%d Reserve=0x%x",
                   Buffer, Bytes, Aligned, Reserve);
@@ -1105,7 +1157,16 @@ gcoBUFFER_Reserve(
     gcmVERIFY_OBJECT(Buffer, gcvOBJ_BUFFER);
     gcmDEBUG_VERIFY_ARGUMENT(Reserve != gcvNULL);
 
-    gcmSAFECASTSIZET(reserveBytes, Bytes);
+    gcmSAFECASTSIZET(originalBytes, Bytes);
+
+    /* Recursive call must be detected and avoided */
+    gcmASSERT(Buffer->inRerserved == gcvFALSE);
+
+    Buffer->inRerserved = gcvTRUE;
+
+    resumeBytes = _GetResumeCommandLength(Buffer);
+
+    reserveBytes = originalBytes + resumeBytes;
 
     /* Get the current command buffer. */
     commandBuffer = Buffer->commandBufferTail;
@@ -1130,7 +1191,7 @@ gcoBUFFER_Reserve(
                : 0;
 
     /* Compute the number of required bytes. */
-    oldBytes = bytes = reserveBytes + alignBytes;
+    alignedBytes = reserveBytes + alignBytes;
 
     if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_PIPE_2D)
      && gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_PIPE_3D)
@@ -1139,13 +1200,13 @@ gcoBUFFER_Reserve(
     {
         offset = commandBuffer->offset + alignBytes;
 
-        if (((offset + bytes - 1) & ~0xFFF) != (offset & ~0xFFF))
+        if (((offset + reserveBytes - 1) & ~0xFFF) != (offset & ~0xFFF))
         {
             notInSamePage = gcvTRUE;
         }
     }
 
-    if (bytes > commandBuffer->free || notInSamePage)
+    if (alignedBytes > commandBuffer->free || notInSamePage)
     {
         /* Sent event to signal when command buffer completes. */
         iface.command            = gcvHAL_SIGNAL;
@@ -1166,23 +1227,30 @@ gcoBUFFER_Reserve(
         /* Get new buffer. */
         commandBuffer = Buffer->commandBufferTail;
 
-        if (Bytes > commandBuffer->free)
+        if (resumeBytes == 0)
+        {
+            resumeBytes = _GetResumeCommandLength(Buffer);
+            reserveBytes = originalBytes + resumeBytes;
+        }
+
+        if (reserveBytes > commandBuffer->free)
         {
             /* This just won't fit! */
-            gcmFATAL("FATAL: Command of %lu bytes is too big!", Bytes);
+            gcmFATAL("FATAL: Command of %lu original bytes + %lu resume bytes is too big!", originalBytes, resumeBytes);
             gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
         }
         /* Calculate total bytes again. */
         alignBytes = 0;
-        bytes      = reserveBytes;
+        finalBytes = reserveBytes;
     }
     else
     {
-         bytes = oldBytes;
+        finalBytes = alignedBytes;
     }
 
     gcmASSERT(commandBuffer != gcvNULL);
-    gcmASSERT(bytes <= commandBuffer->free);
+    gcmASSERT(finalBytes <= commandBuffer->free);
+    gcmASSERT(finalBytes >= 0);
 
     /* Determine the data offset. */
     offset = commandBuffer->offset + alignBytes;
@@ -1192,8 +1260,39 @@ gcoBUFFER_Reserve(
     commandBuffer->lastOffset  = offset;
 
     /* Adjust command buffer size. */
-    commandBuffer->offset += bytes;
-    commandBuffer->free   -= bytes;
+    commandBuffer->offset += finalBytes;
+    commandBuffer->free   -= finalBytes;
+
+#if gcdENABLE_3D
+    for (queryType = gcvQUERY_OCCLUSION; queryType < gcvQUERY_MAX_NUM; queryType++)
+    {
+        if (Buffer->queryPaused[queryType])
+        {
+            gctUINT64 resumeCommand, resumeCommandSaved;
+            resumeCommand = resumeCommandSaved = commandBuffer->lastReserve;
+            gcoHARDWARE_SetQuery(Buffer->hardware,
+                                 ~0U,
+                                 queryType,
+                                 gcvQUERYCMD_RESUME,
+                                 (gctPOINTER *)&resumeCommand);
+            gcmASSERT((resumeCommand - resumeCommandSaved) == resumeSizeInBytes[queryType]);
+            commandBuffer->lastReserve = resumeCommand;
+            commandBuffer->lastOffset += (gctUINT32)(resumeCommand - resumeCommandSaved);
+            Buffer->queryPaused[queryType] = gcvFALSE;
+        }
+    }
+
+    if (Buffer->xfbPaused)
+    {
+        gctUINT64 resumeCommand, resumeCommandSaved;
+        resumeCommand = resumeCommandSaved = commandBuffer->lastReserve;
+        gcoHARDWARE_SetXfbCmd(Buffer->hardware, gcvXFBCMD_RESUME_INCOMMIT, (gctPOINTER *)&resumeCommand);
+        gcmASSERT((resumeCommand - resumeCommandSaved) == gcdRESUME_XFB_LENGH);
+        commandBuffer->lastReserve = resumeCommand;
+        commandBuffer->lastOffset += (gctUINT32)(resumeCommand - resumeCommandSaved);
+        Buffer->xfbPaused = gcvFALSE;
+    }
+#endif
 
     if (Usage & gcvCOMMAND_3D)
     {
@@ -1207,6 +1306,8 @@ gcoBUFFER_Reserve(
 
     /* Set the result. */
     * Reserve = commandBuffer;
+
+    Buffer->inRerserved = gcvFALSE;
 
     /* Success. */
     gcmFOOTER();
@@ -1329,8 +1430,11 @@ gcoBUFFER_Commit(
                                                 + tailCommandBuffer->offset);
 
                 gcoHARDWARE_SetQuery(gcvNULL, ~0U, (gceQueryType)type, gcvQUERYCMD_PAUSE, (gctPOINTER*)&pauseQueryCommand);
-                tailCommandBuffer->offset += (gctUINT32)(pauseQueryCommand - pauseQueryCommandsaved);
-                gcoHARDWARE_SetQuery(gcvNULL, ~0U, (gceQueryType)type, gcvQUERYCMD_RESUME_DELAY, gcvNULL);
+                if ((pauseQueryCommand - pauseQueryCommandsaved) > 0)
+                {
+                    tailCommandBuffer->offset += (gctUINT32)(pauseQueryCommand - pauseQueryCommandsaved);
+                    Buffer->queryPaused[type] = gcvTRUE;
+                }
             }
 
             /* need pauseXFB per commit and resuemeXFB when next draw flushXFB */
@@ -1342,11 +1446,11 @@ gcoBUFFER_Commit(
                 pauseXfbCommand      = gcmPTR_TO_UINT64((gctUINT8_PTR) gcmUINT64_TO_PTR(tailCommandBuffer->logical)
                                             + tailCommandBuffer->offset);
 
-                gcoHARDWARE_SetXfbCmd(gcvNULL, gcvXFBCMD_PAUSE, (gctPOINTER*)&pauseXfbCommand);
+                gcoHARDWARE_SetXfbCmd(gcvNULL, gcvXFBCMD_PAUSE_INCOMMIT, (gctPOINTER*)&pauseXfbCommand);
                 if (pauseXfbCommand - pauseXfbCommandsaved > 0)
                 {
                     tailCommandBuffer->offset += (gctUINT32)(pauseXfbCommand - pauseXfbCommandsaved);
-                    gcoHARDWARE_SetXfbCmd(gcvNULL, gcvXFBCMD_RESUME, gcvNULL);
+                    Buffer->xfbPaused = gcvTRUE;
                 }
             }
 

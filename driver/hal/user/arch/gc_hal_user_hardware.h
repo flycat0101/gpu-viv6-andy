@@ -908,17 +908,10 @@ typedef union _gcsXFBDIRTY
 typedef struct _gcsQUERYSTATES
 {
     gceQueryStatus              queryStatus[gcvQUERY_MAX_NUM];
-    /* record status in cmd buffer */
-    gceQueryStatus              statusInCmd[gcvQUERY_MAX_NUM];
-    gceQueryCmd                 queryCmd[gcvQUERY_MAX_NUM];
     gctUINT32                   queryHeaderPhysical[gcvQUERY_MAX_NUM];
     gctINT32                    queryHeaderIndex[gcvQUERY_MAX_NUM];
 }gcsQUERYSTATES;
 
-typedef struct _gcsQUERYDIRTY
-{
-    gctBOOL                     queryDirty[gcvQUERY_MAX_NUM];
-}gcsQUERYDIRTY;
 
 #endif
 
@@ -1070,7 +1063,6 @@ struct _gcoHARDWARE
     gcsMCDIRTY                  *MCDirty;
     gcsTXDIRTY                  *TXDirty;
     gcsXFBDIRTY                 *XFBDirty;
-    gcsQUERYDIRTY               *QUERYDirty;
 #endif /* gcdENABLE_3D */
 
     /* Stall from source to destination if it's legal */
@@ -1319,13 +1311,6 @@ gcoHARDWARE_FastFlushAlpha(
 
 gceSTATUS
 gcoHARDWARE_FastFlushDepthCompare(
-    IN gcoHARDWARE Hardware,
-    IN gcsFAST_FLUSH_PTR FastFlushInfo,
-    INOUT gctPOINTER *Memory
-    );
-
-gceSTATUS
-gcoHARDWARE_FastDrawIndexedPrimitive(
     IN gcoHARDWARE Hardware,
     IN gcsFAST_FLUSH_PTR FastFlushInfo,
     INOUT gctPOINTER *Memory

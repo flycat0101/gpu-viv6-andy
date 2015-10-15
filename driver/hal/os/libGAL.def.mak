@@ -344,6 +344,7 @@ EXPORTS
     gcoSURF_SetOrientation
     gcoSURF_SetRotation
     gcoSURF_SetWindow
+    gcoSURF_SetImage
     gcoSURF_Unlock
     gcoSURF_GetTiling
     gcoSURF_LockNode

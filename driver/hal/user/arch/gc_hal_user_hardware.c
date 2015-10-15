@@ -2600,10 +2600,18 @@ gcoHARDWARE_DetectProcess(
             gcvTRUE
         },
         {
-            gcvPATCH_GFXBENCH,
-            "\x91\x9a\x8b\xd1\x94\x96\x8c\x97\x90\x91\x8b\x96\xd1\x98\x99\x87"
-            "\x9d\x9a\x91\x9c\x97",
-            gcvTRUE
+             gcvPATCH_GFXBENCH,
+             "\x91\x9a\x8b\xd1\x94\x96\x8c\x97\x90\x91\x8b\x96\xd1\x98\x99"
+             "\x87\x9d\x9a\x91\x9c\x97\xd1\x98\x93\xd1\x89\xcc\xcf\xce\xcf"
+             "\xcf\xd1\x9c\x90\x8d\x8f\x90\x8d\x9e\x8b\x9a",
+             gcvTRUE
+        },
+        {
+             gcvPATCH_GFXBENCH4,
+             "\x91\x9a\x8b\xd1\x94\x96\x8c\x97\x90\x91\x8b\x96\xd1\x98\x99"
+             "\x87\x9d\x9a\x91\x9c\x97\xd1\x98\x93\xd1\x89\xcb\xcf\xcf\xcf"
+             "\xcf\xd1\x9c\x90\x8d\x8f\x90\x8d\x9e\x8b\x9a",
+             gcvTRUE
         },
         {
             gcvPATCH_GLBMGUI,
@@ -4543,7 +4551,6 @@ gcoHARDWARE_Construct(
     gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsTXDIRTY), (gctPOINTER *) &hardware->TXDirty));
     gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsMCDIRTY), (gctPOINTER *) &hardware->MCDirty));
     gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsXFBDIRTY), (gctPOINTER *) &hardware->XFBDirty));
-    gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsQUERYDIRTY), (gctPOINTER *) &hardware->QUERYDirty));
 
     gcoOS_ZeroMemory(hardware->FEDirty, gcmSIZEOF(gcsFEDIRTY));
     gcoOS_ZeroMemory(hardware->PAAndSEDirty, gcmSIZEOF(gcsPAANDSEDIRTY));
@@ -4553,7 +4560,6 @@ gcoHARDWARE_Construct(
     gcoOS_ZeroMemory(hardware->TXDirty, gcmSIZEOF(gcsTXDIRTY));
     gcoOS_ZeroMemory(hardware->MCDirty, gcmSIZEOF(gcsMCDIRTY));
     gcoOS_ZeroMemory(hardware->XFBDirty, gcmSIZEOF(gcsXFBDIRTY));
-    gcoOS_ZeroMemory(hardware->QUERYDirty, gcmSIZEOF(gcsQUERYDIRTY));
 
     hardware->PEStates->stencilStates.mode = gcvSTENCIL_NONE;
     hardware->PEStates->stencilEnabled     = gcvFALSE;
@@ -5284,8 +5290,7 @@ gcoHARDWARE_Construct(
         hardware->funcPtr = &_Funcs;
     }
 
-    hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION] =
-    hardware->QUERYStates->statusInCmd[gcvQUERY_OCCLUSION] = gcvQUERY_Disabled;
+    hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION] = gcvQUERY_Disabled;
 #if gcdENABLE_APPCTXT_BLITDRAW
     hardware->QUERYStates->queryCmd[gcvQUERY_OCCLUSION] = gcvQUERYCMD_INVALID;
 #endif
@@ -5296,9 +5301,7 @@ gcoHARDWARE_Construct(
         hardware->XFBStates->statusInCmd = gcvXFB_Disabled;
 
         hardware->QUERYStates->queryStatus[gcvQUERY_XFB_WRITTEN] =
-        hardware->QUERYStates->statusInCmd[gcvQUERY_XFB_WRITTEN] = gcvQUERY_Disabled;
-        hardware->QUERYStates->queryStatus[gcvQUERY_PRIM_GENERATED] =
-        hardware->QUERYStates->statusInCmd[gcvQUERY_PRIM_GENERATED] = gcvQUERY_Disabled;
+        hardware->QUERYStates->queryStatus[gcvQUERY_PRIM_GENERATED] = gcvQUERY_Disabled;
 #if gcdENABLE_APPCTXT_BLITDRAW
         hardware->QUERYStates->queryCmd[gcvQUERY_PRIM_GENERATED] =
         hardware->QUERYStates->queryCmd[gcvQUERY_XFB_WRITTEN] = gcvQUERYCMD_INVALID;
@@ -5544,7 +5547,6 @@ gceSTATUS gcoHARDWARE_Destroy(
     gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->PEDirty));
     gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->TXDirty));
     gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->MCDirty));
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->QUERYDirty));
 #endif
 
     if (Hardware->XFBStates->internalXFB)
@@ -23540,12 +23542,8 @@ gcoHARDWARE_GetProductName(
         gctUINT32 productID = Hardware->config->productID;
         gctUINT32 type = (((((gctUINT32) (productID)) >> (0 ? 27:24)) & ((gctUINT32) ((((1 ? 27:24) - (0 ? 27:24) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 27:24) - (0 ? 27:24) + 1)))))) );
         gctUINT32 grade = (((((gctUINT32) (productID)) >> (0 ? 3:0)) & ((gctUINT32) ((((1 ? 3:0) - (0 ? 3:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 3:0) - (0 ? 3:0) + 1)))))) );
-        gctBOOL   nanoSeries = gcvFALSE;
 
         chipID = (((((gctUINT32) (productID)) >> (0 ? 23:4)) & ((gctUINT32) ((((1 ? 23:4) - (0 ? 23:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 23:4) - (0 ? 23:4) + 1)))))) );
-
-        nanoSeries = ((grade == 1) || (grade == 5) || (grade == 6) ||
-                      (grade == 7) || (grade == 9));
 
         switch (type)
         {
@@ -23577,25 +23575,21 @@ gcoHARDWARE_GetProductName(
             break;
         }
 
-        /* For nano series, we don't need include PRODUCT_NUM */
-        if (!nanoSeries)
+        /* Translate the ID. */
+        for (i = 0; i < 8; i++)
         {
-            /* Translate the ID. */
-            for (i = 0; i < 8; i++)
+            /* Get the current digit. */
+            gctUINT8 digit = (gctUINT8) ((chipID >> 28) & 0xFF);
+
+            /* Append the digit to the string. */
+            if (foundID || digit)
             {
-                /* Get the current digit. */
-                gctUINT8 digit = (gctUINT8) ((chipID >> 28) & 0xFF);
-
-                /* Append the digit to the string. */
-                if (foundID || digit)
-                {
-                    *chipName++ = '0' + digit;
-                    foundID = gcvTRUE;
-                }
-
-                /* Advance to the next digit. */
-                chipID <<= 4;
+                *chipName++ = '0' + digit;
+                foundID = gcvTRUE;
             }
+
+            /* Advance to the next digit. */
+            chipID <<= 4;
         }
 
         switch (grade)

@@ -4676,12 +4676,12 @@ gcoHARDWARE_QueryCommandBuffer(
     if (ReservedUser != gcvNULL)
     {
         *ReservedUser = gcdRESERVED_FLUSHCACHE_LENGTH;
-        *ReservedUser += gcdRESERVED_OQ_LENGTH;
+        *ReservedUser += gcdRESERVED_PAUSE_OQ_LENGTH;
 
         if (Hardware->features[gcvFEATURE_HW_TFB])
         {
-            *ReservedUser += gcdRESERVED_XFBQUERY_LENGTH;
-            *ReservedUser += gcdRESERVED_XFB_LENGTH;
+            *ReservedUser += gcdRESERVED_PAUSE_XFBWRITTEN_QUERY_LENGTH + gcdRESERVED_PAUSE_PRIMGEN_QUERY_LENGTH;
+            *ReservedUser += gcdRESERVED_PAUSE_XFB_LENGTH;
         }
 
         if (Hardware->config->gpuCoreCount > 1)

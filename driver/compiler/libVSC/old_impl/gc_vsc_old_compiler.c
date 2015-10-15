@@ -30370,6 +30370,9 @@ _findBuiltinVariableTempIndex(
             case gcSL_IN_POINT_SIZE:
                 BuiltinsTempIndex->InPointSizeTempIndex = output->tempIndex;
                 break;
+            case gcSL_BOUNDING_BOX:
+                BuiltinsTempIndex->BoundingBoxTempIndex = output->tempIndex;
+                break;
             default:
                 gcmASSERT(gcvFALSE);
                 break;
@@ -30455,6 +30458,9 @@ _findBuiltinVariableTempIndex(
                 break;
             case gcSL_IN_POINT_SIZE:
                 BuiltinsTempIndex->InPointSizeTempIndex = variable->tempIndex;
+                break;
+            case gcSL_BOUNDING_BOX:
+                BuiltinsTempIndex->BoundingBoxTempIndex = variable->tempIndex;
                 break;
             default:
                 gcmASSERT(gcvFALSE);
