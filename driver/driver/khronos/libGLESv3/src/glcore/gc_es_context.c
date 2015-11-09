@@ -71,7 +71,7 @@ extern GLvoid __glInitImageState(__GLcontext *gc);
 extern GLvoid __glInitDebugState(__GLcontext *gc);
 extern GLvoid __glFreeDebugState(__GLcontext *gc);
 
-extern GLboolean __glInitTracerDispatchTable(GLint trmode);
+extern GLboolean __glInitTracerDispatchTable(GLint trmode, __GLApiVersion apiVersion);
 extern __GLesDispatchTable __glesNopDispatchFuncTable;
 extern __GLesDispatchTable __glesApiProfileDispatchTable;
 extern GLvoid __glSetDrawable(__GLcontext* gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable);
@@ -849,7 +849,7 @@ GLvoid __glInitPattern(__GLcontext *gc)
 }
 #endif
 
-GLvoid __glInitGlobals()
+GLvoid __glInitGlobals(__GLApiVersion apiVersion)
 {
     gctSTRING tracemode = gcvNULL;
 #if VIVANTE_PROFILER
@@ -889,7 +889,7 @@ GLvoid __glInitGlobals()
             gcmPRINT("ES: Unsupported trace mode");
         }
 
-        if (!__glInitTracerDispatchTable(__glesApiTraceMode))
+        if (!__glInitTracerDispatchTable(__glesApiTraceMode, apiVersion))
         {
             /* Reset to regular API entry functions if tracer dispatch table initialization failed */
             __glesApiTraceMode = gcvTRACEMODE_NONE;
@@ -1006,14 +1006,36 @@ GLboolean __glDestroyContext(GLvoid *context)
 GLvoid *__glCreateContext(GLint clientVersion, VEGLimports *imports, GLvoid* sharedCtx)
 {
     __GLcontext *gc = gcvNULL;
+    __GLApiVersion apiVersion;
     __GLdeviceStruct *__glDevice = &__glDevicePipe;
     static GLboolean initialized = GL_FALSE;
 
     __GL_HEADER();
 
+    /* Record the context version: sometime es20 and es30 may have different rule
+    */
+    switch (clientVersion)
+    {
+    case 0x20:
+        apiVersion = __GL_API_VERSION_ES20;
+        break;
+    case 0x30:
+        apiVersion = __GL_API_VERSION_ES30;
+        break;
+    case 0x31:
+        apiVersion = __GL_API_VERSION_ES31;
+        break;
+    case 0x32:
+        apiVersion = __GL_API_VERSION_ES32;
+        break;
+    default:
+        GL_ASSERT(0);
+        __GL_ERROR_EXIT2();
+    }
+
     if (!initialized)
     {
-        __glInitGlobals();
+        __glInitGlobals(apiVersion);
         initialized = GL_TRUE;
     }
     else
@@ -1077,29 +1099,8 @@ GLvoid *__glCreateContext(GLint clientVersion, VEGLimports *imports, GLvoid* sha
     gc->exports.makeCurrent    = __glMakeCurrent;
     gc->exports.loseCurrent    = __glLoseCurrent;
     gc->exports.getThreadData  = __eglGetThreadEsPrivData;
-
-    /* Record the context version: sometime es20 and es30 may have different rule
-    */
-    switch (clientVersion)
-    {
-    case 0x20:
-        gc->apiVersion = __GL_API_VERSION_ES20;
-        break;
-    case 0x30:
-        gc->apiVersion = __GL_API_VERSION_ES30;
-        break;
-    case 0x31:
-        gc->apiVersion = __GL_API_VERSION_ES31;
-        break;
-    case 0x32:
-        gc->apiVersion = __GL_API_VERSION_ES32;
-        break;
-    default:
-        GL_ASSERT(0);
-        __GL_ERROR_EXIT2();
-    }
-
-    gc->shareCtx = (__GLcontext*)sharedCtx;
+    gc->apiVersion = apiVersion;
+    gc->shareCtx   = (__GLcontext*)sharedCtx;
 
     /* Initialize the device constants with GL defaults.
     */

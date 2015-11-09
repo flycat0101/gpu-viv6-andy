@@ -705,7 +705,8 @@ static gceSTATUS _Using_vColor(
         return status;
     }
 
-    if (context->lightingStates.shadeModel == GL_FLAT)
+    if (context->lightingStates.shadeModel == GL_FLAT &&
+        !context->hashKey.hashPointPrimitive)
     {
         shadingMode = gcSHADER_SHADER_FLAT;
     }

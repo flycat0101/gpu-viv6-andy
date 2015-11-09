@@ -529,18 +529,33 @@ extern gceSTATUS set_uModelViewProjection(
     gcUNIFORM Uniform
     );
 
-extern gceSTATUS set_uModelViewInverse3x3Transposed(
+extern gceSTATUS  set_uModelViewInverse3x3Transposed(
     __GLcontext * gc,
     gcUNIFORM Uniform
     );
+
+
+
+#define  _USE_GLSLProgram(chipCtx) do { \
+    oldprogram = chipCtx->currProgram; \
+    chipCtx->currProgram = &temprogram; \
+    temprogram.hints = chipCtx->currGLSLProgram->hints; \
+} while(0)
+
+
+#define _RESTORE_FIXProgram(chipCtx) do { chipCtx->currProgram = oldprogram; }while(0)
 
 static void setBuiltInUniform(__GLcontext *gc)
 {
     glsCHIPCONTEXT_PTR chipCtx = CHIP_CTXINFO(gc);
     GLUniform Uniform;
     GLProgram program = chipCtx->currGLSLProgram;
+    glsPROGRAMINFO temprogram;
+    glsPROGRAMINFO_PTR oldprogram;
+
     GLint i;
 
+    _USE_GLSLProgram(chipCtx);
     for (i = 0; i < program->builtInUniformCount; i++)
     {
         Uniform = &program->builtInUniforms[i];
@@ -1020,6 +1035,7 @@ static void setBuiltInUniform(__GLcontext *gc)
                 break;
         }
     }
+    _RESTORE_FIXProgram(chipCtx);
 }
 
 static void
@@ -1108,7 +1124,7 @@ processUniforms(
     IN OUT GLint * SamplerIndex
     )
 {
-    GLint i, samplers = 0;
+    gctUINT32 i, k, samplers = 0;
     GLint shaderType;
     GLProgram program = (GLProgram)programObject->privateData;
     glsCHIPCONTEXT_PTR  chipCtx = CHIP_CTXINFO(gc);
@@ -1214,20 +1230,22 @@ processUniforms(
         case gcSHADER_SAMPLER_3D:
         case gcSHADER_SAMPLER_CUBIC:
         case gcSHADER_SAMPLER_EXTERNAL_OES:
-            samplers += length;
-
+            k = 0;
+            /* Get the sampler number. */
+            gcmONERROR(gcUNIFORM_GetSampler(uniform, &samplers));
             bytes = gcmSIZEOF(GLfloat) * length;
 
             while (length-- > 0)
             {
-                gcmASSERT(*SamplerIndex < (GLint) gcmCOUNTOF(program->sampleMap));
-                program->sampleMap[*SamplerIndex].shaderType = shaderType;
-                program->sampleMap[*SamplerIndex].type = type;
-                program->sampleMap[*SamplerIndex].unit = *SamplerIndex;
-                program->samplerDirty |=( 1 << (*SamplerIndex) );
-                chipCtx->samplerDirty |=( 1 << (*SamplerIndex) );
-                programObject->bindingInfo.sampler2TexUnit[*SamplerIndex] = *SamplerIndex;
+                gcmASSERT((samplers + k) < (GLint) gcmCOUNTOF(program->sampleMap));
+                program->sampleMap[samplers + k].shaderType = shaderType;
+                program->sampleMap[samplers + k].type = type;
+                program->sampleMap[samplers + k].unit = *SamplerIndex;
+                program->samplerDirty |=( 1 << (samplers + k) );
+                chipCtx->samplerDirty |=( 1 << (samplers + k) );
+                programObject->bindingInfo.sampler2TexUnit[samplers + k] = samplers + k;
                 ++ (*SamplerIndex);
+                k++;
             }
 
             break;

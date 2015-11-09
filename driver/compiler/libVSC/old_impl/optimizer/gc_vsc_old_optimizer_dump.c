@@ -1133,6 +1133,7 @@ decode[] =
     { "IMAGE_ADDR_3D,",gcvTRUE, gcvFALSE },
     { "GET_SAMPLER_LMM",gcvTRUE, gcvFALSE },
     { "GET_SAMPLER_LBS",gcvTRUE, gcvFALSE },
+    { "TEXLD_U", gcvTRUE, gcvFALSE },
 };
 
 char _checkDecodeArray_size[sizeof(decode)/sizeof(decode[0]) == gcSL_MAXOPCODE];

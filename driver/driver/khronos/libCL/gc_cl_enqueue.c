@@ -4795,7 +4795,7 @@ clEnqueueNDRangeKernel(
                        CL_INVALID_GLOBAL_WORK_SIZE);
         }
 
-        /* for type of globalworksize patch, always do recompile */
+        /* reset the variable for the chips which just support 16 bit global id*/
         Kernel->isPatched = gcvFALSE;
     }
 

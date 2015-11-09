@@ -72,7 +72,7 @@
         VIR_TYPE_INT32,
         4/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         4,
         VIR_TY_SCALAR
     },
@@ -85,7 +85,7 @@
         VIR_TYPE_INT16,
         2/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         2,
         VIR_TY_SCALAR
     },
@@ -98,7 +98,7 @@
         VIR_TYPE_INT8,
         1/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         1,
         VIR_TY_SCALAR
     },
@@ -111,7 +111,7 @@
         VIR_TYPE_UINT32,
         4/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_SCALAR
     },
@@ -124,7 +124,7 @@
         VIR_TYPE_UINT16,
         2/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         2,
         VIR_TY_SCALAR
     },
@@ -137,7 +137,7 @@
         VIR_TYPE_UINT8,
         1/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         1,
         VIR_TY_SCALAR
     },
@@ -150,7 +150,7 @@
         VIR_TYPE_SNORM16,
         2/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_SCALAR
     },
@@ -163,7 +163,7 @@
         VIR_TYPE_SNORM8,
         1/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_SCALAR
     },
@@ -176,7 +176,7 @@
         VIR_TYPE_UNORM16,
         2/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_SCALAR
     },
@@ -189,7 +189,7 @@
         VIR_TYPE_UNORM8,
         1/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_SCALAR
     },
@@ -202,7 +202,7 @@
         VIR_TYPE_INT64,
         8/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         4,
         VIR_TY_SCALAR
     },
@@ -215,7 +215,7 @@
         VIR_TYPE_UINT64,
         8/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_SCALAR
     },
@@ -241,7 +241,7 @@
         VIR_TYPE_BOOLEAN,
         4/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_BOOLEAN,
         4,
         VIR_TY_SCALAR
     },
@@ -410,7 +410,7 @@
         VIR_TYPE_BOOLEAN,
         8/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_BOOLEAN,
         8,
         VIR_TY_VECTOR
     },
@@ -423,7 +423,7 @@
         VIR_TYPE_BOOLEAN,
         12/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_BOOLEAN,
         16,
         VIR_TY_VECTOR
     },
@@ -436,7 +436,7 @@
         VIR_TYPE_BOOLEAN,
         16/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_BOOLEAN,
         16,
         VIR_TY_VECTOR
     },
@@ -449,7 +449,7 @@
         VIR_TYPE_BOOLEAN,
         32/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_BOOLEAN,
         16,
         VIR_TY_VECTOR
     },
@@ -462,7 +462,7 @@
         VIR_TYPE_BOOLEAN,
         64/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_BOOLEAN,
         16,
         VIR_TY_VECTOR
     },
@@ -475,7 +475,7 @@
         VIR_TYPE_BOOLEAN,
         128/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_BOOLEAN,
         16,
         VIR_TY_VECTOR
     },
@@ -488,7 +488,7 @@
         VIR_TYPE_INT32,
         8/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -501,7 +501,7 @@
         VIR_TYPE_INT32,
         12/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         16,
         VIR_TY_VECTOR
     },
@@ -514,7 +514,7 @@
         VIR_TYPE_INT32,
         16/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         16,
         VIR_TY_VECTOR
     },
@@ -527,7 +527,7 @@
         VIR_TYPE_INT32,
         32/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         16,
         VIR_TY_VECTOR
     },
@@ -540,7 +540,7 @@
         VIR_TYPE_INT32,
         64/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         16,
         VIR_TY_VECTOR
     },
@@ -553,7 +553,7 @@
         VIR_TYPE_INT32,
         128/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         16,
         VIR_TY_VECTOR
     },
@@ -566,7 +566,7 @@
         VIR_TYPE_UINT32,
         8/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -579,7 +579,7 @@
         VIR_TYPE_UINT32,
         12/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         16,
         VIR_TY_VECTOR
     },
@@ -592,7 +592,7 @@
         VIR_TYPE_UINT32,
         16/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         16,
         VIR_TY_VECTOR
     },
@@ -605,7 +605,7 @@
         VIR_TYPE_UINT32,
         32/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         16,
         VIR_TY_VECTOR
     },
@@ -618,7 +618,7 @@
         VIR_TYPE_UINT32,
         64/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         16,
         VIR_TY_VECTOR
     },
@@ -631,7 +631,7 @@
         VIR_TYPE_UINT32,
         128/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         16,
         VIR_TY_VECTOR
     },
@@ -645,7 +645,7 @@
         VIR_TYPE_UINT8,
         2/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         2,
         VIR_TY_VECTOR
     },
@@ -658,7 +658,7 @@
         VIR_TYPE_UINT8,
         3/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -671,7 +671,7 @@
         VIR_TYPE_UINT8,
         4/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -684,7 +684,7 @@
         VIR_TYPE_UINT8,
         8/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -697,7 +697,7 @@
         VIR_TYPE_UINT8,
         16/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -710,7 +710,7 @@
         VIR_TYPE_UINT8,
         32/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -725,7 +725,7 @@
         VIR_TYPE_INT8,
         2/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         2,
         VIR_TY_VECTOR
     },
@@ -738,7 +738,7 @@
         VIR_TYPE_INT8,
         3/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -751,7 +751,7 @@
         VIR_TYPE_INT8,
         4/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -764,7 +764,7 @@
         VIR_TYPE_INT8,
         8/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -777,7 +777,7 @@
         VIR_TYPE_INT8,
         16/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -790,7 +790,7 @@
         VIR_TYPE_INT8,
         32/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -804,7 +804,7 @@
         VIR_TYPE_UINT16,
         4/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -817,7 +817,7 @@
         VIR_TYPE_UINT16,
         6/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -830,7 +830,7 @@
         VIR_TYPE_UINT16,
         8/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -843,7 +843,7 @@
         VIR_TYPE_UINT16,
         16/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -856,7 +856,7 @@
         VIR_TYPE_UINT16,
         32/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -869,7 +869,7 @@
         VIR_TYPE_UINT16,
         64/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -884,7 +884,7 @@
         VIR_TYPE_INT16,
         4/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -897,7 +897,7 @@
         VIR_TYPE_INT16,
         6/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -910,7 +910,7 @@
         VIR_TYPE_INT16,
         8/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -923,7 +923,7 @@
         VIR_TYPE_INT16,
         16/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -936,7 +936,7 @@
         VIR_TYPE_INT16,
         32/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -949,7 +949,7 @@
         VIR_TYPE_INT16,
         64/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -964,7 +964,7 @@
         VIR_TYPE_UINT64,
         16/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         16,
         VIR_TY_VECTOR
     },
@@ -977,7 +977,7 @@
         VIR_TYPE_UINT64,
         24/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         32,
         VIR_TY_VECTOR
     },
@@ -990,7 +990,7 @@
         VIR_TYPE_UINT64,
         32/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         32,
         VIR_TY_VECTOR
     },
@@ -1003,7 +1003,7 @@
         VIR_TYPE_UINT64,
         64/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         32,
         VIR_TY_VECTOR
     },
@@ -1016,7 +1016,7 @@
         VIR_TYPE_UINT64,
         128/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         32,
         VIR_TY_VECTOR
     },
@@ -1029,7 +1029,7 @@
         VIR_TYPE_UINT64,
         256/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         32,
         VIR_TY_VECTOR
     },
@@ -1044,7 +1044,7 @@
         VIR_TYPE_INT64,
         16/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         16,
         VIR_TY_VECTOR
     },
@@ -1057,7 +1057,7 @@
         VIR_TYPE_INT64,
         24/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         32,
         VIR_TY_VECTOR
     },
@@ -1070,7 +1070,7 @@
         VIR_TYPE_INT64,
         32/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         32,
         VIR_TY_VECTOR
     },
@@ -1083,7 +1083,7 @@
         VIR_TYPE_INT64,
         64/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         32,
         VIR_TY_VECTOR
     },
@@ -1096,7 +1096,7 @@
         VIR_TYPE_INT64,
         128/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         32,
         VIR_TY_VECTOR
     },
@@ -1109,7 +1109,7 @@
         VIR_TYPE_INT64,
         256/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_SIGNED_INT,
         32,
         VIR_TY_VECTOR
     },
@@ -1206,7 +1206,7 @@
         VIR_TYPE_BOOLEAN,
         8/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_BOOLEAN,
         8,
         VIR_TY_VECTOR
     },
@@ -1219,7 +1219,7 @@
         VIR_TYPE_BOOLEAN,
         12/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_BOOLEAN,
         16,
         VIR_TY_VECTOR
     },
@@ -1232,7 +1232,7 @@
         VIR_TYPE_BOOLEAN,
         16/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_BOOLEAN,
         16,
         VIR_TY_VECTOR
     },
@@ -1245,7 +1245,7 @@
         VIR_TYPE_BOOLEAN,
         32/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_BOOLEAN,
         16,
         VIR_TY_VECTOR
     },
@@ -1258,7 +1258,7 @@
         VIR_TYPE_BOOLEAN,
         64/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_BOOLEAN,
         16,
         VIR_TY_VECTOR
     },
@@ -1271,7 +1271,7 @@
         VIR_TYPE_BOOLEAN,
         128/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_BOOLEAN,
         16,
         VIR_TY_VECTOR
     },
@@ -1286,7 +1286,7 @@
         VIR_TYPE_UINT8,
         2/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_UNSIGNED_INT,
         2,
         VIR_TY_VECTOR
     },
@@ -1299,7 +1299,7 @@
         VIR_TYPE_UINT8,
         3/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -1312,7 +1312,7 @@
         VIR_TYPE_UINT8,
         4/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -1325,7 +1325,7 @@
         VIR_TYPE_UINT8,
         8/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -1338,7 +1338,7 @@
         VIR_TYPE_UINT8,
         16/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -1351,7 +1351,7 @@
         VIR_TYPE_UINT8,
         32/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -1366,7 +1366,7 @@
         VIR_TYPE_INT8,
         2/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_SIGNED_INT,
         2,
         VIR_TY_VECTOR
     },
@@ -1379,7 +1379,7 @@
         VIR_TYPE_INT8,
         3/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_SIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -1392,7 +1392,7 @@
         VIR_TYPE_INT8,
         4/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_SIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -1405,7 +1405,7 @@
         VIR_TYPE_INT8,
         8/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_SIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -1418,7 +1418,7 @@
         VIR_TYPE_INT8,
         16/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_SIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -1431,7 +1431,7 @@
         VIR_TYPE_INT8,
         32/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_SIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -1445,7 +1445,7 @@
         VIR_TYPE_UINT16,
         4/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -1458,7 +1458,7 @@
         VIR_TYPE_UINT16,
         6/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_UNSIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -1471,7 +1471,7 @@
         VIR_TYPE_UINT16,
         8/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_UNSIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -1484,7 +1484,7 @@
         VIR_TYPE_UINT16,
         16/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_UNSIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -1497,7 +1497,7 @@
         VIR_TYPE_UINT16,
         32/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_UNSIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -1510,7 +1510,7 @@
         VIR_TYPE_UINT16,
         64/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_UNSIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -1525,7 +1525,7 @@
         VIR_TYPE_INT16,
         4/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_SIGNED_INT,
         4,
         VIR_TY_VECTOR
     },
@@ -1538,7 +1538,7 @@
         VIR_TYPE_INT16,
         6/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_SIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -1551,7 +1551,7 @@
         VIR_TYPE_INT16,
         8/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_SIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -1564,7 +1564,7 @@
         VIR_TYPE_INT16,
         16/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_SIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -1577,7 +1577,7 @@
         VIR_TYPE_INT16,
         32/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_SIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -1590,7 +1590,7 @@
         VIR_TYPE_INT16,
         64/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_PACKED | VIR_TYFLAG_IS_SIGNED_INT,
         8,
         VIR_TY_VECTOR
     },
@@ -2516,7 +2516,7 @@
         VIR_TYPE_INT32,
         4/* size */,
         0,
-        VIR_TYFLAG_SIZED | VIR_TYFLAG_ISINTEGER,
+        VIR_TYFLAG_SIZED | VIR_TYFLAG_IS_UNSIGNED_INT,
         4,
         VIR_TY_SCALAR
     },

@@ -271,12 +271,10 @@ typedef struct _vgsCONTEXT
 #endif
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gctINT32       curMemImage;
     gctINT32       maxMemImage;
     gctINT32       curMemPath;
     gctINT32       maxMemPath;
-#endif
 #endif
 
     /* Debug counters. */

@@ -255,9 +255,7 @@ veglGetThreadData(
         thread->openVGpipe        = gcvFALSE;
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
         thread->fbMemSize         = 0;
-#endif
 #endif
         tls->currentType          = gcvHARDWARE_3D;
 #if veglUSE_HAL_DUMP

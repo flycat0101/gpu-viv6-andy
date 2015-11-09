@@ -84,6 +84,9 @@ struct _gcOPT_CODE
     /* Number sequence of the code. */
     gctUINT                     id;
 
+    /* A working id */
+    gctUINT                     workingId;
+
     /* Instruction. */
     struct _gcSL_INSTRUCTION    instruction;
 

@@ -398,9 +398,9 @@ gcDumpMCStates(
         "img_atom", /* 0x46 */
         "_reserved", /* 0x47 */
         "imod0", /* 0x48 */
-        "imod1", /* 0x49 */
-        "imod2", /* 0x4a */
-        "imod3", /* 0x4b */
+        "texld_u_s_l", /* 0x49 */
+        "texld_u_u_l", /* 0x4a */
+        "texld_u_f_l", /* 0x4b */
         "imadlo0", /* 0x4c */
         "imadlo1", /* 0x4d */
         "imadlosat0", /* 0x4e */
@@ -956,6 +956,9 @@ gcDumpMCStates(
     switch (opcode)
     {
     case 0x18:
+    case 0x4B:
+    case 0x49:
+    case 0x4A:
     case 0x19:
     case 0x1A:
     case 0x1B:

@@ -7846,6 +7846,13 @@ VIR_Shader_IsDual16able(
             VIR_Type        *symType = gcvNULL;
 
             pSym = VIR_Shader_GetSymFromId(Shader, VIR_IdList_GetId(VIR_Shader_GetAttributes(Shader), i));
+
+            /* Only consider used one */
+            if (isSymUnused(pSym) || isSymVectorizedOut(pSym))
+            {
+                continue;
+            }
+
             symType = VIR_Symbol_GetType(pSym);
 
             if (VIR_Type_isPrimitive(symType))

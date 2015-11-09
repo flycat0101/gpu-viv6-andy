@@ -615,7 +615,17 @@ gc_gralloc_alloc_buffer(
     if (err == 0)
     {
         *Handle = hnd;
-        *Stride = stride;
+
+#if ANDROID_SDK_VERSION >= 18
+        if (Format == HAL_PIXEL_FORMAT_YCbCr_420_888)
+        {
+            *Stride = 0;
+        }
+        else
+#endif
+        {
+            *Stride = stride;
+        }
 
 #if gcdENABLE_3D
         if (vaddr && !(Usage & GRALLOC_USAGE_HW_RENDER))
@@ -791,7 +801,7 @@ gc_gralloc_free(
         {
             /* Unlock for 3D core in surfaceflinger side. */
             gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_2D);
-            gcmVERIFY_OK(gcoSURF_Lock(surface, gcvNULL, gcvNULL));
+            gcmVERIFY_OK(gcoSURF_Unlock(surface, gcvNULL));
             gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
         }
 
@@ -799,7 +809,7 @@ gc_gralloc_free(
         {
             /* Unlock for 3D/2D core in surfaceflinger side. */
             gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D2D);
-            gcmVERIFY_OK(gcoSURF_Lock(surface, gcvNULL, gcvNULL));
+            gcmVERIFY_OK(gcoSURF_Unlock(surface, gcvNULL));
             gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
         }
 
@@ -883,6 +893,14 @@ gc_gralloc_lock(
              hnd, Usage, handle->allocUsage);
     }
 
+#if ANDROID_SDK_VERSION >= 18
+    if (handle->format == HAL_PIXEL_FORMAT_YCbCr_420_888)
+    {
+        /* Not for HAL_PIXEL_FORMAT_YCbCr_420_888 */
+        return -EINVAL;
+    }
+#endif
+
     *Vaddr = (void *) hnd->base;
     handle->lockUsage = (int) Usage;
 
@@ -920,7 +938,6 @@ gc_gralloc_lock_ycbcr(
     struct android_ycbcr *YCbCr
     )
 {
-    int err;
     void * vaddr[3];
     gctINT stride;
     gcoSURF surface;
@@ -935,8 +952,15 @@ gc_gralloc_lock_ycbcr(
     if (handle->surface == 0)
     {
         /* Invalid handle. */
-        YCbCr->y  = YCbCr->cb = YCbCr->cr = NULL;
+        YCbCr->y = YCbCr->cb = YCbCr->cr = NULL;
         return -EINVAL;
+    }
+
+    if ((Usage & handle->allocUsage) != Usage)
+    {
+        LOGE("lock_ycbcr: Invalid access to buffer=%p: "
+             "lockUsage=0x%08x, allocUsage=0x%08x",
+             hnd, Usage, handle->allocUsage);
     }
 
     if (handle->format != HAL_PIXEL_FORMAT_YCbCr_420_888)
@@ -945,21 +969,13 @@ gc_gralloc_lock_ycbcr(
         return -EINVAL;
     }
 
+    handle->lockUsage = (int) Usage;
+
     /* Get hardware type. */
     gcoHAL_GetHardwareType(gcvNULL, &hwType);
 
     /* Switch to proper hardware type. */
     switch_hardware_type(handle->allocUsage);
-
-    /* Call general lock function. */
-    err = gc_gralloc_lock(Module, Handle, Usage, Left, Top, Width, Height, vaddr);
-
-    if (err)
-    {
-        /* Restore hardware type. */
-        gcoHAL_SetHardwareType(gcvNULL, hwType);
-        return err;
-    }
 
     /* Obtain HAL surface. */
     surface = (gcoSURF) handle->surface;
@@ -968,10 +984,14 @@ gc_gralloc_lock_ycbcr(
     gcmVERIFY_OK(
         gcoSURF_Lock(surface, gcvNULL, vaddr));
 
-    /* Should be already lock, so the unlock is safe. */
+    /* Should be already locked, so the unlock is safe. */
     gcmVERIFY_OK(
         gcoSURF_Unlock(surface, gcvNULL));
 
+    /*
+     * Notice: The following is only for NV12.
+     * Modify if HAL_PIXEL_FORMAT_YCbCr_420_888 is not NV12!
+     */
     YCbCr->y  = (void *) vaddr[0];
     YCbCr->cb = (void *) vaddr[1];
     YCbCr->cr = (void *)((intptr_t) vaddr[1] + 1);
@@ -994,7 +1014,7 @@ int
 gc_gralloc_unlock(
     gralloc_module_t const * Module,
     buffer_handle_t Handle
-)
+    )
 {
     if (private_handle_t::validate(Handle) < 0)
         return -EINVAL;
@@ -1016,10 +1036,20 @@ gc_gralloc_unlock(
 
     if (handle->lockUsage & GRALLOC_USAGE_SW_WRITE_MASK)
     {
+        gceHARDWARE_TYPE hwType = gcvHARDWARE_3D;
+
+        gcoHAL_GetHardwareType(gcvNULL, &hwType);
+
+        /* Switch to proper hardware type. */
+        switch_hardware_type(handle->allocUsage);
+
         /* Ignoring the error. */
         gcmVERIFY_OK(
             gcoSURF_CPUCacheOperation((gcoSURF) handle->surface,
                                       gcvCACHE_CLEAN));
+
+        /* Restore hardware type. */
+        gcoHAL_SetHardwareType(gcvNULL, hwType);
     }
 
     handle->lockUsage = 0;

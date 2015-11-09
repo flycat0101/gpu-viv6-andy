@@ -2245,6 +2245,10 @@ _createFormatConvertStubFunction(
     {
         type = TEXLDTYPE_PROJ;
     }
+    else if (opcode == gcSL_TEXLD_U)
+    {
+        type = TEXLDTYPE_U;
+    }
     else
     {
         type = TEXLDTYPE_NORMAL;
@@ -10356,7 +10360,7 @@ _InsertAssignmentForSamplerSize(
     gcSL_INSTRUCTION code, insertCode1, insertCode2;
     gctSIZE_T len;
     gctUINT offset;
-    gcUNIFORM uniform, lodMinMaxUniform, levelBaseSizeUniform;
+    gcUNIFORM uniform, firstChild, lodMinMaxUniform, levelBaseSizeUniform;
     gctSTRING symbol;
     gctINT16 lodMinMaxIndex, levelBaseSizeIndex;
     gctINT16 argumentIndex0 = 0, argumentIndex1 = 0;
@@ -10367,6 +10371,7 @@ _InsertAssignmentForSamplerSize(
     for (i = 0; i < (gctINT32)codeCount; i++)
     {
         uniform = gcvNULL;
+        lodMinMaxIndex = levelBaseSizeIndex = -1;
 
         code = Shader->code + i;
 
@@ -10423,62 +10428,39 @@ _InsertAssignmentForSamplerSize(
 
             if (uniform->firstChild != -1)
             {
-                gcmONERROR(gcSHADER_GetUniform(Shader, (gctUINT)uniform->firstChild, &lodMinMaxUniform));
+                gcmONERROR(gcSHADER_GetUniform(Shader, (gctUINT)uniform->firstChild, &firstChild));
 
-                if (isUniformLodMinMax(lodMinMaxUniform))
+                if (isUniformLodMinMax(firstChild))
                 {
-                    lodMinMaxIndex = lodMinMaxUniform->index;
-                    levelBaseSizeIndex = lodMinMaxUniform->nextSibling;
+                    lodMinMaxIndex = firstChild->index;
+                    if (firstChild->nextSibling != -1)
+                    {
+                        levelBaseSizeIndex = firstChild->nextSibling;
+                    }
                 }
                 else
                 {
-                    levelBaseSizeIndex = lodMinMaxUniform->index;
-                    lodMinMaxIndex = lodMinMaxUniform->nextSibling;
+                    gcmASSERT(isUniformLevelBaseSize(firstChild));
+                    levelBaseSizeIndex = firstChild->index;
+                    if (firstChild->nextSibling != -1)
+                    {
+                        lodMinMaxIndex = firstChild->nextSibling;
+                    }
                 }
             }
-            else
+
+            /* Create levelBaseSize if needed. */
+            if (levelBaseSizeIndex == -1)
             {
-                /* Create lodMinMax. */
-                len = uniform->nameLength + 12;
-                gcmONERROR(gcoOS_Allocate(gcvNULL, len, &pointer));
-                symbol = pointer;
-                offset = 0;
-                gcmONERROR(gcoOS_PrintStrSafe(symbol,
-                                                len,
-                                                &offset,
-                                                /*"#%s$LodMinMax_%d",*/
-                                                "#%s$LodMinMax",
-                                                uniform->name));
-
-                gcmONERROR(gcSHADER_AddUniformEx1(Shader,
-                                                  symbol,
-                                                  gcSHADER_INTEGER_X3,
-                                                  gcSHADER_PRECISION_MEDIUM,
-                                                  -1,
-                                                  -1,
-                                                  -1,
-                                                  0,
-                                                  gcvNULL,
-                                                  gcSHADER_VAR_CATEGORY_LOD_MIN_MAX,
-                                                  0,
-                                                  uniform->index,
-                                                  -1,
-                                                  gcIMAGE_FORMAT_DEFAULT,
-                                                  &lodMinMaxIndex,
-                                                  &lodMinMaxUniform));
-                gcmOS_SAFE_FREE(gcvNULL, symbol);
-
-                /* Create levelBaseSize. */
                 len = uniform->nameLength + 16;
                 gcmONERROR(gcoOS_Allocate(gcvNULL, len, &pointer));
                 symbol = pointer;
                 offset = 0;
                 gcmONERROR(gcoOS_PrintStrSafe(symbol,
-                                                len,
-                                                &offset,
-                                                /*"#%s$LevelBaseSize_%d",*/
-                                                "#%s$LevelBaseSize",
-                                                uniform->name));
+                                              len,
+                                              &offset,
+                                              "#%s$LevelBaseSize",
+                                              uniform->name));
 
                 gcmONERROR(gcSHADER_AddUniformEx1(Shader,
                                                   symbol,
@@ -10492,10 +10474,42 @@ _InsertAssignmentForSamplerSize(
                                                   gcSHADER_VAR_CATEGORY_LEVEL_BASE_SIZE,
                                                   0,
                                                   uniform->index,
-                                                  uniform->firstChild,
+                                                  uniform->firstChild != -1 ? uniform->firstChild : -1,
                                                   gcIMAGE_FORMAT_DEFAULT,
                                                   &levelBaseSizeIndex,
                                                   &levelBaseSizeUniform));
+                gcmOS_SAFE_FREE(gcvNULL, symbol);
+            }
+
+            /* Create lodMinMax if needed. */
+            if (lodMinMaxIndex == -1)
+            {
+                len = uniform->nameLength + 12;
+                gcmONERROR(gcoOS_Allocate(gcvNULL, len, &pointer));
+                symbol = pointer;
+                offset = 0;
+                gcmONERROR(gcoOS_PrintStrSafe(symbol,
+                                              len,
+                                              &offset,
+                                              "#%s$LodMinMax",
+                                              uniform->name));
+
+                gcmONERROR(gcSHADER_AddUniformEx1(Shader,
+                                                  symbol,
+                                                  gcSHADER_INTEGER_X3,
+                                                  gcSHADER_PRECISION_MEDIUM,
+                                                  -1,
+                                                  -1,
+                                                  -1,
+                                                  0,
+                                                  gcvNULL,
+                                                  gcSHADER_VAR_CATEGORY_LOD_MIN_MAX,
+                                                  0,
+                                                  uniform->index,
+                                                  uniform->firstChild != -1 ? uniform->firstChild : -1,
+                                                  gcIMAGE_FORMAT_DEFAULT,
+                                                  &lodMinMaxIndex,
+                                                  &lodMinMaxUniform));
                 gcmOS_SAFE_FREE(gcvNULL, symbol);
             }
 

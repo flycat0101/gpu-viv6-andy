@@ -427,6 +427,7 @@ typedef enum _gceFEATURE
     gcvFEATURE_SECURITY,
     gcvFEATURE_USC_GOS_ADDR_FIX,
     gcvFEATURE_TX_DESC_CACHE_CLOCKGATE_FIX,
+    gcvFEATURE_TX_INTEGER_COORDINATE_V2,
 
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */
@@ -480,6 +481,8 @@ typedef enum _gceFRAMEINFO
     gcvFRAMEINFO_COMPUTE_NUM     = 2,
     /* Total dual16 draw/compute count in current frame, subset of drawNum */
     gcvFRAMEINFO_DUAL16_NUM      = 3,
+    /* Current programID is being set. only valid for ES20 driver right now */
+    gcvFRAMEINFO_PROGRAM_ID     = 4,
 
     gcvFRAMEINFO_COUNT,
 }
@@ -491,6 +494,7 @@ typedef enum _gceFRAMEINFO_OP
     gcvFRAMEINFO_OP_DEC       = 1,
     gcvFRAMEINFO_OP_ZERO      = 2,
     gcvFRAMEINFO_OP_GET       = 3,
+    gcvFRAMEINFO_OP_SET       = 4,
     gcvFRAMEINFO_OP_COUNT,
 }
 gceFRAMEINFO_OP;

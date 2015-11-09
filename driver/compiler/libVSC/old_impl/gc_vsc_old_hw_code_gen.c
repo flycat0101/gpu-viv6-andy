@@ -12399,6 +12399,49 @@ value_type0_immediate_or_const_0(
 }
 
 static gctBOOL
+no_rel_adr_denorm_value_type0(
+    IN gcLINKTREE Tree,
+    IN gcsCODE_GENERATOR_PTR CodeGen,
+    IN gcSL_INSTRUCTION Instruction,
+    IN OUT gctUINT32 * States
+    )
+{
+    gctUINT format = gcmSL_TARGET_GET(Instruction->temp, Format);
+    gctUINT value_type0 = type_conv[format];
+    gctUINT inst_type0 = value_type0 & 0x1;
+    gctUINT inst_type1 = value_type0 >> 1;
+
+    States[1] = ((((gctUINT32) (States[1])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 21:21) - (0 ? 21:21) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:21) - (0 ? 21:21) + 1))))))) << (0 ?
+ 21:21))) | (((gctUINT32) ((gctUINT32) (inst_type0) & ((gctUINT32) ((((1 ?
+ 21:21) - (0 ? 21:21) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:21) - (0 ? 21:21) + 1))))))) << (0 ?
+ 21:21)));
+    States[2] = ((((gctUINT32) (States[2])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:30) - (0 ? 31:30) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:30) - (0 ? 31:30) + 1))))))) << (0 ?
+ 31:30))) | (((gctUINT32) ((gctUINT32) (inst_type1) & ((gctUINT32) ((((1 ?
+ 31:30) - (0 ? 31:30) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:30) - (0 ? 31:30) + 1))))))) << (0 ?
+ 31:30)));
+
+    if (CodeGen->hasSHEnhancements2)
+    {
+        gctUINT8 swizzle = (((((gctUINT32) (States[1])) >> (0 ? 10:3)) & ((gctUINT32) ((((1 ? 10:3) - (0 ? 10:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 10:3) - (0 ? 10:3) + 1)))))) );
+        States[1] = ((((gctUINT32) (States[1])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:3) - (0 ? 10:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 10:3) - (0 ? 10:3) + 1))))))) << (0 ?
+ 10:3))) | (((gctUINT32) ((gctUINT32) (swizzle | 0x80) & ((gctUINT32) ((((1 ?
+ 10:3) - (0 ? 10:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 10:3) - (0 ? 10:3) + 1))))))) << (0 ?
+ 10:3)));
+    }
+
+    States[0] = ((((gctUINT32) (States[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:13) - (0 ? 15:13) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:13) - (0 ? 15:13) + 1))))))) << (0 ?
+ 15:13))) | (((gctUINT32) ((gctUINT32) (0x0) & ((gctUINT32) ((((1 ? 15:13) - (0 ?
+ 15:13) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:13) - (0 ? 15:13) + 1))))))) << (0 ?
+ 15:13)));
+
+    return gcvTRUE;
+}
+
+static gctBOOL
 denorm_value_type0(
     IN gcLINKTREE Tree,
     IN gcsCODE_GENERATOR_PTR CodeGen,
@@ -16889,7 +16932,7 @@ const gcsSL_PATTERN patterns_STORE[] =
             store 0, 2, 3, 1, 0
     */
     { 1, gcSL_STORE, 1, 2, 3, 0, 0, _hasInteger },
-        { -1, 0x33, 1, 2, 3, 1, 0, denorm_value_type0 },
+        { -1, 0x33, 1, 2, 3, 1, 0, no_rel_adr_denorm_value_type0 },
 
     { 0 }
 };
@@ -19102,6 +19145,12 @@ const gcsSL_PATTERN patterns_GET_SAMPLER_LBS[] =
     { 0 }
 };
 
+/* 0x8D  TEXLD_U */
+const gcsSL_PATTERN patterns_TEXLD_U[] =
+{
+    { 0 }
+};
+
 const gcsSL_PATTERN_PTR  patterns[] =
 {
     patterns_NOP, /* 0x00 gcSL_NOP */
@@ -19245,6 +19294,7 @@ const gcsSL_PATTERN_PTR  patterns[] =
     patterns_IMAGE_ADDR_3D, /* 0x8A gcSL_IMAGE_ADDR_3D */
     patterns_GET_SAMPLER_LMM,/* 0x8B gcSL_GET_SAMPLER_LMM */
     patterns_GET_SAMPLER_LBS,/* 0x8C gcSL_GET_SAMPLER_LBS */
+    patterns_TEXLD_U, /* 0x8D gcSL_TEXLD_U */
 };
 
 #ifdef WIN32

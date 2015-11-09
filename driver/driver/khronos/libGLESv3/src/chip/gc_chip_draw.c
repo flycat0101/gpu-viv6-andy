@@ -5645,6 +5645,16 @@ __glChipDrawBegin(
         }
 #endif
 
+        /* Special patch for fishnoodle.*/
+        if (chipCtx->patchId == gcvPATCH_FISHNOODLE &&
+            gc->vertexArray.indices == gcvNULL &&
+            gc->vertexArray.indexCount == 12 &&
+            !(gc->vertexArray.varrayDirty & __GL_DIRTY_VARRAY_ENABLE_BIT) &&
+            !chipCtx->patchInfo.bufBindDirty)
+        {
+            break;
+        }
+
         /* Evaluate program objects */
         if (gc->globalDirtyState[__GL_PROGRAM_ATTRS] & (__GL_DIRTY_GLSL_PROGRAM_SWITCH |
                                                         __GL_DIRTY_GLSL_MODE_SWITCH))
@@ -6428,24 +6438,12 @@ __glChipDrawPattern(
 
         if (uniform->halUniform[0])
         {
-            gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(program->curPgInstance->programState.hints->vsConstBase,
-                                                              program->curPgInstance->programState.hints->psConstBase,
-                                                              program->curPgInstance->programState.hints->tcsConstBase,
-                                                              program->curPgInstance->programState.hints->tesConstBase,
-                                                              program->curPgInstance->programState.hints->gsConstBase,
-                                                              uniform->halUniform[0],
-                                                              &(pFastFlush->uniforms[i].physicalAddress[0])));
+            pFastFlush->uniforms[i].physicalAddress[0] = uniform->stateAddress[0];
         }
 
         if (uniform->halUniform[1])
         {
-            gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(program->curPgInstance->programState.hints->vsConstBase,
-                                                              program->curPgInstance->programState.hints->psConstBase,
-                                                              program->curPgInstance->programState.hints->tcsConstBase,
-                                                              program->curPgInstance->programState.hints->tesConstBase,
-                                                              program->curPgInstance->programState.hints->gsConstBase,
-                                                              uniform->halUniform[1],
-                                                              &(pFastFlush->uniforms[i].physicalAddress[1])));
+            pFastFlush->uniforms[i].physicalAddress[1] = uniform->stateAddress[1];
         }
     }
 
@@ -6825,7 +6823,7 @@ __glChipComputeEnd(
                         gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
                                                         __GLES_MAX_FILENAME_LEN,
                                                         &fileNameOffset,
-                                                        "fID%d_dID%d(compute)_pID%d_imageUnit%d(tex[%s]ID%d_%s_level%d_layer_%d_layered=%d)",
+                                                        "fID%04d_dID%04d(compute)_pID%04d_imageUnit%02d(tex[%s]ID%04d_%s_level%02d_layer_%02d_layered=%d)",
                                                         frameCount,
                                                         drawCount,
                                                         gc->shaderProgram.activeProgObjs[__GLSL_STAGE_CS]->objectInfo.id,

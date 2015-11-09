@@ -35,37 +35,10 @@ extern GLvoid __glUnBindImageTexture(__GLcontext *gc, GLuint unit, __GLtextureOb
 
 GLvoid __glFreeDefaultTextureObject(__GLcontext *gc, __GLtextureObject *tex)
 {
-    GLuint targetIndex = tex->targetIndex;
-    GLuint i, faces;
-
-    /* Notify Dp that this texture object is deleted.
-    */
+    /* Notify Dp that this texture object is deleted */
     if (tex->privateData)
     {
         (*gc->dp.deleteTexture)(gc, tex);
-    }
-
-    switch(targetIndex)
-    {
-    case __GL_TEXTURE_CUBEMAP_INDEX:
-        faces = 6;
-        break;
-    case __GL_TEXTURE_CUBEMAP_ARRAY_INDEX:
-        faces = gc->constants.maxTextureArraySize * 6;
-        break;
-    case __GL_TEXTURE_2D_ARRAY_INDEX:
-    case __GL_TEXTURE_2D_MS_ARRAY_INDEX:
-        faces = gc->constants.maxTextureArraySize;
-        break;
-    default:
-        faces = 1;
-        break;
-    }
-
-    /* Delete the texture object's texture image */
-    for (i = 0; i < faces; i ++)
-    {
-        (*gc->imports.free)(gc, tex->faceMipmap[i]);
     }
 
     /* Free texture unit list */
@@ -78,6 +51,9 @@ GLvoid __glInitTextureObject(__GLcontext *gc, __GLtextureObject *tex, GLuint id,
 {
     GLuint i, j;
     GLuint maxFaces = 1, maxLevels = 1, maxDepths = 1;
+    GLint requestedFormat = (targetIndex == __GL_TEXTURE_BINDING_BUFFER_EXT) ? GL_R8 : GL_RGBA;
+    GLvoid *pointer = NULL;
+    __GLmipMapLevel *mipmaps = NULL;
 
     tex->bindCount = 0;
     tex->seqNumber = 1;
@@ -197,20 +173,20 @@ GLvoid __glInitTextureObject(__GLcontext *gc, __GLtextureObject *tex, GLuint id,
     tex->maxLevels = maxLevels;
     tex->maxDepths = maxDepths;
 
-    tex->faceMipmap = (__GLmipMapLevel **)(*gc->imports.malloc)(gc, maxFaces * sizeof(__GLmipMapLevel *));
+    pointer = gc->imports.calloc(gc, 1, maxFaces * sizeof(__GLmipMapLevel*) +
+                                        maxFaces * maxLevels * sizeof(__GLmipMapLevel));
+
+    tex->faceMipmap = (__GLmipMapLevel**)pointer;
+    mipmaps = (__GLmipMapLevel*)(tex->faceMipmap + maxFaces);
+
     for (i = 0; i < maxFaces; i++)
     {
-        tex->faceMipmap[i] = (__GLmipMapLevel *)(*gc->imports.calloc)(gc, 1, maxLevels * sizeof(__GLmipMapLevel));
+        tex->faceMipmap[i] = mipmaps;
+        mipmaps += maxLevels;
+
         for (j = 0; j < maxLevels; j++)
         {
-            if(targetIndex == __GL_TEXTURE_BINDING_BUFFER_EXT)
-            {
-                tex->faceMipmap[i][j].requestedFormat = GL_R8;
-            }
-            else
-            {
-                tex->faceMipmap[i][j].requestedFormat = GL_RGBA;
-            }
+            tex->faceMipmap[i][j].requestedFormat = requestedFormat;
             tex->faceMipmap[i][j].formatInfo = &__glFormatInfoTable[__GL_FMT_MAX];
         }
     }
@@ -1767,14 +1743,6 @@ GLboolean __glDeleteTextureObject(__GLcontext *gc, __GLtextureObject *tex)
     }
 
     /* Delete the texture object's texture image */
-    for (i = 0; i < tex->maxFaces; i ++)
-    {
-        if (tex->faceMipmap[i])
-        {
-            (*gc->imports.free)(gc, tex->faceMipmap[i]);
-            tex->faceMipmap[i] = NULL;
-        }
-    }
     if (tex->faceMipmap)
     {
         (*gc->imports.free)(gc, tex->faceMipmap);

@@ -451,8 +451,10 @@ gco3D_SetTarget(
         /* Unset previous target if any. */
         if (Engine->mRT[TargetIndex] != gcvNULL)
         {
+            gcoSURF prevRT = Engine->mRT[TargetIndex];
+
             /* Disable tile status for this surface with color slot0 */
-            gcmONERROR(gcoSURF_DisableTileStatus(Engine->mRT[TargetIndex], gcvFALSE));
+            gcmONERROR(gcoSURF_DisableTileStatus(prevRT, gcvFALSE));
 
             /* Disable tile status setting for MRT */
             if (Engine->mRTtileStatus && (TargetIndex != 0))
@@ -466,13 +468,20 @@ gco3D_SetTarget(
             gcmONERROR(gcoHARDWARE_MultiGPUSync(gcvNULL, gcvNULL));
 
             /* Unlock the current render target. */
-            gcmVERIFY_OK(gcoSURF_Unlock(Engine->mRT[TargetIndex], Engine->mRTMemory[TargetIndex]));
+            gcmVERIFY_OK(gcoSURF_Unlock(prevRT, Engine->mRTMemory[TargetIndex]));
 
             /* Reset mapped memory pointer. */
             Engine->mRTMemory[TargetIndex] = gcvNULL;
 
+            /*
+             * If this is last reference, below destroy will call Unset target
+             * and then run here again. Set to NULL to avoid recursive
+             * destroying.
+             */
+            Engine->mRT[TargetIndex] = gcvNULL;
+
             /* Dereference the surface. */
-            gcmONERROR(gcoSURF_Destroy(Engine->mRT[TargetIndex]));
+            gcmONERROR(gcoSURF_Destroy(prevRT));
         }
 
         /* Set new target. */
@@ -638,17 +647,22 @@ gco3D_SetDepth(
         /* Unset previous depth buffer if any. */
         if (Engine->depth != gcvNULL)
         {
+            gcoSURF prevDepth = Engine->depth;
+
             /* Disable previous tile status. */
-            gcmONERROR(gcoSURF_DisableTileStatus(Engine->depth, gcvFALSE));
+            gcmONERROR(gcoSURF_DisableTileStatus(prevDepth, gcvFALSE));
 
             /* Unlock the current depth surface. */
-            gcmONERROR(gcoSURF_Unlock(Engine->depth, Engine->depthMemory));
+            gcmONERROR(gcoSURF_Unlock(prevDepth, Engine->depthMemory));
 
             /* Reset mapped memory pointer. */
             Engine->depthMemory = gcvNULL;
 
+            /* Set depth to NULL to avoid recursive destroying. */
+            Engine->depth = gcvNULL;
+
             /* Dereference the surface. */
-            gcmONERROR(gcoSURF_Destroy(Engine->depth));
+            gcmONERROR(gcoSURF_Destroy(prevDepth));
         }
 
         /* Set new depth buffer. */

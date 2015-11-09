@@ -130,10 +130,8 @@ struct _gcoVG
 #endif
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gctINT                      tsMaxMemSize;
     gctINT                      tsCurMemSize;
-#endif
 #endif
 };
 

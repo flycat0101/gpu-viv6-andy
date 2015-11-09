@@ -717,6 +717,7 @@ slGetOpcodeName(
     case slvOPCODE_IDIV:                return "div";
 
     case slvOPCODE_TEXTURE_LOAD:        return "texture_load";
+    case slvOPCODE_TEXTURE_LOAD_U:      return "texture_load_u";
     case slvOPCODE_TEXTURE_LOAD_PCF:    return "texture_load_pcf";
     case slvOPCODE_TEXTURE_LOAD_PROJ:   return "texture_load_proj";
     case slvOPCODE_TEXTURE_LOAD_PCFPROJ:return "texture_load_pcfproj";
@@ -9225,13 +9226,9 @@ _MakeStoreSource(
         }
         else if (gcIsVectorDataType(LOperand->dataType) || gcIsMatrixDataType(LOperand->dataType))
         {
-            if (gcIsVectorDataType(LOperand->dataType))
-            {
-                enable = _ConvComponentSelectionToEnable(LOperand->reg.componentSelection);
+            enable = _ConvComponentSelectionToEnable(LOperand->reg.componentSelection);
 
-                reversedComponentSelection = _ReverseComponentSelection(LOperand->reg.componentSelection);
-
-            }
+            reversedComponentSelection = _ReverseComponentSelection(LOperand->reg.componentSelection);
         }
 
         /* I: Get matrix index. */
@@ -9459,7 +9456,7 @@ _MakeStoreSource(
             /* If this variable is a matrix, and its array index has been multiplied the size, we need to divide it here. */
             if (gcIsMatrixDataType(LOperand->reg.dataType) && isArray)
             {
-                constantValue->uintValue /= gcGetDataTypeSize(LOperand->reg.dataType);
+                constantValue->uintValue = 1;
             }
 
             slsROPERAND_InitializeConstant(constantROperand,
@@ -12940,6 +12937,7 @@ slGenGenericCode3(
     switch (Opcode1)
     {
     case slvOPCODE_TEXTURE_LOAD:
+    case slvOPCODE_TEXTURE_LOAD_U:
     case slvOPCODE_TEXTURE_LOAD_PCF:
     case slvOPCODE_TEXTURE_LOAD_PROJ:
     case slvOPCODE_TEXTURE_LOAD_PCFPROJ:
@@ -13460,6 +13458,7 @@ slGenGenericCode2WithFormat(
     switch (Opcode)
     {
     case slvOPCODE_TEXTURE_LOAD:
+    case slvOPCODE_TEXTURE_LOAD_U:
     case slvOPCODE_TEXTURE_LOAD_PCF:
     case slvOPCODE_TEXTURE_LOAD_PROJ:
     case slvOPCODE_TEXTURE_LOAD_PCFPROJ:

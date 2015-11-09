@@ -21,6 +21,7 @@
 #if gcdFRAMEINFO_STATISTIC
 extern GLboolean g_dbgPerDrawKickOff;
 extern GLboolean g_dbgDumpImagePerDraw;
+extern GLboolean g_dbgSkipDraw;
 #endif
 
 /***************************************************************************/
@@ -312,6 +313,13 @@ __glChipClearBegin(
     {
         return GL_FALSE;
     }
+
+#if gcdFRAMEINFO_STATISTIC
+    if (g_dbgSkipDraw)
+    {
+        return GL_FALSE;
+    }
+#endif
 
     /* Clear invalid mask */
     if (*mask & GL_COLOR_BUFFER_BIT)

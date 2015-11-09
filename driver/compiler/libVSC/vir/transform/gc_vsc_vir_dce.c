@@ -39,6 +39,7 @@ _VSC_DCE_GetInstChannelNum(
         return 4;
 
     case VIR_OP_TEXLD:
+    case VIR_OP_TEXLD_U:
     case VIR_OP_TEXLDPROJ:
     case VIR_OP_TEXLDPCF:
     case VIR_OP_TEXLDPCFPROJ:

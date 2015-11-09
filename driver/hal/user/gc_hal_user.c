@@ -227,6 +227,11 @@ gcoHAL_FrameInfoOps(
         *Val = gcFrameInfos[FrameInfo];
         break;
 
+    case gcvFRAMEINFO_OP_SET:
+        gcmVERIFY_ARGUMENT(Val != gcvNULL);
+        gcFrameInfos[FrameInfo] = *Val;
+        break;
+
     default:
         gcmPRINT("GAL: invalid FrameInfo operation(%d)", Op);
     }

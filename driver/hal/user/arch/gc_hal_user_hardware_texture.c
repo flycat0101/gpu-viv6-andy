@@ -9300,27 +9300,39 @@ _UploadSuperTiled8bppto8bpp(
     }
 
     /* Y middle - X middle. */
-    for (y = Y; y < Bottom; y += 4)
+    if ((((gctUINTPTR_T) Memory & 3) == 0) && ((SourceStride & 3) == 0))
     {
-        for (x = X; x < Right; x += 4)
+        for (y = Y; y < Bottom; y += 4)
         {
-            xt = gcmSUPERTILE_OFFSET_X(x, y, Hardware->config->superTileMode);
-            yt = gcmSUPERTILE_OFFSET_Y(x, y);
-
-            trgLine = (gctUINT8_PTR) Logical + yt * TargetStride + xt * 1;
-            srcLine = (gctUINT8_PTR) Memory  + y  * SourceStride + x  * 1;
-
-            if ((((gctUINTPTR_T) srcLine & 3) == 0) && ((SourceStride & 3) == 0))
+            for (x = X; x < Right; x += 4)
             {
+                xt = gcmSUPERTILE_OFFSET_X(x, y, Hardware->config->superTileMode);
+                yt = gcmSUPERTILE_OFFSET_Y(x, y);
+
+                trgLine = (gctUINT8_PTR) Logical + yt * TargetStride + xt * 1;
+                srcLine = (gctUINT8_PTR) Memory  + y  * SourceStride + x  * 1;
+
                 /* Special optimization for aligned source. */
                 ((gctUINT32_PTR) trgLine)[0] = ((gctUINT32_PTR) (srcLine + SourceStride * 0))[0];
                 ((gctUINT32_PTR) trgLine)[1] = ((gctUINT32_PTR) (srcLine + SourceStride * 1))[0];
                 ((gctUINT32_PTR) trgLine)[2] = ((gctUINT32_PTR) (srcLine + SourceStride * 2))[0];
                 ((gctUINT32_PTR) trgLine)[3] = ((gctUINT32_PTR) (srcLine + SourceStride * 3))[0];
             }
-            else
+        }
+    }
+    else
+    {
+        for (y = Y; y < Bottom; y += 4)
+        {
+            for (x = X; x < Right; x += 4)
             {
                 gctUINT8_PTR src;
+
+                xt = gcmSUPERTILE_OFFSET_X(x, y, Hardware->config->superTileMode);
+                yt = gcmSUPERTILE_OFFSET_Y(x, y);
+
+                trgLine = (gctUINT8_PTR) Logical + yt * TargetStride + xt * 1;
+                srcLine = (gctUINT8_PTR) Memory  + y  * SourceStride + x  * 1;
 
                 /* 8 bpp to 8 bpp: one tile. */
                 src  = srcLine;
@@ -13018,6 +13030,7 @@ static void _GetBorderColor(
         gctUINT   uintValue;
     } minValue, maxValue;
 
+    gcoOS_ZeroMemory((gctPOINTER)&tempValue, gcmSIZEOF(tempValue));
     for (i = 0; i < 4; i++)
     {
         tempValue.fv[i] = borderColor32[i];
@@ -13858,6 +13871,10 @@ gcoHARDWARE_BindTexture(
         {
             roundUV = (SamplerInfo->textureInfo->magFilter == gcvTEXTURE_POINT &&
                        samplerWidth <= 32 && samplerHeight <= 32 ) ? 0 : 1;
+        }
+        else if (Hardware->patchID == gcvPATCH_NETFLIX)
+        {
+            roundUV = 1;
         }
         else
         {

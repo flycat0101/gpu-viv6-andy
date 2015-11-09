@@ -1233,10 +1233,12 @@ gcChipCreateTexture(
     __GLtextureObject *texObj
     )
 {
-    GLuint face;
-    GLuint level;
-    GLuint depth;
+    GLuint face, level;
     __GLchipTextureInfo *texInfo;
+    gctSIZE_T size;
+    GLvoid *pointer = NULL;
+    __GLchipMipmapInfo *mipmaps = NULL;
+    __GLchipResourceShadow *shadows = NULL;
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("gc=0x%x texObj=0x%x", gc, texObj);
@@ -1255,30 +1257,29 @@ gcChipCreateTexture(
     texObj->privateData = texInfo;
 
     texInfo->rendered = GL_FALSE;
-    texInfo->mipLevel = (__GLchipMipmapInfo**)gc->imports.malloc(gc,
-        texObj->maxFaces * sizeof(__GLchipMipmapInfo*));
 
-    if (!texInfo->mipLevel)
+    size = texObj->maxFaces * sizeof(__GLchipMipmapInfo*)
+         + texObj->maxFaces * texObj->maxLevels * sizeof(__GLchipMipmapInfo)
+         + texObj->maxFaces * texObj->maxLevels * texObj->maxDepths *sizeof(__GLchipResourceShadow);
+    pointer = gc->imports.calloc(gc, 1, size);
+    if (!pointer)
     {
         gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
     }
 
+    texInfo->mipLevel = (__GLchipMipmapInfo**)pointer;
+    mipmaps = (__GLchipMipmapInfo*)(texInfo->mipLevel + texObj->maxFaces);
+    shadows = (__GLchipResourceShadow*)(mipmaps + texObj->maxFaces * texObj->maxLevels);
+
     for (face = 0; face < texObj->maxFaces; ++face)
     {
-        texInfo->mipLevel[face] = (__GLchipMipmapInfo*)gc->imports.calloc(gc, 1,
-            texObj->maxLevels * sizeof(__GLchipMipmapInfo));
+        texInfo->mipLevel[face] = mipmaps;
+        mipmaps += texObj->maxLevels;
 
         for (level = 0; level < texObj->maxLevels; ++level)
         {
-            texInfo->mipLevel[face][level].shadow = (__GLchipResourceShadow*)gc->imports.calloc(gc,
-                texObj->maxDepths, sizeof(__GLchipResourceShadow));
-
-            for (depth = 0; depth < texObj->maxDepths; ++depth)
-            {
-                texInfo->mipLevel[face][level].shadow[depth].masterDirty = GL_FALSE;
-                texInfo->mipLevel[face][level].shadow[depth].shadowDirty = GL_FALSE;
-                texInfo->mipLevel[face][level].shadow[depth].surface = gcvNULL;
-            }
+            texInfo->mipLevel[face][level].shadow = shadows;
+            shadows += texObj->maxDepths;
         }
     }
 
@@ -1466,8 +1467,8 @@ gcChipResolveDrawToTempBitmap(
 {
     gceSTATUS status;
     gceSURF_FORMAT format  = gcvSURF_UNKNOWN;
-    GLuint  drawRTWidth    = 0;
-    GLuint  drawRTHeight   = 0;
+    GLuint  surfWidth    = 0;
+    GLuint  surfHeight   = 0;
 
     gcmHEADER_ARG("chipCtx=0x%x srcView=0x%x SourceX=%d SourceY=%d Width=%d Height=%d",
                     chipCtx, srcView, SourceX, SourceY, Width, Height);
@@ -1491,14 +1492,15 @@ gcChipResolveDrawToTempBitmap(
 
         gcsSURF_VIEW tmpView = {gcvNULL, 0, 1};
         gcsSURF_RESOLVE_ARGS rlvArgs = {0};
+        GLboolean surfYInverted = (gcoSURF_QueryFlags(srcView->surf, gcvSURF_FLAG_CONTENT_YINVERTED) == gcvSTATUS_TRUE);
 
-        gcmERR_BREAK(gcoSURF_GetSize(srcView->surf, &drawRTWidth, &drawRTHeight, gcvNULL));
+        gcmERR_BREAK(gcoSURF_GetSize(srcView->surf, &surfWidth, &surfHeight, gcvNULL));
 
         /* Clamp coordinates. */
         left   = gcmMAX(SourceX, 0);
         top    = gcmMAX(SourceY, 0);
-        right  = gcmMIN(SourceX + Width,  (GLint) drawRTWidth);
-        bottom = gcmMIN(SourceY + Height, (GLint) drawRTHeight);
+        right  = gcmMIN(SourceX + Width,  (GLint) surfWidth);
+        bottom = gcmMIN(SourceY + Height, (GLint) surfHeight);
 
         if ((right <= 0) || (bottom <= 0))
         {
@@ -1511,13 +1513,18 @@ gcChipResolveDrawToTempBitmap(
                                                  &resW,
                                                  &resH));
 
+        if (((gctUINT) right < resW) || ((gctUINT) bottom < resH))
+        {
+            gcmERR_BREAK(gcvSTATUS_INVALID_ARGUMENT);
+        }
+
         /* Convert GL coordinates. */
         sourceX = left;
 
         /* Adjust to right rectangle */
-        if (chipCtx->readYInverted)
+        if (surfYInverted)
         {
-            sourceY = (gctINT)(chipCtx->readRTHeight - bottom);
+            sourceY = (gctINT)(surfHeight - bottom);
         }
         else
         {
@@ -1525,18 +1532,23 @@ gcChipResolveDrawToTempBitmap(
         }
 
         rlvArgs.version = gcvHAL_ARG_VERSION_V2;
-        rlvArgs.uArgs.v2.yInverted  = chipCtx->readYInverted;
+        rlvArgs.uArgs.v2.yInverted  = surfYInverted;
         rlvArgs.uArgs.v2.numSlices = 1;
 
         /* Determine the aligned source origin. */
         rlvArgs.uArgs.v2.srcOrigin.x = sourceX & ~(resX - 1);
         rlvArgs.uArgs.v2.srcOrigin.y = sourceY & ~(resY - 1);
-        if ((rlvArgs.uArgs.v2.srcOrigin.x + (gctINT)resW > (GLint)drawRTWidth) &&
-            (rlvArgs.uArgs.v2.srcOrigin.x > 0)
-           )
+        if (rlvArgs.uArgs.v2.srcOrigin.x + (gctINT)resW > (GLint)surfWidth)
         {
-            rlvArgs.uArgs.v2.srcOrigin.x = (chipCtx->drawRTWidth - resW) & ~(resX - 1);
+            rlvArgs.uArgs.v2.srcOrigin.x = (surfWidth - resW) & ~(resX - 1);
         }
+
+        if (rlvArgs.uArgs.v2.srcOrigin.y + (gctINT)resH > (GLint)surfHeight)
+        {
+            rlvArgs.uArgs.v2.srcOrigin.y = (surfHeight - resH) & ~(resY - 1);
+        }
+
+        GL_ASSERT((rlvArgs.uArgs.v2.srcOrigin.x >= 0) && (rlvArgs.uArgs.v2.srcOrigin.y >= 0));
 
         /* Determine the origin adjustment. */
         chipCtx->tempX = sourceX - rlvArgs.uArgs.v2.srcOrigin.x;
@@ -1567,7 +1579,7 @@ gcChipResolveDrawToTempBitmap(
         /* Make sure the operation is complete. */
         gcmERR_BREAK(gcoHAL_Commit( chipCtx->hal, gcvTRUE));
 
-        if (chipCtx->readYInverted)
+        if (surfYInverted)
         {
             /* Compute the pointer to the last line. */
             chipCtx->tempLastLine
@@ -1911,8 +1923,14 @@ gcChipCopyTexImage(
             blitArgs.dstHeight          = height;
             blitArgs.dstDepth           = 1;
             blitArgs.xReverse           = gcvFALSE;
-            blitArgs.yReverse           = gcvFALSE;
             blitArgs.scissorTest        = gcvFALSE;
+            blitArgs.yReverse           = chipCtx->readYInverted;
+
+            if (chipCtx->readYInverted)
+            {
+                blitArgs.srcY = (gctINT)(chipCtx->readRTHeight - (y + height));
+            }
+
             gcmONERROR(gcoSURF_BlitCPU(&blitArgs));
         }
     }
@@ -2484,8 +2502,13 @@ gcChipCopyTexSubImage(
             blitArgs.dstHeight          = height;
             blitArgs.dstDepth           = 1;
             blitArgs.xReverse           = gcvFALSE;
-            blitArgs.yReverse           = gcvFALSE;
             blitArgs.scissorTest        = gcvFALSE;
+            blitArgs.yReverse           = chipCtx->readYInverted;
+
+            if (chipCtx->readYInverted)
+            {
+                blitArgs.srcY = (gctINT)(chipCtx->readRTHeight - (y + height));
+            }
             gcmONERROR(gcoSURF_BlitCPU(&blitArgs));
         }
     }
@@ -2770,10 +2793,7 @@ __glChipDeleteTexture(
                     mipLevel->shadow[depth].surface = gcvNULL;
                 }
             }
-            gc->imports.free(gc, mipLevel->shadow);
         }
-        gc->imports.free(gc, texInfo->mipLevel[face]);
-        texInfo->mipLevel[face] = gcvNULL;
     }
     gc->imports.free(gc, texInfo->mipLevel);
     texInfo->mipLevel = gcvNULL;

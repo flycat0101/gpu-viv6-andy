@@ -1885,7 +1885,8 @@ static gceSTATUS _Assign_vColor(
     gceSTATUS status;
     gcmHEADER_ARG("Context=0x%x ShaderControl=0x%x OutputIndex=%d", Context, ShaderControl, OutputIndex);
 
-    if (Context->lightingStates.shadeModel == GL_FLAT)
+    if (Context->lightingStates.shadeModel == GL_FLAT &&
+        !Context->hashKey.hashPointPrimitive)
     {
         shadingMode = gcSHADER_SHADER_FLAT;
     }

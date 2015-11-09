@@ -600,6 +600,18 @@ _VSC_MC_GEN_GenOpcode(
     case VIR_OP_TEXLD_GATHER_PCF:
         *BaseOpcode = MC_AUXILIARY_OP_CODE_TEXLD_GATHER_PCF;
         break;
+    case VIR_OP_TEXLD_U_F_L:
+        *BaseOpcode = 0x4B;
+        break;
+    case VIR_OP_TEXLD_U_F_B:
+        *BaseOpcode = 0x7B;
+        break;
+    case VIR_OP_TEXLD_U_S_L:
+        *BaseOpcode = 0x49;
+        break;
+    case VIR_OP_TEXLD_U_U_L:
+        *BaseOpcode = 0x4A;
+        break;
     case VIR_OP_IMG_LOAD:
     case VIR_OP_VX_IMG_LOAD:
         *BaseOpcode = 0x79;

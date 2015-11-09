@@ -88,6 +88,6 @@ LIBS += -lm -lpthread -lGAL -lGL
 
 LFLAGS += -Wl,--version-script=glCoreSymExport
 
-INSTALL_DIR = $(SDK_DIR)/drivers
+INSTALL_DIR = $(SDK_DIR)/drivers/dri
 
 include $(AQROOT)/common.target

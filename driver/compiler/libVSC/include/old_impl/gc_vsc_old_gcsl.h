@@ -288,13 +288,16 @@ typedef enum _gcSL_OPCODE
     gcSL_IMAGE_ADDR_3D, /* 0x8A */
     gcSL_GET_SAMPLER_LMM, /* 0x8B Get sampler's lodminmax */
     gcSL_GET_SAMPLER_LBS, /* 0x8C Get sampler's levelbasesize */
+    gcSL_TEXLD_U, /* 0x8D For TEXLD_U, use the format of coord to select FLOAT/INT/UNSIGINED. */
     gcSL_MAXOPCODE
 }
 gcSL_OPCODE;
 
-#define gcSL_isOpcodeTexld(Opcode)         ((Opcode) == gcSL_TEXLD ||       \
-                                            (Opcode) == gcSL_TEXLDPROJ ||   \
-                                            (Opcode) == gcSL_TEXLDPCF ||    \
+#define gcSL_isOpcodeTexld(Opcode)         ((Opcode) == gcSL_TEXLD         ||    \
+                                            (Opcode) == gcSL_TEXLD_U       ||    \
+                                            (Opcode) == gcSL_TEXLDPROJ     ||    \
+                                            (Opcode) == gcSL_TEXLDPCF      ||    \
+                                            (Opcode) == gcSL_TEXLODQ       ||    \
                                             (Opcode) == gcSL_TEXLDPCFPROJ)
 
 #define gcSL_isOpcodeTexldModifier(Opcode) ((Opcode) == gcSL_TEXBIAS ||    \

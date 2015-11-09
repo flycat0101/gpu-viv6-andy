@@ -193,6 +193,7 @@ const gcSL_OPCODE_ATTR gcvOpcodeAttr[] =
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HP      }, /* gcSL_IMAGE_ADDR_3D, 0x8A  ES31 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_MP      }, /* gcSL_GET_SAMPLER_LMM,0x8B Get sampler's lodminmax */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_MP      }, /* gcSL_GET_SAMPLER_LBS,0x8C Get sampler's levelbasesize */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_TEXLD_U, 0x8D */
 };
 char _checkOpAttr_size[sizeof(gcvOpcodeAttr)/sizeof(gcvOpcodeAttr[0]) == gcSL_MAXOPCODE];
 
@@ -30639,9 +30640,7 @@ gcSHADER_CountCode(
         /* If there is a texld on vs and the previous code is not texlod,
         ** we need to increase the code count for texlod.
         */
-        if ((Shader->type == gcSHADER_TYPE_VERTEX) &&
-            (opcode == gcSL_TEXLD || opcode == gcSL_TEXLDPROJ ||
-             opcode == gcSL_TEXLDPCF || opcode == gcSL_TEXLDPCFPROJ))
+        if ((Shader->type == gcSHADER_TYPE_VERTEX) && gcSL_isOpcodeTexld(opcode))
         {
             if (instIdx == 0 && !gcHasNewTexld())
             {

@@ -41,6 +41,8 @@ BEGIN_EXTERN_C()
 #define MC_AUXILIARY_OP_CODE_TEXLD_U_BIAS      0xFFFF0008 /* Extended from 0x7B */
 #define MC_AUXILIARY_OP_CODE_TEXLD_GATHER      0xFFFF0009 /* Extended from 0x7D */
 #define MC_AUXILIARY_OP_CODE_TEXLD_GATHER_PCF  0xFFFF000a /* Extended from 0x7D */
+#define MC_AUXILIARY_OP_CODE_TEXLD_U_F_B_PLAIN 0xFFFF000b /* Extended from 0x7B */
+#define MC_AUXILIARY_OP_CODE_TEXLD_U_F_B_BIAS  0xFFFF000c /* Extended from 0x7B */
 
 /* Normally, stores don't need dst, but for the chips that equiped with USC, if src2 is
    immediate/constant/dynamic-indexing, dst must be provided. To differ with normal stores,

@@ -1250,7 +1250,6 @@ gcoBUFFER_Reserve(
 
     gcmASSERT(commandBuffer != gcvNULL);
     gcmASSERT(finalBytes <= commandBuffer->free);
-    gcmASSERT(finalBytes >= 0);
 
     /* Determine the data offset. */
     offset = commandBuffer->offset + alignBytes;

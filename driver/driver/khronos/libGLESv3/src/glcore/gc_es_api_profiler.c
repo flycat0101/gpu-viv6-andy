@@ -18,8 +18,6 @@
 
 __GLesTracerDispatchTableStruct __glesTracerDispatchTable = {0};
 
-const GLint __glesTracerDispatchTableSize = sizeof(__GLesTracerDispatchTableStruct) / sizeof(GLvoid*);
-
 #define __glesApiNameStr(func)  #func
 
 GLchar *__glesTracerFuncNames[] = {
@@ -62,16 +60,17 @@ extern GLint __glesApiProfileMode;
 
 #endif
 
-GLboolean __glInitTracerDispatchTable(GLint trmode)
+GLboolean __glInitTracerDispatchTable(GLint trmode, __GLApiVersion apiVersion)
 {
-    gctHANDLE trlib = gcvNULL;
-    gctPOINTER funcPtr = gcvNULL;
-    gceSTATUS status;
-    char trApiName[80];
-    int i;
-
     if (trmode == gcvTRACEMODE_LOGGER)
     {
+        gctHANDLE trlib = gcvNULL;
+        gctPOINTER funcPtr = gcvNULL;
+        gceSTATUS status;
+        char trApiName[80];
+        GLsizei tableSize;
+        GLsizei i;
+
 #if defined(_WIN32) || defined(_WIN32_WCE)
         gcoOS_LoadLibrary(gcvNULL, "libGLES_vlogger.dll", &trlib);
 #else
@@ -92,7 +91,26 @@ GLboolean __glInitTracerDispatchTable(GLint trmode)
             return GL_FALSE;
         }
 
-        for (i = 0; i < __glesTracerDispatchTableSize; i++)
+        switch (apiVersion)
+        {
+        case __GL_API_VERSION_ES20:
+            tableSize = (GLsizei)(offsetof(__GLesTracerDispatchTableStruct, ReadBuffer)              / sizeof(GLvoid*));
+            break;
+        case __GL_API_VERSION_ES30:
+            tableSize = (GLsizei)(offsetof(__GLesTracerDispatchTableStruct, DispatchCompute)         / sizeof(GLvoid*));
+            break;
+        case __GL_API_VERSION_ES31:
+            tableSize = (GLsizei)(offsetof(__GLesTracerDispatchTableStruct, TexStorage3DMultisample) / sizeof(GLvoid*));
+            break;
+        case __GL_API_VERSION_ES32:
+            tableSize = (GLsizei)(sizeof(__GLesTracerDispatchTableStruct)                            / sizeof(GLvoid*));
+            break;
+        default:
+            GL_ASSERT(0);
+            return GL_FALSE;
+        }
+
+        for (i = 0; i < tableSize; ++i)
         {
             trApiName[0] = '\0';
             gcoOS_StrCatSafe(trApiName, 80, "TR_gl");
@@ -3846,7 +3864,7 @@ GLvoid* GL_APIENTRY __glesProfile_MapBufferRange(__GLcontext *gc, GLenum target,
 
     if (__glesTracerDispatchTable.MapBufferRange)
     {
-        (*__glesTracerDispatchTable.MapBufferRange)(target, offset, length, access);
+        (*__glesTracerDispatchTable.MapBufferRange)(target, offset, length, access, buf);
     }
 
     return buf;
@@ -8125,7 +8143,7 @@ GLvoid* GL_APIENTRY __glesProfile_MapBufferOES(__GLcontext *gc, GLenum target, G
 
     if (__glesTracerDispatchTable.MapBufferOES)
     {
-        (*__glesTracerDispatchTable.MapBufferOES)(target, access);
+        (*__glesTracerDispatchTable.MapBufferOES)(target, access, addr);
     }
 
     return addr;

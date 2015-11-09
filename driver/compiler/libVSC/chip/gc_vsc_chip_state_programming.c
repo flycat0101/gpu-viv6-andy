@@ -637,16 +637,6 @@ static VSC_ErrCode _ProgramVsInsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PR
         }
         VSC_LOAD_HW_STATE(0x021A, state);
 
-        if (pStatesPgmer->pHwCfg->hwFeatureFlags.newSteeringICacheFlush)
-        {
-            state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 0:0) - (0 ? 0:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 0:0) - (0 ?
- 0:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0)));
-            VSC_LOAD_HW_STATE(0x022C, state);
-        }
-
         /* Prefetch inst */
         if (pStatesPgmer->pHwCfg->hwFeatureFlags.hasInstCachePrefetch)
         {
@@ -792,18 +782,7 @@ static VSC_ErrCode _ProgramVsInsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PR
  4:4)));
             }
 
-            VSC_LOAD_HW_STATE(0x021A, state);
-
-            if (pStatesPgmer->pHwCfg->hwFeatureFlags.newSteeringICacheFlush)
-            {
-                state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 0:0) - (0 ? 0:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 0:0) - (0 ?
- 0:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0)));
-
-                VSC_LOAD_HW_STATE(0x022C, state);
-             }
+            VSC_LOAD_HW_STATE(0x021A, state)
 
             state = 0;
             VSC_LOAD_HW_STATE(0x021B, state);
@@ -1311,14 +1290,6 @@ static VSC_ErrCode _ProgramHsInsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PR
     /* Invalidate cache lines ownered by HS */
     gcmASSERT(pStatesPgmer->pHwCfg->hwFeatureFlags.newSteeringICacheFlush);
 
-    state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 1:1) - (0 ?
- 1:1) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ?
- 1:1))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 1:1) - (0 ?
- 1:1) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ?
- 1:1)));
-
-    VSC_LOAD_HW_STATE(0x022C, state);
-
     /* Prefetch inst */
     if (pStatesPgmer->pHwCfg->hwFeatureFlags.hasInstCachePrefetch)
     {
@@ -1823,14 +1794,6 @@ static VSC_ErrCode _ProgramDsInsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PR
     /* Invalidate cache lines ownered by DS */
     gcmASSERT(pStatesPgmer->pHwCfg->hwFeatureFlags.newSteeringICacheFlush);
 
-    state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 2:2) - (0 ?
- 2:2) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ?
- 2:2))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 2:2) - (0 ?
- 2:2) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ?
- 2:2)));
-
-    VSC_LOAD_HW_STATE(0x022C, state);
-
     /* Prefetch inst */
     if (pStatesPgmer->pHwCfg->hwFeatureFlags.hasInstCachePrefetch)
     {
@@ -2197,15 +2160,6 @@ static VSC_ErrCode _ProgramGsInsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PR
     VSC_LOAD_HW_STATE(0x021A, state);
 
     gcmASSERT(pStatesPgmer->pHwCfg->hwFeatureFlags.newSteeringICacheFlush);
-
-    /* Invalidate cache lines ownered by GS */
-    state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 3:3) - (0 ?
- 3:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ?
- 3:3))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 3:3) - (0 ?
- 3:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ?
- 3:3)));
-
-    VSC_LOAD_HW_STATE(0x022C, state);
 
     /* Prefetch inst */
     if (pStatesPgmer->pHwCfg->hwFeatureFlags.hasInstCachePrefetch)
@@ -2804,16 +2758,6 @@ static VSC_ErrCode _ProgramPsInsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PR
 
         VSC_LOAD_HW_STATE(0x021A, state);
 
-        if (pStatesPgmer->pHwCfg->hwFeatureFlags.newSteeringICacheFlush)
-        {
-            state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 4:4) - (0 ? 4:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ?
- 4:4))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 4:4) - (0 ?
- 4:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ?
- 4:4)));
-            VSC_LOAD_HW_STATE(0x022C, state);
-        }
-
         /* Prefetch inst */
         if (pStatesPgmer->pHwCfg->hwFeatureFlags.hasInstCachePrefetch)
         {
@@ -3039,16 +2983,6 @@ static VSC_ErrCode _ProgramPsInsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PR
             }
 
             VSC_LOAD_HW_STATE(0x021A, state);
-
-            if (pStatesPgmer->pHwCfg->hwFeatureFlags.newSteeringICacheFlush)
-            {
-                state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 4:4) - (0 ? 4:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ?
- 4:4))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 4:4) - (0 ?
- 4:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ?
- 4:4)));
-                VSC_LOAD_HW_STATE(0x022C, state);
-            }
 
             state = 0;
             VSC_LOAD_HW_STATE(0x040A, state);

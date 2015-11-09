@@ -2072,9 +2072,7 @@ gcoSURF_Destroy(
 #endif
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_AddRecordAllocation(-(gctINT32)Surface->info.node.size);
-#endif
 #endif
 
     /* Free the video memory. */
@@ -13141,9 +13139,7 @@ gcsSURF_NODE_Construct(
     }
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_AddRecordAllocation((gctINT32)Node->size);
-#endif
 #endif
 
     gcmFOOTER_NO();

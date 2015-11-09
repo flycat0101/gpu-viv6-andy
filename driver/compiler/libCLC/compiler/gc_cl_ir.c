@@ -1991,6 +1991,30 @@ cloIR_InitializeVecCompSelTypes()
        (to)->matrixSize = (from)->matrixSize; \
    } while (gcvFALSE)
 
+#define _clmDATA_TYPE_InitializeGenTypeWithCheck(compiler, to, from, ref, refParamName, updateRef) \
+   do { \
+       gctUINT8 vectorSize; \
+       vectorSize =  clmDATA_TYPE_vectorSize_NOCHECK_GET(from); \
+       if(vectorSize == 0 && /* scalar */ \
+          (vectorSize != clmDATA_TYPE_vectorSize_NOCHECK_GET(ref) || \
+           (ref)->elementType > (from)->elementType)) { \
+           (to)->type = (ref)->type; \
+           (to)->elementType = (ref)->elementType; \
+           (to)->matrixSize = (ref)->matrixSize; \
+           gcmVERIFY_OK(cloCOMPILER_CloneDataType((Compiler), \
+                                                  (to)->accessQualifier, \
+                                                  (to)->addrSpaceQualifier, \
+                                                  (to), \
+                                                  &(refParamName)->u.variableInfo.effectiveDecl.dataType)); \
+           (updateRef) = gcvTRUE; \
+       } \
+       else { \
+           (to)->type = (from)->type; \
+           (to)->elementType = (from)->elementType; \
+           (to)->matrixSize = (from)->matrixSize; \
+       } \
+   } while (gcvFALSE)
+
 #define _clmConvElementTypeToSigned(et) \
    (et == clvTYPE_UINT ? clvTYPE_INT : \
     (et == clvTYPE_USHORT ? clvTYPE_SHORT : \
@@ -2153,23 +2177,27 @@ clsDECL_IsMatchingBuiltinArg(
 IN cloCOMPILER Compiler,
 IN clsNAME * ParamName,
 IN cloIR_EXPR Argument,
-IN OUT cltELEMENT_TYPE *RefElementType,
-IN OUT clsDATA_TYPE ** RefDataType
+IN OUT clsNAME **RefParamName
 )
 {
   clsDECL lDecl[1];
   clsDECL *paramDecl;
   clsDECL *rDecl;
   clsDATA_TYPE dataType[1];
+  clsDATA_TYPE *refDataType = gcvNULL;
+  cltELEMENT_TYPE refElementType = clvTYPE_VOID;
   gctBOOL updateRefDataType = gcvFALSE;
   gctBOOL matched = gcvFALSE;
-  gctBOOL sameElementType = gcvFALSE;
+  gctBOOL sameType = gcvFALSE;
 
   gcmASSERT(ParamName);
   gcmASSERT(Argument);
-  gcmASSERT(RefElementType);
-  gcmASSERT(RefDataType);
+  gcmASSERT(RefParamName);
 
+  if(*RefParamName) {
+      refDataType = (*RefParamName)->u.variableInfo.effectiveDecl.dataType;
+      refElementType = (*RefParamName)->decl.dataType->elementType;
+  }
   paramDecl = &ParamName->decl;
   rDecl = &Argument->decl;
   if(clmDECL_IsScalar(rDecl) &&
@@ -2197,7 +2225,7 @@ IN OUT clsDATA_TYPE ** RefDataType
   *dataType = *(paramDecl->dataType);
   clmDECL_Initialize(lDecl, dataType, &paramDecl->array, paramDecl->ptrDscr, gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
   if(clmDECL_IsGenType(paramDecl)) {
-     if(*RefDataType == gcvNULL) {
+     if(refDataType == gcvNULL) {
         _GetGenTypeCandidateType(paramDecl,
                                  rDecl,
                                  lDecl);
@@ -2205,18 +2233,23 @@ IN OUT clsDATA_TYPE ** RefDataType
      }
      else switch(paramDecl->dataType->elementType) {
      case clvTYPE_SIU_GEN:
-        switch(*RefElementType) {
+        switch(refElementType) {
         case clvTYPE_SIU_GEN:
-           _clmDATA_TYPE_InitializeGenType(lDecl->dataType, *RefDataType);
+           _clmDATA_TYPE_InitializeGenTypeWithCheck(compiler,
+                                                    lDecl->dataType,
+                                                    refDataType,
+                                                    rDecl->dataType,
+                                                    *RefParamName,
+                                                    updateRefDataType);
            break;
 
         case clvTYPE_I_GEN:
         case clvTYPE_U_GEN:
         case clvTYPE_IU_GEN:
-           _clmInitGenType((*RefDataType)->elementType,
+           _clmInitGenType(refDataType->elementType,
                           1,
                           dataType);
-       break;
+           break;
 
         case clvTYPE_F_GEN:
         case clvTYPE_GEN:
@@ -2232,10 +2265,10 @@ IN OUT clsDATA_TYPE ** RefDataType
         break;
 
      case clvTYPE_GEN:
-        switch(*RefElementType) {
+        switch(refElementType) {
         case clvTYPE_SIU_GEN:
            if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType)) {
-              _clmDATA_TYPE_InitializeGenType(lDecl->dataType, *RefDataType);
+              _clmDATA_TYPE_InitializeGenType(lDecl->dataType, refDataType);
            }
            updateRefDataType = gcvTRUE;
            break;
@@ -2246,14 +2279,19 @@ IN OUT clsDATA_TYPE ** RefDataType
         case clvTYPE_F_GEN:
            if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType)) {
               _clmInitGenType(rDecl->dataType->elementType,
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(*RefDataType),
+                             clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
                              dataType);
            }
            updateRefDataType = gcvTRUE;
            break;
 
         case clvTYPE_GEN:
-           _clmDATA_TYPE_InitializeGenType(lDecl->dataType, *RefDataType);
+           _clmDATA_TYPE_InitializeGenTypeWithCheck(Compiler,
+                                                    lDecl->dataType,
+                                                    refDataType,
+                                                    rDecl->dataType,
+                                                    *RefParamName,
+                                                    updateRefDataType);
            break;
         default:
            break;
@@ -2261,17 +2299,17 @@ IN OUT clsDATA_TYPE ** RefDataType
         break;
 
      case clvTYPE_I_GEN:
-        switch(*RefElementType) {
+        switch(refElementType) {
         case clvTYPE_IU_GEN:
         case clvTYPE_U_GEN:
-           _clmInitGenType(_clmConvElementTypeToSigned((*RefDataType)->elementType),
-                          clmDATA_TYPE_vectorSize_NOCHECK_GET(*RefDataType),
+           _clmInitGenType(_clmConvElementTypeToSigned(refDataType->elementType),
+                          clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
                           dataType);
            break;
 
         case clvTYPE_SIU_GEN:
            if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType)) {
-              _clmInitGenType(_clmConvElementTypeToSigned((*RefDataType)->elementType),
+              _clmInitGenType(_clmConvElementTypeToSigned(refDataType->elementType),
                              clmDATA_TYPE_vectorSize_NOCHECK_GET(rDecl->dataType),
                              dataType);
            }
@@ -2279,7 +2317,12 @@ IN OUT clsDATA_TYPE ** RefDataType
            break;
 
         case clvTYPE_I_GEN:
-           _clmDATA_TYPE_InitializeGenType(lDecl->dataType, *RefDataType);
+           _clmDATA_TYPE_InitializeGenTypeWithCheck(Compiler,
+                                                    lDecl->dataType,
+                                                    refDataType,
+                                                    rDecl->dataType,
+                                                    *RefParamName,
+                                                    updateRefDataType);
            break;
 
         case clvTYPE_F_GEN:
@@ -2287,7 +2330,7 @@ IN OUT clsDATA_TYPE ** RefDataType
            if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType) &&
               clmIsElementTypeInteger(rDecl->dataType->elementType)) {
               _clmInitGenType(_clmConvElementTypeToSigned(rDecl->dataType->elementType),
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(*RefDataType),
+                             clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
                              dataType);
            }
            break;
@@ -2297,21 +2340,26 @@ IN OUT clsDATA_TYPE ** RefDataType
         break;
 
      case clvTYPE_U_GEN:
-        switch(*RefElementType) {
+        switch(refElementType) {
         case clvTYPE_IU_GEN:
         case clvTYPE_I_GEN:
-           _clmInitGenType(_clmConvElementTypeToUnsigned((*RefDataType)->elementType),
-                          clmDATA_TYPE_vectorSize_NOCHECK_GET(*RefDataType),
+           _clmInitGenType(_clmConvElementTypeToUnsigned(refDataType->elementType),
+                          clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
                           dataType);
            break;
 
         case clvTYPE_U_GEN:
-           _clmDATA_TYPE_InitializeGenType(lDecl->dataType, *RefDataType);
+           _clmDATA_TYPE_InitializeGenTypeWithCheck(Compiler,
+                                                    lDecl->dataType,
+                                                    refDataType,
+                                                    rDecl->dataType,
+                                                    *RefParamName,
+                                                    updateRefDataType);
            break;
 
         case clvTYPE_SIU_GEN:
            if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType)) {
-              _clmInitGenType(_clmConvElementTypeToUnsigned((*RefDataType)->elementType),
+              _clmInitGenType(_clmConvElementTypeToUnsigned(refDataType->elementType),
                              clmDATA_TYPE_vectorSize_NOCHECK_GET(rDecl->dataType),
                              dataType);
            }
@@ -2323,7 +2371,7 @@ IN OUT clsDATA_TYPE ** RefDataType
            if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType) &&
               clmIsElementTypeInteger(rDecl->dataType->elementType)) {
               _clmInitGenType(_clmConvElementTypeToUnsigned(rDecl->dataType->elementType),
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(*RefDataType),
+                             clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
                              dataType);
            }
            break;
@@ -2333,21 +2381,26 @@ IN OUT clsDATA_TYPE ** RefDataType
         break;
 
      case clvTYPE_IU_GEN:
-        switch(*RefElementType) {
+        switch(refElementType) {
         case clvTYPE_IU_GEN:
-           _clmDATA_TYPE_InitializeGenType(lDecl->dataType, *RefDataType);
+           _clmDATA_TYPE_InitializeGenTypeWithCheck(Compiler,
+                                                    lDecl->dataType,
+                                                    refDataType,
+                                                    rDecl->dataType,
+                                                    *RefParamName,
+                                                    updateRefDataType);
            break;
 
         case clvTYPE_I_GEN:
            if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType)) {
               if(clmIsElementTypeUnsigned(rDecl->dataType->elementType)) {
-                 dataType->elementType =_clmConvElementTypeToUnsigned((*RefDataType)->elementType);
+                 dataType->elementType =_clmConvElementTypeToUnsigned(refDataType->elementType);
               }
               else {
-                 dataType->elementType = (*RefDataType)->elementType;
+                 dataType->elementType = refDataType->elementType;
               }
               _clmInitGenType(dataType->elementType,
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(*RefDataType),
+                             clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
                              dataType);
            }
            updateRefDataType = gcvTRUE;
@@ -2356,13 +2409,13 @@ IN OUT clsDATA_TYPE ** RefDataType
         case clvTYPE_U_GEN:
            if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType)) {
               if(clmIsElementTypeSigned(rDecl->dataType->elementType)) {
-                 dataType->elementType =_clmConvElementTypeToSigned((*RefDataType)->elementType);
+                 dataType->elementType =_clmConvElementTypeToSigned(refDataType->elementType);
               }
               else {
-                 dataType->elementType = (*RefDataType)->elementType;
+                 dataType->elementType = refDataType->elementType;
               }
               _clmInitGenType(dataType->elementType,
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(*RefDataType),
+                             clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
                              dataType);
            }
            updateRefDataType = gcvTRUE;
@@ -2370,7 +2423,7 @@ IN OUT clsDATA_TYPE ** RefDataType
 
         case clvTYPE_SIU_GEN:
            if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType)) {
-              _clmInitGenType((*RefDataType)->elementType,
+              _clmInitGenType(refDataType->elementType,
                              clmDATA_TYPE_vectorSize_NOCHECK_GET(rDecl->dataType),
                              dataType);
            }
@@ -2382,7 +2435,7 @@ IN OUT clsDATA_TYPE ** RefDataType
            if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType) &&
               clmIsElementTypeInteger(rDecl->dataType->elementType)) {
               _clmInitGenType(rDecl->dataType->elementType,
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(*RefDataType),
+                             clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
                              dataType);
            }
            break;
@@ -2392,7 +2445,7 @@ IN OUT clsDATA_TYPE ** RefDataType
         break;
 
      case clvTYPE_F_GEN:
-        switch(*RefElementType) {
+        switch(refElementType) {
         case clvTYPE_SIU_GEN:
            if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType) &&
               clmIsElementTypeFloating(rDecl->dataType->elementType)) {
@@ -2406,20 +2459,25 @@ IN OUT clsDATA_TYPE ** RefDataType
         case clvTYPE_IU_GEN:
            if(clmIsElementTypeFloating(rDecl->dataType->elementType)) {
               _clmInitGenType(rDecl->dataType->elementType,
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(*RefDataType),
+                             clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
                              dataType);
            }
            updateRefDataType = gcvTRUE;
            break;
 
         case clvTYPE_F_GEN:
-           _clmDATA_TYPE_InitializeGenType(lDecl->dataType, *RefDataType);
+           _clmDATA_TYPE_InitializeGenTypeWithCheck(Compiler,
+                                                    lDecl->dataType,
+                                                    refDataType,
+                                                    rDecl->dataType,
+                                                    *RefParamName,
+                                                    updateRefDataType);
            break;
 
         case clvTYPE_GEN:
            if(clmIsElementTypeFloating(rDecl->dataType->elementType)) {
               _clmInitGenType(rDecl->dataType->elementType,
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(*RefDataType),
+                             clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
                              dataType);
            }
            break;
@@ -2434,15 +2492,16 @@ IN OUT clsDATA_TYPE ** RefDataType
      if(clmDECL_IsScalar(rDecl) &&
         !clmDECL_IsPointerType(rDecl) &&
         ParamName->u.variableInfo.isConvertibleType) {  /*implicit conversion */
-        sameElementType = gcvTRUE;
+        sameType = gcvTRUE;
      }
   }
 
-  if((sameElementType || lDecl->dataType->elementType == rDecl->dataType->elementType) &&
+  if(sameType ||
+     (lDecl->dataType->elementType == rDecl->dataType->elementType &&
      (clmDATA_TYPE_vectorSize_NOCHECK_GET(lDecl->dataType) == clmDATA_TYPE_vectorSize_NOCHECK_GET(rDecl->dataType)) &&
      (clmDATA_TYPE_matrixRowCount_GET(lDecl->dataType) == clmDATA_TYPE_matrixRowCount_GET(rDecl->dataType)) &&
      (clmDATA_TYPE_matrixColumnCount_GET(lDecl->dataType) == clmDATA_TYPE_matrixColumnCount_GET(rDecl->dataType)) &&
-     (lDecl->dataType->u.generic == rDecl->dataType->u.generic)) {
+     (lDecl->dataType->u.generic == rDecl->dataType->u.generic))) {
     if(!clmDECL_IsArray(lDecl)) {
        if(clmDECL_IsArray(rDecl)) {
           matched = (clParseCountIndirectionLevel(lDecl->ptrDscr) == 1);
@@ -2467,15 +2526,14 @@ IN OUT clsDATA_TYPE ** RefDataType
                                           lDecl->dataType->addrSpaceQualifier,
                                           lDecl->dataType,
                                           &ParamName->u.variableInfo.effectiveDecl.dataType);
-    gcmASSERT(gcmNO_ERROR(status));
+       gcmASSERT(gcmNO_ERROR(status));
 
     }
     else {
       ParamName->u.variableInfo.effectiveDecl = ParamName->decl;
     }
     if(updateRefDataType) {
-       *RefDataType = ParamName->u.variableInfo.effectiveDecl.dataType;
-       *RefElementType = paramDecl->dataType->elementType;
+       *RefParamName = ParamName;
     }
   }
   if(clmDECL_IsGenType(paramDecl) && !_clGentypeArgCheck) return gcvTRUE;
@@ -2484,42 +2542,50 @@ IN OUT clsDATA_TYPE ** RefDataType
 
 static void
 _UpdateGentypeDataType(
-IN cltELEMENT_TYPE RefElementType,
-IN clsDATA_TYPE *RefDataType,
+IN clsNAME *RefParamName,
+IN clsDATA_TYPE *OrgFuncDataType,
 IN OUT clsDATA_TYPE *FuncDataType
 )
 {
-   if(!clmDATA_TYPE_IsGenType(FuncDataType)) return;
-   if(RefDataType && FuncDataType->elementType == RefElementType) {
-       _clmDATA_TYPE_InitializeGenType(FuncDataType, RefDataType);
+   clsDATA_TYPE *refDataType = gcvNULL;
+   cltELEMENT_TYPE refElementType = clvTYPE_VOID;
+
+   if(!clmDATA_TYPE_IsGenType(OrgFuncDataType)) return;
+
+   if(RefParamName) {
+       refDataType = RefParamName->u.variableInfo.effectiveDecl.dataType;
+       refElementType = RefParamName->decl.dataType->elementType;
    }
-   else {
+   if(refDataType && OrgFuncDataType->elementType == refElementType) {
+       _clmDATA_TYPE_InitializeGenType(FuncDataType, refDataType);
+   }
+   else if(clmDATA_TYPE_IsGenType(FuncDataType)) {
      cltELEMENT_TYPE elementType;
 
-     switch(RefElementType) {
+     switch(refElementType) {
      case clvTYPE_I_GEN:
      case clvTYPE_U_GEN:
      case clvTYPE_IU_GEN:
      case clvTYPE_GEN:
        if(FuncDataType->elementType == clvTYPE_I_GEN) {
-          if(clmIsElementTypeUnsigned(RefDataType->elementType)) {
-             elementType =_clmConvElementTypeToSigned(RefDataType->elementType);
+          if(clmIsElementTypeUnsigned(refDataType->elementType)) {
+             elementType =_clmConvElementTypeToSigned(refDataType->elementType);
           }
           else {
-             elementType = RefDataType->elementType;
+             elementType = refDataType->elementType;
           }
        }
        else if(FuncDataType->elementType == clvTYPE_U_GEN) {
-          if(clmIsElementTypeSigned(RefDataType->elementType)) {
-             elementType =_clmConvElementTypeToUnsigned(RefDataType->elementType);
+          if(clmIsElementTypeSigned(refDataType->elementType)) {
+             elementType =_clmConvElementTypeToUnsigned(refDataType->elementType);
           }
           else {
-             elementType = RefDataType->elementType;
+             elementType = refDataType->elementType;
           }
        }
        else if(FuncDataType->elementType == clvTYPE_F_GEN) {
-          if(clmIsElementTypeFloating(RefDataType->elementType)) {
-             elementType = RefDataType->elementType;
+          if(clmIsElementTypeFloating(refDataType->elementType)) {
+             elementType = refDataType->elementType;
           }
           else elementType = clvTYPE_FLOAT;
        }
@@ -2541,7 +2607,7 @@ IN OUT clsDATA_TYPE *FuncDataType
        return;
      }
      _clmInitGenType(elementType,
-                    clmDATA_TYPE_vectorSize_NOCHECK_GET(RefDataType),
+                    clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
                     FuncDataType);
   }
 }
@@ -2617,7 +2683,7 @@ OUT clsNAME **NewFuncName
                                           clvEXTENSION_NONE,
                                           &newParamName));
         newParamName->u.variableInfo.effectiveDecl = newParamName->decl;
-        newParamName->u.variableInfo.isConvertibleType = paramName->u.variableInfo.isConvertibleType;
+        newParamName->u.variableInfo.isConvertibleType = gcvFALSE;
         newParamName->u.variableInfo.hasGenType = paramName->u.variableInfo.hasGenType;
       }
 OnError:
@@ -2726,8 +2792,7 @@ OUT clsDATA_TYPE *FuncDataType
     }
 
     if(FuncName->isBuiltin) {
-       clsDATA_TYPE *refDataType = gcvNULL;
-       cltELEMENT_TYPE refElementType = clvTYPE_VOID;
+       clsNAME *refParamName = gcvNULL;
 
        for (paramName = (clsNAME *)FuncName->u.funcInfo.localSpace->names.next,
             argument = (cloIR_EXPR)PolynaryExpr->operands->members.next;
@@ -2740,16 +2805,16 @@ OUT clsDATA_TYPE *FuncDataType
             if (!clsDECL_IsMatchingBuiltinArg(Compiler,
                                               paramName,
                                               argument,
-                                              &refElementType,
-                                              &refDataType)) {
+                                              &refParamName)) {
                 return gcvFALSE;
             }
 
-            if(!*HasGenType && clmIsElementTypeGenType(refElementType)) {
+            if(!*HasGenType && refParamName &&
+               clmIsElementTypeGenType(refParamName->decl.dataType->elementType)) {
                 *HasGenType = gcvTRUE;
             }
 
-            _UpdateGentypeDataType(refElementType, refDataType, FuncDataType);
+            _UpdateGentypeDataType(refParamName, FuncName->decl.dataType, FuncDataType);
        }
        if(clmDATA_TYPE_IsGenType(FuncDataType)) return gcvFALSE;
     }

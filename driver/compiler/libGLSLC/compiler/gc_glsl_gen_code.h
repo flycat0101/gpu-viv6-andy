@@ -183,6 +183,8 @@ typedef enum _sleOPCODE
     slvOPCODE_EMIT_VERTEX,
     slvOPCODE_END_PRIMITIVE,
 
+    slvOPCODE_TEXTURE_LOAD_U,
+
     /* The max opcode. */
     slvOPCODE_MAXOPCODE
 }
@@ -1243,26 +1245,17 @@ sleGEN_CODE_HINT;
 typedef struct _slsGEN_CODE_PARAMETERS
 {
     gctBOOL            needLOperand;
-
     gctBOOL            needROperand;
-
     sleGEN_CODE_HINT   hint;
-
     sloIR_CONSTANT     constant;
-
     gctUINT            offsetInParent;
-
     gctUINT            operandCount;
-
     gcSHADER_TYPE *    dataTypes;
-
     slsLOPERAND *      lOperands;
-
     slsROPERAND *      rOperands;
-
     slsNAME            *constantVariable;
-
     gctBOOL            treatFloatAsInt;
+    gctBOOL            genTexldU;
 }
 slsGEN_CODE_PARAMETERS;
 
@@ -1280,6 +1273,7 @@ slsGEN_CODE_PARAMETERS;
         (parameters)->rOperands           = gcvNULL; \
         (parameters)->constantVariable    = gcvNULL; \
         (parameters)->treatFloatAsInt     = gcvFALSE; \
+        (parameters)->genTexldU           = gcvFALSE; \
     } \
     while (gcvFALSE)
 

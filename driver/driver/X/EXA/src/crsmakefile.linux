@@ -72,7 +72,8 @@ clean:
 	-@rm $(OBJS)
 
 install:
-	cp .libs/$(target) $(AQROOT)/build/sdk/drivers
+	@mkdir -p $(AQROOT)/build/sdk/drivers/xorg/modules/drivers
+	@cp .libs/$(target) $(AQROOT)/build/sdk/drivers/xorg/modules/drivers
 
 %.o: %.c
 	$(GCC) $(CFLAGS) -o $@ -c $<

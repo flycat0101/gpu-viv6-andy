@@ -137,7 +137,7 @@ gceSTATUS gckVGKERNEL_Construct(
 
         /* Construct the gckVGMMU object. */
         gcmkERR_BREAK(gckVGMMU_Construct(
-            kernel, gcmMB2BYTES(1), &kernel->mmu
+            kernel, gcmKB2BYTES(gcdGC355_VGMMU_MEMORY_SIZE_KB), &kernel->mmu
             ));
 
         /* Return pointer to the gckKERNEL object. */
@@ -503,6 +503,10 @@ gceSTATUS gckVGKERNEL_Dispatch(
         gcmkONERROR(
             gckOS_GetBaseAddress(Kernel->os,
                                  &Interface->u.GetBaseAddress.baseAddress));
+        break;
+
+    case gcvHAL_EVENT_COMMIT:
+        gcmkERR_BREAK(gcvSTATUS_NOT_SUPPORTED);
         break;
 
     default:

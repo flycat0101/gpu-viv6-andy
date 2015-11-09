@@ -157,9 +157,7 @@ _GetTessellationBuffer(
     gceSTATUS status;
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
 
 #if gcdGC355_PROFILER
@@ -293,10 +291,8 @@ _GetTessellationBuffer(
                 ));
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
             gcoOS_AddRecordAllocation(-(gctINT32)buffer->allocatedSize);
             gcoOS_AddRecordAllocation((gctINT32)allocationSize);
-#endif
 #endif
 
             /* Set the new size. */
@@ -337,13 +333,11 @@ _GetTessellationBuffer(
         (* TessellationBuffer) = buffer;
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Vg->tsCurMemSize += gcoOS_EndRecordAllocation();
     if (Vg->tsMaxMemSize < Vg->tsCurMemSize)
     {
         Vg->tsMaxMemSize = Vg->tsCurMemSize;
     }
-#endif
 #endif
 
     }
@@ -1145,10 +1139,8 @@ gcoVG_Construct(
         }
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
         vg->tsCurMemSize = 0;
         vg->tsMaxMemSize = 0;
-#endif
 #endif
 
         /* Return gcoVG object pointer. */
@@ -1222,9 +1214,7 @@ gcoVG_Destroy(
         Vg->object.type = gcvOBJ_UNKNOWN;
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
         gcmPRINT("04) Tessellation buffer:     %d \n", Vg->tsMaxMemSize);
-#endif
 #endif
 
         /* Free the gcoVG structure. */

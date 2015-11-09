@@ -499,6 +499,7 @@ static gctCONST_STRING OpName[] =
     "gcSL_IMAGE_ADDR_3D",                 /* 0x8A */
     "gcSL_GET_SAMPLER_LMM",               /* 0x8B */
     "gcSL_GET_SAMPLER_LBS",               /* 0x8C */
+    "gcSL_TEXLD_U",                       /* 0x8D */
 };
 char _checkOpName_size[sizeof(OpName)/sizeof(OpName[0]) == gcSL_MAXOPCODE];
 
@@ -4999,6 +5000,7 @@ _ConvOpcode(
     case slvOPCODE_MOD:                     gcmASSERT(0); return gcSL_NOP;
 
     case slvOPCODE_TEXTURE_LOAD:            return gcSL_TEXLD;
+    case slvOPCODE_TEXTURE_LOAD_U:          return gcSL_TEXLD_U;
     case slvOPCODE_TEXTURE_LOAD_PROJ:       return gcSL_TEXLDPROJ;
     case slvOPCODE_TEXTURE_LOAD_PCF:        return gcSL_TEXLDPCF;
     case slvOPCODE_TEXTURE_LOAD_PCFPROJ:    return gcSL_TEXLDPCFPROJ;

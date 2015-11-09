@@ -561,11 +561,11 @@ gcOpt_OptimizeMOVInstructions(
     gcOPT_TEMP tempArray = Optimizer->tempArray;
     gcVARIABLE variable;
     gctUINT16 i;
-    gctUINT codeRemoved;
+    gctUINT codeRemoved, workingId;
     gctBOOL isArgument;
     gcOPT_CODE code, depCode, iterCode;
     gcSL_OPCODE opcode, depOpcode;
-    gcOPT_LIST list, caller, userList;
+    gcOPT_LIST list, caller, userList, defList;
     gctUINT16 codeEnable;
     gctUINT16 depCodeEnable;
     gctBOOL bSelfMoveGenerated;
@@ -669,8 +669,7 @@ gcOpt_OptimizeMOVInstructions(
             !(depOpcode == gcSL_DP3 || depOpcode == gcSL_DP4 || depOpcode == gcSL_DP2 ||
               depOpcode == gcSL_CROSS || depOpcode == gcSL_NORM || depOpcode == gcSL_LOAD ||
               depOpcode == gcSL_ATTR_ST || depOpcode == gcSL_ATTR_LD ||
-              depOpcode == gcSL_TEXLD || depOpcode == gcSL_TEXLDPROJ ||
-              depOpcode == gcSL_TEXLDPCF || depOpcode == gcSL_TEXLDPCFPROJ ||
+              gcSL_isOpcodeTexld(depOpcode) ||
               depOpcode == gcSL_ARCTRIG0 || depOpcode == gcSL_ARCTRIG1 ||
               depOpcode == gcSL_IMAGE_WR || depOpcode == gcSL_IMAGE_RD ||
               depOpcode == gcSL_IMAGE_ADDR || depOpcode == gcSL_IMAGE_ADDR_3D);
@@ -678,8 +677,7 @@ gcOpt_OptimizeMOVInstructions(
         isdepOpcodeTargetComponentWised =
             !(depOpcode == gcSL_CROSS || depOpcode == gcSL_NORM || depOpcode == gcSL_LOAD ||
               depOpcode == gcSL_ATTR_ST || depOpcode == gcSL_ATTR_LD ||
-              depOpcode == gcSL_TEXLD || depOpcode == gcSL_TEXLDPROJ ||
-              depOpcode == gcSL_TEXLDPCF || depOpcode == gcSL_TEXLDPCFPROJ ||
+              gcSL_isOpcodeTexld(depOpcode) ||
               depOpcode == gcSL_ARCTRIG0 || depOpcode == gcSL_ARCTRIG1 ||
               depOpcode == gcSL_IMAGE_WR || depOpcode == gcSL_IMAGE_RD ||
               depOpcode == gcSL_IMAGE_ADDR || depOpcode == gcSL_IMAGE_ADDR_3D);
@@ -813,16 +811,92 @@ gcOpt_OptimizeMOVInstructions(
         }
 
         /* Make sure there is no jump in or out between code and depCode. */
+        workingId = 0;
         for (iterCode = code; iterCode != depCode; iterCode = iterCode->prev)
         {
             if (iterCode->callers || gcmSL_OPCODE_GET(iterCode->instruction.opcode, Opcode) == gcSL_JMP)
             {
                 break;
             }
+
+            iterCode->workingId = workingId ++;
         }
         if (iterCode != depCode)
         {
             continue;
+        }
+
+        depCode->workingId = workingId ++;
+
+        /* Srcs of dep-code can not be re-written */
+        if (depCode->dependencies0)
+        {
+            for (list = depCode->dependencies0; list; list = list->next)
+            {
+                if (list->index < 0) continue;
+
+                if (list->code->nextDefines)
+                {
+                    for (defList = list->code->nextDefines; defList; defList = defList->next)
+                    {
+                        gcOPT_CODE ndCode;
+
+                        if (defList->index < 0) continue;
+
+                        ndCode = defList->code;
+                        if (ndCode->workingId < depCode->workingId && ndCode->workingId > code->workingId)
+                        {
+                            if (gcmSL_SOURCE_GET(depCode->instruction.source0, Indexed) != gcSL_NOT_INDEXED ||
+                                gcmSL_INDEX_GET(depCode->instruction.source0Index, Index) == ndCode->instruction.tempIndex)
+                            {
+                                break;
+                            }
+                        }
+                    }
+
+                    if (defList) break;
+                }
+            }
+
+            if (list)
+            {
+                continue;
+            }
+        }
+
+        if (depCode->dependencies1)
+        {
+            for (list = depCode->dependencies1; list; list = list->next)
+            {
+                if (list->index < 0) continue;
+
+                if (list->code->nextDefines)
+                {
+                    for (defList = list->code->nextDefines; defList; defList = defList->next)
+                    {
+                        gcOPT_CODE ndCode;
+
+                        if (defList->index < 0) continue;
+
+                        ndCode = defList->code;
+                        if (ndCode->workingId < depCode->workingId && ndCode->workingId > code->workingId)
+                        {
+                            if (gcmSL_SOURCE_GET(depCode->instruction.source1, Indexed) != gcSL_NOT_INDEXED ||
+                                gcmSL_INDEX_GET(depCode->instruction.source1Index, Index) == ndCode->instruction.tempIndex)
+                            {
+                                break;
+                            }
+                        }
+                    }
+
+                    if (defList) break;
+                }
+            }
+
+            if (list)
+            {
+                continue;
+            }
         }
 
         codeEnable    = gcmSL_TARGET_GET(code->instruction.temp, Enable);
@@ -1119,11 +1193,7 @@ gcOpt_OptimizeMOVInstructions(
 
         depOpcode = gcmSL_OPCODE_GET(depCode->instruction.opcode, Opcode);
 
-        if (depCode->prev != gcvNULL &&
-            (depOpcode == gcSL_TEXLD || depOpcode == gcSL_TEXLDPROJ ||
-             depOpcode == gcSL_TEXLDPCF || depOpcode == gcSL_TEXLDPCFPROJ ||
-             depOpcode == gcSL_TEXLDPCF || depOpcode == gcSL_TEXLDPCFPROJ ||
-             depOpcode == gcSL_TEXLODQ))
+        if (depCode->prev != gcvNULL && gcSL_isOpcodeTexld(depOpcode))
         {
             if (gcmSL_OPCODE_GET(depCode->prev->instruction.opcode, Opcode) == gcSL_TEXGRAD)
             {
@@ -1487,6 +1557,7 @@ gcOpt_OptimizeMOVInstructions(
             case gcSL_TEXU_LOD:
                 /* Skip texture state instructions. */
             case gcSL_TEXLD:
+            case gcSL_TEXLD_U:
             case gcSL_TEXLDPROJ:
             case gcSL_TEXLDPCF:
             case gcSL_TEXLDPCFPROJ:
@@ -6303,6 +6374,7 @@ gcOpt_PropagateConstants(
             case gcSL_TEXU_LOD:
                 /* Skip texture state instructions. */
             case gcSL_TEXLD:
+            case gcSL_TEXLD_U:
             case gcSL_TEXLDPROJ:
             case gcSL_TEXLDPCF:
             case gcSL_TEXLDPCFPROJ:
@@ -9425,9 +9497,10 @@ gcOpt_MovTexLodCode(
             gcSL_OPCODE opcode = gcmSL_OPCODE_GET(userCode->instruction.opcode, Opcode);
 
             /* Test for TEXLD instruction. */
-            if (!(opcode == gcSL_TEXLD || opcode == gcSL_TEXLDPROJ ||
-                opcode == gcSL_TEXLDPCF || opcode == gcSL_TEXLDPCFPROJ))
+            if (!gcSL_isOpcodeTexld(opcode))
+            {
                 continue;
+            }
 
             gcOpt_MoveCodeListBefore(Optimizer, code, code, userCode);
             codeMoved++;

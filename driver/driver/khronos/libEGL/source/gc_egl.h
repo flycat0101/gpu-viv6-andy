@@ -25,6 +25,7 @@
 #endif
 
 #include "gc_hal.h"
+#include "gc_hal_priv.h"
 #include "gc_hal_driver.h"
 #include "gc_hal_engine.h"
 #include "gc_egl_common.h"
@@ -223,9 +224,7 @@ struct eglThreadData
     struct eglWorkerInfo *      worker;
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gctINT                      fbMemSize;
-#endif
 #endif
 };
 

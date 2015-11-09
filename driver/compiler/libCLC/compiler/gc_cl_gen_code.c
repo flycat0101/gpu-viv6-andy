@@ -22134,6 +22134,8 @@ IN clsROPERAND *Offset
          /* clear the tempRegIndex so that it is different from
             source to avoid the MOV*/
          superTarget.targets[j].tempRegIndex = 0;
+         superTarget.targets[j].indexMode = gcSL_NOT_INDEXED;
+         superTarget.targets[j].indexRegIndex = 0;
          status = clEmitCode2(Compiler,
                               LineNo,
                               StringNo,
@@ -26482,6 +26484,8 @@ cloIR_POLYNARY_EXPR_GenBuiltinCode(
     )
 {
     gceSTATUS status;
+    clsNAME *    paramName;
+    cloIR_EXPR    argument;
     gctUINT    operandCount;
     clsGEN_CODE_PARAMETERS *operandsParameters;
 
@@ -26499,6 +26503,26 @@ cloIR_POLYNARY_EXPR_GenBuiltinCode(
                              &operandCount,
                              &operandsParameters);
     if (gcmIS_ERROR(status)) return status;
+
+    if(operandCount) {
+        gctUINT    i = 0;
+        for (paramName = (clsNAME *)PolynaryExpr->funcName->u.funcInfo.localSpace->names.next,
+             argument = (cloIR_EXPR)PolynaryExpr->operands->members.next;
+             (slsDLINK_NODE *)paramName != &PolynaryExpr->funcName->u.funcInfo.localSpace->names
+             && (slsDLINK_NODE *)argument != &PolynaryExpr->operands->members;
+             paramName = (clsNAME *)((slsDLINK_NODE *)paramName)->next,
+             argument = (cloIR_EXPR)((slsDLINK_NODE *)argument)->next) {
+            if (paramName->type != clvPARAMETER_NAME) break;
+
+            gcmASSERT(i < operandCount);
+            status = _GenImplicitConvToType(Compiler,
+                                            &paramName->decl,
+                                            argument,
+                                            &operandsParameters[i]);
+            if (gcmIS_ERROR(status)) return status;
+            i++;
+        }
+    }
 
     /* make sure that operand count is set to 0 to signal operands to be allocated */
     Parameters->operandCount = 0;

@@ -1856,31 +1856,42 @@ gcoHARDWARE_FlushDrawID(
 {
     gceSTATUS status = gcvSTATUS_OK;
 
+#if gcdFRAMEINFO_STATISTIC
+    gctUINT32 drawCount;
+    gctUINT32 frameCount;
+#else
+    gctUINT32 programID;
+#endif
+
+    gctUINT32 drawID;
+
     gcmHEADER_ARG("Hardware=0x%x", Hardware);
 
-    if (Hardware->features[gcvFEATURE_DRAW_ID])
-    {
-        gctUINT32 drawCount;
-        gctUINT32 frameCount;
-        gctUINT32 drawID;
-        gcoHAL_FrameInfoOps(gcvNULL,
-                            gcvFRAMEINFO_FRAME_NUM,
-                            gcvFRAMEINFO_OP_GET,
-                            &frameCount);
+#if gcdFRAMEINFO_STATISTIC
+    gcoHAL_FrameInfoOps(gcvNULL,
+                        gcvFRAMEINFO_FRAME_NUM,
+                        gcvFRAMEINFO_OP_GET,
+                        &frameCount);
 
-        gcoHAL_FrameInfoOps(gcvNULL,
-                            gcvFRAMEINFO_DRAW_NUM,
-                            gcvFRAMEINFO_OP_GET,
-                            &drawCount);
+    gcoHAL_FrameInfoOps(gcvNULL,
+                        gcvFRAMEINFO_DRAW_NUM,
+                        gcvFRAMEINFO_OP_GET,
+                        &drawCount);
 
-        drawCount --;
+    drawCount --;
 
-        drawID = (frameCount << 16) | drawCount;
+    drawID = (frameCount << 16) | drawCount;
+#else
+    gcoHAL_FrameInfoOps(gcvNULL,
+                        gcvFRAMEINFO_PROGRAM_ID,
+                        gcvFRAMEINFO_OP_GET,
+                        &programID);
+    drawID = programID;
+#endif
 
-        gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW(Hardware, 0x0389C, drawID, Memory));
+    gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW(Hardware, 0x0389C, drawID, Memory));
 
-        gcmDUMP(gcvNULL, "#drawID=0x%x", drawID);
-    }
+    gcmDUMP(gcvNULL, "#drawID=0x%x", drawID);
 
  OnError:
 
@@ -2042,10 +2053,10 @@ static gceSTATUS gcoHARDWARE_FlushStates(
         gcmONERROR(gcoHARDWARE_FlushL2Cache(Hardware, Memory));
     }
 
-
-#if gcdFRAMEINFO_STATISTIC
-    gcmONERROR(gcoHARDWARE_FlushDrawID(Hardware, Memory));
-#endif
+    if (Hardware->features[gcvFEATURE_DRAW_ID])
+    {
+        gcmONERROR(gcoHARDWARE_FlushDrawID(Hardware, Memory));
+    }
 
     if (Hardware->stallSource < Hardware->stallDestination)
     {

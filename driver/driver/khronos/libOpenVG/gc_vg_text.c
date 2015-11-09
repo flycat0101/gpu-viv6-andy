@@ -136,9 +136,7 @@ static gceSTATUS _ResetGlyph(
         if (Glyph->path != gcvNULL)
         {
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
      gcoOS_RecordAllocation();
-#endif
 #endif
 
             gcmERR_BREAK(vgfDereferenceObject(
@@ -149,13 +147,11 @@ static gceSTATUS _ResetGlyph(
             Glyph->path = gcvNULL;
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
      Context->curMemPath += gcoOS_EndRecordAllocation();
      if (Context->maxMemPath < Context->curMemPath)
      {
          Context->maxMemPath = Context->curMemPath;
      }
-#endif
 #endif
 
         }

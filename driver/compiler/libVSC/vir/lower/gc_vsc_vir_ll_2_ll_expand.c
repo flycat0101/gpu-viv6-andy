@@ -4729,6 +4729,176 @@ VIR_Pattern _texldPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
+static gctBOOL
+_isCoordFloat(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_Operand * coord = VIR_Inst_GetSource(Inst, 1);
+    return VIR_TypeId_isFloat(VIR_Operand_GetType(coord));
+}
+
+static gctBOOL
+_isCoordSignedInt(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_Operand * coord = VIR_Inst_GetSource(Inst, 1);
+    return VIR_TypeId_isSignedInteger(VIR_Operand_GetType(coord));
+}
+
+static gctBOOL
+_isCoordUnSignedInt(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_Operand * coord = VIR_Inst_GetSource(Inst, 1);
+    return VIR_TypeId_isUnSignedInteger(VIR_Operand_GetType(coord));
+}
+
+static gctBOOL
+_genFloatCoordData(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_ScalarConstVal imm;
+    gctUINT dataType = 0x1; /* 0x1 */
+    gctUINT addressingType = 0x0; /* 0x0 */
+
+    imm.uValue = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:0) - (0 ? 1:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
+ 1:0))) | (((gctUINT32) ((gctUINT32) (dataType) & ((gctUINT32) ((((1 ? 1:0) - (0 ?
+ 1:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
+ 1:0)))
+               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 9:8) - (0 ? 9:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 9:8) - (0 ? 9:8) + 1))))))) << (0 ?
+ 9:8))) | (((gctUINT32) ((gctUINT32) (addressingType) & ((gctUINT32) ((((1 ?
+ 9:8) - (0 ? 9:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 9:8) - (0 ? 9:8) + 1))))))) << (0 ?
+ 9:8)));
+
+    VIR_Operand_SetImmediate(Inst->src[0],
+        VIR_TYPE_UINT32,
+        imm);
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_genIntegeroordData(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_ScalarConstVal imm;
+    gctUINT dataType = 0x0; /* 0x0 */
+    gctUINT addressingType = 0x0; /* 0x0 */
+    gctUINT magFilter = 0x0; /* 0x0 */
+    gctUINT minFilter = 0x0; /* 0x0 */
+
+    imm.uValue = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:0) - (0 ? 1:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
+ 1:0))) | (((gctUINT32) ((gctUINT32) (dataType) & ((gctUINT32) ((((1 ? 1:0) - (0 ?
+ 1:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
+ 1:0)))
+               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 9:8) - (0 ? 9:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 9:8) - (0 ? 9:8) + 1))))))) << (0 ?
+ 9:8))) | (((gctUINT32) ((gctUINT32) (addressingType) & ((gctUINT32) ((((1 ?
+ 9:8) - (0 ? 9:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 9:8) - (0 ? 9:8) + 1))))))) << (0 ?
+ 9:8)))
+               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:4) - (0 ? 4:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ?
+ 4:4))) | (((gctUINT32) ((gctUINT32) (magFilter) & ((gctUINT32) ((((1 ?
+ 4:4) - (0 ? 4:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ?
+ 4:4)))
+               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:5) - (0 ? 5:5) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ?
+ 5:5))) | (((gctUINT32) ((gctUINT32) (minFilter) & ((gctUINT32) ((((1 ?
+ 5:5) - (0 ? 5:5) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ?
+ 5:5)));
+
+    VIR_Operand_SetImmediate(Inst->src[0],
+        VIR_TYPE_UINT32,
+        imm);
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_setSource3UnsignedZero(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_ScalarConstVal imm;
+    imm.uValue = 0;
+
+    VIR_Operand_SetImmediate(Inst->src[3],
+        VIR_TYPE_UINT32,
+        imm);
+
+    return gcvTRUE;
+}
+
+/* Generate TEXLD_U_F_L. */
+static VIR_PatternMatchInst _texlduPatInst0[] = {
+    { VIR_OP_TEXLD_U, -1, 0, { 1, 2, 3, 4 }, { _isLodTexModifier, _isCoordFloat }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _texlduRepInst0[] = {
+    { VIR_OP_MOV, 0, VIR_PATTERN_TEMP_TYPE_XYZ, { -1, 3, 0, 0 }, { 0 } },
+    { VIR_OP_MOV, 0, VIR_PATTERN_TEMP_TYPE_W, { -1, 0, 0, 0 }, { _genFloatCoordData } },
+    { VIR_OP_TEXLD_U_F_L, 0, 0, { 1, 2, -1, 4, 0 }, { 0, 0, VIR_Lower_SetSwizzleXYZW, 0, _setSource3UnsignedZero } },
+};
+
+/* Generate TEXLD_U_F_B. */
+static VIR_PatternMatchInst _texlduPatInst1[] = {
+    { VIR_OP_TEXLD_U, -1, 0, { 1, 2, 3, 4 }, { _isBiasTexModifier, _isCoordFloat }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _texlduRepInst1[] = {
+    { VIR_OP_MOV, 0, VIR_PATTERN_TEMP_TYPE_XYZ, { -1, 3, 0, 0 }, { 0 } },
+    { VIR_OP_MOV, 0, VIR_PATTERN_TEMP_TYPE_W, { -1, 0, 0, 0 }, { _genFloatCoordData } },
+    { VIR_OP_TEXLD_U_F_B, 0, 0, { 1, 2, -1, 4, 0 }, { 0, 0, VIR_Lower_SetSwizzleXYZW, 0, _setSource3UnsignedZero } },
+};
+
+/* Generate TEXLD_U_S_L. */
+static VIR_PatternMatchInst _texlduPatInst2[] = {
+    { VIR_OP_TEXLD_U, -1, 0, { 1, 2, 3, 4 }, { _isLodTexModifier, _isCoordSignedInt }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _texlduRepInst2[] = {
+    { VIR_OP_MOV, 0, VIR_PATTERN_TEMP_TYPE_XYZ, { -1, 3, 0, 0 }, { 0 } },
+    { VIR_OP_MOV, 0, VIR_PATTERN_TEMP_TYPE_W, { -1, 0, 0, 0 }, { _genIntegeroordData } },
+    { VIR_OP_TEXLD_U_S_L, 0, 0, { 1, 2, -1, 4, 0 }, { 0, 0, VIR_Lower_SetSwizzleXYZW, 0, _setSource3UnsignedZero } },
+};
+
+/* Generate TEXLD_U_U_L. */
+static VIR_PatternMatchInst _texlduPatInst3[] = {
+    { VIR_OP_TEXLD_U, -1, 0, { 1, 2, 3, 4 }, { _isLodTexModifier, _isCoordUnSignedInt }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _texlduRepInst3[] = {
+    { VIR_OP_MOV, 0, VIR_PATTERN_TEMP_TYPE_XYZ, { -1, 3, 0, 0 }, { 0 } },
+    { VIR_OP_MOV, 0, VIR_PATTERN_TEMP_TYPE_W, { -1, 0, 0, 0 }, { _genIntegeroordData } },
+    { VIR_OP_TEXLD_U_U_L, 0, 0, { 1, 2, -1, 4, 0 }, { 0, 0, VIR_Lower_SetSwizzleXYZW, 0, _setSource3UnsignedZero } },
+};
+
+
+VIR_Pattern _texlduPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_texldu, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_texldu, 1) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_texldu, 2) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_texldu, 3) },
+    { VIR_PATN_FLAG_NONE }
+};
+
 /*
     { 1, gcSL_TEXLDPROJ, 1, 2, 3, 0, 0, _hasNEW_TEXLD_isVertex },
         { -3, 0x0C, gcSL_CG_TEMP1, 0, 0, 3, 0, swizzle2ZorW },
@@ -5736,6 +5906,8 @@ _GetLowerPatternPhaseExpand(
             return _lodqPattern;
         case VIR_OP_TEXLD:
             return _texldPattern;
+        case VIR_OP_TEXLD_U:
+            return _texlduPattern;
         case VIR_OP_TEXLDPCF:
             return _texldpcfPattern;
         case VIR_OP_TEXLDPROJ:

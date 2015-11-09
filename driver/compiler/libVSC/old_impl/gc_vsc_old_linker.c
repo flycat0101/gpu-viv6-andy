@@ -2945,17 +2945,13 @@ gcLINKTREE_Build(
                     {
                         /* Get sample number. */
                         gcSL_INSTRUCTION nextCode = &Shader->code[curInstIdx + 1];
-                        switch (gcmSL_OPCODE_GET(nextCode->opcode, Opcode))
+                        if (gcSL_isOpcodeTexld(gcmSL_OPCODE_GET(nextCode->opcode, Opcode)))
                         {
-                        case gcSL_TEXLD:
-                        case gcSL_TEXLDPROJ:
-                        case gcSL_TEXLDPCF:
-                        case gcSL_TEXLDPCFPROJ:
                             samplerNum = nextCode->source0Index;
-                            break;
-                        default:
+                        }
+                        else
+                        {
                             gcmASSERT(0);
-                            break;
                         }
                         isTexAttr2 = gcvTRUE;
                     }
@@ -3027,11 +3023,7 @@ gcLINKTREE_Build(
             */
             if (gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_IMAGE_RD ||
                 gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_IMAGE_RD_3D ||
-                gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_TEXLD ||
-                gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_TEXLDPCF ||
-                gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_TEXLDPROJ ||
-                gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_TEXLDPCFPROJ ||
-                gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_TEXLODQ)
+                gcSL_isOpcodeTexld(gcmSL_OPCODE_GET(code->opcode, Opcode)))
             {
                 temp->usage = gcSL_ENABLE_XYZW;
                 if (paired64BitUpperTemp)
@@ -3288,12 +3280,9 @@ gcLINKTREE_Build(
         }
 
         /* Special case for TEXLD. */
-        if ((gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_TEXLD ||
-             gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_TEXLDPROJ ||
-             gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_TEXLDPCF ||
-             gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_TEXLDPCFPROJ)
-        &&  (texAttrCount > 0)
-        &&  (code->source0Index < texAttrCount)
+        if (gcSL_isOpcodeTexld(gcmSL_OPCODE_GET(code->opcode, Opcode)) &&
+            (texAttrCount > 0) &&
+            (code->source0Index < texAttrCount)
         )
         {
             gcsLINKTREE_LIST_PTR list;
@@ -7809,16 +7798,14 @@ _PreviousMOV(
     isPrevOpcodeTargetComponentWised =
         !(prevOpcode == gcSL_CROSS || prevOpcode == gcSL_NORM || prevOpcode == gcSL_LOAD ||
             prevOpcode == gcSL_ATTR_ST || prevOpcode == gcSL_ATTR_LD ||
-            prevOpcode == gcSL_TEXLD || prevOpcode == gcSL_TEXLDPROJ ||
-            prevOpcode == gcSL_TEXLDPCF || prevOpcode == gcSL_TEXLDPCFPROJ ||
+            gcSL_isOpcodeTexld(prevOpcode) ||
             prevOpcode == gcSL_ARCTRIG0 || prevOpcode == gcSL_ARCTRIG1);
 
     isPrevOpcodeSourceComponentWised =
         !(prevOpcode == gcSL_DP3 || prevOpcode == gcSL_DP4 || prevOpcode == gcSL_DP2 ||
             prevOpcode == gcSL_CROSS || prevOpcode == gcSL_NORM || prevOpcode == gcSL_LOAD ||
             prevOpcode == gcSL_ATTR_ST || prevOpcode == gcSL_ATTR_LD ||
-            prevOpcode == gcSL_TEXLD || prevOpcode == gcSL_TEXLDPROJ ||
-            prevOpcode == gcSL_TEXLDPCF || prevOpcode == gcSL_TEXLDPCFPROJ ||
+            gcSL_isOpcodeTexld(prevOpcode) ||
             prevOpcode == gcSL_ARCTRIG0 || prevOpcode == gcSL_ARCTRIG1);
 
     /* Make sure the previous instruction is not acos, asin, or orther
@@ -7890,10 +7877,7 @@ _PreviousMOV(
              2: TEXLDPCF        temp(4).x, uniform(0), attribute(0).xyz
              3: MOV             temp(5).xyz, temp(4).x
     */
-    if ((prevOpcode == gcSL_TEXLD ||
-         prevOpcode == gcSL_TEXLDPROJ ||
-         prevOpcode == gcSL_TEXLDPCF ||
-         prevOpcode == gcSL_TEXLDPCFPROJ) &&
+    if (gcSL_isOpcodeTexld(prevOpcode) &&
         (((enable & gcSL_ENABLE_X) && gcmSL_SOURCE_GET(source0Current, SwizzleX) != gcSL_SWIZZLE_X)||
          ((enable & gcSL_ENABLE_Y) && gcmSL_SOURCE_GET(source0Current, SwizzleY) != gcSL_SWIZZLE_Y)||
          ((enable & gcSL_ENABLE_Z) && gcmSL_SOURCE_GET(source0Current, SwizzleZ) != gcSL_SWIZZLE_Z)||
@@ -12890,11 +12874,7 @@ _changeUserToUseConstUniform(
         }
     }
 
-    if (CodeIndex > 0 &&
-        (opcode == gcSL_TEXLD || opcode == gcSL_TEXLDPROJ ||
-         opcode == gcSL_TEXLDPCF || opcode == gcSL_TEXLDPCFPROJ ||
-         opcode == gcSL_TEXLDPCF || opcode == gcSL_TEXLDPCFPROJ ||
-         opcode == gcSL_TEXLODQ))
+    if (CodeIndex > 0 && gcSL_isOpcodeTexld(opcode))
     {
         /*
         ** This temp may be used as the source0/source1 of instruction "texgrad",

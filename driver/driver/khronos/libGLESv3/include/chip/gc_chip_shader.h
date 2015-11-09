@@ -127,6 +127,7 @@ struct __GLchipSLUniformRec
 {
     /* Record halUniform in its corresponding stage */
     gcUNIFORM           halUniform[__GLSL_STAGE_LAST];
+    gctUINT32           stateAddress[__GLSL_STAGE_LAST];
     gctSTRING           name;
     gctSIZE_T           nameLen;
     gcSHADER_PRECISION  precision;
@@ -174,6 +175,7 @@ typedef struct __GLchipSLUniformBlockRec
 {
     gcsUNIFORM_BLOCK    halUB[__GLSL_STAGE_LAST];
     gcUNIFORM           halUniform[__GLSL_STAGE_LAST];
+    gctUINT32           stateAddress[__GLSL_STAGE_LAST];
     GLboolean           refByStage[__GLSL_STAGE_LAST];
     GLbitfield          mapFlags[__GLSL_STAGE_LAST];
     /* Overall map flag for all shader stages */
@@ -279,6 +281,7 @@ typedef struct __GLchipSLStorageBlockRec
 {
     gcsSTORAGE_BLOCK    halSB[__GLSL_STAGE_LAST];
     gcUNIFORM           halUniform[__GLSL_STAGE_LAST];
+    gctUINT32           stateAddress[__GLSL_STAGE_LAST];
     GLboolean           refByStage[__GLSL_STAGE_LAST];
 
     gctCONST_STRING     name;
@@ -472,12 +475,14 @@ typedef struct __GLchipProgCmdStateKeyRec
 
 typedef struct __GLchipProgramFlagsRec
 {
-    gctUINT alphaKill       : 1;
-    gctUINT noLTC       : 1;
-    gctUINT dual16        : 1;
-    gctUINT skipRecompile        : 1;
-    gctUINT cube_UserLOD        : 1;
-    gctUINT CTSMaxUBOSize       : 1;
+    gctUINT alphaKill               : 1;
+    gctUINT noLTC                   : 1;
+    gctUINT dual16                  : 1;
+    gctUINT skipRecompile           : 1;
+    gctUINT cube_UserLOD            : 1;
+    gctUINT CTSMaxUBOSize           : 1;
+
+    gctUINT enableNetflix           : 1;
 } __GLchipProgramFlags;
 
 

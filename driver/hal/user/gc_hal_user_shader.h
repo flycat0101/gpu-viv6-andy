@@ -16,6 +16,8 @@
 
 #if gcdENABLE_3D
 
+#include "gc_hal_priv.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

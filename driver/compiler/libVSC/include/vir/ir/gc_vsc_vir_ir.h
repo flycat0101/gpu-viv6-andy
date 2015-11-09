@@ -188,6 +188,7 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 
 #define VIR_OPCODE_isTexLd(Opcode)          \
     ((Opcode) == VIR_OP_TEXLD ||            \
+     (Opcode) == VIR_OP_TEXLD_U ||          \
      (Opcode) == VIR_OP_TEXLDPROJ ||        \
      (Opcode) == VIR_OP_TEXLDPCF ||         \
      (Opcode) == VIR_OP_TEXLDPCFPROJ ||     \
@@ -620,6 +621,16 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_TypeId_isBuffer(Id)             (VIR_TypeId_isSamplerBuffer(Id) || VIR_TypeId_isImageBuffer(Id))
 #define VIR_TypeId_is3DImage(Id)            (!VIR_TypeId_is2DImage(Id) && !VIR_TypeId_isImageBuffer(Id))
 
+#define VIR_TypeId_isSignedInteger(Id)      ((VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_SIGNED_INT) != 0)
+#define VIR_TypeId_isUnSignedInteger(Id)    ((VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_UNSIGNED_INT) != 0)
+#define VIR_TypeId_isBoolean(Id)            ((VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_BOOLEAN) != 0)
+#define VIR_TypeId_isInteger(Id)            (VIR_TypeId_isSignedInteger(Id)     || \
+                                             VIR_TypeId_isUnSignedInteger(Id)   || \
+                                             VIR_TypeId_isBoolean(Id))
+#define VIR_TypeId_isFloat(Id)              ((VIR_GetTypeFlag(Id) & VIR_TYFLAG_ISFLOAT) != 0)
+#define VIR_TypeId_isPacked(Id)             ((VIR_GetTypeFlag(Id) & VIR_TYFLAG_PACKED) != 0)
+
+/* Symbol check.*/
 #define VIR_Symbol_isVariable(Sym)   ((Sym)->_kind == VIR_SYM_VARIABLE)
 #define VIR_Symbol_isSBO(Sym)        ((Sym)->_kind == VIR_SYM_SBO)
 #define VIR_Symbol_isVreg(Sym)       ((Sym)->_kind == VIR_SYM_VIRREG)
@@ -2017,18 +2028,23 @@ typedef enum _VIR_TYPEKIND
 typedef enum _VIR_TYFLAG
 {
     /* common flags for all type */
-    VIR_TYFLAG_NONE       = 0x000,
-    VIR_TYFLAG_SIZED      = 0x001, /* the type has size */
-    VIR_TYFLAG_BUILTIN    = 0x002, /* builtin type */
-    VIR_TYFLAG_PACKED     = 0x004, /* packed type */
+    VIR_TYFLAG_NONE             = 0x000,
+    VIR_TYFLAG_SIZED            = 0x001, /* the type has size */
+    VIR_TYFLAG_BUILTIN          = 0x002, /* builtin type */
+    VIR_TYFLAG_PACKED           = 0x004, /* packed type */
     /* flags for struct */
-    VIR_TYFLAG_ISUNION      = 0x010,
-    VIR_TYFLAG_PACKEDSTRUCT = 0x020, /* packed struct */
-    VIR_TYFLAG_ANONYMOUS    = 0x040, /* the struct/union/ is anonymous */
-    VIR_TYFLAG_HASBODY      = 0x080, /* body definition is seen */
+    VIR_TYFLAG_ISUNION          = 0x010,
+    VIR_TYFLAG_PACKEDSTRUCT     = 0x020, /* packed struct */
+    VIR_TYFLAG_ANONYMOUS        = 0x040, /* the struct/union/ is anonymous */
+    VIR_TYFLAG_HASBODY          = 0x080, /* body definition is seen */
     /* flags for saclar/vector/matrix */
-    VIR_TYFLAG_ISFLOAT      = 0x010, /* is float type */
-    VIR_TYFLAG_ISINTEGER    = 0x020, /* is integer type */
+    VIR_TYFLAG_ISFLOAT          = 0x010, /* is float type */
+    VIR_TYFLAG_IS_SIGNED_INT    = 0x020, /* is signed integer type */
+    VIR_TYFLAG_IS_UNSIGNED_INT  = 0x040, /* is unsigned integer type */
+    VIR_TYFLAG_IS_BOOLEAN       = 0x080, /* is boolean type */
+    VIR_TYFLAG_ISINTEGER        = VIR_TYFLAG_IS_SIGNED_INT
+                                | VIR_TYFLAG_IS_UNSIGNED_INT
+                                | VIR_TYFLAG_IS_BOOLEAN, /* is integer type */
 
     /* flags for function */
 

@@ -552,7 +552,8 @@ _Inst_ChangeOpnd2HP(
 gctBOOL
 _Inst_RequireHPDest(
     VIR_Instruction *pInst,
-    gctBOOL         forceChange)
+    gctBOOL         forceChange,
+    gcePATCH_ID     patchID)
 {
     VIR_OpCode      opcode = VIR_Inst_GetOpcode(pInst);
 
@@ -561,8 +562,8 @@ _Inst_RequireHPDest(
         opcode == VIR_OP_VX_IMG_STORE  ||
         opcode == VIR_OP_IMG_STORE_3D ||
         opcode == VIR_OP_MOVA ||
-        opcode == VIR_OP_FRAC ||
-        opcode == VIR_OP_RCP ||
+        (opcode == VIR_OP_FRAC && patchID != gcvPATCH_GLBM21 && patchID != gcvPATCH_GLBM27) ||
+        (opcode == VIR_OP_RCP && patchID != gcvPATCH_GLBM21 && patchID != gcvPATCH_GLBM27) ||
         (VIR_OPCODE_isTexLd(opcode) && forceChange) ||
         (VIR_OPCODE_BITWISE(opcode) && forceChange))
     {
@@ -593,15 +594,13 @@ _Inst_RequireHPSrc(
     gctUINT             sourceIdx,
     VIR_DEF_USAGE_INFO  *pDuInfo,
     gctBOOL             *forceChange,
-    gctBOOL             *skipLowp)
+    gctBOOL             *skipLowp,
+    gcePATCH_ID         patchID)
 {
     VIR_OpCode      opcode = VIR_Inst_GetOpcode(pInst);
     VIR_Operand     *srcOpnd = VIR_Inst_GetSource(pInst, sourceIdx);
     VIR_Symbol      *srcSym = VIR_Operand_GetUnderlyingSymbol(srcOpnd);
-    gcePATCH_ID     patchID = gcvPATCH_INVALID;
     gctBOOL         qualityMode = gcvTRUE;
-
-    gcoHAL_GetPatchID(gcvNULL, &patchID);
 
     /* dual16 quality mode: more restrict mode for higher quality
        e.g., promote texld coordinate (coming from varying) to highp */
@@ -686,8 +685,8 @@ _Inst_RequireHPSrc(
         opcode == VIR_OP_IMG_ADDR        ||
         opcode == VIR_OP_IMG_ADDR_3D     ||
         VIR_OPCODE_isAtom(opcode)        ||
-        opcode == VIR_OP_FRAC            ||
-        opcode == VIR_OP_RCP
+        (opcode == VIR_OP_FRAC && patchID != gcvPATCH_GLBM21 && patchID != gcvPATCH_GLBM27) ||
+        (opcode == VIR_OP_RCP &&  patchID != gcvPATCH_GLBM21 && patchID != gcvPATCH_GLBM27)
         )
     {
         if (sourceIdx == 0)
@@ -812,6 +811,9 @@ VSC_ErrCode vscVIR_AdjustPrecision(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuI
     VSC_ErrCode                    errCode = VSC_ERR_NONE;
     VIR_FuncIterator               func_iter;
     VIR_FunctionNode*              func_node;
+
+    gcePATCH_ID     patchID = gcvPATCH_INVALID;
+    gcoHAL_GetPatchID(gcvNULL, &patchID);
 
     /* currently only PS is dual16-able */
     if (VIR_Shader_GetKind(pShader) == VIR_SHADER_FRAGMENT)
@@ -969,13 +971,13 @@ VSC_ErrCode vscVIR_AdjustPrecision(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuI
 
                 for (i = 0; i < VIR_Inst_GetSrcNum(inst); ++i)
                 {
-                    if (_Inst_RequireHPSrc(inst, i, pDuInfo, &forceChange, &skipLowp))
+                    if (_Inst_RequireHPSrc(inst, i, pDuInfo, &forceChange, &skipLowp, patchID))
                     {
                         _Inst_ChangeOpnd2HP(inst, VIR_Inst_GetSource(inst, i), gcvFALSE, skipLowp, pDuInfo);
                     }
                 }
 
-                if (_Inst_RequireHPDest(inst, forceChange))
+                if (_Inst_RequireHPDest(inst, forceChange, patchID))
                 {
                     _Inst_ChangeOpnd2HP(inst, VIR_Inst_GetDest(inst), gcvTRUE, skipLowp, pDuInfo);
                 }

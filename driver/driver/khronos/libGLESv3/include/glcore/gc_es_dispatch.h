@@ -574,7 +574,7 @@
     GLvoid         (GL_APIENTRY *BlitFramebuffer) (_gcArgComma_ GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter); \
     GLvoid         (GL_APIENTRY *RenderbufferStorageMultisample) (_gcArgComma_ GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height); \
     GLvoid         (GL_APIENTRY *FramebufferTextureLayer) (_gcArgComma_ GLenum target, GLenum attachment, GLuint texture, GLint level, GLint layer); \
-    GLvoid*        (GL_APIENTRY *MapBufferRange) (_gcArgComma_ GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access); \
+    GLvoid*        (GL_APIENTRY *MapBufferRange) (_gcArgComma_ GLenum target, GLintptr offset, GLsizeiptr length, GLbitfield access _retPointer); \
     GLvoid         (GL_APIENTRY *FlushMappedBufferRange) (_gcArgComma_ GLenum target, GLintptr offset, GLsizeiptr length); \
     GLvoid         (GL_APIENTRY *BindVertexArray) (_gcArgComma_ GLuint array); \
     GLvoid         (GL_APIENTRY *DeleteVertexArrays) (_gcArgComma_ GLsizei n, const GLuint* arrays); \
@@ -779,7 +779,7 @@
     GLvoid         (GL_APIENTRY *MultiDrawElementsBaseVertexEXT) (_gcArgComma_ GLenum mode, const GLsizei *count, GLenum type, const void *const *indices, GLsizei drawcount, const GLint * basevertex); \
     /* GL_OES_mapbuffer */ \
     GLvoid         (GL_APIENTRY *GetBufferPointervOES) (_gcArgComma_ GLenum target, GLenum pname, GLvoid** params); \
-    GLvoid*        (GL_APIENTRY *MapBufferOES) (_gcArgComma_ GLenum target, GLenum access); \
+    GLvoid*        (GL_APIENTRY *MapBufferOES) (_gcArgComma_ GLenum target, GLenum access _retPointer); \
     GLboolean      (GL_APIENTRY *UnmapBufferOES) (_gcArgComma_ GLenum target); \
     /* GL_EXT_discard_framebuffer */ \
     GLvoid         (GL_APIENTRY *DiscardFramebufferEXT) (_gcArgComma_ GLenum target, GLsizei numAttachments, const GLenum *attachments); \
@@ -804,6 +804,7 @@
 #define _retLocation_
 #define _retIndex_
 #define _retSync_
+#define _retPointer
 
 struct __GLesDispatchTableRec
 {
@@ -817,6 +818,7 @@ struct __GLesDispatchTableRec
 #undef _retLocation_
 #undef _retIndex_
 #undef _retSync_
+#undef _retPointer
 
 
 /* Define GLES 3.0 API Tracer Dispatch Table */
@@ -827,6 +829,7 @@ struct __GLesDispatchTableRec
 #define _retLocation_ ,GLint retloc
 #define _retIndex_ ,GLuint retidx
 #define _retSync_ ,GLsync retsync
+#define _retPointer ,GLvoid* retptr
 
 typedef struct __GLtraceDispatchTableRec{
 
@@ -841,6 +844,7 @@ typedef struct __GLtraceDispatchTableRec{
 #undef _retLocation_
 #undef _retIndex_
 #undef _retSync_
+#undef _retPointer
 
 extern __GLesDispatchTable __glesApiFuncDispatchTable;
 

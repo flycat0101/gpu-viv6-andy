@@ -41,7 +41,7 @@ CFLAGS  += $(INCLUDE)
 ################################################################################
 # Describe extra libraries.
 
-LIBS    += -L$(DFB_DIR)/lib -ldirectfb -ldirect -lfusion -lz
+LIBS    += -L$(SDK_DIR)/drivers -L$(DFB_DIR)/lib -ldirectfb -ldirect -lfusion -lz
 LIBS    += -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL
 LIBS    += -lm -lpthread
 

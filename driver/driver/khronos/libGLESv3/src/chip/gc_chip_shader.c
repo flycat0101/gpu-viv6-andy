@@ -1478,6 +1478,14 @@ gcChipProcessUniforms(
 
             slot->halUniform[stageIdx] = uniform;
 
+            gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(pgInstance->programState.hints->vsConstBase,
+                                                              pgInstance->programState.hints->psConstBase,
+                                                              pgInstance->programState.hints->tcsConstBase,
+                                                              pgInstance->programState.hints->tesConstBase,
+                                                              pgInstance->programState.hints->gsConstBase,
+                                                              uniform,
+                                                              &slot->stateAddress[stageIdx]));
+
             if (!duplicate)
             {
                 /* Assign primary uniform. */
@@ -2154,6 +2162,15 @@ gcChipProcessUniformBlocks(
         ubSlot->refByStage[stageIdx] = HasIBIFlag(GetUBInterfaceBlockInfo(uniformBlock), gceIB_FLAG_STATICALLY_USED);
         ubSlot->mapFlags[stageIdx]   = mapFlags;
         ubSlot->mapFlag             |= mapFlags;
+
+        gcmVERIFY_OK(gcSHADER_ComputeUniformPhysicalAddress(pgInstance->programState.hints->vsConstBase,
+                                                            pgInstance->programState.hints->psConstBase,
+                                                            pgInstance->programState.hints->tcsConstBase,
+                                                            pgInstance->programState.hints->tesConstBase,
+                                                            pgInstance->programState.hints->gsConstBase,
+                                                            ubUniform,
+                                                            &ubSlot->stateAddress[stageIdx]));
+
         if (mapFlags & gcdUB_MAPPED_TO_REG)
         {
             program->ubMapToReg = gcvTRUE;
@@ -2616,6 +2633,47 @@ gcChipCountStorageBlocks(
 }
 
 static GLvoid
+gcChipUpdateBaseAddrUniformForStorageBlocks(
+    IN     __GLcontext *gc,
+    IN OUT __GLprogramObject *progObj,
+    IN     gcSHADER Shader
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    __GLchipSLProgram *program = (__GLchipSLProgram *)progObj->privateData;
+    __GLchipSLStorageBlock *sbSlot = gcvNULL;
+    __GLSLStage stageIdx = __GLSL_STAGE_LAST;
+    gcUNIFORM newBaseAddrUniform = gcvNULL;
+    GLuint i;
+
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x Shader=0x%x", gc, progObj, Shader);
+
+    stageIdx = gcChipGetShaderStage(Shader);
+
+    for (i = 0; i < program->totalSsbCount; i++)
+    {
+        sbSlot = &program->ssbs[i];
+
+        if (sbSlot == gcvNULL || sbSlot->halUniform[stageIdx] == gcvNULL)
+        {
+            continue;
+        }
+
+        /* Get the new base address uniform. */
+        gcmONERROR(gcSHADER_GetUniform(Shader,
+                                       GetUniformIndex(sbSlot->halUniform[stageIdx]),
+                                       &newBaseAddrUniform));
+        gcmASSERT(GetUniformKind(newBaseAddrUniform) == gcvUNIFORM_KIND_STORAGE_BLOCK_ADDRESS);
+
+        /* Set the new base address uniform. */
+        sbSlot->halUniform[stageIdx] = newBaseAddrUniform;
+    }
+
+OnError:
+    gcmFOOTER_NO();
+}
+
+static GLvoid
 gcChipProcessStorageBlocks(
     IN     __GLcontext *gc,
     IN OUT __GLprogramObject *progObj,
@@ -2892,6 +2950,15 @@ gcChipProcessStorageBlocks(
         sbSlot->halSB[stageIdx] = storageBlock;
         sbSlot->halUniform[stageIdx] = sbUniform;
         sbSlot->refByStage[stageIdx] = HasIBIFlag(GetSBInterfaceBlockInfo(storageBlock),gceIB_FLAG_STATICALLY_USED);
+
+        gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(program->curPgInstance->programState.hints->vsConstBase,
+                                                          program->curPgInstance->programState.hints->psConstBase,
+                                                          program->curPgInstance->programState.hints->tcsConstBase,
+                                                          program->curPgInstance->programState.hints->tesConstBase,
+                                                          program->curPgInstance->programState.hints->gsConstBase,
+                                                          sbUniform,
+                                                          &sbSlot->stateAddress[stageIdx]));
+
         if (!duplicate)
         {
             sbSlot->name        = sbName;
@@ -3550,7 +3617,10 @@ gcChipProgramBindingRecompiledInfo(
         program->activeUniformCount = program->userDefUniformCount + program->builtInUniformCount;
     }
 
-    /* Rebuild uniform table only, supposed recompile only affect uniform, not UBO, attribute, output etc. */
+    /*
+    ** Rebuild uniform table only(including the base address of SSBOs),
+    ** supposed recompile only affect uniform, not UBO, attribute, output etc.
+    */
     if (pgInstance->privateUniformCount > 0)
     {
         GLint userDefIndex = 0;
@@ -3670,6 +3740,15 @@ gcChipProgramBindingRecompiledInfo(
             }
         }
         gcoBUFOBJ_Upload(uBlock->halBufObj, data, 0, uBlock->dataSize, gcvBUFOBJ_USAGE_STATIC_READ);
+    }
+
+    /* The base address uniform of a SSBO may be changed, so we need to update this uniform. */
+    for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
+    {
+        if (pBinaries[stage])
+        {
+            gcChipUpdateBaseAddrUniformForStorageBlocks(gc, programObject, pBinaries[stage]);
+        }
     }
 
     if (pBinaries[__GLSL_STAGE_TCS])
@@ -6479,13 +6558,20 @@ gcChipFlushSingleUniform(
                     arraySize = GetUniformSingleLevelArraySzie(halUniform, halUniform->arrayLengthCount - 1);
                 }
 
-                gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->vsConstBase,
-                                                                  chipCtx->activeProgState->hints->psConstBase,
-                                                                  chipCtx->activeProgState->hints->tcsConstBase,
-                                                                  chipCtx->activeProgState->hints->tesConstBase,
-                                                                  chipCtx->activeProgState->hints->gsConstBase,
-                                                                  halUniform,
-                                                                  &physicalAddress));
+                if (gc->shaderProgram.boundPPO || 1)
+                {
+                    gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->vsConstBase,
+                                                                      chipCtx->activeProgState->hints->psConstBase,
+                                                                      chipCtx->activeProgState->hints->tcsConstBase,
+                                                                      chipCtx->activeProgState->hints->tesConstBase,
+                                                                      chipCtx->activeProgState->hints->gsConstBase,
+                                                                      halUniform,
+                                                                      &physicalAddress));
+                }
+                else
+                {
+                    physicalAddress = uniform->stateAddress[stageIdx];
+                }
 
                 gcmONERROR(gcoSHADER_ProgramUniformEx(gcvNULL, physicalAddress + uniform->regOffset,
                                                       columns, rows, arraySize, gcvFALSE, matrixStride,
@@ -6594,7 +6680,7 @@ gcChipIsLTCEnabled(
 
     /* Disable LTC optimization for real racing */
     if (patchId == gcvPATCH_REALRACING || patchId == gcvPATCH_NENAMARK
-        || patchId == gcvPATCH_BM21 || patchId == gcvPATCH_MM07)
+        || patchId == gcvPATCH_BATCHCOUNT)
     {
         return gcvFALSE;
     }
@@ -7247,6 +7333,7 @@ __glChipLinkProgram(
              gcvSHADER_REMOVE_UNUSED_UNIFORMS |
              gcvSHADER_ONCE_OPTIMIZER);
 
+
     if (
 #if __GL_CHIP_PATCH_ENABLED
         (!program->progFlags.noLTC) &&
@@ -7405,6 +7492,11 @@ __glChipUseProgram(
     )
 {
     gcmHEADER_ARG("gc=0x%x programObject=0x%x valid=0x%x", gc, programObject, valid);
+
+    if (programObject)
+    {
+        gcoHAL_FrameInfoOps(gcvNULL, gcvFRAMEINFO_PROGRAM_ID, gcvFRAMEINFO_OP_SET, &programObject->objectInfo.id);
+    }
 
 #if VIVANTE_PROFILER
     if (programObject &&
@@ -9242,13 +9334,21 @@ gcChipFlushUniformBlock(
         {
             gctUINT32 physicalAddress = 0;
 
-            gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->vsConstBase,
-                                                              chipCtx->activeProgState->hints->psConstBase,
-                                                              chipCtx->activeProgState->hints->tcsConstBase,
-                                                              chipCtx->activeProgState->hints->tesConstBase,
-                                                              chipCtx->activeProgState->hints->gsConstBase,
-                                                              ubUniform,
-                                                              &physicalAddress));
+            if (gc->shaderProgram.boundPPO || 1)
+            {
+                gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->vsConstBase,
+                                                                  chipCtx->activeProgState->hints->psConstBase,
+                                                                  chipCtx->activeProgState->hints->tcsConstBase,
+                                                                  chipCtx->activeProgState->hints->tesConstBase,
+                                                                  chipCtx->activeProgState->hints->gsConstBase,
+                                                                  ubUniform,
+                                                                  &physicalAddress));
+            }
+            else
+            {
+                physicalAddress = ub->stateAddress[stageIdx];
+            }
+
             if (-1 != GetUBArrayIndex(ub->halUB[stageIdx]))
             {
                 physicalAddress += GetUBArrayIndex(ub->halUB[stageIdx]) * 16;
@@ -9778,7 +9878,7 @@ gcChipFlushUserDefUniforms(
         GLint i;
 
 #if __GL_CHIP_PATCH_ENABLED
-        gcChipPatchUpdateUniformData(gc, program);
+        gcChipPatchUpdateUniformData(gc, progObj, program);
 #endif
 
         for (i = 0; i < program->userDefUniformCount; ++i)
@@ -10312,13 +10412,20 @@ gcChipFlushUserDefSSBs(
                                                          (gctINT *)&unsizedArrayLength));
                 }
 
-                gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->vsConstBase,
-                                                                  chipCtx->activeProgState->hints->psConstBase,
-                                                                  chipCtx->activeProgState->hints->tcsConstBase,
-                                                                  chipCtx->activeProgState->hints->tesConstBase,
-                                                                  chipCtx->activeProgState->hints->gsConstBase,
-                                                                  sbUniform,
-                                                                  &physicalAddress));
+                if (gc->shaderProgram.boundPPO || 1)
+                {
+                    gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->vsConstBase,
+                                                                      chipCtx->activeProgState->hints->psConstBase,
+                                                                      chipCtx->activeProgState->hints->tcsConstBase,
+                                                                      chipCtx->activeProgState->hints->tesConstBase,
+                                                                      chipCtx->activeProgState->hints->gsConstBase,
+                                                                      sbUniform,
+                                                                      &physicalAddress));
+                }
+                else
+                {
+                    physicalAddress = sb->stateAddress[stageIdx];
+                }
 
                 gcmONERROR(gcoSHADER_BindBufferBlock(gcvNULL,
                                                      physicalAddress,
@@ -10419,13 +10526,20 @@ gcChipFlushPrivateSSBs(
                     continue;
                 }
 
-                gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->vsConstBase,
-                                                                  chipCtx->activeProgState->hints->psConstBase,
-                                                                  chipCtx->activeProgState->hints->tcsConstBase,
-                                                                  chipCtx->activeProgState->hints->tesConstBase,
-                                                                  chipCtx->activeProgState->hints->gsConstBase,
-                                                                  sbUniform,
-                                                                  &physicalAddress));
+                if (gc->shaderProgram.boundPPO)
+                {
+                    gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->vsConstBase,
+                                                                      chipCtx->activeProgState->hints->psConstBase,
+                                                                      chipCtx->activeProgState->hints->tcsConstBase,
+                                                                      chipCtx->activeProgState->hints->tesConstBase,
+                                                                      chipCtx->activeProgState->hints->gsConstBase,
+                                                                      sbUniform,
+                                                                      &physicalAddress));
+                }
+                else
+                {
+                    physicalAddress = sb->stateAddress[stageIdx];
+                }
 
                 gcmONERROR(gcoSHADER_BindBufferBlock(gcvNULL,
                                                      physicalAddress,

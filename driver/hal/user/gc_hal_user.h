@@ -19,6 +19,7 @@
 #include "gc_hal_enum.h"
 #include "gc_hal_dump.h"
 #include "gc_hal_base.h"
+#include "gc_hal_priv.h"
 #include "gc_hal_raster.h"
 #include "gc_hal_user_math.h"
 #include "gc_hal_user_os_memory.h"

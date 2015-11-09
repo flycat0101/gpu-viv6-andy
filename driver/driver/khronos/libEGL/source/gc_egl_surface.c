@@ -1856,9 +1856,7 @@ veglCreatePlatformWindowSurface(
     }
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
 
     /* Create and initialize the surface. */
@@ -1912,9 +1910,7 @@ veglCreatePlatformWindowSurface(
     gcoOS_SetPLSValue(gcePLS_VALUE_EGL_SURFACE_INFO, (gctPOINTER) surface);
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     thread->fbMemSize += gcoOS_EndRecordAllocation();
-#endif
 #endif
 
     /* Success. */
@@ -2618,6 +2614,7 @@ eglSurfaceAttrib(
     VEGLDisplay dpy;
     VEGLSurface surface;
     gceSTATUS status;
+    VEGLContext current;
 
     gcmHEADER_ARG("Dpy=0x%x Surface=0x%x attribute=%d value=%d",
                     Dpy, Surface, attribute, value);
@@ -2795,6 +2792,24 @@ eglSurfaceAttrib(
             if (!success)
             {
                 veglSetEGLerror(thread, EGL_BAD_ALLOC);
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            }
+        }
+
+        current = thread->context;
+        if (current && (current->draw == Surface || current->read == Surface))
+        {
+            VEGLDrawable drawable = (current->draw == Surface)
+                                 ? &surface->drawable
+                                 : &current->draw->drawable;
+
+            VEGLDrawable readable = (current->read == Surface)
+                                 ? &surface->drawable
+                                 : &current->read->drawable;
+
+            if (!_SetDrawable(thread, current, drawable, readable))
+            {
+                /* Error feeing surface objects. */
                 gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
             }
         }

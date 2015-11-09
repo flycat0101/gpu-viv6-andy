@@ -1292,9 +1292,9 @@ gceSTATUS vgfUseImageAsGlyph(
                     Image->glyph--;
 
                     /* Decrement image reference count. */
-                    gcmERR_BREAK(vgfDereferenceObject(
+                    vgfDereferenceObject(
                         Context, (vgsOBJECT_PTR *) &Image
-                        ));
+                        );
                 }
                 else
                 {
@@ -2741,9 +2741,7 @@ VG_API_CALL VGImage VG_API_ENTRY vgCreateImage(
         }
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
         gcoOS_RecordAllocation();
-#endif
 #endif
 
         /* Create the image. */
@@ -2767,13 +2765,11 @@ VG_API_CALL VGImage VG_API_ENTRY vgCreateImage(
             ));
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
         Context->curMemImage += gcoOS_EndRecordAllocation();
         if (Context->maxMemImage < Context->curMemImage)
         {
             Context->maxMemImage = Context->curMemImage;
         }
-#endif
 #endif
 
         gcmTRACE_ZONE(
@@ -2836,9 +2832,7 @@ VG_API_CALL void VG_API_ENTRY vgDestroyImage(
         ((vgsOBJECT_PTR) Image)->userValid = VG_FALSE;
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
         gcoOS_RecordAllocation();
-#endif
 #endif
 
         /* Decrement the reference count. */
@@ -2847,13 +2841,11 @@ VG_API_CALL void VG_API_ENTRY vgDestroyImage(
             ));
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
         Context->curMemImage += gcoOS_EndRecordAllocation();
         if (Context->maxMemImage < Context->curMemImage)
         {
             Context->maxMemImage = Context->curMemImage;
         }
-#endif
 #endif
     }
     vgmLEAVEAPI(vgDestroyImage);
@@ -3077,9 +3069,7 @@ VG_API_CALL void VG_API_ENTRY vgImageSubData(
 
     vgmENTERAPI(vgImageSubData)
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
     {
         vgsIMAGE_PTR image;
@@ -3152,13 +3142,11 @@ VG_API_CALL void VG_API_ENTRY vgImageSubData(
         Context->wrapperImage.surfArgValid = gcvTRUE;
     }
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Context->curMemImage += gcoOS_EndRecordAllocation();
     if (Context->maxMemImage < Context->curMemImage)
     {
         Context->maxMemImage = Context->curMemImage;
     }
-#endif
 #endif
     vgmLEAVEAPI(vgImageSubData);
 }
@@ -3225,9 +3213,7 @@ VG_API_CALL void VG_API_ENTRY vgGetImageSubData(
 
     vgmENTERAPI(vgGetImageSubData)
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
     {
         vgsIMAGE_PTR image;
@@ -3292,13 +3278,11 @@ VG_API_CALL void VG_API_ENTRY vgGetImageSubData(
         Context->wrapperImage.surfArgValid = gcvTRUE;
     }
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Context->curMemImage += gcoOS_EndRecordAllocation();
     if (Context->maxMemImage < Context->curMemImage)
     {
         Context->maxMemImage = Context->curMemImage;
     }
-#endif
 #endif
     vgmLEAVEAPI(vgGetImageSubData);
 }
@@ -3576,9 +3560,7 @@ VG_API_CALL void VG_API_ENTRY vgCopyImage(
 {
     vgmENTERAPI(vgCopyImage)
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
     {
         vgsIMAGE_PTR source;
@@ -3643,13 +3625,11 @@ VG_API_CALL void VG_API_ENTRY vgCopyImage(
             );
     }
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Context->curMemImage += gcoOS_EndRecordAllocation();
     if (Context->maxMemImage < Context->curMemImage)
     {
         Context->maxMemImage = Context->curMemImage;
     }
-#endif
 #endif
     vgmLEAVEAPI(vgCopyImage);
 }
@@ -3817,9 +3797,7 @@ VG_API_CALL void VG_API_ENTRY vgSetPixels(
 {
     vgmENTERAPI(vgSetPixels)
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
     {
         vgsIMAGE_PTR source;
@@ -3872,13 +3850,11 @@ VG_API_CALL void VG_API_ENTRY vgSetPixels(
             );
     }
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Context->curMemImage += gcoOS_EndRecordAllocation();
     if (Context->maxMemImage < Context->curMemImage)
     {
         Context->maxMemImage = Context->curMemImage;
     }
-#endif
 #endif
     vgmLEAVEAPI(vgSetPixels);
 }
@@ -3945,9 +3921,7 @@ VG_API_CALL void VG_API_ENTRY vgWritePixels(
 
     vgmENTERAPI(vgWritePixels)
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
     {
         vgsFORMAT_PTR surfaceFormat;
@@ -4036,13 +4010,11 @@ VG_API_CALL void VG_API_ENTRY vgWritePixels(
         Context->wrapperImage.surfArgValid = gcvTRUE;
     }
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Context->curMemImage += gcoOS_EndRecordAllocation();
     if (Context->maxMemImage < Context->curMemImage)
     {
         Context->maxMemImage = Context->curMemImage;
     }
-#endif
 #endif
     vgmLEAVEAPI(vgWritePixels);
 }
@@ -4094,9 +4066,7 @@ VG_API_CALL void VG_API_ENTRY vgGetPixels(
 {
     vgmENTERAPI(vgGetPixels)
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
         gcoOS_RecordAllocation();
-#endif
 #endif
     {
         vgsIMAGE_PTR target;
@@ -4145,13 +4115,11 @@ VG_API_CALL void VG_API_ENTRY vgGetPixels(
             ));
     }
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
         Context->curMemImage += gcoOS_EndRecordAllocation();
         if (Context->maxMemImage < Context->curMemImage)
         {
             Context->maxMemImage = Context->curMemImage;
         }
-#endif
 #endif
     vgmLEAVEAPI(vgGetPixels);
 }
@@ -4216,9 +4184,7 @@ VG_API_CALL void VG_API_ENTRY vgReadPixels(
     vgmENTERAPI(vgReadPixels)
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
         gcoOS_RecordAllocation();
-#endif
 #endif
     {
         vgsFORMAT_PTR surfaceFormat;
@@ -4269,13 +4235,11 @@ VG_API_CALL void VG_API_ENTRY vgReadPixels(
     }
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
         Context->curMemImage += gcoOS_EndRecordAllocation();
         if (Context->maxMemImage < Context->curMemImage)
         {
             Context->maxMemImage = Context->curMemImage;
         }
-#endif
 #endif
     vgmLEAVEAPI(vgReadPixels);
 }
@@ -4326,9 +4290,7 @@ VG_API_CALL void VG_API_ENTRY vgCopyPixels(
     vgmENTERAPI(vgCopyPixels)
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
     {
         gcmTRACE_ZONE(
@@ -4364,13 +4326,11 @@ VG_API_CALL void VG_API_ENTRY vgCopyPixels(
 
     }
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Context->curMemImage += gcoOS_EndRecordAllocation();
     if (Context->maxMemImage < Context->curMemImage)
     {
         Context->maxMemImage = Context->curMemImage;
     }
-#endif
 #endif
     vgmLEAVEAPI(vgCopyPixels);
 }

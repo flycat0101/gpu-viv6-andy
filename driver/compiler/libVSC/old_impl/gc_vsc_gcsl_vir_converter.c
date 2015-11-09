@@ -20,14 +20,16 @@
 #if VSC_BUILD
 #include "vir/lower/gc_vsc_vir_ml_2_ll.h"
 
-#define OPCODE_TEXBIAS (VIR_OP_TEXLD)
-#define EXTERN_TEXBIAS (1)
+#define OPCODE_TEXBIAS      (VIR_OP_TEXLD)
+#define OPCODE_TEXBIAS_U    (VIR_OP_TEXLD)
+#define EXTERN_TEXBIAS      (1)
 
 #define OPCODE_TEXGRAD (VIR_OP_TEXLD)
 #define EXTERN_TEXGRAD (2)
 
-#define OPCODE_TEXLOD  (VIR_OP_TEXLD)
-#define EXTERN_TEXLOD  (3)
+#define OPCODE_TEXLOD       (VIR_OP_TEXLD)
+#define OPCODE_TEXLOD_U     (VIR_OP_TEXLD_U)
+#define EXTERN_TEXLOD       (3)
 
 #define OPCODE_TEXGATHER (VIR_OP_TEXLD)
 #define EXTERN_TEXGATHER (4)
@@ -74,12 +76,61 @@
 #define OPCODE_ARCTRIG1 (VIR_OP_ARCTRIG)
 #define EXTERN_ARCTRIG1 (2)
 
+typedef VIR_OpCode
+(* CONV_VIR_OPCODE_FUNC_PTR)(
+    IN gcSHADER         Shader,
+    IN gctUINT16        CodeIndex
+    );
+
+VIR_OpCode _ConvTEXLOD(
+    IN gcSHADER         Shader,
+    IN gctUINT16        CodeIndex
+    )
+{
+    VIR_OpCode          virOpcode = OPCODE_TEXLOD;
+    gcSL_INSTRUCTION    nextCode;
+
+    if (CodeIndex < Shader->codeCount - 1)
+    {
+        nextCode = &Shader->code[CodeIndex + 1];
+
+        if (gcmSL_OPCODE_GET(nextCode->opcode, Opcode) == gcSL_TEXLD_U)
+        {
+            virOpcode = OPCODE_TEXLOD_U;
+        }
+    }
+
+    return virOpcode;
+}
+
+VIR_OpCode _ConvTEXBIAS(
+    IN gcSHADER         Shader,
+    IN gctUINT16        CodeIndex
+    )
+{
+    VIR_OpCode          virOpcode = OPCODE_TEXBIAS;
+    gcSL_INSTRUCTION    nextCode;
+
+    if (CodeIndex < Shader->codeCount - 1)
+    {
+        nextCode = &Shader->code[CodeIndex + 1];
+
+        if (gcmSL_OPCODE_GET(nextCode->opcode, Opcode) == gcSL_TEXLD_U)
+        {
+            virOpcode = OPCODE_TEXBIAS_U;
+        }
+    }
+
+    return virOpcode;
+}
+
 typedef struct _conv2VirsVirOpcodeMap
 {
-    VIR_OpCode   virOpcode;
-    VIR_Modifier modifier;
-    gctUINT      externOpcode;
-    gctINT       srcComponents;
+    VIR_OpCode                  virOpcode;
+    VIR_Modifier                modifier;
+    gctUINT                     externOpcode;
+    gctINT                      srcComponents;
+    CONV_VIR_OPCODE_FUNC_PTR    convVirOpCode;
 
 }
 conv2VirsVirOpcodeMap;
@@ -112,9 +163,9 @@ conv2VirsVirOpcodeMap _virOpcodeMap[] =
     {VIR_OP_CEIL, /* gcSL_CEIL, 0x17 */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_CROSS, /* gcSL_CROSS, 0x18 */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_TEXLDPROJ, /* gcSL_TEXLDPROJ, 0x19 */ VIR_MOD_NONE, 0, -1},
-    {OPCODE_TEXBIAS, /* gcSL_TEXBIAS, 0x1A */ VIR_MOD_NONE, EXTERN_TEXBIAS, -1},
+    {OPCODE_TEXBIAS, /* gcSL_TEXBIAS, 0x1A */ VIR_MOD_NONE, EXTERN_TEXBIAS, -1, _ConvTEXBIAS},
     {OPCODE_TEXGRAD, /* gcSL_TEXGRAD, 0x1B */ VIR_MOD_NONE, EXTERN_TEXGRAD, -1},
-    {OPCODE_TEXLOD, /* gcSL_TEXLOD, 0x1C */ VIR_MOD_NONE, EXTERN_TEXLOD, -1},
+    {OPCODE_TEXLOD, /* gcSL_TEXLOD, 0x1C */ VIR_MOD_NONE, EXTERN_TEXLOD, -1, _ConvTEXLOD},
     {VIR_OP_SIN, /* gcSL_SIN, 0x1D */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_COS, /* gcSL_COS, 0x1E */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_TAN, /* gcSL_TAN, 0x1F */ VIR_MOD_NONE, 0, 0},
@@ -227,6 +278,7 @@ conv2VirsVirOpcodeMap _virOpcodeMap[] =
     {VIR_OP_IMG_ADDR_3D, /* gcSL_IMAGE_ADDR_3D, 0x8A */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_GET_SAMPLER_LMM,/* gcSL_GET_SAMPLER_LMM, 0x8B */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_GET_SAMPLER_LBS,/* gcSL_GET_SAMPLER_LBS, 0x8C */ VIR_MOD_NONE, 0, 0},
+    {VIR_OP_TEXLD_U, /* gcSL_TEXLD_U, 0x8D */ VIR_MOD_NONE, 0, -1},
     {VIR_OP_MAXOPCODE, /* gcSL_MAXOPCODE */                    VIR_MOD_NONE, 0, 0},
 };
 
@@ -971,8 +1023,9 @@ _ConvBuiltinNameKindToVirNameId(
     return gcvSTATUS_OK;
 }
 
-#define _gcmConvShaderOpcodeToVirOpcode(Opcode) \
-    (((Opcode) < gcSL_MAXOPCODE) ? _virOpcodeMap[(Opcode)].virOpcode : VIR_OP_MAXOPCODE)
+#define _gcmConvShaderOpcodeToVirOpcode(Shader, CodeIndex, Opcode) \
+    (((Opcode) < gcSL_MAXOPCODE) ? \
+        (_virOpcodeMap[(Opcode)].convVirOpCode ? (*_virOpcodeMap[(Opcode)].convVirOpCode)(Shader, CodeIndex) : _virOpcodeMap[(Opcode)].virOpcode) : VIR_OP_MAXOPCODE)
 
 #define _gcmGetShaderOpcodeVirModifier(Opcode) \
     (((Opcode) < gcSL_MAXOPCODE) ? _virOpcodeMap[(Opcode)].modifier : VIR_MOD_NONE)
@@ -4552,7 +4605,7 @@ _ConvCode2VirInstruction(
         VIR_Shader_SetFlag(VirShader, VIR_SHFLAG_HAS_BARRIER);
     }
 
-    virOpcode    = _gcmConvShaderOpcodeToVirOpcode(opcode);
+    virOpcode    = _gcmConvShaderOpcodeToVirOpcode(Shader, CodeIndex, opcode);
     externOpcode = _gcmGetShaderOpcodeVirExternOpcode(opcode);
 
     /* handling viv_intrinsic */
@@ -6618,6 +6671,40 @@ static VIR_Pattern _texldPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
+/*
+texlod  *0, 1, 2
+texld_u    3, *1, 4
+    texld_u 3, 1, 4, 2
+*/
+static VIR_PatternMatchInst _texlduPatInst0[] = {
+    { MERGE_OPCODE(VIR_OP_TEXLD_U, EXTERN_TEXLOD), VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_TEXLD_U, VIR_PATTERN_ANYCOND, 0, {4, 2, 5, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _texlduRepInst0[] = {
+    { VIR_OP_TEXLD_U, -2, 0, { 4, 2, 5, 0 }, { _SetTexLod } },
+};
+
+/*
+texbias  *0, 1, 2
+texld_u    3, *1, 4
+    texld_u 3, 1, 4, 2
+*/
+static VIR_PatternMatchInst _texlduPatInst1[] = {
+    { MERGE_OPCODE(VIR_OP_TEXLD_U, EXTERN_TEXBIAS), VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_TEXLD_U, VIR_PATTERN_ANYCOND, 0, {4, 2, 5, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _texlduRepInst1[] = {
+    { VIR_OP_TEXLD_U, -2, 0, { 4, 2, 5, 0 }, { _SetTexBias } },
+};
+
+static VIR_Pattern _texlduPattern[] = {
+    { VIR_PATN_FLAG_DELETE_MANUAL, CODEPATTERN(_texldu, 0) },
+    { VIR_PATN_FLAG_DELETE_MANUAL, CODEPATTERN(_texldu, 1) },
+    { VIR_PATN_FLAG_NONE }
+};
+
 static gctBOOL
 _SetI2F(
     IN VIR_PatternContext *Context,
@@ -7273,6 +7360,8 @@ _GetgcSL2VirPatterns(
         return _storePattern;
     case VIR_OP_TEXLD:
         return _texldPattern;
+    case VIR_OP_TEXLD_U:
+        return _texlduPattern;
     case VIR_OP_LOAD:
         return _loadPattern;
     case VIR_OP_ATOMADD:

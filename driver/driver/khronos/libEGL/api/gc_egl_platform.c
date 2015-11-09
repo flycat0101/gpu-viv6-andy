@@ -122,8 +122,8 @@ veglGetNativeVisualId(
 EGLBoolean
 veglGetSwapInterval(
     IN VEGLDisplay Display,
-    OUT EGLint * Max,
-    OUT EGLint * Min
+    OUT EGLint * Min,
+    OUT EGLint * Max
     )
 {
     gceSTATUS status;

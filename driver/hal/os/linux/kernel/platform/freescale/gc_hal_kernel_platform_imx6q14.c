@@ -92,20 +92,17 @@
 
 #include <linux/regulator/consumer.h>
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
 #ifdef CONFIG_DEVICE_THERMAL
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
 #include <linux/device_cooling.h>
 #define REG_THERMAL_NOTIFIER(a) register_devfreq_cooling_notifier(a);
 #define UNREG_THERMAL_NOTIFIER(a) unregister_devfreq_cooling_notifier(a);
-#else
-#define REG_THERMAL_NOTIFIER(a) (void)a;
-#define UNREG_THERMAL_NOTIFIER(a) (void)a;
-#endif
 #else
 extern int register_thermal_notifier(struct notifier_block *nb);
 extern int unregister_thermal_notifier(struct notifier_block *nb);
 #define REG_THERMAL_NOTIFIER(a) register_thermal_notifier(a);
 #define UNREG_THERMAL_NOTIFIER(a) unregister_thermal_notifier(a);
+#endif
 #endif
 
 static int initgpu3DMinClock = 1;
@@ -260,7 +257,7 @@ _ShrinkMemory(
 }
 #endif
 
-#if gcdENABLE_FSCALE_VAL_ADJUST
+#if gcdENABLE_FSCALE_VAL_ADJUST && defined(CONFIG_DEVICE_THERMAL)
 static int thermal_hot_pm_notify(struct notifier_block *nb, unsigned long event,
        void *dummy)
 {
@@ -440,6 +437,28 @@ gckPLATFORM_AdjustParam(
     {
         Args->registerMemBaseVG = res->start;
         Args->registerMemSizeVG = res->end - res->start + 1;
+    }
+
+    res = platform_get_resource_byname(pdev, IORESOURCE_IRQ, "irq_3d_0");
+    if (res)
+        Args->irqs[gcvCORE_MAJOR] = res->start;
+
+    res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "iobase_3d_0");
+    if (res)
+    {
+        Args->registerBases[gcvCORE_MAJOR] = res->start;
+        Args->registerSizes[gcvCORE_MAJOR] = res->end - res->start + 1;
+    }
+
+    res = platform_get_resource_byname(pdev, IORESOURCE_IRQ, "irq_3d_1");
+    if (res)
+        Args->irqs[gcvCORE_3D1] = res->start;
+
+    res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "iobase_3d_1");
+    if (res)
+    {
+        Args->registerBases[gcvCORE_3D1] = res->start;
+        Args->registerSizes[gcvCORE_3D1] = res->end - res->start + 1;
     }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)

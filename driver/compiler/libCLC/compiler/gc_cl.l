@@ -475,10 +475,13 @@ IN gctINT SkipChar
      }
 
      unput(ch);
+
+     /*put back the skipped chararacters*/
+     for(i = 0; i < skipCount; i++)
+     {
+        unput(SkipChar);
+     }
      if(ch == LookAheadChr) { /*found the lookahead*/
-        for (i = 0; i < skipCount; i++) { /*put back the skipped chararacters*/
-          unput(SkipChar);
-        }
         return gcvSTATUS_OK;
      }
      else break;

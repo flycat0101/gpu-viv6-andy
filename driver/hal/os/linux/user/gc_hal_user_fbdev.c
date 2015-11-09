@@ -2074,8 +2074,26 @@ gcoOS_IsValidDisplay(
     IN HALNativeDisplayType Display
     )
 {
-    if(Display != gcvNULL)
+    struct _FBDisplay* display;
+
+    pthread_mutex_lock(&displayMutex);
+
+    for (display = displayStack; display != NULL; display = display->next)
+    {
+        if (display == (struct _FBDisplay*) Display)
+        {
+            /* Found display. */
+            break;
+        }
+    }
+
+    pthread_mutex_unlock(&displayMutex);
+
+    if (display != NULL)
+    {
         return gcvSTATUS_OK;
+    }
+
     return gcvSTATUS_INVALID_ARGUMENT;
 }
 

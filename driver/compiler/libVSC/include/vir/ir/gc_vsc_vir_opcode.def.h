@@ -498,6 +498,12 @@
     VIR_OPINFO(KILL, 2, NoDest, 0, AL),
     /* texture lookup with optional bias, lod, gradient  */
     VIR_OPINFO(TEXLD, 4, HasDest|MemRead|EPFromS0, 1, AL),
+    /* texture lookup with optional bias, lod, gradient  */
+    VIR_OPINFO(TEXLD_U, 4, HasDest|MemRead|EPFromS0, 1, AL),
+    VIR_OPINFO(TEXLD_U_F_L, 4, HasDest|MemRead|EPFromS0, 1, LM),/* Extended from 0x4B */
+    VIR_OPINFO(TEXLD_U_F_B, 4, HasDest|MemRead|EPFromS0, 1, LM),/* Extended from 0x7B */
+    VIR_OPINFO(TEXLD_U_S_L, 4, HasDest|MemRead|EPFromS0, 1, LM),/* Extended from 0x49 */
+    VIR_OPINFO(TEXLD_U_U_L, 4, HasDest|MemRead|EPFromS0, 1, LM),/* Extended from 0x4A */
     /* projection texture lookup with optional bias, lod, gradient  */
     VIR_OPINFO(TEXLDPROJ, 4, HasDest|MemRead|EPFromS0, 1, AL),
     /* percentage close filtering texture lookup with optional bias, lod, gradient */

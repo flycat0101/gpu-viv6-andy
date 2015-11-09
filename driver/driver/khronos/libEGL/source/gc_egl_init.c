@@ -475,14 +475,13 @@ _SetTraceMode(
             }
 
             veglInitTracerDispatchTable();
+            Once = gcvTRUE;
         }
 
         if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_NO_MT", &veglNoMtEnvVar)) && veglNoMtEnvVar)
         {
             enableSwapWorker = gcvFALSE;
         }
-
-        Once = gcvTRUE;
     }
 
 #if VIVANTE_PROFILER
@@ -1024,7 +1023,7 @@ veglInitilizeDisplay(
     )
 {
     gctUINT color, depth;
-    gctINT index;
+    EGLint index;
     EGLint i;
     gceSTATUS status;
 
@@ -1469,6 +1468,7 @@ eglInitialize(
     gcmDUMP_API("${EGL eglInitialize 0x%08X}", Dpy);
     VEGL_TRACE_API(Initialize)(Dpy, major, minor);
 
+    _SetTraceMode();
     /* Get thread data. */
     thread = veglGetThreadData();
     if (thread == gcvNULL)
@@ -1599,7 +1599,7 @@ eglTerminate(
     dpy->blobCacheGet = gcvNULL;
     dpy->blobCacheSet = gcvNULL;
 
-#if defined(LINUX) && gcdGC355_MEM_PRINT
+#if gcdGC355_MEM_PRINT
     gcmPRINT("03) Frame buffer  : %d \n", thread->fbMemSize);
 #endif
 

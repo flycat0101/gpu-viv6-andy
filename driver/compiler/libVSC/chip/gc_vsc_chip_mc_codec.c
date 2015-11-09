@@ -1616,11 +1616,18 @@ static VSC_MC_CODEC_TYPE _GetMcCodecType(VSC_MC_CODEC* pMcCodec,
     case MC_AUXILIARY_OP_CODE_TEXLD_BIAS_PCF:   /* From 0x18 */
     case MC_AUXILIARY_OP_CODE_TEXLD_PLAIN:      /* From 0x18 */
     case MC_AUXILIARY_OP_CODE_TEXLD_PCF:        /* From 0x18 */
+    case 0x7B:
     case MC_AUXILIARY_OP_CODE_TEXLD_U_PLAIN:    /* From 0x7B */
     case MC_AUXILIARY_OP_CODE_TEXLD_U_LOD:      /* From 0x7B */
     case MC_AUXILIARY_OP_CODE_TEXLD_U_BIAS:     /* From 0x7B */
+    case MC_AUXILIARY_OP_CODE_TEXLD_U_F_B_PLAIN:/* From 0x7B */
+    case MC_AUXILIARY_OP_CODE_TEXLD_U_F_B_BIAS:  /* From 0x7B */
     case MC_AUXILIARY_OP_CODE_TEXLD_GATHER:     /* From 0x7D */
     case MC_AUXILIARY_OP_CODE_TEXLD_GATHER_PCF: /* From 0x7D */
+
+    case 0x4B:
+    case 0x49:
+    case 0x4A:
         return VSC_MC_CODEC_TYPE_SAMPLE;
 
     case 0x32:
@@ -1689,6 +1696,12 @@ static gctUINT _MapSampleAuxOpcodeToHwOpcode(gctUINT auxOpcode)
 
     if (auxOpcode >= MC_AUXILIARY_OP_CODE_TEXLD_U_PLAIN &&
         auxOpcode <= MC_AUXILIARY_OP_CODE_TEXLD_U_BIAS)
+    {
+        return 0x7B;
+    }
+
+    if (auxOpcode >= MC_AUXILIARY_OP_CODE_TEXLD_U_F_B_PLAIN &&
+        auxOpcode <= MC_AUXILIARY_OP_CODE_TEXLD_U_F_B_BIAS)
     {
         return 0x7B;
     }
@@ -2129,7 +2142,8 @@ static gctBOOL _Common_Encode_Mc_Sample_Inst(VSC_MC_CODEC* pMcCodec,
         _EncodeSrc(pMcCodec, 1, &pInCodecHelperInst->src[2], gcvFALSE, pOutMcInst);
     }
     else if (pInCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_TEXLD_PCF ||
-             pInCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_TEXLD_U_PLAIN)
+             pInCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_TEXLD_U_PLAIN ||
+             pInCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_TEXLD_U_F_B_PLAIN)
     {
         gcmASSERT(pInCodecHelperInst->srcCount == 3);
 
@@ -2142,7 +2156,11 @@ static gctBOOL _Common_Encode_Mc_Sample_Inst(VSC_MC_CODEC* pMcCodec,
              pInCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_TEXLD_BIAS_PCF ||
              pInCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_TEXLD_U_LOD ||
              pInCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_TEXLD_U_BIAS ||
-             pInCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_TEXLD_GATHER_PCF)
+             pInCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_TEXLD_GATHER_PCF ||
+             pInCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_TEXLD_U_F_B_BIAS ||
+             pInCodecHelperInst->baseOpcode == 0x4B ||
+             pInCodecHelperInst->baseOpcode == 0x49 ||
+             pInCodecHelperInst->baseOpcode == 0x4A)
     {
         gcmASSERT(pInCodecHelperInst->srcCount == 4);
 

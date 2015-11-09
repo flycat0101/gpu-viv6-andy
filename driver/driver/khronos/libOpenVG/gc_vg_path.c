@@ -481,9 +481,7 @@ gceSTATUS vgfDrawPath(
 
     vgmENTERSUBAPI(vgfDrawPath);
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
     do
     {
@@ -781,13 +779,11 @@ gceSTATUS vgfDrawPath(
     while (gcvFALSE);
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Context->curMemPath += gcoOS_EndRecordAllocation();
     if (Context->maxMemPath < Context->curMemPath)
     {
         Context->maxMemPath = Context->curMemPath;
     }
-#endif
 #endif
 
     vgmLEAVESUBAPI(vgfDrawPath);
@@ -1098,9 +1094,7 @@ VG_API_CALL VGPath VG_API_ENTRY vgCreatePath(
 
     vgmENTERAPI(vgCreatePath)
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
     {
         /* Data type transaltion table. */
@@ -1213,13 +1207,11 @@ VG_API_CALL VGPath VG_API_ENTRY vgCreatePath(
             );
     }
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Context->curMemPath += gcoOS_EndRecordAllocation();
     if (Context->maxMemPath < Context->curMemPath)
     {
         Context->maxMemPath = Context->curMemPath;
     }
-#endif
 #endif
     vgmLEAVEAPI(vgCreatePath);
 
@@ -1325,9 +1317,7 @@ VG_API_CALL void VG_API_ENTRY vgDestroyPath(
 {
     vgmENTERAPI(vgDestroyPath)
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
     {
         gcmTRACE_ZONE(
@@ -1356,13 +1346,11 @@ VG_API_CALL void VG_API_ENTRY vgDestroyPath(
 
     }
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Context->curMemPath += gcoOS_EndRecordAllocation();
     if (Context->maxMemPath < Context->curMemPath)
     {
         Context->maxMemPath = Context->curMemPath;
     }
-#endif
 #endif
     vgmLEAVEAPI(vgDestroyPath);
 }
@@ -1520,9 +1508,7 @@ VG_API_CALL void VG_API_ENTRY vgAppendPath(
 {
     vgmENTERAPI(vgAppendPath)
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
     {
         gceSTATUS status;
@@ -1670,13 +1656,11 @@ VG_API_CALL void VG_API_ENTRY vgAppendPath(
 
     }
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Context->curMemPath += gcoOS_EndRecordAllocation();
     if (Context->maxMemPath < Context->curMemPath)
     {
         Context->maxMemPath = Context->curMemPath;
     }
-#endif
 #endif
     vgmLEAVEAPI(vgAppendPath);
 }
@@ -1732,9 +1716,7 @@ VG_API_CALL void VG_API_ENTRY vgAppendPathData(
     vgmENTERAPI(vgAppendPathData)
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
     {
         gceSTATUS status;
@@ -1898,13 +1880,11 @@ VG_API_CALL void VG_API_ENTRY vgAppendPathData(
     }
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Context->curMemPath += gcoOS_EndRecordAllocation();
     if (Context->maxMemPath < Context->curMemPath)
     {
         Context->maxMemPath = Context->curMemPath;
     }
-#endif
 #endif
 
     vgmLEAVEAPI(vgAppendPathData);
@@ -2025,9 +2005,7 @@ VG_API_CALL void VG_API_ENTRY vgModifyPathCoords(
     vgmENTERAPI(vgModifyPathCoords)
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
     {
         gceSTATUS status;
@@ -2217,13 +2195,11 @@ VG_API_CALL void VG_API_ENTRY vgModifyPathCoords(
 
     }
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Context->curMemPath += gcoOS_EndRecordAllocation();
     if (Context->maxMemPath < Context->curMemPath)
     {
         Context->maxMemPath = Context->curMemPath;
     }
-#endif
 #endif
     vgmLEAVEAPI(vgModifyPathCoords);
 }
@@ -2280,9 +2256,7 @@ VG_API_CALL void VG_API_ENTRY vgTransformPath(
     vgmENTERAPI(vgTransformPath)
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
     {
         gceSTATUS status;
@@ -2434,13 +2408,11 @@ VG_API_CALL void VG_API_ENTRY vgTransformPath(
 
     }
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Context->curMemPath += gcoOS_EndRecordAllocation();
     if (Context->maxMemPath < Context->curMemPath)
     {
         Context->maxMemPath = Context->curMemPath;
     }
-#endif
 #endif
     vgmLEAVEAPI(vgTransformPath);
 }
@@ -2501,9 +2473,7 @@ VG_API_CALL VGboolean VG_API_ENTRY vgInterpolatePath(
     vgmENTERAPI(vgInterpolatePath)
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
     {
         gceSTATUS status;
@@ -2750,13 +2720,11 @@ VG_API_CALL VGboolean VG_API_ENTRY vgInterpolatePath(
 
     }
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Context->curMemPath += gcoOS_EndRecordAllocation();
     if (Context->maxMemPath < Context->curMemPath)
     {
         Context->maxMemPath = Context->curMemPath;
     }
-#endif
 #endif
     vgmLEAVEAPI(vgInterpolatePath);
 
@@ -2803,9 +2771,7 @@ VG_API_CALL VGfloat VG_API_ENTRY vgPathLength(
     vgmENTERAPI(vgPathLength)
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
     {
         gctBOOL success;
@@ -2857,13 +2823,11 @@ VG_API_CALL VGfloat VG_API_ENTRY vgPathLength(
         }
     }
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Context->curMemPath += gcoOS_EndRecordAllocation();
     if (Context->maxMemPath < Context->curMemPath)
     {
         Context->maxMemPath = Context->curMemPath;
     }
-#endif
 #endif
     vgmLEAVEAPI(vgPathLength);
 
@@ -2962,9 +2926,7 @@ VG_API_CALL void VG_API_ENTRY vgPointAlongPath(
     vgmENTERAPI(vgPointAlongPath)
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
     {
         gctBOOL success;
@@ -3050,13 +3012,11 @@ VG_API_CALL void VG_API_ENTRY vgPointAlongPath(
         }
     }
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Context->curMemPath += gcoOS_EndRecordAllocation();
     if (Context->maxMemPath < Context->curMemPath)
     {
         Context->maxMemPath = Context->curMemPath;
     }
-#endif
 #endif
     vgmLEAVEAPI(vgPointAlongPath);
 }
@@ -3097,9 +3057,7 @@ VG_API_CALL void VG_API_ENTRY vgPathBounds(
     vgmENTERAPI(vgPathBounds)
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
     {
         gctBOOL success;
@@ -3172,13 +3130,11 @@ VG_API_CALL void VG_API_ENTRY vgPathBounds(
     }
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Context->curMemPath += gcoOS_EndRecordAllocation();
     if (Context->maxMemPath < Context->curMemPath)
     {
         Context->maxMemPath = Context->curMemPath;
     }
-#endif
 #endif
     vgmLEAVEAPI(vgPathBounds);
 }
@@ -3222,9 +3178,7 @@ VG_API_CALL void VG_API_ENTRY vgPathTransformedBounds(
     vgmENTERAPI(vgPathTransformedBounds)
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     gcoOS_RecordAllocation();
-#endif
 #endif
     {
         gctBOOL success;
@@ -3341,13 +3295,11 @@ VG_API_CALL void VG_API_ENTRY vgPathTransformedBounds(
         }
     }
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
     Context->curMemPath += gcoOS_EndRecordAllocation();
     if (Context->maxMemPath < Context->curMemPath)
     {
         Context->maxMemPath = Context->curMemPath;
     }
-#endif
 #endif
     vgmLEAVEAPI(vgPathTransformedBounds);
 }

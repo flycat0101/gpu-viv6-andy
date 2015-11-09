@@ -15,6 +15,7 @@
 #define __gc_vgsh_precomp_h_
 
 #include <gc_hal.h>
+#include <gc_hal_priv.h>
 #include <gc_vsc_drvi_interface.h>
 #include <gc_hal_raster.h>
 #include <gc_hal_user_math.h>

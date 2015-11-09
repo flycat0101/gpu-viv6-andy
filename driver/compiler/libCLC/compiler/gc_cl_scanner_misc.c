@@ -183,6 +183,7 @@ static clsKEYWORD KeywordTable[] =
     {"__read_only",          T_READ_ONLY,            0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"__write_only",         T_WRITE_ONLY,           0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"__read_write",         T_RESERVED_KEYWORD,     1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"__restrict",           T_RESTRICT,             0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"_viv_bool_packed",     T_BOOL_PACKED,         0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"_viv_bool2_packed",    T_BOOL2_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"_viv_bool3_packed",    T_BOOL3_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},

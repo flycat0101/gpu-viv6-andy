@@ -789,9 +789,10 @@ gcChipUtilsDumpTexture(
             gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
                                             __GLES_MAX_FILENAME_LEN,
                                             &fileNameOffset,
-                                            "fID%d_dID%d(draw)_texID%d[%s]_%s_level%d_slice%d",
+                                            "fID%04d_dID%04d(%s)_texID%04d[%s]_%s_level%02d_slice%02d",
                                             frameCount,
                                             drawCount,
+                                            (gc->shaderProgram.mode == __GLSL_MODE_COMPUTE ? "compute" : "draw"),
                                             tex->name,
                                             txTypeStr[tex->targetIndex],
                                             formatInfo->formatName,
@@ -799,11 +800,21 @@ gcChipUtilsDumpTexture(
                                             slice
                                             ));
             gcmERR_BREAK(gcChipUtilsDumpSurface(gc, &surfView, fileName, gcvFALSE));
+
+            if (tex->targetIndex == __GL_TEXTURE_2D_INDEX || tex->targetIndex == __GL_TEXTURE_2D_MS_INDEX)
+            {
+                break;
+            }
+
             ++slice;
         } while (gcvTRUE);
 
         slice = 0;
         surfView = gcChipGetTextureSurface(chipCtx, tex, ++level, slice, slice);
+        if (!surfView.surf)
+        {
+            break;
+        }
     } while(gcvTRUE);
 
     if (fileName)
@@ -878,7 +889,7 @@ gcChipUtilsDumpRT(
                     gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
                                                     __GLES_MAX_FILENAME_LEN,
                                                     &fileNameOffset,
-                                                    "fID%d_clear_fbo%d(%s[%s]ID%d_%s_level%d_face%d_layer%d)_RT%d",
+                                                    "fID%04d_clear_fbo%04d(%s[%s]ID%04d_%s_level%02d_face%d_layer%02d)_RT%d",
                                                     frameCount,
                                                     gc->frameBuffer.drawFramebufObj->name,
                                                     (attachPoint->objType == GL_RENDERBUFFER) ? "rbo" : "tex",
@@ -896,7 +907,7 @@ gcChipUtilsDumpRT(
                     gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
                                                     __GLES_MAX_FILENAME_LEN,
                                                     &fileNameOffset,
-                                                    "fID%d_dID%d(draw)_pID%d_ppID%d_fbo%d(%s[%s]ID%d_%s_level%d_face%d_layer%d)_RT%d",
+                                                    "fID%04d_dID%04d(draw)_pID%04d_ppID%04d_fbo%04d(%s[%s]ID%04d_%s_level%02d_face%d_layer%02d)_RT%d",
                                                     frameCount,
                                                     drawCount,
                                                     gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
@@ -921,7 +932,7 @@ gcChipUtilsDumpRT(
                     gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
                                                     __GLES_MAX_FILENAME_LEN,
                                                     &fileNameOffset,
-                                                    "fID%d_clear_window_%s_RT",
+                                                    "fID%04d_clear_window_%s_RT",
                                                     frameCount,
                                                     formatInfo->formatName));
                 }
@@ -931,7 +942,7 @@ gcChipUtilsDumpRT(
                     gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
                                                     __GLES_MAX_FILENAME_LEN,
                                                     &fileNameOffset,
-                                                    "fID%d_dID%d(draw)_pID%d_ppID%d_window_%s_RT",
+                                                    "fID%04d_dID%04d(draw)_pID%04d_ppID%04d_window_%s_RT",
                                                     frameCount,
                                                     drawCount,
                                                     gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
@@ -969,7 +980,7 @@ gcChipUtilsDumpRT(
                 gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
                                                 __GLES_MAX_FILENAME_LEN,
                                                 &fileNameOffset,
-                                                "fID%d_clear_fbo%d(%s[%s]ID%d_%s_level%d_face%d_layer%d)_depth",
+                                                "fID%04d_clear_fbo%04d(%s[%s]ID%04d_%s_level%02d_face%d_layer%02d)_depth",
                                                 frameCount,
                                                 gc->frameBuffer.drawFramebufObj->name,
                                                 (attachPoint->objType == GL_RENDERBUFFER) ? "rbo" : "tex",
@@ -987,7 +998,7 @@ gcChipUtilsDumpRT(
                 gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
                                                 __GLES_MAX_FILENAME_LEN,
                                                 &fileNameOffset,
-                                                "fID%d_dID%d(draw)_pID%d_ppID%d_fbo%d(%s[%s]ID%d_%s_level%d_face%d_layer%d)_depth",
+                                                "fID%04d_dID%04d(draw)_pID%04d_ppID%04d_fbo%04d(%s[%s]ID%04d_%s_level%02d_face%d_layer%02d)_depth",
                                                 frameCount,
                                                 drawCount,
                                                 gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
@@ -1010,7 +1021,7 @@ gcChipUtilsDumpRT(
                 gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
                                                 __GLES_MAX_FILENAME_LEN,
                                                 &fileNameOffset,
-                                                "fID%d_clear_window_%s_depth",
+                                                "fID%04d_clear_window_%s_depth",
                                                 frameCount,
                                                 formatInfo->formatName
                                                 ));
@@ -1021,7 +1032,7 @@ gcChipUtilsDumpRT(
                 gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
                                                 __GLES_MAX_FILENAME_LEN,
                                                 &fileNameOffset,
-                                                "fID%d_dID%d(draw)_pID%d_ppID%d_window_%s_depth",
+                                                "fID%04d_dID%04d(draw)_pID%04d_ppID%04d_window_%s_depth",
                                                 frameCount,
                                                 drawCount,
                                                 gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,

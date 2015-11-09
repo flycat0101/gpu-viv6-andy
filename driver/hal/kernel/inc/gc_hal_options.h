@@ -474,6 +474,9 @@
 #   define gcdMMU_SIZE                          (256 << 10)
 #endif
 
+#ifndef gcdGC355_VGMMU_MEMORY_SIZE_KB
+#   define gcdGC355_VGMMU_MEMORY_SIZE_KB   32
+#endif
 /*
     gcdSECURE_USER
 

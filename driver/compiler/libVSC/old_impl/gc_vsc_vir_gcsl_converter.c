@@ -235,8 +235,11 @@ _CalculateInstCount(
             }
         }
 
-    case VIR_OP_TEXLD:      case VIR_OP_TEXLDPCF:
-    case VIR_OP_TEXLDPCFPROJ:case VIR_OP_TEXLDPROJ:
+    case VIR_OP_TEXLD:
+    case VIR_OP_TEXLD_U:
+    case VIR_OP_TEXLDPCF:
+    case VIR_OP_TEXLDPCFPROJ:
+    case VIR_OP_TEXLDPROJ:
         {
             gctSIZE_T                  i            = 0;
             gctSIZE_T                  count        = 0;
@@ -1365,6 +1368,7 @@ _ConvVirOpcode2Opcode(
     case VIR_OP_RET:            return gcSL_RET;
     case VIR_OP_CONV:           return gcSL_CONV;
     case VIR_OP_TEXLD:          return gcSL_TEXLD;
+    case VIR_OP_TEXLD_U:        return gcSL_TEXLD_U;
     case VIR_OP_TEXLDPCF:       return gcSL_TEXLDPCF;
     case VIR_OP_TEXLDPCFPROJ:   return gcSL_TEXLDPCFPROJ;
     case VIR_OP_TEXLDPROJ:      return gcSL_TEXLDPROJ;
@@ -2236,8 +2240,11 @@ _ConvVirInst2Inst(
             break;
         }
         /* texld dest, src0, src1, src2 */
-    case VIR_OP_TEXLD:        case VIR_OP_TEXLDPCF:
-    case VIR_OP_TEXLDPCFPROJ: case VIR_OP_TEXLDPROJ:
+    case VIR_OP_TEXLD:
+    case VIR_OP_TEXLD_U:
+    case VIR_OP_TEXLDPCF:
+    case VIR_OP_TEXLDPCFPROJ:
+    case VIR_OP_TEXLDPROJ:
         {
             VIR_Operand_TexldModifier *texldOperand = gcvNULL;
             gctSIZE_T                  i            = 0;

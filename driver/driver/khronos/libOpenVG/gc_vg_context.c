@@ -920,12 +920,10 @@ veglDestroyContext(
         }
 
 #if gcdGC355_MEM_PRINT
-#ifdef LINUX
         /* Print the memory info when exiting. */
         gcmPRINT("== Memory profiling results in bytes ==\n");
         gcmPRINT("01) VGImage objects: %d \n", context->maxMemImage);
         gcmPRINT("02) VGPath objects : %d \n", context->maxMemPath);
-#endif
 #endif
         /* Destroy the context object. */
         gcmERR_BREAK(gcoOS_Free(context->os, Context));
