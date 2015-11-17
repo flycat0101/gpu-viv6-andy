@@ -318,7 +318,7 @@ gfx dfb:            $(LIB_DFB)
 endif
 
 ifeq ($(USE_EXA_G2D),1)
-LIB_EXA             := $(AQROOT)/driver/X/EXA_G2D/src
+#LIB_EXA             := $(AQROOT)/driver/X/EXA_G2D/src
 
 ifeq ($(EGL_API_DRI),1)
 LIB_LIST            += $(LIB_EXA)
@@ -339,7 +339,7 @@ else
 
 ifeq ($(VIVANTE_ENABLE_2D),1)
 
-LIB_EXA             := $(AQROOT)/driver/X/EXA/src
+#LIB_EXA             := $(AQROOT)/driver/X/EXA/src
 
 ifeq ($(EGL_API_DRI),1)
 LIB_LIST            += $(LIB_EXA)

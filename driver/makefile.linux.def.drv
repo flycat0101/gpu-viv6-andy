@@ -474,9 +474,9 @@ VG112D_DIR          := $(AQROOT)/driver/khronos/libOpenVG
 GFX_DIR             := $(AQROOT)/driver/dfb
 
 ifeq ($(USE_EXA_G2D),1)
-EXA_DIR             := $(AQROOT)/driver/X/EXA_G2D/src
+#EXA_DIR             := $(AQROOT)/driver/X/EXA_G2D/src
 else
-EXA_DIR             := $(AQROOT)/driver/X/EXA/src
+#EXA_DIR             := $(AQROOT)/driver/X/EXA/src
 endif
 
 ifeq ($(GL4_LINUX_ENABLE),1)
