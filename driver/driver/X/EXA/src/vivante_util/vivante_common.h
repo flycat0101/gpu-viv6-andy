@@ -170,6 +170,12 @@ extern "C" {
                         || gcmALIGN(sh, HEIGHT_ALIGNMENT) < IMX_EXA_NONCACHESURF_HEIGHT )   \
                         )
 
+
+
+#ifdef ADD_FSL_XRANDR
+#define  IMX_ALIGN(offset, align)  gcmALIGN_NP2(offset, align)
+#endif
+
 #ifdef __cplusplus
 }
 #endif

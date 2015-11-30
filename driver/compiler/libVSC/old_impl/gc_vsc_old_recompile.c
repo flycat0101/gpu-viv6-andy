@@ -6258,7 +6258,7 @@ _patchNP2Texture(
             {
                 /* insert nops before texld or texlod instruction. */
                 addCodeCount++;
-                gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, insertIndex, (gctUINT)addCodeCount));
+                gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, insertIndex, (gctUINT)addCodeCount, gcvTRUE));
                 Shader->lastInstruction = insertIndex;
                 Shader->instrIndex = gcSHADER_OPCODE;
                 /* Do NP2 texture patch. */
@@ -6776,7 +6776,7 @@ _patchGlobalWorkSizeCode(
     gcmONERROR(gcSHADER_FindMainFunction(Shader, &mainStart, &mainEnd));
 
     /* Insert nops at the beginning of main function. */
-    gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, mainStart, 3));
+    gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, mainStart, 3, gcvTRUE));
     lastInstruction = Shader->lastInstruction;
     Shader->lastInstruction = mainStart;
     Shader->instrIndex = gcSHADER_OPCODE;
@@ -6892,7 +6892,7 @@ _patchRealGlobalWorkSizeCode(
     gcmONERROR(gcSHADER_FindMainFunction(Shader, &mainStart, &mainEnd));
 
     /* Insert nops at the beginning of main function. */
-    gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, mainStart, 3));
+    gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, mainStart, 3, gcvTRUE));
     lastInstruction = Shader->lastInstruction;
     Shader->lastInstruction = mainStart;
     Shader->instrIndex = gcSHADER_OPCODE;
@@ -7715,7 +7715,7 @@ _patchYFlippedTexture(
             }
 
             /* insert two instructions. */
-            gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, insertIndex, 2));
+            gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, insertIndex, 2, gcvTRUE));
             Shader->lastInstruction = insertIndex;
             Shader->instrIndex = gcSHADER_OPCODE;
 
@@ -8126,7 +8126,7 @@ _ConvertIntOrUIntAttribute(
         return status;
 
     /* Insert nops at the beginning of main function. */
-    gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, mainStart, convertAttribCount));
+    gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, mainStart, convertAttribCount, gcvTRUE));
     lastInstruction = Shader->lastInstruction;
     Shader->lastInstruction = mainStart;
     Shader->instrIndex = gcSHADER_OPCODE;
@@ -10518,7 +10518,7 @@ _InsertAssignmentForSamplerSize(
         }
 
         /* Insert two argument assignments. */
-        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, j + 1, createCodeCount));
+        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, j + 1, createCodeCount, gcvTRUE));
 
         insertCode1 = &Shader->code[j + 1];
         insertCode1->opcode = gcSL_MOV;
@@ -10765,7 +10765,7 @@ _InsertAssignmentForInterpolation(
         gcmASSERT(attribute);
 
         /* Insert new arguments assignment codes. */
-        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, i, createCodeCount));
+        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, i, createCodeCount, gcvTRUE));
         currentPos = i;
         currentArg = origArgumentCount;
 
@@ -11376,7 +11376,7 @@ _LinkImageLibFuc(
                     gcmASSERT(uniform->firstChild != -1);
                     gcmONERROR(gcSHADER_GetUniform(Shader, (gctUINT)uniform->firstChild, &extraUniform));
                     /* Insert one argument assignment */
-                    gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, movIndex + 1, 1));
+                    gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, movIndex + 1, 1, gcvTRUE));
                     gcSHADER_Pack(Shader);
 
                     argCode = &Shader->code[movIndex + 1];

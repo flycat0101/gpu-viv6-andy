@@ -212,6 +212,7 @@ static void _MergeDepthAndStencil(
 {
     glsNAMEDOBJECT_PTR depthWrapper, stencilWrapper;
     glsRENDER_BUFFER_PTR depth, stencil;
+    gctINT32 depthReferenceCount = 0;
 
     gcmHEADER_ARG("Context=0x%x", Context);
 
@@ -291,6 +292,12 @@ static void _MergeDepthAndStencil(
 
         gcmFOOTER_NO();
         return;
+    }
+
+    gcoSURF_QueryReferenceCount(depth->surface, &depthReferenceCount);
+    while (depthReferenceCount--)
+    {
+        gcoSURF_ReferenceSurface(stencil->surface);
     }
 
     /* Delete depth surface. */
@@ -1952,12 +1959,6 @@ GL_API void GL_APIENTRY glFramebufferRenderbufferOES(
             }
             context->frameBuffer->color.surface = surface;
 
-            if(context->frameBuffer->color.surface)
-            {
-                /* Reference newly bound surface. */
-                gcoSURF_ReferenceSurface(context->frameBuffer->color.surface);
-            }
-
             if (context->frameBuffer->color.target != gcvNULL &&
                 context->frameBuffer->color.surface != gcvNULL)
             {
@@ -2010,12 +2011,6 @@ GL_API void GL_APIENTRY glFramebufferRenderbufferOES(
                 gcoSURF_Destroy(context->frameBuffer->depth.surface);
             }
             context->frameBuffer->depth.surface = surface;
-
-            if(context->frameBuffer->depth.surface)
-            {
-                /* Reference newly boundly surface. */
-                gcoSURF_ReferenceSurface(context->frameBuffer->depth.surface);
-            }
 
             /* Merge the depth and stencil buffers. */
             _MergeDepthAndStencil(context);

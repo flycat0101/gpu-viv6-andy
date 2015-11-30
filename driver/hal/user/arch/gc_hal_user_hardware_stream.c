@@ -3893,9 +3893,38 @@ gcmENDSTATEBATCH(reserve, memory);
         }
         else
         {
+            gctUINT32 addr = 0;
             gcmASSERT(!Hardware->features[gcvFEATURE_32_ATTRIBUTES]);
 
+            if (streamRegV2)
+            {
+                /* Set initial state addresses. */
+                streamAddressState = 0x5180;
+            }
+            else if (Hardware->config->streamCount > 1)
+            {
+                /* Set initial state addresses. */
+                streamAddressState = 0x01A0;
+            }
+            else
+            {
+                /* Set initial state addresses. */
+                streamAddressState = 0x0193;
+            }
             reserveSize = 4 * gcmSIZEOF(gctUINT32);
+
+            reserveSize += 2 * gcmSIZEOF(gctUINT32);
+
+            /* Hardware  have a read operation ,so we create a buffer and program a address for reading. */
+            if(Hardware->tempBuffer.valid == gcvFALSE)
+            {
+                gcmONERROR(gcsSURF_NODE_Construct(&Hardware->tempBuffer, 16, 16, gcvSURF_VERTEX, 0, gcvPOOL_DEFAULT));
+                gcmONERROR(gcoHARDWARE_Lock(&Hardware->tempBuffer, &addr, gcvNULL));
+            }
+            else
+            {
+                gcmGETHARDWAREADDRESS(Hardware->tempBuffer, addr);
+            }
 
             if (VertexInstanceIdLinkage != -1)
             {
@@ -3903,6 +3932,26 @@ gcmENDSTATEBATCH(reserve, memory);
             }
 
             gcmBEGINSTATEBUFFER(Hardware, reserve, stateDelta, memory, reserveSize);
+
+           *memory++
+            = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
+ 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
+ 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
+ 25:16)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (streamAddressState) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));
+
+
+           _gcmSETSTATEDATA(stateDelta, memory, streamAddressState, addr);
+
 
             {{    gcmASSERT(((memory - gcmUINT64_TO_TYPE(reserve->lastReserve,
  gctUINT32_PTR)) & 1) == 0);    gcmASSERT((gctUINT32)1 <= 1024);

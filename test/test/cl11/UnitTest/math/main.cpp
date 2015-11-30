@@ -30,6 +30,7 @@
 #include <math.h>
 
 const char * testName = "Math";
+bool         gHasLong = false;    /* OpenCL proflile. */
 
 /******************************************************************************\
 |* CL programs                                                                *|
@@ -1264,17 +1265,38 @@ test(
 
     clmVERBOSE("Running %s testcase %d...\n", testName, testCase);
 
-    if (testCase == 20)
+    switch (testCase)
     {
-        bool supported = false;
-
-        /* Check atomic extention. */
-        errNum = checkExtension(device, "cl_khr_global_int32_extended_atomics", &supported);
-
-        if (! supported)
+    case 20:
         {
-            return errNum;
+            bool supported = false;
+            /* Check atomic extention. */
+            errNum = checkExtension(device, "cl_khr_global_int32_extended_atomics", &supported);
+            if (! supported)
+                return errNum;
         }
+        break;
+    case 26:
+    case 27:
+    case 28:
+    case 29:
+    case 30:
+    case 31:
+    case 32:
+    case 33:
+    case 34:
+    case 35:
+    case 36:
+    case 37:
+    case 38:
+    case 39:
+        if (!gHasLong) {
+            clmINFO("Device not support FULL_PROFILE.\n");
+            return 0;
+        }
+        break;
+    default:
+        break;
     }
 
     clmVERBOSE("Creating program...\n");
@@ -2671,6 +2693,12 @@ main(
     /* Get a GPU device. */
     errNum = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, &device, NULL);
     clmCHECKERROR(errNum, CL_SUCCESS);
+
+    char profile[1024] = "";
+    errNum = clGetDeviceInfo( device, CL_DEVICE_PROFILE, sizeof(profile), profile, NULL );
+    clmCHECKERROR(errNum, CL_SUCCESS);
+    if( strstr(profile, "FULL_PROFILE" ))
+        gHasLong = true;
 
     /* Create the context. */
     context = clCreateContext(0, 1, &device, NULL, NULL, &errNum);

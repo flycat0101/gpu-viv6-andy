@@ -25963,6 +25963,11 @@ gcSetOptimizerOption(
 {
     gceSHADER_OPTIMIZATION opt  = gcvOPTIMIZATION_NONE;
 
+    if (Flags & gcvSHADER_RESET_INLINE_LEVEL)
+    {
+        gcmOPT_SetINLINELEVEL(GC_DEFAULT_INLINE_LEVEL);
+    }
+
     /* get options from the environment variables  */
     gcGetOptionFromEnv(&theOptimizerOption);
 
@@ -25997,6 +26002,12 @@ gcGetOptimizerOption()
 
     return &theOptimizerOption;
 } /* gcGetOptimizerOption */
+
+gcOPTIMIZER_OPTION *
+gcGetOptimizerOptionVariable()
+{
+    return &theOptimizerOption;
+}
 
 gctBOOL gcDebugZoneLevelEnabled(
     IN gctUINT32 Zone,
@@ -32935,9 +32946,10 @@ OnError:
 
 gceSTATUS
 gcSHADER_InsertNOP2BeforeCode(
-    IN OUT gcSHADER          Shader,
-    OUT     gctUINT            CodeIndex,
-    OUT     gctUINT            AddCodeCount
+    IN OUT gcSHADER                Shader,
+    OUT gctUINT                    CodeIndex,
+    OUT gctUINT                    AddCodeCount,
+    IN  gctBOOL                    ReplaceJmp
     )
 {
     gceSTATUS status;
@@ -32976,10 +32988,35 @@ gcSHADER_InsertNOP2BeforeCode(
         code = &Shader->code[i];
         opcode = gcmSL_OPCODE_GET(code->opcode, Opcode);
 
-        if ((opcode == gcSL_JMP || opcode == gcSL_CALL) &&
-            (code->tempIndex > (gctUINT16)CodeIndex && code->tempIndex < (gctUINT16)(origCodeCount + 10)))
+        if (opcode == gcSL_CALL)
         {
-            code->tempIndex += (gctUINT16)AddCodeCount;
+            if (code->tempIndex > (gctUINT16)CodeIndex &&
+                code->tempIndex < (gctUINT16)(origCodeCount + 10))
+            {
+                code->tempIndex += (gctUINT16)AddCodeCount;
+            }
+        }
+
+        if (opcode == gcSL_JMP)
+        {
+            /* Jmp to the new instruction. */
+            if (ReplaceJmp)
+            {
+                if (code->tempIndex > (gctUINT16)CodeIndex &&
+                    code->tempIndex < (gctUINT16)(origCodeCount + 10))
+                {
+                    code->tempIndex += (gctUINT16)AddCodeCount;
+                }
+            }
+            /* Jmp to the original instruction. */
+            else
+            {
+                if (code->tempIndex >= (gctUINT16)CodeIndex &&
+                    code->tempIndex < (gctUINT16)(origCodeCount + 10))
+                {
+                    code->tempIndex += (gctUINT16)AddCodeCount;
+                }
+            }
         }
     }
 

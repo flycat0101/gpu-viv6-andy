@@ -941,9 +941,9 @@ eglGetSyncAttribKHR(
     /* Call internal function. */
     result = veglGetSyncAttrib(dpy, (EGLSync) sync, attribute, pointer);
 
-    if (value != gcvNULL)
+    if (result == gcvTRUE)
     {
-        *value = (EGLint) value0;
+        *value = (EGLint) *pointer;
     }
 
     gcmFOOTER_ARG("return=%d", result);

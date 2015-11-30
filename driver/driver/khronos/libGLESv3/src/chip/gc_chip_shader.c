@@ -2667,6 +2667,14 @@ gcChipUpdateBaseAddrUniformForStorageBlocks(
 
         /* Set the new base address uniform. */
         sbSlot->halUniform[stageIdx] = newBaseAddrUniform;
+
+        gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(program->curPgInstance->programState.hints->vsConstBase,
+                                                          program->curPgInstance->programState.hints->psConstBase,
+                                                          program->curPgInstance->programState.hints->tcsConstBase,
+                                                          program->curPgInstance->programState.hints->tesConstBase,
+                                                          program->curPgInstance->programState.hints->gsConstBase,
+                                                          newBaseAddrUniform,
+                                                          &sbSlot->stateAddress[stageIdx]));
     }
 
 OnError:
@@ -6558,7 +6566,8 @@ gcChipFlushSingleUniform(
                     arraySize = GetUniformSingleLevelArraySzie(halUniform, halUniform->arrayLengthCount - 1);
                 }
 
-                if (gc->shaderProgram.boundPPO || 1)
+                if (gc->shaderProgram.boundPPO ||
+                    chipCtx->activePrograms[stageIdx]->masterPgInstance != chipCtx->activePrograms[stageIdx]->curPgInstance)
                 {
                     gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->vsConstBase,
                                                                       chipCtx->activeProgState->hints->psConstBase,
@@ -9334,7 +9343,8 @@ gcChipFlushUniformBlock(
         {
             gctUINT32 physicalAddress = 0;
 
-            if (gc->shaderProgram.boundPPO || 1)
+            if (gc->shaderProgram.boundPPO ||
+                chipCtx->activePrograms[stageIdx]->masterPgInstance != chipCtx->activePrograms[stageIdx]->curPgInstance)
             {
                 gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->vsConstBase,
                                                                   chipCtx->activeProgState->hints->psConstBase,
@@ -10412,7 +10422,8 @@ gcChipFlushUserDefSSBs(
                                                          (gctINT *)&unsizedArrayLength));
                 }
 
-                if (gc->shaderProgram.boundPPO || 1)
+                if (gc->shaderProgram.boundPPO ||
+                    chipCtx->activePrograms[stageIdx]->masterPgInstance != chipCtx->activePrograms[stageIdx]->curPgInstance)
                 {
                     gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->vsConstBase,
                                                                       chipCtx->activeProgState->hints->psConstBase,
@@ -10526,7 +10537,8 @@ gcChipFlushPrivateSSBs(
                     continue;
                 }
 
-                if (gc->shaderProgram.boundPPO)
+                if (gc->shaderProgram.boundPPO ||
+                    chipCtx->activePrograms[stageIdx]->masterPgInstance != chipCtx->activePrograms[stageIdx]->curPgInstance)
                 {
                     gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->vsConstBase,
                                                                       chipCtx->activeProgState->hints->psConstBase,

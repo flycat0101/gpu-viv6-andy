@@ -4545,20 +4545,47 @@ gcOpt_InlineFunctions(
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT functionRemoved = 0;
     gctINT i;
-    gctUINT inlineLevel = gcmOPT_INLINELEVEL();
+    gctUINT inlineLevel;
     gcOPTIMIZER Optimizer = *OptimizerPtr;
     gctUINT inlineDepthComparison  = gcmOPT_INLINEDEPTHCOMP();
     gctUINT inlineFormatConversion = gcmOPT_INLINEFORMATCONV();
-    gctUINT currentBudget = (inlineLevel == 4) ? 0x7fffffff
-                                               : _GetInlineBudget(Optimizer);
+    gctUINT currentBudget;
     gctUINT savedShaderTempCount = Optimizer->shader->_tempRegCount;
     gctBOOL imagePatch;
     gctBOOL imageFunctionInlined;
     gctBOOL isCTSInline = gcvFALSE;
+    gctUINT option = Optimizer->shader->optimizationOption;
 
     gcmHEADER_ARG("Optimizer=0x%x", Optimizer);
 
     imagePatch = gcdHasOptimization(Optimizer->option, gcvOPTIMIZATION_IMAGE_PATCHING);
+
+    if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_LEVEL_0))
+    {
+        inlineLevel = 0;
+    }
+    else if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_LEVEL_1))
+    {
+        inlineLevel = 1;
+    }
+    else if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_LEVEL_2))
+    {
+        inlineLevel = 2;
+    }
+    else if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_LEVEL_3))
+    {
+        inlineLevel = 3;
+    }
+    else if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_LEVEL_4))
+    {
+        inlineLevel = 4;
+    }
+    else
+    {
+        inlineLevel = gcmOPT_INLINELEVEL();
+    }
+
+    currentBudget = (inlineLevel == 4) ? 0x7fffffff : _GetInlineBudget(Optimizer);
 
     if (Optimizer->functionCount == 0 || inlineLevel == 0)
     {
@@ -10311,12 +10338,6 @@ gcOptimizeShader(
         }
         else if (gcdHasOptimization(option, gcvOPTIMIZATION_UNIT_TEST))
         {
-            /* Unit test for specified optimization feature. */
-            if (gcdHasOptimization(option, gcvOPTIMIZATION_CONSTRUCTION))
-            {
-                status = gcvSTATUS_OK;
-            }
-
             if (gcdHasOptimization(option, gcvOPTIMIZATION_DEAD_CODE))
             {
                 status = gcOpt_RemoveDeadCode(optimizer);

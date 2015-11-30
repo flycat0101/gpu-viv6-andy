@@ -11001,7 +11001,7 @@ _ConvertCONV(
             code->source1 = code->source1Index = code->source1Indexed = 0;
 
             /* Insert a I2F. */
-            gcmONERROR(gcSHADER_InsertNOP2BeforeCode(shader, CodeIndex + 1, 1));
+            gcmONERROR(gcSHADER_InsertNOP2BeforeCode(shader, CodeIndex + 1, 1, gcvFALSE));
 
             /* Fill the new code. */
             code = &shader->code[CodeIndex];
@@ -11015,7 +11015,7 @@ _ConvertCONV(
             I2FCode->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_TEMP)
                              | gcmSL_SOURCE_SET(0, Format, gcSL_INTEGER)
                              | gcmSL_SOURCE_SET(0, Precision, gcmSL_TARGET_GET(I2FCode->temp, Precision))
-                             | gcmSL_SOURCE_SET(0, Swizzle, _Enable2Swizzle(gcmSL_TARGET_GET(I2FCode->temp, Enable)));
+                             | gcmSL_SOURCE_SET(0, Swizzle, _Enable2SwizzleWShift(gcmSL_TARGET_GET(I2FCode->temp, Enable)));
             I2FCode->source0Index = I2FCode->tempIndex;
         }
         else
@@ -11034,7 +11034,7 @@ _ConvertCONV(
             code->source1 = code->source1Index = code->source1Indexed = 0;
 
             /* Insert three codes. */
-            gcmONERROR(gcSHADER_InsertNOP2BeforeCode(shader, CodeIndex + 1, 3));
+            gcmONERROR(gcSHADER_InsertNOP2BeforeCode(shader, CodeIndex + 1, 3, gcvFALSE));
             code = &shader->code[CodeIndex];
             absCode = &shader->code[CodeIndex + 1];
             floorCode = &shader->code[CodeIndex + 2];
@@ -12514,7 +12514,7 @@ gcAddVertexAndInstanceIdPatch(
                 addCodeCount += 2;
         }
 
-        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(VertexShader, mainEnter, addCodeCount));
+        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(VertexShader, mainEnter, addCodeCount, gcvTRUE));
 
         if (needXFB || bVertexIdUsed)
         {
@@ -12583,7 +12583,7 @@ gcAddVertexAndInstanceIdPatch(
         !gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_FE_START_VERTEX_SUPPORT) &&
         bVertexIdUsed && vtxIdVariable)
     {
-        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(VertexShader, mainEnter, 2));
+        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(VertexShader, mainEnter, 2, gcvTRUE));
 
         addCode = &VertexShader->code[mainEnter];
         movCode = &VertexShader->code[mainEnter + 1];
@@ -13308,7 +13308,7 @@ _splitInstructionHasSameDestAndSrcTempIndex(
             if (isTwoSourceSameRegister)
             {
                 /* Insert two NOP instructions before current instruction. */
-                gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, (gctUINT)insertPoint, 2));
+                gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, (gctUINT)insertPoint, 2, gcvTRUE));
                 inst = &Shader->code[i + 2];
                 newInst[0] = &Shader->code[insertPoint];
                 newInst[1] = &Shader->code[insertPoint + 1];
@@ -13332,7 +13332,7 @@ _splitInstructionHasSameDestAndSrcTempIndex(
                 /* Insert a NOP instruction before current instruction. */
                 if (!isCmpPair)
                 {
-                    gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, (gctUINT)insertPoint, 1));
+                    gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, (gctUINT)insertPoint, 1, gcvTRUE));
                     inst = &Shader->code[i+1];
                     newInst[0] = &Shader->code[insertPoint];
                 }
@@ -13473,7 +13473,7 @@ _ConvertIntegerBranchToFloat(
             format == gcSL_FLOAT64) continue;
 
         /* Insert two NOPS before current instruction. */
-        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, (gctUINT)i, 2));
+        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, (gctUINT)i, 2, gcvTRUE));
 
         currentCode = &Shader->code[i + 2];
         newInst[0] = &Shader->code[i];
@@ -15590,7 +15590,7 @@ _GetIndexedRegAndModeForLoadInstruction(
             gcSL_INSTRUCTION insertCode;
             gctUINT16 newTempIndex = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_INTEGER_X1);
 
-            gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, CodeIndex, 1));
+            gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, CodeIndex, 1, gcvTRUE));
             insertCode = &Shader->code[CodeIndex];
             code = insertCode - 2;
             insertCode->opcode = gcSL_MOV;
@@ -16519,7 +16519,7 @@ _ChangeAtomicCounterUniform2BaseAddrBindingUniform(
 
                 *sourceIndexed = 0;
 
-                gcSHADER_InsertNOP2BeforeCode(Shader, i, 1);
+                gcSHADER_InsertNOP2BeforeCode(Shader, i, 1, gcvTRUE);
                 Shader->code[i] = loadInst;
 
                 ++i;
@@ -16634,7 +16634,7 @@ _ChangeAtomicCounterUniform2BaseAddrBindingUniform(
 
                 *sourceIndexed = 0;
 
-                gcSHADER_InsertNOP2BeforeCode(Shader, i, 3);
+                gcSHADER_InsertNOP2BeforeCode(Shader, i, 3, gcvTRUE);
 
                 Shader->code[i]     = mulInst;
                 Shader->code[i + 1] = addInst;
@@ -16730,7 +16730,7 @@ _PreprocessHeplerInvocation(
             }
         }
 
-        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(FragmentShader, i, 1));
+        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(FragmentShader, i, 1, gcvTRUE));
 
         setCode = &FragmentShader->code[i];
 
@@ -17093,7 +17093,7 @@ _gcConvert32BitModulus(
             addCodeCount -= 2;
         }
 
-        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, i, (gctUINT)addCodeCount));
+        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, i, (gctUINT)addCodeCount, gcvTRUE));
         Shader->lastInstruction = i;
         Shader->instrIndex = gcSHADER_OPCODE;
         gcmONERROR(_Implement32BitModulus(Shader, isInt32, isMod, &Shader->code[i + addCodeCount]));
@@ -17811,6 +17811,37 @@ _IgnoreAllReferenceToBoundingBox(
     return gcvSTATUS_OK;
 }
 
+static gceSHADER_OPTIMIZATION
+_ConvFlags2OptimizerOption(
+    IN gceSHADER_FLAGS Flags
+    )
+{
+    gceSHADER_OPTIMIZATION opt = gcvOPTIMIZATION_NONE;
+
+    if (Flags & gcvSHADER_SET_INLINE_LEVEL_0)
+    {
+        opt |= gcvOPTIMIZATION_INLINE_LEVEL_0;
+    }
+    if (Flags & gcvSHADER_SET_INLINE_LEVEL_1)
+    {
+        opt |= gcvOPTIMIZATION_INLINE_LEVEL_1;
+    }
+    if (Flags & gcvSHADER_SET_INLINE_LEVEL_2)
+    {
+        opt |= gcvOPTIMIZATION_INLINE_LEVEL_2;
+    }
+    if (Flags & gcvSHADER_SET_INLINE_LEVEL_3)
+    {
+        opt |= gcvOPTIMIZATION_INLINE_LEVEL_3;
+    }
+    if (Flags & gcvSHADER_SET_INLINE_LEVEL_4)
+    {
+        opt |= gcvOPTIMIZATION_INLINE_LEVEL_4;
+    }
+
+    return opt;
+}
+
 /*******************************************************************************
 **                                gcLinkShaders
 ********************************************************************************
@@ -18006,7 +18037,7 @@ gcLinkShaders(
 
     /* set the flag for optimizer and BE */
     gcSetOptimizerOption(Flags);
-    opt = gcGetOptimizerOption()->optFlags;
+    opt = gcGetOptimizerOption()->optFlags | _ConvFlags2OptimizerOption(Flags);
 
     /* Initialize our pass manager who will take over all passes
        whether to trigger or not */
@@ -18920,7 +18951,7 @@ _gcLinkFullGraphicsShaders(
 
     /* set the flag for optimizer and BE */
     gcSetOptimizerOption(Flags);
-    opt = gcGetOptimizerOption()->optFlags;
+    opt = gcGetOptimizerOption()->optFlags | _ConvFlags2OptimizerOption(Flags);
 
     /* Extract the gcoOS object pointer. */
     os = gcvNULL;
@@ -19241,7 +19272,7 @@ gcLinkKernel(
 
     /* set the flag for optimizer and BE */
     gcSetOptimizerOption(Flags);
-    opt = gcGetOptimizerOption()->optFlags;
+    opt = gcGetOptimizerOption()->optFlags | _ConvFlags2OptimizerOption(Flags);
     dumpCGVerbose = gcSHADER_DumpCodeGenVerbose(Kernel);
 
     if (gcSHADER_DumpOptimizer(Kernel))
@@ -19565,7 +19596,7 @@ _gcLinkComputeShader(
 
     /* set the flag for optimizer and BE */
     gcSetOptimizerOption(Flags);
-    opt = gcGetOptimizerOption()->optFlags;
+    opt = gcGetOptimizerOption()->optFlags | _ConvFlags2OptimizerOption(Flags);
     dumpCGVerbose = gcSHADER_DumpCodeGenVerbose(ComputeShader);
 
     if (ComputeShader)
@@ -21811,7 +21842,7 @@ _gcLINKTREE_ReplaceColor2FrontBackColor(
         fColor  = frontColor;
         bColor  = backColor;
 
-        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(FragmentShader, mainStartIdx, 2));
+        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(FragmentShader, mainStartIdx, 2, gcvTRUE));
         gcOpt_Dump(gcvNULL, "Incoming Fragment Shader", gcvNULL, FragmentShader);
         FragmentShader->instrIndex = (mainStartIdx == 0) ? gcSHADER_OPCODE : gcSHADER_SOURCE1;
         FragmentShader->lastInstruction = (mainStartIdx == 0) ? 0 : (mainStartIdx - 1);
@@ -21836,7 +21867,7 @@ _gcLINKTREE_ReplaceColor2FrontBackColor(
         fColor  = front2Color;
         bColor  = back2Color;
 
-        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(FragmentShader, mainStartIdx, 2));
+        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(FragmentShader, mainStartIdx, 2, gcvTRUE));
         FragmentShader->instrIndex = gcSHADER_SOURCE1;
         FragmentShader->lastInstruction = (mainStartIdx == 0) ? 0 : (mainStartIdx - 1);
 

@@ -3734,7 +3734,7 @@ sloCOMPILER_CheckAssignmentForGlFragData(
         }
 
         tempIndex = tempIndex;
-        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(shader, i, 1));
+        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(shader, i, 1, gcvTRUE));
         shader->lastInstruction = i;
         shader->instrIndex = gcSHADER_OPCODE;
 

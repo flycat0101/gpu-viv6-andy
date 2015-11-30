@@ -298,6 +298,9 @@ typedef struct _gcsHAL_QUERY_CHIP_IDENTITY
 
     /* ECO ID. */
     gctUINT32                   ecoID;
+
+    /* Customer ID. */
+    gctUINT32                   customerID;
 }
 gcsHAL_QUERY_CHIP_IDENTITY;
 

@@ -2341,7 +2341,8 @@ _FillInConfigTableByDatabase(
         Config->chipModel,
         Config->chipRevision,
         iface.u.QueryChipIdentity.productID,
-        iface.u.QueryChipIdentity.ecoID);
+        iface.u.QueryChipIdentity.ecoID,
+        iface.u.QueryChipIdentity.customerID);
 
     gcmASSERT(Hardware->featureDatabase != gcvNULL);
 
@@ -5400,6 +5401,12 @@ gceSTATUS gcoHARDWARE_Destroy(
     {
         gcmONERROR(gcoHARDWARE_Free2DSurface(Hardware, Hardware->hw2DClearDummySurf));
         Hardware->hw2DClearDummySurf = gcvNULL;
+    }
+
+    if(Hardware->tempBuffer.valid)
+    {
+        gcmONERROR(gcoHARDWARE_Unlock(&Hardware->tempBuffer, gcvSURF_VERTEX));
+        gcmONERROR(gcsSURF_NODE_Destroy(&Hardware->tempBuffer));
     }
 
 #if gcdENABLE_3D

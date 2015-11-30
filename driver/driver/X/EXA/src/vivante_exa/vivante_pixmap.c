@@ -101,6 +101,7 @@ VivPixmapIsOffscreen(PixmapPtr pPixmap) {
     BOOL ret = FALSE;
     ScreenPtr pScreen = pPixmap->drawable.pScreen;
 
+    Viv2DPixmapPtr vivPixmap = exaGetPixmapDriverPrivate(pPixmap);
     /* offscreen means in 'gpu accessible memory', not that it's off the
     * visible screen.
     */
@@ -108,7 +109,10 @@ VivPixmapIsOffscreen(PixmapPtr pPixmap) {
         TRACE_EXIT(TRUE);
     }
 
-    ret = pPixmap->devPrivate.ptr ? FALSE : TRUE;
+    if(vivPixmap->mVidMemInfo!=NULL)
+        ret = TRUE;
+    else
+        ret = pPixmap->devPrivate.ptr ? FALSE : TRUE;
 
     TRACE_EXIT(ret);
 }
@@ -282,7 +286,8 @@ Bool
 VivPrepareAccess(PixmapPtr pPix, int index) {
     TRACE_ENTER();
     Viv2DPixmapPtr vivpixmap = exaGetPixmapDriverPrivate(pPix);
-
+    VivPtr pViv = VIVPTR_FROM_PIXMAP(pPix);
+    VIV2DBLITINFOPTR pBlt = &pViv->mGrCtx.mBlitInfo;
     if (vivpixmap->mRef == 0) {
         pPix->devPrivate.ptr = MapSurface(vivpixmap);
     }
@@ -294,6 +299,12 @@ VivPrepareAccess(PixmapPtr pPix, int index) {
         TRACE_ERROR("Logical Address is not set\n");
         TRACE_EXIT(FALSE);
 
+    }
+
+    if ( pBlt && (pBlt->hwMask & 0x1) )
+    {
+        pBlt->hwMask = 0x0;
+        VIV2DGPUBlitComplete(&pViv->mGrCtx, TRUE);
     }
 
     vivpixmap->mCpuBusy=TRUE;

@@ -412,6 +412,7 @@ gco3D_SetTarget(
     )
 {
     gceSTATUS status;
+	gcoSURF prevRT = gcvNULL;
 
     gcmHEADER_ARG("Engine=0x%x TargetIndex=%d Surface=0x%x SliceIndex=%d LayerIndex=%d",
                    Engine, TargetIndex, Surface, SliceIndex, LayerIndex);
@@ -451,7 +452,7 @@ gco3D_SetTarget(
         /* Unset previous target if any. */
         if (Engine->mRT[TargetIndex] != gcvNULL)
         {
-            gcoSURF prevRT = Engine->mRT[TargetIndex];
+            prevRT = Engine->mRT[TargetIndex];
 
             /* Disable tile status for this surface with color slot0 */
             gcmONERROR(gcoSURF_DisableTileStatus(prevRT, gcvFALSE));
@@ -472,16 +473,6 @@ gco3D_SetTarget(
 
             /* Reset mapped memory pointer. */
             Engine->mRTMemory[TargetIndex] = gcvNULL;
-
-            /*
-             * If this is last reference, below destroy will call Unset target
-             * and then run here again. Set to NULL to avoid recursive
-             * destroying.
-             */
-            Engine->mRT[TargetIndex] = gcvNULL;
-
-            /* Dereference the surface. */
-            gcmONERROR(gcoSURF_Destroy(prevRT));
         }
 
         /* Set new target. */
@@ -493,6 +484,11 @@ gco3D_SetTarget(
 
             /* Invalidate target. */
             gcmONERROR(gcoHARDWARE_SetRenderTarget(Engine->hardware, TargetIndex, gcvNULL, 0, 0));
+            if (prevRT)
+            {
+                /* Dereference the surface. */
+                gcmONERROR(gcoSURF_Destroy(prevRT));
+            }
         }
         else
         {
@@ -512,6 +508,11 @@ gco3D_SetTarget(
 
             /* Reference the surface. */
             gcmONERROR(gcoSURF_ReferenceSurface(Surface));
+            if (prevRT)
+            {
+                /* Dereference the surface. */
+                gcmONERROR(gcoSURF_Destroy(prevRT));
+            }
          }
 
          if (Engine->mRTtileStatus && Surface)

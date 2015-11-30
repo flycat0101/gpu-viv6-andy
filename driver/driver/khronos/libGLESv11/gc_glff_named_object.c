@@ -480,7 +480,7 @@ gceSTATUS glfCreateNamedObject(
 
                 Name = List->nextName++;
             }
-            else if (Name > List->nextName)
+            else if (Name >= List->nextName)
             {
                 /* Name for the object has been explicitly specified by
                    the application and it is greater then the next automatic

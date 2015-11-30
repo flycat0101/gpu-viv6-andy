@@ -34,7 +34,7 @@ include $(AQROOT)/makefile.linux.def
 ##############################################
 # For C++ program, we need set CC=g++
 
-CC = $(CROSS_COMPILE)g++
+CC ?= $(CROSS_COMPILE)g++
 
 ##############################################
 # Supply additional include directories.

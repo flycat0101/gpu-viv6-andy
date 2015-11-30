@@ -259,6 +259,11 @@ _IdentifyHardwareByDatabase(
 
     _GetEcoID(Hardware, Identity);
 
+    gcmkONERROR(
+        gckOS_ReadRegisterEx(Os, Core,
+                                0x00030,
+                                &Identity->customerID));
+
     /***************************************************************************
     ** Get chip features.
     */
@@ -269,7 +274,8 @@ _IdentifyHardwareByDatabase(
         Hardware->identity.chipModel,
         Hardware->identity.chipRevision,
         Hardware->identity.productID,
-        Hardware->identity.ecoID);
+        Hardware->identity.ecoID,
+        Hardware->identity.customerID);
 
     if (database == gcvNULL)
     {
@@ -10705,7 +10711,7 @@ gckHARDWARE_DumpGPUState(
         { "TFB", 0x474, 24, 0x44C, 32, 0x2, 0xA0 },
         { "USC", 0x474, 24, 0x44C, 64, 0x2, 0xC0 },
         { "L2", 0x478, 0, 0x564, 256, 0x1, 0x00 },
-        { "BLT", 0x478, 0, 0x1A4, 256, 0x1, 0x00 }
+        { "BLT", 0x478, 24, 0x1A4, 256, 0x1, 0x00 }
     };
 
     static gctUINT32 _otherRegs[] =

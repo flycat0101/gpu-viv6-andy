@@ -1774,6 +1774,8 @@ gcoVGBUFFER_Destroy(
     {
         gcsCMDBUFFER_PTR currentBuffer;
 
+        gcmERR_BREAK(gcoVGHARDWARE_FlushPipe(gcvNULL));
+
         /* Commit the command queue and stall. */
         gcmERR_BREAK(gcoVGHARDWARE_Commit(
             Buffer->hardware, gcvTRUE

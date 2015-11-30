@@ -337,8 +337,7 @@ static void
 gcChipPatchA8_Replace(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -394,7 +393,7 @@ gcChipPatchA8_Replace(
 
 
      gcChipUtilsDecrypt(vertexShader);
-     *vertPatched = vertexShader;
+     patchedSrcs[__GLSL_STAGE_VS] = vertexShader;
 
 }
 
@@ -433,8 +432,7 @@ static void
 gcChipPatchCKZombies2_Replace(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -458,9 +456,10 @@ gcChipPatchCKZombies2_Replace(
 
 
 
-    gctCONST_STRING vertSource = (*vertPatched != gcvNULL)? *vertPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
-    gctCONST_STRING vertReplace = gcChipPatchShaderReplace(SHADER_TYPE_VERT, vertSource, vertexShaders);
-    *vertPatched = vertReplace;
+    gctCONST_STRING vertSource = patchedSrcs[__GLSL_STAGE_VS]
+                               ? patchedSrcs[__GLSL_STAGE_VS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_VS] = gcChipPatchShaderReplace(SHADER_TYPE_VERT, vertSource, vertexShaders);
 
 }
 
@@ -468,8 +467,7 @@ static void
 gcChipPatchAndroidCTSTextureView_Replace(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -501,7 +499,9 @@ gcChipPatchAndroidCTSTextureView_Replace(
     gctCONST_STRING fragReplace;
     gctBOOL bMatchState = gcvFALSE;
 
-    fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    fragSource = patchedSrcs[__GLSL_STAGE_FS]
+               ? patchedSrcs[__GLSL_STAGE_FS]
+               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
     fragReplace = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragShaders);
 
     /* Check some state.*/
@@ -512,7 +512,7 @@ gcChipPatchAndroidCTSTextureView_Replace(
 
     if(bMatchState)
     {
-        *fragPatched = fragReplace;
+        patchedSrcs[__GLSL_STAGE_FS] = fragReplace;
     }
 }
 
@@ -520,8 +520,7 @@ static void
 gcChipPatchA8_Remove(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -543,9 +542,10 @@ gcChipPatchA8_Remove(
 
 
 
-    gctCONST_STRING vertSource = (*vertPatched != gcvNULL)? *vertPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
-    gctCONST_STRING vertReplace = gcChipPatchShaderReplace(SHADER_TYPE_VERT, vertSource, vertexShaders);
-    *vertPatched = vertReplace;
+    gctCONST_STRING vertSource = patchedSrcs[__GLSL_STAGE_VS]
+                               ? patchedSrcs[__GLSL_STAGE_VS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_VS] = gcChipPatchShaderReplace(SHADER_TYPE_VERT, vertSource, vertexShaders);
 
 }
 
@@ -557,26 +557,16 @@ static void
 gcChipPatch1(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-    gcmHEADER_ARG("gc=0x%x progObj=0x%x vertPatched=0x%x fragPatched=0x%x index=%d",
-                   gc, progObj, vertPatched, fragPatched, index);
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x index=%d", gc, progObj, index);
 
     /* Enable stencil clear. */
     chipCtx->patchInfo.patchFlags.clearStencil = 1;
 
-    if (vertPatched != gcvNULL)
-    {
-        *vertPatched = gcvNULL;
-    }
-    if (fragPatched != gcvNULL)
-    {
-        *fragPatched = gcvNULL;
-    }
     gcmFOOTER_NO();
 }
 
@@ -584,16 +574,14 @@ static void
 gcChipPatch2(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     __GLchipSLProgram *program = (__GLchipSLProgram *)progObj->privateData;
 
-    gcmHEADER_ARG("gc=0x%x progObj=0x%x vertPatched=0x%x fragPatched=0x%x index=%d",
-                   gc, progObj, vertPatched, fragPatched, index);
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x index=%d", gc, progObj, index);
 
     /* Enable certain patches. */
     chipCtx->patchInfo.patchFlags.disableEZ = 1;
@@ -656,14 +644,6 @@ gcChipPatch2(
         }
     }
 
-    if (vertPatched != gcvNULL)
-    {
-        *vertPatched = gcvNULL;
-    }
-    if (fragPatched != gcvNULL)
-    {
-        *fragPatched = gcvNULL;
-    }
     gcmFOOTER_NO();
 }
 
@@ -671,28 +651,18 @@ static void
 gcChipPatch3(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     __GLchipSLProgram *program = (__GLchipSLProgram *)progObj->privateData;
 
-    gcmHEADER_ARG("gc=0x%x progObj=0x%x vertPatched=0x%x fragPatched=0x%x index=%d",
-                   gc, progObj, vertPatched, fragPatched, index);
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x index=%d", gc, progObj, index);
 
     chipCtx->patchInfo.patchFlags.blurDepth = 1;
     chipCtx->patchInfo.blurProgram          = program;
 
-    if (vertPatched != gcvNULL)
-    {
-        *vertPatched = gcvNULL;
-    }
-    if (fragPatched != gcvNULL)
-    {
-        *fragPatched = gcvNULL;
-    }
     gcmFOOTER_NO();
 }
 
@@ -700,16 +670,14 @@ static void
 gcChipPatch4(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     __GLchipSLProgram *program = (__GLchipSLProgram *)progObj->privateData;
 
-    gcmHEADER_ARG("gc=0x%x progObj=0x%x vertPatched=0x%x fragPatched=0x%x index=%d",
-                   gc, progObj, vertPatched, fragPatched, index);
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x index=%d", gc, progObj, index);
 
     /* Enable Alpha Kill in GLBenchmark. */
     program->progFlags.alphaKill = 1;
@@ -717,14 +685,6 @@ gcChipPatch4(
     /* Save program handle to clean up. */
     chipCtx->patchInfo.patchCleanupProgram = program;
 
-    if (vertPatched != gcvNULL)
-    {
-        *vertPatched = gcvNULL;
-    }
-    if (fragPatched != gcvNULL)
-    {
-        *fragPatched = gcvNULL;
-    }
     gcmFOOTER_NO();
 }
 
@@ -732,16 +692,14 @@ static void
 gcChipPatch5(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     __GLchipSLProgram *program = (__GLchipSLProgram *)progObj->privateData;
 
-    gcmHEADER_ARG("gc=0x%x progObj=0x%x vertPatched=0x%x fragPatched=0x%x index=%d",
-                   gc, progObj, vertPatched, fragPatched, index);
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x index=%d", gc, progObj, index);
 
     /* Save program handle to clean up. */
     chipCtx->patchInfo.patchCleanupProgram = program;
@@ -749,15 +707,6 @@ gcChipPatch5(
     /* Reduce depth scale for GLBenchmark 2.5. */
     chipCtx->patchInfo.patchFlags.depthScale = 1;
     chipCtx->patchInfo.patchFlags.clipW      = 1;
-
-    if (vertPatched != gcvNULL)
-    {
-        *vertPatched = gcvNULL;
-    }
-    if (fragPatched != gcvNULL)
-    {
-        *fragPatched = gcvNULL;
-    }
 
     chipCtx->patchInfo.patchFlags.fastRenderTarget = 1;
     chipCtx->patchInfo.patchFlags.triLinear = 1;
@@ -769,8 +718,7 @@ static void
 gcChipPatch6(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -870,7 +818,7 @@ gcChipPatch6(
         "\x81\xe0\x97\xd4\xbb\xce\xa0\xd4\xef\xe2\xe8\x95"
     ;
 
-    gcmHEADER_ARG("gc=0x%x progObj=0x%x vertPatched=0x%x fragPatched=0x%x index=%d", gc, progObj, vertPatched, fragPatched, index);
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x index=%d", gc, progObj, index);
 
     /* Save program handle to clean up. */
     chipCtx->patchInfo.patchCleanupProgram = program;
@@ -883,24 +831,18 @@ gcChipPatch6(
     chipCtx->patchInfo.firstLoop             = GL_FALSE;
 
     /* Replace shaders. */
-    if (vertPatched != gcvNULL)
-    {
-        gcChipUtilsDecrypt(vertexShader);
-        *vertPatched = vertexShader;
-    }
-    if (fragPatched != gcvNULL)
-    {
-        gcChipUtilsDecrypt(fragmentShader);
-        *fragPatched = fragmentShader;
-    }
+    gcChipUtilsDecrypt(vertexShader);
+    patchedSrcs[__GLSL_STAGE_VS] = vertexShader;
+    gcChipUtilsDecrypt(fragmentShader);
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
     gcmFOOTER_NO();
 }
 
 static void
-gcChipPatch7(__GLcontext *gc,
+gcChipPatch7(
+    __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -1130,7 +1072,7 @@ gcChipPatch7(__GLcontext *gc,
         "\x8f\xa6\x9d\xc1\xaf\xa5\xd8\x84\xea\xe0"
     ;
 
-    gcmHEADER_ARG("gc=0x%x progObj=0x%x vertPatched=0x%x fragPatched=0x%x index=%d", gc, progObj, vertPatched, fragPatched, index);
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x index=%d", gc, progObj, index);
 
     /* Save program handle to clean up. */
     chipCtx->patchInfo.patchCleanupProgram = program;
@@ -1140,16 +1082,10 @@ gcChipPatch7(__GLcontext *gc,
 
 
     /* Replace shaders. */
-    if (vertPatched != gcvNULL)
-    {
-        gcChipUtilsDecrypt(vertexShader);
-        *vertPatched = vertexShader;
-    }
-    if (fragPatched != gcvNULL)
-    {
-        gcChipUtilsDecrypt(fragmentShader);
-        *fragPatched = fragmentShader;
-    }
+    gcChipUtilsDecrypt(vertexShader);
+    patchedSrcs[__GLSL_STAGE_VS] = vertexShader;
+    gcChipUtilsDecrypt(fragmentShader);
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
     gcmFOOTER_NO();
 }
 
@@ -1157,8 +1093,7 @@ static void
 gcChipPatch8(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -1289,11 +1224,8 @@ gcChipPatch8(
         "\xf8\xd8\xe9\xc7\xf7\xcc\xc6\xbb"
     ;
 
-    if (fragPatched != gcvNULL)
-    {
-        gcChipUtilsDecrypt(fragmentShader);
-        *fragPatched = fragmentShader;
-    }
+    gcChipUtilsDecrypt(fragmentShader);
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 #if gcdSHADER_SRC_BY_MACHINECODE
@@ -1301,8 +1233,7 @@ static void
 gcChipPatch9(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -1452,16 +1383,15 @@ gcChipPatch9(
 
     /* Replace shaders. */
     gcChipUtilsDecrypt(fragmentShader);
-    *vertPatched = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
-    *fragPatched = fragmentShader;
+    patchedSrcs[__GLSL_STAGE_VS] = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 static void
 gcChipPatch10(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -1576,16 +1506,15 @@ gcChipPatch10(
 
     /* Replace shaders. */
     gcChipUtilsDecrypt(fragmentShader);
-    *vertPatched = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
-    *fragPatched = fragmentShader;
+    patchedSrcs[__GLSL_STAGE_VS] = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 static void
 gcChipPatch101(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -2040,16 +1969,15 @@ gcChipPatch101(
 
     /* Replace shaders. */
     gcChipUtilsDecrypt(fragmentShader);
-    *vertPatched = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
-    *fragPatched = fragmentShader;
+    patchedSrcs[__GLSL_STAGE_VS] = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 static void
 gcChipPatch11(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -2063,8 +1991,7 @@ static void
 gcChipPatch115(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -2294,8 +2221,8 @@ gcChipPatch115(
 
     /* Replace shaders. */
     gcChipUtilsDecrypt(fragmentShader);
-    *vertPatched = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
-    *fragPatched = fragmentShader;
+    patchedSrcs[__GLSL_STAGE_VS] = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 
@@ -2303,8 +2230,7 @@ static void
 gcChipPatch118(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -2318,8 +2244,7 @@ static void
 gcChipPatch2710(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -2463,14 +2388,13 @@ gcChipPatch2710(
         ;
     /* Replace shaders. */
     gcChipUtilsDecrypt(fragmentShader);
-    *fragPatched = fragmentShader;
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 static void
 gcChipPatch2711(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -2560,16 +2484,17 @@ gcChipPatch2711(
         {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
 
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 static void
 gcChipPatch120(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -2639,16 +2564,15 @@ gcChipPatch120(
 
     /* Replace shaders. */
     gcChipUtilsDecrypt(fragmentShader);
-    *vertPatched = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
-    *fragPatched = fragmentShader;
+    patchedSrcs[__GLSL_STAGE_VS] = progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 static void
 gcChipPatch119(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -2666,14 +2590,12 @@ static void
 gcChipPatch2714(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-    gcmHEADER_ARG("gc=0x%x progObj=0x%x vertPatched=0x%x fragPatched=0x%x index=%d",
-                   gc, progObj, vertPatched, fragPatched, index);
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x index=%d", gc, progObj, index);
 
     chipCtx->patchInfo.posAttribName = "in_position";
     chipCtx->patchInfo.mvpUniformName = "mvp";
@@ -2690,16 +2612,14 @@ static void
 gcChipPatch2715(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     __GLchipSLProgram *program = (__GLchipSLProgram *)progObj->privateData;
 
-    gcmHEADER_ARG("gc=0x%x progObj=0x%x vertPatched=0x%x fragPatched=0x%x index=%d",
-                   gc, progObj, vertPatched, fragPatched, index);
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x index=%d", gc, progObj, index);
 
     if (chipCtx->patchInfo.notificationCount++ &&
         !((chipCtx->chipModel == gcv1000) && (chipCtx->chipRevision == 0x5036)))
@@ -2718,8 +2638,7 @@ static void
 gcChipPatch16(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -2729,8 +2648,7 @@ static void
 gcChipPatch17(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -2740,8 +2658,7 @@ static void
 gcChipPatch19(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -2752,8 +2669,7 @@ gcChipPatch19(
     __GLshaderObject *fragShaderObj = progObj->programInfo.attachedShader[__GLSL_STAGE_FS];
     gctUINT32_PTR compilerVersion = gcvNULL;
 
-    gcmHEADER_ARG("gc=0x%x progObj=0x%x vertPatched=0x%x fragPatched=0x%x index=%d",
-                   gc, progObj, vertPatched, fragPatched, index);
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x index=%d", gc, progObj, index);
 
     gcmONERROR(gcSHADER_Construct(gcvNULL, gcSHADER_TYPE_FRAGMENT, &shader));
 
@@ -2789,8 +2705,7 @@ static void
 gcChipPatch20(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -2846,8 +2761,7 @@ static void
 gcChipPatch2701(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index,
     gctCONST_STRING sourceSh
     )
@@ -6729,15 +6643,19 @@ gcChipPatch2701(
 
     gctCONST_STRING vertSource, fragSource;
     gctCONST_STRING vertReplace;
-    vertSource = (*vertPatched != gcvNULL)? *vertPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
+    vertSource = patchedSrcs[__GLSL_STAGE_VS]
+               ? patchedSrcs[__GLSL_STAGE_VS]
+               : progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
     vertReplace = gcChipPatchShaderReplace(SHADER_TYPE_VERT, vertSource, vertexShaders);
 
     if (vertReplace && vertReplace[0] != '\0')
     {
-        *vertPatched = vertReplace;
+        patchedSrcs[__GLSL_STAGE_VS] = vertReplace;
     }
 
-    fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    fragSource = patchedSrcs[__GLSL_STAGE_FS]
+               ? patchedSrcs[__GLSL_STAGE_FS]
+               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
 
     if (gcChipUtilFindString(SH_ENC, fragSource, define6, &searchIndex) != gcvNULL)
     {
@@ -6776,7 +6694,7 @@ gcChipPatch2701(
         fragment21Shaders->replaceString = defaultSh12;
     }
 
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment21Shaders);
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment21Shaders);
 
     program->progFlags.dual16 = 1;
 }
@@ -6785,8 +6703,7 @@ static void
 gcChipPatch2701a(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -7439,15 +7356,14 @@ gcChipPatch2701a(
 #endif
         ;
 
-    gcChipPatch2701(gc, progObj, vertPatched, fragPatched, index, sourceSh);
+    gcChipPatch2701(gc, progObj, patchedSrcs, index, sourceSh);
 }
 
 static void
 gcChipPatch2701b(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -8101,15 +8017,14 @@ gcChipPatch2701b(
 #endif
         ;
 
-    gcChipPatch2701(gc, progObj, vertPatched, fragPatched, index, sourceSh);
+    gcChipPatch2701(gc, progObj, patchedSrcs, index, sourceSh);
 }
 
 static void
 gcChipPatch2720(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -8145,8 +8060,10 @@ gcChipPatch2720(
         {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragmentShaders);
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragmentShaders);
 
 }
 
@@ -8154,8 +8071,7 @@ static void
 gcChipPatch2722(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -8224,24 +8140,17 @@ gcChipPatch2722(
         "\xd3\xd9"
         ;
 
-    if (vertPatched != gcvNULL)
-    {
-        gcChipUtilsDecrypt(vertexShader);
-        *vertPatched = vertexShader;
-    }
-    if (fragPatched != gcvNULL)
-    {
-        gcChipUtilsDecrypt(fragmentShader);
-        *fragPatched = fragmentShader;
-    }
+    gcChipUtilsDecrypt(vertexShader);
+    patchedSrcs[__GLSL_STAGE_VS] = vertexShader;
+    gcChipUtilsDecrypt(fragmentShader);
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 static void
 gcChipPatch2723(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -8562,11 +8471,8 @@ gcChipPatch2723(
         "\xf3\xdd\xed\xd6\xdc\xa1\xab\xa1"
         ;
 
-    if (fragPatched != gcvNULL)
-    {
-        gcChipUtilsDecrypt(fragmentShader);
-        *fragPatched = fragmentShader;
-    }
+    gcChipUtilsDecrypt(fragmentShader);
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 
@@ -8574,8 +8480,7 @@ static void
 gcChipPatch2702(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -8671,12 +8576,14 @@ gcChipPatch2702(
         {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
 
     if (gcChipUtilFindString(gcvTRUE, fragSource, fragment270Shaders->searchString, &searchIndex) != gcvNULL)
-        *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment270Shaders);
+        patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment270Shaders);
     else
-        *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment275Shaders);
+        patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment275Shaders);
 
 }
 
@@ -8686,8 +8593,7 @@ static void
 gcChipPatch22(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -8708,19 +8614,15 @@ gcChipPatch22(
         "\xf6\xc6\xe8\xd8\xe8\xda\xf3\xc8\xc2\xbf\xb5"
     ;
 
-    if (fragPatched != gcvNULL)
-    {
-        gcChipUtilsDecrypt(fragment22Shaders);
-        *fragPatched = fragment22Shaders;
-    }
+    gcChipUtilsDecrypt(fragment22Shaders);
+    patchedSrcs[__GLSL_STAGE_FS] = fragment22Shaders;
 }
 
 static void
 gcChipPatch23(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -8750,19 +8652,15 @@ gcChipPatch23(
         "\xc8\xf8\xca\xe3\xd8\xd2\xaf\xa5\xaf"
         ;
 
-        if (fragPatched != gcvNULL)
-        {
-            gcChipUtilsDecrypt(fragment23Shaders);
-            *fragPatched = fragment23Shaders;
-        }
+        gcChipUtilsDecrypt(fragment23Shaders);
+        patchedSrcs[__GLSL_STAGE_FS] = fragment23Shaders;
 }
 
 static void
 gcChipPatch2152(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -8805,8 +8703,7 @@ static void
 gcChipPatch2153(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -8931,15 +8828,14 @@ gcChipPatch2153(
 
     gcChipUtilsDecrypt(fragmentShader);
 
-    *fragPatched = fragmentShader;
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 static void
 gcChipPatch2154(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -9045,15 +8941,14 @@ gcChipPatch2154(
 
     gcChipUtilsDecrypt(fragmentShader);
 
-    *fragPatched = fragmentShader;
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 static void
 gcChipPatch2155(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -9099,17 +8994,16 @@ gcChipPatch2155(
         "\xfb\x97\xf6\x9b\xfe\xd2\xf2\x94\xf8\x99\xf4\x91\xd2\xbd\xd2\xa0"
         "\xc4\xed\xd6\xdc\xa1\xab"
     };
-    gcChipUtilsDecrypt(fragmentShader);
 
-    *fragPatched = fragmentShader;
+    gcChipUtilsDecrypt(fragmentShader);
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 static void
 gcChipPatch2156(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -9249,20 +9143,20 @@ gcChipPatch2156(
         "\xf7\x80\xb2\x89\xa9\xd4\xde\xa3\xa9\xa3"
     };
 
-    gctCONST_STRING vertSource = (*vertPatched != gcvNULL)? *vertPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
-    *vertPatched = gcChipPatchShaderReplace(SHADER_TYPE_VERT, vertSource, vertexShaders);
+    gctCONST_STRING vertSource = patchedSrcs[__GLSL_STAGE_VS]
+                               ? patchedSrcs[__GLSL_STAGE_VS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_VS] = gcChipPatchShaderReplace(SHADER_TYPE_VERT, vertSource, vertexShaders);
 
     gcChipUtilsDecrypt(fragmentShader);
-
-    *fragPatched = fragmentShader;
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 static void
 gcChipPatch300(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -9281,8 +9175,7 @@ static void
 gcChipPatch3031(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -9383,17 +9276,16 @@ gcChipPatch3031(
         "\xf6\x9e\xea\xb5\xd6\xb9\xd5\xba\xc8\xe6\x9e\xe7\x9d\xbd\x97\xb7"
         "\x87\xa9\x9c\xa7\xad\xd0\xda"
     };
-    gcChipUtilsDecrypt(fragmentShader);
 
-    *fragPatched = fragmentShader;
+    gcChipUtilsDecrypt(fragmentShader);
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 static void
 gcChipPatch3032(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -9500,15 +9392,14 @@ gcChipPatch3032(
         "}\n"
     };
 
-    *fragPatched = fragmentShader;
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 static void
 gcChipPatch3033(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -9691,16 +9582,17 @@ gcChipPatch3033(
         {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
 static void
 gcChipPatch3033_31(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -9899,16 +9791,18 @@ gcChipPatch3033_31(
         {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
+
 }
 
 static void
 gcChipPatch3034(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -10025,8 +9919,10 @@ gcChipPatch3034(
         {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
 
@@ -10034,8 +9930,7 @@ static void
 gcChipPatch3036(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -10263,16 +10158,17 @@ gcChipPatch3036(
        {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
 static void
 gcChipPatch3036_31(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -10452,16 +10348,17 @@ gcChipPatch3036_31(
        {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
 static void
 gcChipPatch3037(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -11245,7 +11142,9 @@ gcChipPatch3037(
         {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
     gctINT searchIndex = 0;
 
     static gctCONST_STRING finalKeyWord =
@@ -11257,17 +11156,16 @@ gcChipPatch3037(
         ;
 
     if (gcChipUtilFindString(gcvTRUE, fragSource, finalKeyWord, &searchIndex))
-        *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30FinalShaders);
+        patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30FinalShaders);
     else
-        *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
+        patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
 static void
 gcChipPatch3037_31(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -11806,17 +11704,17 @@ gcChipPatch3037_31(
         {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
-
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30FinalShaders);
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30FinalShaders);
 }
 
 static void
 gcChipPatch3038(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -11861,16 +11759,17 @@ gcChipPatch3038(
         {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
 static void
 gcChipPatch3038_31(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -11895,16 +11794,17 @@ gcChipPatch3038_31(
         {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
 static void
 gcChipPatch3039(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -11958,16 +11858,17 @@ gcChipPatch3039(
         {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
 static void
 gcChipPatch303A(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -12164,16 +12065,17 @@ gcChipPatch303A(
         {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
 static void
 gcChipPatch303A_31(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -12398,8 +12300,10 @@ gcChipPatch303A_31(
         {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
 
@@ -12407,8 +12311,7 @@ static void
 gcChipPatch3041(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -12677,19 +12580,15 @@ gcChipPatch3041(
             "\xf7\x8a\x80"
         ;
 
-    if (fragPatched != gcvNULL)
-    {
-        gcChipUtilsDecrypt(fragmentShader);
-        *fragPatched = fragmentShader;
-    }
+    gcChipUtilsDecrypt(fragmentShader);
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 static void
 gcChipPatch3042(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -12753,19 +12652,15 @@ gcChipPatch3042(
         "\xb7\xd4\xb5\xc7\xa3\x98\x92\xb2\x92\xb2\xcf\xc5\xb8\xb2"
         ;
 
-    if (fragPatched != gcvNULL)
-    {
-        gcChipUtilsDecrypt(fragmentShader);
-        *fragPatched = fragmentShader;
-    }
+    gcChipUtilsDecrypt(fragmentShader);
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 static void
 gcChipPatch3043(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -12780,8 +12675,7 @@ static void
 gcChipPatch3132(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -12896,15 +12790,14 @@ gcChipPatch3132(
         "}\n"
     };
 
-    *fragPatched = fragmentShader;
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 static void
 gcChipPatch3133(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -13022,16 +12915,17 @@ gcChipPatch3133(
         {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
 static void
 gcChipPatch3136(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -13234,16 +13128,17 @@ gcChipPatch3136(
        {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
 static void
 gcChipPatch3137(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -13494,17 +13389,17 @@ gcChipPatch3137(
         {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
-
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30FinalShaders);
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30FinalShaders);
 }
 
 static void
 gcChipPatch3138(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -13537,16 +13432,17 @@ gcChipPatch3138(
         {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
 static void
 gcChipPatch313A(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -13807,16 +13703,17 @@ gcChipPatch313A(
         {gcvFALSE, gcvNULL, gcvNULL}
     };
 
-    gctCONST_STRING fragSource = (*fragPatched != gcvNULL)? *fragPatched : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
-    *fragPatched = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+    patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment30Shaders);
 }
 
 static void
 gcChipPatchGTF_IntVarying(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -13854,17 +13751,10 @@ gcChipPatchGTF_IntVarying(
     ;
 
 
-    if (vertPatched)
-    {
-        gcChipUtilsDecrypt(vertShader);
-        *vertPatched = vertShader;
-    }
-
-    if (fragPatched)
-    {
-        gcChipUtilsDecrypt(fragShader);
-        *fragPatched = fragShader;
-    }
+    gcChipUtilsDecrypt(vertShader);
+    patchedSrcs[__GLSL_STAGE_VS] = vertShader;
+    gcChipUtilsDecrypt(fragShader);
+    patchedSrcs[__GLSL_STAGE_FS] = fragShader;
 
 }
 
@@ -13872,8 +13762,7 @@ static void
 gcChipPatchGTF_DiscardDraw(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -13890,25 +13779,15 @@ static void
 gcChipPatch2v2(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
-    gcmHEADER_ARG("gc=0x%x progObj=0x%x vertPatched=0x%x fragPatched=0x%x index=%d",
-                   gc, progObj, vertPatched, fragPatched, index);
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x index=%d", gc, progObj, index);
 
     gcoHAL_SetPatchID(gcvNULL, gcvPATCH_BASEMARK2V2);
     gcoHAL_SetGlobalPatchID(gcvNULL, gcvPATCH_BASEMARK2V2);
 
-    if (vertPatched != gcvNULL)
-    {
-        *vertPatched = gcvNULL;
-    }
-    if (fragPatched != gcvNULL)
-    {
-        *fragPatched = gcvNULL;
-    }
     gcmFOOTER_NO();
 }
 
@@ -13916,8 +13795,7 @@ static void
 gcChipPatchGFX31_Precision(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -14312,11 +14190,8 @@ gcChipPatchGFX31_Precision(
 "\x86\x8c\xaf\xca\xa4\xc0\xa9\xcf\xc6\xcf\xc5\xb8\xb2\xb8"
         ;
 
-    if (fragPatched)
-    {
-        gcChipUtilsDecrypt(fragShader);
-        *fragPatched = fragShader;
-    }
+    gcChipUtilsDecrypt(fragShader);
+    patchedSrcs[__GLSL_STAGE_FS] = fragShader;
     gcoHAL_SetPatchID(gcvNULL,gcvPATCH_GFXBENCH);
 }
 
@@ -14324,8 +14199,7 @@ static void
 gcChipPatch2v2_Precision(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -14538,11 +14412,8 @@ gcChipPatch2v2_Precision(
 "\xe9\xc9\xf4\xd4\xe5\xcb\xfb\xc0\xca\xb7\xbd"
         ;
 
-    if (fragPatched)
-    {
-        gcChipUtilsDecrypt(fragShader);
-        *fragPatched = fragShader;
-    }
+    gcChipUtilsDecrypt(fragShader);
+    patchedSrcs[__GLSL_STAGE_FS] = fragShader;
 }
 
 #if gcdUSE_WCLIP_PATCH
@@ -14550,8 +14421,7 @@ static void
 gcChipPatch_PSC(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -14568,8 +14438,7 @@ static void
 gcChipPatch_VSFloatTexGTF(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -14742,21 +14611,13 @@ gcChipPatch_VSFloatTexGTF(
 
     __GLchipSLProgram *program = (__GLchipSLProgram *)progObj->privateData;
 
-    gcmHEADER_ARG("gc=0x%x progObj=0x%x vertPatched=0x%x fragPatched=0x%x index=%d",
-                   gc, progObj, vertPatched, fragPatched, index);
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x index=%d", gc, progObj, index);
 
 
-    if (vertPatched)
-    {
-        gcChipUtilsDecrypt(vertShader);
-        *vertPatched = vertShader;
-    }
-
-    if (fragPatched)
-    {
-        gcChipUtilsDecrypt(fragShader);
-        *fragPatched = fragShader;
-    }
+    gcChipUtilsDecrypt(vertShader);
+    patchedSrcs[__GLSL_STAGE_VS] = vertShader;
+    gcChipUtilsDecrypt(fragShader);
+    patchedSrcs[__GLSL_STAGE_FS] = fragShader;
 
     program->progFlags.skipRecompile = 1;
 
@@ -14767,8 +14628,7 @@ static void
     gcChipPatch_VSIntTexGTF(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -14941,20 +14801,12 @@ static void
         ;
 
     __GLchipSLProgram *program = (__GLchipSLProgram *)progObj->privateData;
-    gcmHEADER_ARG("gc=0x%x progObj=0x%x vertPatched=0x%x fragPatched=0x%x index=%d",
-                   gc, progObj, vertPatched, fragPatched, index);
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x index=%d", gc, progObj, index);
 
-    if (vertPatched)
-    {
-        gcChipUtilsDecrypt(vertShader);
-        *vertPatched = vertShader;
-    }
-
-    if (fragPatched)
-    {
-        gcChipUtilsDecrypt(fragShader);
-        *fragPatched = fragShader;
-    }
+    gcChipUtilsDecrypt(vertShader);
+    patchedSrcs[__GLSL_STAGE_VS] = vertShader;
+    gcChipUtilsDecrypt(fragShader);
+    patchedSrcs[__GLSL_STAGE_FS] = fragShader;
 
     program->progFlags.skipRecompile = 1;
 
@@ -14965,8 +14817,7 @@ static void
 gcChipPatch_VSUIntTexGTF(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -15138,21 +14989,12 @@ gcChipPatch_VSUIntTexGTF(
         ;
 
     __GLchipSLProgram *program = (__GLchipSLProgram *)progObj->privateData;
-    gcmHEADER_ARG("gc=0x%x progObj=0x%x vertPatched=0x%x fragPatched=0x%x index=%d",
-                   gc, progObj, vertPatched, fragPatched, index);
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x index=%d", gc, progObj, index);
 
-    if (vertPatched)
-    {
-        gcChipUtilsDecrypt(vertShader);
-        *vertPatched = vertShader;
-    }
-
-    if (fragPatched)
-    {
-        gcChipUtilsDecrypt(fragShader);
-        *fragPatched = fragShader;
-    }
-
+    gcChipUtilsDecrypt(vertShader);
+    patchedSrcs[__GLSL_STAGE_VS] = vertShader;
+    gcChipUtilsDecrypt(fragShader);
+    patchedSrcs[__GLSL_STAGE_FS] = fragShader;
 
     program->progFlags.skipRecompile = 1;
 
@@ -15164,8 +15006,7 @@ static void
 gcChipPatch_Netflix1(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -15218,19 +15059,15 @@ gcChipPatch_Netflix1(
 
     program->progFlags.enableNetflix = 1;
     chipCtx->patchInfo.patchCleanupProgram = program;
-    *vertPatched = vertexShader;
-    *fragPatched = fragmentShader;
+    patchedSrcs[__GLSL_STAGE_VS] = vertexShader;
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
-
-#define GLchipPatch_Shader          0x1
-#define GLchipPatch_Hardware        0x2
 
 static void
 gcChipPatch_UserCubeLod(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -15277,11 +15114,8 @@ gcChipPatch_UserCubeLod(
 
     program->progFlags.cube_UserLOD = 1;
 
-    if (fragPatched)
-    {
-        gcChipUtilsDecrypt(fragShader);
-        *fragPatched = fragShader;
-    }
+    gcChipUtilsDecrypt(fragShader);
+    patchedSrcs[__GLSL_STAGE_FS] = fragShader;
 
 }
 
@@ -15289,8 +15123,7 @@ static void
 gcChipPatch_UserCubeLodBias(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -15337,11 +15170,8 @@ gcChipPatch_UserCubeLodBias(
 
     program->progFlags.cube_UserLOD = 1;
 
-    if (fragPatched)
-    {
-        gcChipUtilsDecrypt(fragShader);
-        *fragPatched = fragShader;
-    }
+    gcChipUtilsDecrypt(fragShader);
+    patchedSrcs[__GLSL_STAGE_FS] = fragShader;
 
 }
 
@@ -15349,8 +15179,7 @@ static void
 gcChipPatch_MaxUBOSize(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -15374,11 +15203,8 @@ gcChipPatch_MaxUBOSize(
 
     program->progFlags.CTSMaxUBOSize = 1;
 
-    if (fragPatched)
-    {
-        gcChipUtilsDecrypt(fragShader);
-        *fragPatched = fragShader;
-    }
+    gcChipUtilsDecrypt(fragShader);
+    patchedSrcs[__GLSL_STAGE_FS] = fragShader;
 
 }
 
@@ -15386,8 +15212,7 @@ static void
 gcChipPatch_CocShader(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -15403,15 +15228,14 @@ gcChipPatch_CocShader(
             gl_FragColor = vec4(1,1,1,3.0*gl_FragColor.r)*constColor;   \
         }";
 
-    *fragPatched = fragmentShader;
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 static void
 gcChipPatch_DotShader(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
@@ -15428,20 +15252,19 @@ gcChipPatch_DotShader(
         "o_out0 = floatBitsToUint(out0);\n"
         "}\n";
 
-    *fragPatched = fragmentShader;
+    patchedSrcs[__GLSL_STAGE_FS] = fragmentShader;
 }
 
 static void
 gcChipPatch_Trex(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
-    gcmHEADER_ARG("gc=0x%x progObj=0x%x vertPatched=0x%x fragPatched=0x%x index=%d",
-                   gc, progObj, vertPatched, fragPatched, index);
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x patchedSrcs=0x%x index=%d",
+                   gc, progObj, patchedSrcs, index);
 
     gcoHAL_SetPatchID(gcvNULL, gcvPATCH_GLBM27);
 
@@ -15452,13 +15275,12 @@ static void
 gcChipPatch_Manhattan(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
-    gcmHEADER_ARG("gc=0x%x progObj=0x%x vertPatched=0x%x fragPatched=0x%x index=%d",
-                   gc, progObj, vertPatched, fragPatched, index);
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x patchedSrcs=0x%x index=%d",
+                   gc, progObj, patchedSrcs, index);
 
     gcoHAL_SetPatchID(gcvNULL, gcvPATCH_GFXBENCH);
 
@@ -15469,46 +15291,48 @@ static void
 gcChipPatch_BatchCount(
     __GLcontext *gc,
     __GLprogramObject *progObj,
-    const gctCHAR **vertPatched,
-    const gctCHAR **fragPatched,
+    const gctCHAR **patchedSrcs,
     gctINT* index
     )
 {
-    gcmHEADER_ARG("gc=0x%x progObj=0x%x vertPatched=0x%x fragPatched=0x%x index=%d",
-                   gc, progObj, vertPatched, fragPatched, index);
+    gcmHEADER_ARG("gc=0x%x progObj=0x%x patchedSrcs=0x%x index=%d",
+                   gc, progObj, patchedSrcs, index);
 
     gcoHAL_SetPatchID(gcvNULL, gcvPATCH_BATCHCOUNT);
 
     gcmFOOTER_NO();
 }
 
+#define GLchipPatch_Shader          0x1
+#define GLchipPatch_Hardware        0x2
+
 typedef struct __GLchipPatchRec
 {
     __GCPatchNum patchNum;
-    gctBOOL encrypted;
+    gctCONST_STRING description;
 
-    /* TODO: change infrastructure to support patch for all shader stage */
-    gctCONST_STRING fromVertex;
-    gctCONST_STRING fromFragment;
     gctUINT flags;
+    gctBOOL encrypted;
+    gctCONST_STRING fromStages[__GLSL_STAGE_LAST];
+
     void (*handler)(__GLcontext *gc,
                     __GLprogramObject *progObj,
-                    const gctCHAR **vertPatched,
-                    const gctCHAR **fragPatched,
+                    const gctCHAR **patchedSrcs,
                     gctINT* index);
-
-#if gcdDUMP
-    gctCONST_STRING patchDescription;
-#endif
 } __GLchipPatch;
+
+#define __GL_CHIP_PATCH_EMPTY_TS_GS     gcvNULL, gcvNULL, gcvNULL
 
 static __GLchipPatch gcChipPatches[] =
 {
     /* Detect 3.0 Beta 3. */
     {
         GC_CHIP_PATCH_30BETA3_1,
-        gcvTRUE
-        ,
+        "gcChipPatch3031, 3.0 Beta 3, shader replacement",
+
+        GLchipPatch_Shader, /* flags */
+        gcvTRUE,            /* encrypted */
+        {
         /* Vertex shader. */
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x95\xa5\x95\xf0\x83\xa0\xc9\xaf"
         "\xcb\xae\xc8\x8f\xc3\x9c\xd9\x8a\xfa\x88\xed\x8e\xe7\x94\xfd\x92"
@@ -15524,7 +15348,11 @@ static __GLchipPatch gcChipPatches[] =
         "\xb3\xd2\xb6\xd9\xae\xf1\x9c\xfd\x89\xfb\x92\xea\xda\xe1"
         ,
 
-        /* Fragment shader. */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x95\xa5\x95\xf0\x83\xa0\xc9\xaf"
         "\xcb\xae\xc8\x8f\xc3\x9c\xd9\x8a\xfa\x88\xed\x8e\xe7\x94\xfd\x92"
         "\xfc\x91\xf4\x90\xf9\x8c\xe1\x91\xf7\x9b\xf4\x95\xe1\xda\xf9\x9c"
@@ -15571,21 +15399,22 @@ static __GLchipPatch gcChipPatches[] =
         "\x88\xd7\xb4\xdb\xb7\xd8\xaa\x91\xe7\x88\xe1\x85\xe8\x89\xe0\x8e"
         "\xa6\x8f"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3031,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3031, 3.0 Beta 3, shader replacement",
-#endif
     },
 
     /* Detect 3.0 Beta 3. */
     {
         GC_CHIP_PATCH_30BETA3_2,
-        gcvTRUE
-        ,
-        /* Vertex shader. */
+        "gcChipPatch3032, 3.0 Beta 3, shader replacement",
+
+        GLchipPatch_Shader, /* flags */
+        gcvTRUE,            /* encrypted */
+        {
+        /* VS  */
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x95\xa5\x95\xf0\x83\xa0\xc9\xaf"
         "\xcb\xae\xc8\x8f\xc3\x9c\xd9\x8a\xfa\x88\xed\x8e\xe7\x94\xfd\x92"
         "\xfc\x94\xfd\x9a\xf2\x82\xe4\x88\xe7\x86\xf2\xc9\xea\x8f\xe1\x85"
@@ -15602,6 +15431,10 @@ static __GLchipPatch gcChipPatches[] =
         "\xb6\xdf\xab\xc2\xad\xc3\xed\x95\xec\xc6\xf6\xd8\xed\xc6\xf6\xd8"
         "\xed\xd6\xab"
         ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
         /* Fragment shader. */
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x95\xa5\x95\xf0\x83\xa0\xc9\xaf"
         "\xcb\xae\xc8\x8f\xc3\x9c\xd9\x8a\xfa\x88\xed\x8e\xe7\x94\xfd\x92"
@@ -15773,20 +15606,21 @@ static __GLchipPatch gcChipPatches[] =
         "\xde\xac\x91\xf2\xc0\xfb\x9d\xef\x8e\xe9\xb6\xd5\xba\xd6\xb9\xcb"
         "\xe5\x84\xb9\xda\xeb\xc5\xa4\x9f\xbc\xd9\xb7\xd3\xba\xdc\xa1"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3032,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3032, 3.0 Beta 3, shader replacement",
-#endif
     },
     /* Detect 3.1. */
     {
         GC_CHIP_PATCH_30BETA3_2_31,
-        gcvTRUE
-        ,
-        /* Vertex shader. */
+        "gcChipPatch3032, 3.0 Beta 3, shader replacement",
+
+        GLchipPatch_Shader, /* flags */
+        gcvTRUE,            /* encrypted */
+        {
+        /* VS  */
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
         "\xaa\xce\xab\xcd\xa4\xca\xaf\x8f\xdc\x8a\xd5\xe6\xd6\xdc\xff\x96"
         "\xf0\x94\xf1\x97\xb7\xf0\xbc\xe3\xa6\xf5\xff\x8f\xfd\x98\xfb\x92"
@@ -15806,6 +15640,10 @@ static __GLchipPatch gcChipPatches[] =
         "\xd0\x8f\xff\x90\xe3\x8a\xfe\x97\xf8\x96\xb8\xc0\xb9\x99\xb3\x93"
         "\xa3\x8d\xb8\x98\xb3\x93\xa3\x8d\xb8\x83\x89\xf4\xfe"
         ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
         /* Fragment shader. */
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
         "\xaa\xce\xab\xcd\xa4\xca\xaf\x8f\xdc\x8a\xd5\xe6\xd6\xdc\xff\x96"
@@ -16040,22 +15878,24 @@ static __GLchipPatch gcChipPatches[] =
         "\xc9\xa8\xc6\xa1\xc4\xe8\xc8\xab\xc4\xa9\xd9\xab\xce\xbd\xce\xee"
         "\x87\xf3\xf9\xda\xbf\xd1\xb5\xdc\xba\xb3\xb9\xc4\xce"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3032,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3032, 3.1, shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_30BETA3_3,
-        gcvTRUE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
+        "gcChipPatch3033, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xec\x89\xea\xd9\xb7"
         "\xd8\xaa\xc7\xa6\xca\xf7\x99\xf6\x84\xe9\x88\xe4\x8d\xf7\x92\xba"
         "\xd5\xa0\xd4\x8b\xe5\x8a\xf8\x95\xf4\x98\xb1\x8a\xfc\x99\xfa\xc9"
@@ -16129,22 +15969,24 @@ static __GLchipPatch gcChipPatches[] =
         "\x9a\xf5\x99\xf6\x84\xb9\xcf\xaa\xc9\xfd\xd5\xb6\xd9\xb5\xda\xa8"
         "\x84\xb4\x9a\xaf\x86\xbd\xc0"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3033,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3033, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_30BETA3_3_31,
-        gcvTRUE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
+        "gcChipPatch3033, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "\xdc\xb5\xd3\xb7\xd2\xb4\x94\xc1\x92\xd7\x88\xdd\x9f\xd0\xa3\xa9"
         "\x8a\xe3\x8d\xee\x82\xf7\x93\xf6\xd6\xbb\xda\xae\xed\x82\xec\x9f"
         "\xeb\x98\xa3\xa9\x8a\xe3\x8d\xee\x82\xf7\x93\xf6\xd6\xb3\xdd\xab"
@@ -16267,22 +16109,24 @@ static __GLchipPatch gcChipPatches[] =
         "\xda\xa8\xcd\xbe\xcd\xed\x84\xf0\xfa\xd9\xbc\xd2\xb6\xdf\xb9\xb3"
         "\xce\xc4"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3033_31,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3033_31, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_30BETA3_4,
-        gcvTRUE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
+        "gcChipPatch3034, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "\x99\xf5\x9a\xfb\x8f\xc8\xad\xd9\x95\xfc\x92\xf7\x96\xe4\xa0\xc5"
         "\xb5\xc1\xa9\x81\xa8\xd3\xb5\xd9\xb6\xd7\xa3\xc7\xfa\x8e\xeb\x93"
         "\xe7\x92\xe0\x85\xad\xd9\xbc\xc4\xb0\xc5\xb7\xd2\x8d\xf8\x96\xff"
@@ -16323,23 +16167,25 @@ static __GLchipPatch gcChipPatches[] =
         "\xba\xd9\xb6\xda\xb5\xc7\xfa\x9c\xf5\x9b\xfa\x96\xbc\xca\xaf\xcc"
         "\xf8\xd0\xe1\xcf\xff\xd6\xed\x90"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3034,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3034, No description, fragment shader replacement",
-#endif
     },
 
 
     {
         GC_CHIP_PATCH_30BETA3_6,
-        gcvFALSE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
+        "gcChipPatch3036, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvFALSE,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         /* Fragment shader. */
         "float DecodeFloatRG( vec2 value, float max_value)"
         "{"
@@ -16473,22 +16319,25 @@ static __GLchipPatch gcChipPatches[] =
         "#endif"
         "}"
         ,
-        GLchipPatch_Shader,
+
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3036,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3036, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_30BETA3_6_31,
-        gcvTRUE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
+        "gcChipPatch3036, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "\xdc\xb5\xd3\xb7\xd2\xb4\x94\xdd\x93\xc0\x94\xd5\x9b\xd8\x91\xdf"
         "\x98\x92\xb1\xc4\xaa\xce\xab\xcd\xed\xb8\xeb\xae\xf1\xa4\xe6\xa9"
         "\xda\xd0\xf3\x9a\xf4\x97\xfb\x8e\xea\x8f\xaf\xcc\xad\xc0\xa5\xd7"
@@ -16802,23 +16651,26 @@ static __GLchipPatch gcChipPatches[] =
         "\xfb\xdb\xb8\xd7\xba\xca\xb8\xdd\xae\xdd\xfd\x94\xe0\xea\xc9\xac"
         "\xc2\xa6\xcf\xa9\xa3\xde\xd4"
        ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3036_31,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3036_31, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_30BETA3_7_1,
-        gcvTRUE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch3037, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\x89\xec\x8f\xbd\xf8\x96\xf5\x9a\xfe\x9b\xdd\xb1\xde\xbf\xcb\x99"
         "\xde\xf6\x90\xfc\x93\xf2\x86\xf0\x91\xfd\x88\xed\xc1\xa7\xcb\xa4"
         "\xc5\xb1\xdc\xbd\xc5\x9a\xec\x8d\xe1\x94\xf1\xd8\xa3\xc0\xaf\xc1"
@@ -17018,23 +16870,26 @@ static __GLchipPatch gcChipPatches[] =
         "\xac\xc1\xa8\xdb\xa8\xc1\xb7\xd2\xf1\x94\xfa\x9e\xf7\x91\xb2\xd7"
         "\xb9\xdd\xb4\xd2\xaf"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3037,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3037, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_30BETA3_7_2,
-        gcvTRUE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
-        /* Fragment shader for Final version. */
+        "gcChipPatch3037, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\x89\xec\x8f\xbd\xf8\x96\xf5\x9a\xfe\x9b\xdd\xb1\xde\xbf\xcb\x99"
         "\xde\xf6\x90\xfc\x93\xf2\x86\xf0\x91\xfd\x88\xed\xc1\xa7\xcb\xa4"
         "\xc5\xb1\xdc\xbd\xc5\x9a\xec\x8d\xe1\x94\xf1\xd8\xa3\xc0\xaf\xc1"
@@ -17234,23 +17089,26 @@ static __GLchipPatch gcChipPatches[] =
         "\xe7\xc8\xad\xc0\xa9\xda\xa9\xc0\xb6\xd3\xf0\x95\xfb\x9f\xf6\x90"
         "\xb3\xd6\xb8\xdc\xb5\xd3\xae"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3037,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3037, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_30BETA3_7_31,
-        gcvTRUE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch3037, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\xdc\xb5\xd3\xb7\xd2\xb4\x94\xc1\x92\xd7\x88\xdd\x9f\xd0\xa3\xa9"
         "\x8a\xe3\x8d\xee\x82\xf7\x93\xf6\xd6\xb5\xd4\xb9\xdc\xae\xcf\x8c"
         "\xe3\x8d\xfe\x8a\xf9\xc2\xc8\xeb\x82\xec\x8f\xe3\x96\xf2\x97\xb7"
@@ -17521,23 +17379,26 @@ static __GLchipPatch gcChipPatches[] =
         "\xe9\xc7\xbe\x85\xa5\x8a\xa5\xc0\xad\xc4\xb7\xc4\xad\xdb\xbe\xb4"
         "\x97\xf2\x9c\xf8\x91\xf7\xfd\xde\xbb\xd5\xb1\xd8\xbe\xb4\xc9\xc3"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3037_31,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3037_31, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_30BETA3_8,
-        gcvFALSE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch3038, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvFALSE,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "vec3 get_world_pos( vec2 out_texcoord)"
         "{"
         "float d = texture( texture_unit3, out_texcoord).x;"
@@ -17562,23 +17423,26 @@ static __GLchipPatch gcChipPatches[] =
         "frag_color = mix(vec4(0.25),vec4(1.0),shadow);"
         "}"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3038,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3038, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_30BETA3_8_31,
-        gcvTRUE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch3038, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
         "\xaa\xc3\xa5\xc1\xa4\xc2\xe2\xa5\xe9\xb6\xf3\xa0\xaa\xda\xa8\xcd"
         "\xae\xc7\xb4\xdd\xb2\xdc\xfc\x91\xf4\x90\xf9\x8c\xe1\x91\xb1\xd7"
@@ -17681,23 +17545,26 @@ static __GLchipPatch gcChipPatches[] =
         "\xaf\xca\xa9\x9d\xb5\x85\xab\x99\xac\x85\xa9\xdf\xba\xd9\xed\xc5"
         "\xf4\xda\xea\xc3\xef\x9c\xf4\x95\xf1\x9e\xe9\xc0\xfb\xf1\x8c\x86"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3038_31,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3038_31, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_30BETA3_9,
-        gcvTRUE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch3039, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xec\x89\xea\xd9\xba"
         "\x88\xb5\xc1\xa4\xdc\xa8\xdd\xaf\xca\xe2\x96\xf3\x8b\xff\x8a\xf8"
         "\x9d\xc2\xb7\xd9\xb0\xc4\xf5\xd9\xb6\xc3\xb7\xe8\x9c\xf9\x81\xe2"
@@ -17721,23 +17588,26 @@ static __GLchipPatch gcChipPatches[] =
         "\xb3\xd0\xbf\xd3\xbc\xce\xf3\x85\xe0\x83\xb7\x9f\xfc\xd0\xe1\xcf"
         "\xff\xd6\xed\x90"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3039,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3039, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_30BETA3_A,
-        gcvFALSE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch303A, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvFALSE,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "#version 300 es"
         "#ifdef GL_ES"
         "precision mediump float;"
@@ -17870,23 +17740,26 @@ static __GLchipPatch gcChipPatches[] =
         "//frag_color = vec4(0, (z_view_depth - start_depth)/200, 0, 1.0);"
         "}"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch303A,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch303A, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_30BETA3_A_31,
-        gcvTRUE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch303A, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
         "\xaa\xce\xab\xcd\xa4\xca\xaf\x8f\xdc\x8a\xd5\xe6\xd6\xdc\xff\x96"
         "\xf0\x94\xf1\x97\xb7\xf0\xbc\xe3\xa6\xf5\xff\x8f\xfd\x98\xfb\x92"
@@ -18237,19 +18110,26 @@ static __GLchipPatch gcChipPatches[] =
         "\xcb\xac\xf3\x90\xff\x93\xfc\x8e\xa2\x82\xf4\x91\xf2\xc6\xee\xde"
         "\xf0\xc0\xe9\xc0\xfb\xf1\xd2\xb7\xd9\xbd\xd4\xb2\xb8\xc5\xcf"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch303A_31,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch303A_31, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_3041,
+       "gcChipPatch3041, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
         gcvTRUE,
-        gcvNULL,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8c\xff\x9a\xb9\xdd\xb8\xde\xb7\xd9\xbc\xd1\xb4\xd0"
@@ -18420,19 +18300,24 @@ static __GLchipPatch gcChipPatches[] =
         "\xe6\x83\xe5\x89\xec\x8f\xfb\x9e\xfa\xa9\xc2\xbb\x97\xa6\x88\xb8"
         "\x91\xaa\xd7\xaa"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3041,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3041, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_3042,
+        "gcChipPatch3042, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
         gcvTRUE,
-        gcvNULL,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x95\xa5\x95\xf0\x83\xa0\xc9\xaf"
         "\xcb\xae\xc8\x8f\xc3\x9c\xd9\x8a\xfa\x88\xed\x8e\xe7\x94\xfd\x92"
         "\xfc\x91\xf4\x90\xf9\x8c\xe1\x91\xf7\x9b\xf4\x95\xe1\xda\xf9\x9c"
@@ -18473,22 +18358,25 @@ static __GLchipPatch gcChipPatches[] =
         "\x9c\xf0\x9f\xed\xd6\xb0\xc2\xa3\xc4\x9b\xf8\x97\xfb\x94\xe6\xc8"
         "\xbf\x82\xf6\x93\xeb\xa8\xc7\xab\x90\xed"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3042,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3042, No description, fragment shader replacement",
-#endif
     },
 
     /* Manhattan shader: Skip D16 texture */
     {
         GC_CHIP_PATCH_MANHATTAN_SKIP_D16TEXTURE,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
+        "gcChipPatch3043, Manhattan skip D16 texture, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xf9\x96\xf8\x8b\xff"
         "\x99\xf5\x9a\xfb\x8f\xe6\x88\xfe\xa1\xd3\xb6\xc5\xf5\xc8\xf9\xd7"
         "\xe7\xc8\xf9\xc9\xfb\xcf\xe1\xd1\xea\x89\xe6\x88\xfb\x8f\xe9\x85"
@@ -18516,23 +18404,24 @@ static __GLchipPatch gcChipPatches[] =
         "\xde\xec\xd9\xf0\xdc\xaa\xcf\xac\x98\xb0\x81\xaf\x9f\xb6\x9a\xe9"
         "\x81\xe0\x84\xeb\x9c\xb5\x8e\xf3"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3043,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3043, Manhattan skip D16 texture, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_31_2,
-        gcvFALSE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch3132, 3.1, shader replacement",
+
+        GLchipPatch_Shader,
+        gcvFALSE,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "#version 300 es"
         "#define USE_UBOs"
         "#define SV_31"
@@ -18638,23 +18527,24 @@ static __GLchipPatch gcChipPatches[] =
         "#endif"
         "}"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3132,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3132, 3.1, shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_31_3,
-        gcvFALSE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch3133, 3.1, shader replacement",
+
+        GLchipPatch_Shader,
+        gcvFALSE,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "#ifdef USE_UBOs"
         "layout(std140) uniform matConsts"
         "{"
@@ -18728,23 +18618,24 @@ static __GLchipPatch gcChipPatches[] =
         "#endif"
         "}"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3133,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3133, 3.1, shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_31_6,
-        gcvFALSE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch3136, 3.1, shader replacement",
+
+        GLchipPatch_Shader,
+        gcvFALSE,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "#ifdef INSTANCING"
         "#undef USE_UBOs"
         "layout(std140) uniform cameraConsts"
@@ -18977,23 +18868,24 @@ static __GLchipPatch gcChipPatches[] =
         "#endif"
         "}"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3136,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3136, 3.1, shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_31_7,
-        gcvFALSE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch3137, 3.1, shader replacement",
+
+        GLchipPatch_Shader,
+        gcvFALSE,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "#ifdef USE_UBOs"
         "layout(std140) uniform cameraConsts"
         "{"
@@ -19144,23 +19036,24 @@ static __GLchipPatch gcChipPatches[] =
         "#endif"
         "}"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3137,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3137, 3.1, shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_31_8,
-        gcvFALSE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch3138, 3.1, shader replacement",
+
+        GLchipPatch_Shader,
+        gcvFALSE,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "#version 300 es"
         "#define USE_UBOs"
         "#ifdef GL_ES"
@@ -19238,23 +19131,24 @@ static __GLchipPatch gcChipPatches[] =
         "frag_color = mix(vec4(0.25),vec4(1.0),shadow);"
         "}"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch3138,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3138, 3.1, shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_31_A,
-        gcvFALSE
-        ,
-        /* Vertex shader. */
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch313A, 3.1, shader replacement",
+
+        GLchipPatch_Shader,
+        gcvFALSE,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "#ifdef USE_UBOs"
         "layout(std140) uniform cameraConsts"
         "{"
@@ -19414,46 +19308,51 @@ static __GLchipPatch gcChipPatches[] =
         "#endif"
         "}"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch313A,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch313A, 3.1, shader replacement",
-#endif
     },
 
     /* Detect Miranda. */
     {
         GC_CHIP_PATCH_MIRANDA,
-        gcvTRUE
-        ,
+        "gcChipPatch1, Miranda, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
         /* Vertex shader. */
         "\x98\xf4\xab\xfb\x94\xe7\x8e\xfa\x93\xfc\x92\xaf\xc9\xa4\xfb\x97"
         "\xf8\x9b\xfa\x96\xc9\xbd\xd2\x8d\xee\x82\xeb\x9b\xc4\xa9\xc8\xbc"
         "\xce\xa7\xdf\xf5\x83\xe6\x85\xb1\x99\xff\x92\xcd\xbd\xd2\xa1\xc8"
         "\xbc\xd5\xba\xd4\xfa\x82\xfb\x81\xad\x9c\xb2\x82\xab\x90"
         ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
         /* Fragment shader. */
         "\x98\xf4\xab\xed\x9f\xfe\x99\xda\xb5\xd9\xb6\xc4\xf9\x9f\xf2\xad"
         "\xc9\xac\xc0\xb4\xd5\x8a\xee\x87\xe1\x87\xf2\x81\xe4\xbb\xd8\xb7"
         "\xdb\xb4\xc6\xfd"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch1,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch1, Miranda, hardware patch",
-#endif
     },
 
     /* Detect Siegecraft Lite. */
     {
         GC_CHIP_PATCH_SIEGECRAFT,
-        gcvTRUE
-        ,
-        /* Vertex shader. */
+        "gcChipPatch119, Siegecraft Lite, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xf2\x9b\xfc\x94\xe4"
         "\x92\xf7\x94\xa6\xd2\xbf\xcf\xb9\xd8\xaa\xf5\xc4\xff\x92\xf7\x93"
         "\xfa\x8f\xe2\x92\xe4\x81\xe2\xd0\xa4\xc9\xb9\xcf\xae\xdc\x83\xb1"
@@ -19467,7 +19366,11 @@ static __GLchipPatch gcChipPatches[] =
         "\x8e\xcd\x82\xcd\x9f\xdb\xeb\xd6\xa2\xcf\xbf\xc9\xa8\xda\x85\xb4"
         "\x8f\xf2"
         ,
-        /* Fragment shader. */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xf7\x92\xf6\x9f\xea"
         "\x87\xf7\x81\xe4\x87\xb3\xc7\xaa\xda\xac\xcd\xbf\xe0\xd1\xea\x86"
         "\xe9\x9e\xee\x98\xfd\x9e\xaa\xde\xb3\xc3\xb5\xd4\xa6\xf9\xcb\xf0"
@@ -19479,20 +19382,21 @@ static __GLchipPatch gcChipPatches[] =
         "\xfc\x9d\xe9\x88\xd3\xe3\xbe\x83\xf7\x9a\xea\x9c\xfd\x8f\xd0\xe1"
         "\xda\xa7"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch119,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch119, Siegecraft Lite, hardware patch",
-#endif
     },
 
     /* Detect water_shader (Navigation). */
     {
         GC_CHIP_PATCH_NAVIGATION,
-        gcvTRUE
-        ,
-        /* Vertex shader. */
+        "gcChipPatch2, Water shader of Navigation, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
+        /* VS  */
         "\x8c\xe5\x8b\xa3\xd3\xbc\xcf\xa6\xd2\xbb\xd4\xba\x94\xec\xc6\xa0"
         "\xcd\x92\xe1\x91\xf4\x91\xf5\xaa\xdc\xb9\xda\xae\xc1\xb3\x83\xad"
         "\xd5\xfe\x8e\xe1\x92\xfb\x8f\xe6\x89\xe7\xc9\xb3\x99\xff\x92\xcd"
@@ -19500,7 +19404,11 @@ static __GLchipPatch gcChipPatches[] =
         "\xc6\xab\xf4\x80\xe9\x84\xe1\xcf\xb7\x9d\xfb\x96\xc9\xba\xca\xaf"
         "\xca\xae\xf1\x87\xe2\x81\xf5\x9a\xe8\xd8\xf6\x8c\xa5"
         ,
-        /* Fragment shader. */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\x89\xec\x8f\xbd\xc9\xac\xd4\x8b\xfb\x94\xe7\xda\xac\xf3\x87\xe2"
         "\x9a\xf9\x96\xf9\x8b\xef\xc5\xf5\xdb\xe3\xc8\xbe\xdb\xb8\x8a\xa2"
         "\xc4\xa9\xf6\x82\xeb\x86\xe3\xcd\xb5\x9f\xaf\x81\xb1\x83\xa9\xcf"
@@ -19509,46 +19417,52 @@ static __GLchipPatch gcChipPatches[] =
         "\x83\xa9\xcf\xa2\xfd\x8e\xfe\x9b\xfe\x9a\xc5\xb3\xd6\xb5\xc1\xae"
         "\xdc\xec\xc2\xbb\x92"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         /* Handler. */
         gcChipPatch2,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2, Water shader of Navigation, hardware patch",
-#endif
     },
 
     /* Detect horizontal blur filter. */
     {
         GC_CHIP_PATCH_HOR_BLUR_FILTER,
-        gcvTRUE
-        ,
-        /* Vertex shader. */
+        "gcChipPatch3, Horizontal blur filter, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
+        /* VS  */
         "\x89\xd6\xa2\xc7\xbf\xdc\xb3\xdc\xae\xca\x91\xa1\xfc\xc1\xb7\xd2"
         "\xb1\x83\xab\xcd\xa0\xff\x8b\xee\x96\xf5\x9a\xf5\x87\xe3\xd3\xfd"
         "\x85\xae\x86\xab\x98\xb6\x86\xaf\x85\xf6\x95\xf4\x98\xfd\xd1\xb7"
         "\xda\x85\xf1\x94\xec\x8f\xe0\x8f\xfd\x99\xa9\x87\xfe\xd7\xec"
         ,
-        /* Fragment shader. */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\x9c\xf3\x9f\xf0\x82\xbf\xc8\xf9\xd3\xbe\xdf\xa7\x8f\xfb\x9e\xe6"
         "\x92\xe7\x95\xf0\xc2\x86\xae\xc8\xa5\xfa\x8e\xeb\x93\xe7\x92\xe0"
         "\x85\xb4\x98\xee\xb1\xc5\xa0\xd8\xbb\xd4\xbb\xc9\xad\xf6\xc6\x9b"
         "\xb2\x9c\xee\x89\xeb\x8a\xa7\xca\xa3\xcd\xb8\xcb\x94\xf7\x98\xf4"
         "\x9b\xe9\xc5\xb3\xd6\xb5\x81\xa9\x99\xb7\x87\xae\x87\xbc"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch3,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch3, Horizontal blur filter, hardware patch",
-#endif
     },
 
     /* Detect torch shader. */
     {
         GC_CHIP_PATCH_TORCH,
-        gcvTRUE
-        ,
+        "gcChipPatch4, Torch shader, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
         /* Vertex shader. */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xe8\x81\xe6\x8e\xfe\x98\xf4\x9b\xfa\x8e\xb5\x96"
@@ -19566,7 +19480,11 @@ static __GLchipPatch gcChipPatches[] =
         "\xb2\xdb\xaf\xc6\xa9\xc7\xfa\x97\xee\xa3\xf5\xa5\xd7\xb8\xd2\x9f"
         "\xfe\x8a\xf8\x91\xe9\xc3\xae\xd7\x81\xe4\x96\xe2\x87\xff\xc4\xb9"
         ,
-        /* Fragment shader. */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8e\xea\x83\xe5\x93\xf2\x80\xf9\x90\xfe\x99\xef\x8a"
@@ -19574,19 +19492,20 @@ static __GLchipPatch gcChipPatches[] =
         "\xac\xda\xb5\xdc\xb8\x91\xea\x8d\xe1\xbe\xf8\x8a\xeb\x8c\xcf\xa0"
         "\xcc\xa3\xd1\xec\x8f\xe0\x8c\xe3\x91\xaa\xd7"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch4,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch4, Torch shader, hardware patch",
-#endif
     },
 
     /* Detect GLBenchmark 2.5. */
     {
         GC_CHIP_PATCH_GLBENCH25,
-        gcvTRUE
-        ,
+        "gcChipPatch5, GLBenchmark 2.5, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
         /* Vertex shader. */
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xfd\x91\xce\x9e\xf1"
         "\x82\xeb\x9f\xf6\x99\xf7\xca\xa7\xd1\xa1\x8b\xfd\x98\xfb\xcf\xe7"
@@ -19596,25 +19515,30 @@ static __GLchipPatch gcChipPatches[] =
         "\x8d\xf9\x9c\xe4\x87\xe8\x87\xf5\x91\xa1\x9c\xf5\x9b\xc4\xb0\xd5"
         "\xad\xce\xa1\xce\xbc\xd8\xe8\xd3\xae"
         ,
-        /* Fragment shader. */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xfd\x91\xce\x88\xfa"
         "\x9b\xfc\xbf\xd0\xbc\xd3\xa1\x9c\xe8\x8d\xf5\x81\xf4\x86\xe3\xd1"
         "\x95\xbd\xc9\xac\xd4\xa0\xd5\xa7\xc2\x9d\xe8\x86\xef\x9b\xab\x87"
         "\xe8\x9d\xe9\xb6\xc2\xa7\xdf\xbc\xd3\xbc\xce\xaa\x9a\xb3\x88\xf5"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch5,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch5, GLBenchmark 2.5, hardware patch",
-#endif
     },
 
     /* Detect GLBenchmark 2.5 fill rate. */
     {
         GC_CHIP_PATCH_GLBENCH25_FILL_RATE,
-        gcvTRUE
-        ,
+        "gcChipPatch6, GLBenchmark 2.5 fill rate, shader replacement and hardware patch",
+
+        GLchipPatch_Shader | GLchipPatch_Hardware,
+        gcvTRUE,
+        {
         /* Vertex shader. */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xe8\x81\xe6\x8e\xfe\x98\xf4\x9b\xfa\x8e\xb5\x96"
@@ -19671,7 +19595,11 @@ static __GLchipPatch gcChipPatches[] =
         "\xd1\xfd\x90\xe9\xbf\xda\xa8\xdc\xb9\xc1\xef\x96\xba\xd7\xae\xf8"
         "\x9d\xef\x9b\xfe\x86\xa8\xd2\xfe\xcf\xe1\xd1\xf8\xc3\xbe"
         ,
-        /* Fragment shader. */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8e\xea\x83\xe5\x90\xfe\x97\xf1\x9e\xec\x81\xf2\x93"
@@ -19697,19 +19625,20 @@ static __GLchipPatch gcChipPatches[] =
         "\xf0\xd8\xac\xc9\xb1\x83\xc7\x9c\xab\xf6\xda\xac\xf8\x9d\xe5\xa6"
         "\xc9\xa6\xd4\xb0\xeb\xdc\x81\xa8\x81\xba\xc7"
         ,
-        GLchipPatch_Shader | GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch6,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch6, GLBenchmark 2.5 fill rate, shader replacement and hardware patch",
-#endif
     },
 
     /* Detect GLBenchmark 2.7 RC 1/2. */
     {
         GC_CHIP_PATCH_GLBENCH27_RC,
-        gcvTRUE
-        ,
+        "gcChipPatch5, GLBenchmark 2.7 RC 1/2, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
         /* Vertex shader. */
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xfd\x91\xce\x9e\xf1"
         "\x82\xeb\x9f\xf6\x99\xf7\xca\xa7\xd1\xa1\x8b\xfd\x98\xfb\xcf\xe7"
@@ -19719,7 +19648,11 @@ static __GLchipPatch gcChipPatches[] =
         "\x8d\xf9\x9c\xe4\x87\xe8\x87\xf5\x91\xa1\x9c\xf5\x9b\xc4\xb0\xd5"
         "\xad\xce\xa1\xce\xbc\xd8\xe8\xd3\xae"
         ,
-        /* Fragment shader. */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xfd\x91\xce\x88\xfa"
         "\x9b\xfc\xbf\xd0\xbc\xd3\xa1\x9c\xe8\x8d\xf5\x81\xf4\x86\xe3\xd1"
         "\x95\xbd\xc9\xac\xd4\xa0\xd5\xa7\xc2\x9d\xe8\x86\xef\x9b\xab\x87"
@@ -19727,19 +19660,20 @@ static __GLchipPatch gcChipPatches[] =
         "\x83\xdc\x9a\xe8\x89\xee\xad\xc2\xae\xc1\xb3\x9d\xea\xd7\xe7\xc9"
         "\xf9\xc2\xbf"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch5,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch5, GLBenchmark 2.7 RC 1/2, hardware patch",
-#endif
     },
 
     /* Detect youilabs road shaders. */
     {
         GC_CHIP_PATCH_YOUILABS_ROAD,
-        gcvTRUE
-        ,
+        "gcChipPatch7, Youilabs road shaders, shader replacement and hardware patch",
+
+        GLchipPatch_Shader | GLchipPatch_Hardware,
+        gcvTRUE,
+        {
         "\x8f\xfd\x98\xfb\x92\xe1\x88\xe7\x89\xe1\x88\xef\x87\xf7\x91\xfd"
         "\x92\xf3\x87\xbc\xdd\xa9\xdd\xaf\xc6\xa4\xd1\xa5\xc0\xb6\xd3\xb0"
         "\x84\xe5\x93\xa7\xd7\xb8\xcb\xa2\xd6\xbf\xd0\xbe\x85\xf3\x9c\xf5"
@@ -19747,6 +19681,10 @@ static __GLchipPatch gcChipPatches[] =
         "\x8c\xe3\x8d\xb0\xd1\xa7\x93\xe3\x8c\xff\x96\xe2\x8b\xe4\x8a\xb1"
         "\xcc"
         ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
         "\xd0\xfa\xa3\xea\xb5\xf9\xb0\xe6\xa3\xf5\xbc\xf9\xae\xeb\xb9\xe6"
         "\xb4\xf1\xa2\xed\xa1\xf4\xa0\xe9\xa6\xe8\xb7\xf1\xb0\xf3\xa7\xe8"
         "\xba\x88\xa6\x93\xb9\x96\xb9\x93\xd2\xbe\xd2\xa1\xc9\xa8\xcc\xa9"
@@ -19908,22 +19846,26 @@ static __GLchipPatch gcChipPatches[] =
         "\xd3\xfb\xcb\xe5\xd0\xfc\xcc\xe2\xd7\xfb\xcb\xe5\xd0\xfc\xcd\xe3"
         "\xd3\xfa\xc1\xbc"
         ,
-        GLchipPatch_Shader | GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch7,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch7, Youilabs road shaders, shader replacement and hardware patch",
-#endif
     },
 
     /* Detect Hoverjet Fragment terrain_baked_shadows2.frag ... */
     {
         GC_CHIP_PATCH_HOVERJET_TERRAIN_BAKED_SHADOW2,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch8, Hoverjet Fragment terrain_baked_shadows2.frag, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\x8a\xe4\x8d\xeb\x84\xf6\x9b\xf6\x93\xf7\x9e\xeb\x86\xf6\x80\xe5"
         "\x86\xb2\xd4\xb9\xe6\x8a\xe3\x84\xec\x98\xc7\xa3\xca\xb8\xdd\xbe"
         "\xca\xa3\xcc\xa2\x99\xec\x82\xeb\x8d\xe2\x90\xfd\x90\xf5\x91\xf8"
@@ -20022,23 +19964,27 @@ static __GLchipPatch gcChipPatches[] =
         "\xb0\xf6\x84\xe5\x82\xc1\xae\xc2\xad\xdf\xf1\x90\xad\x9c\xb2\x82"
         "\xb9\xc4"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch8,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch8, Hoverjet Fragment terrain_baked_shadows2.frag, fragment shader replacement",
-#endif
     },
 
 #if gcdSHADER_SRC_BY_MACHINECODE
     /* Detect Taiji Fragment brdf_normalmapped.frag ... */
     {
         GC_CHIP_PATCH_TAIJI_NORMALMAPPED,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch9, Taiji Fragment brdf_normalmapped.frag, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\x8a\xe4\x8d\xeb\x84\xf6\x9b\xf6\x93\xf7\x9e\xeb\x86\xf6\x80\xe5"
         "\x86\xb2\xd4\xb9\xe6\x8a\xe3\x84\xec\x98\xc7\xa3\xca\xac\xca\xbf"
         "\xcc\xa9\xf6\x95\xfa\x96\xf9\x8b\xb0\xc5\xab\xc2\xa4\xcb\xb9\xd4"
@@ -20155,22 +20101,26 @@ static __GLchipPatch gcChipPatches[] =
         "\xfd\x9c\xf1\x93\xfa\x9f\xf1\x85\xbe\xd9\xb5\xea\xac\xde\xbf\xd8"
         "\x9b\xf4\x98\xf7\x85\xab\xca\xf7\xc6\xe8\xd8\xe3\x9e"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch9,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch9, Taiji Fragment brdf_normalmapped.frag, fragment shader replacement",
-#endif
     },
 
     /* compat latest version, Detect Taiji Fragment brdf_normalmapped.frag ... */
     {
         GC_CHIP_PATCH_TAIJI_NORMALMAPPED_2,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch9, Compat latest version of Taiji Fragment brdf_normalmapped.frag, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\x8a\xe4\x8d\xeb\x84\xf6\x9b\xf6\x93\xf7\x9e\xeb\x86\xf6\x80\xe5"
         "\x86\xb2\xd4\xb9\xe6\x8a\xe3\x84\xec\x98\xc7\xa3\xca\xac\xca\xbf"
         "\xcc\xa9\xf6\x95\xfa\x96\xf9\x8b\xb0\xc5\xab\xc2\xa4\xcb\xb9\xd4"
@@ -20281,23 +20231,26 @@ static __GLchipPatch gcChipPatches[] =
         "\x94\xfa\x8e\xb5\xd2\xbe\xe1\xa7\xd5\xb4\xd3\x90\xff\x93\xfc\x8e"
         "\xa0\xc1\xfc\xcd\xe3\xd3\xe8\x95"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch9,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch9, Compat latest version of Taiji Fragment brdf_normalmapped.frag, "
-        "fragment shader replacement",
-#endif
     },
 
     /* Detect Taiji Fragment brdf.frag ... */
     {
         GC_CHIP_PATCH_TAIJI_BRDF,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch10, Taiji Fragment brdf.frag, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\x8a\xe4\x8d\xeb\x84\xf6\x9b\xf6\x93\xf7\x9e\xeb\x86\xf6\x80\xe5"
         "\x86\xb2\xd4\xb9\xe6\x8a\xe3\x84\xec\x98\xc7\xa3\xca\xac\xca\xbf"
         "\xcc\xa9\xf6\x95\xfa\x96\xf9\x8b\xb0\xc5\xab\xc2\xa4\xcb\xb9\xd4"
@@ -20388,20 +20341,25 @@ static __GLchipPatch gcChipPatches[] =
         "\xe4\x89\xeb\x82\xe7\x89\xfd\xc6\xa1\xcd\x92\xd4\xa6\xc7\xa0\xe3"
         "\x8c\xe0\x8f\xfd\xd3\xb2\x8f\xbe\x90\xa0\x9b\xe6"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch10,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch10, Taiji Fragment brdf.frag, fragment shader replacement",
-#endif
     },
     /* Detect Taiji Fragment brdf normal mapped shadowed.frag ... */
     {
         GC_CHIP_PATCH_TAIJI_NORMALMAPPED_SHADOWED,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
+        "gcChipPatch101, Taiji Fragment brdf normal mapped shadowed.frag, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\xdc\xb8\xdd\xbb\xd2\xbc\xd9\x89\xc0\xe8\xdb\xf5\xc4\xf0\xc1\xf4"
         "\xcd\xff\xc9\xfc\xcf\xfa\xc2\xfb\xcc\xf5\xc6\xf4\xc7\xff\xcb\xfd"
         "\xcf\xf9\xcd\xfe\xcd\xf5\xc6\xf4\xc3\xfa\xcf\xe6\xc5\xa1\xc4\xa2"
@@ -20466,22 +20424,26 @@ static __GLchipPatch gcChipPatches[] =
         "\x89\xbc\x8b\xa2\x88\xb9\x8a\xbd\x88\xa6\x91\xa4\x90\xa8\x9f\xa8"
         "\x81\xba\xc7"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch101,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch101, Taiji Fragment brdf normal mapped shadowed.frag, fragment shader "
-        "replacement",
-#endif
     },
 
     /* compat latest version, Detect Taiji Fragment brdf normal mapped shadowed.frag ... */
     {
         GC_CHIP_PATCH_TAIJI_NORMALMAPPED_SHADOWED_2,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
+        "gcChipPatch101, compat latest version, Detect Taiji Fragment brdf normal mapped shadowed.frag, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\xdc\xb8\xdd\xbb\xd2\xbc\xd9\x89\xc0\xe8\xdb\xf5\xc4\xf0\xc1\xf4"
         "\xcd\xff\xc9\xfc\xcf\xfa\xc2\xfb\xcc\xf5\xc6\xf4\xc7\xff\xcb\xfd"
         "\xcf\xf9\xcd\xfe\xcd\xf5\xc6\xf4\xc3\xfa\xcf\xe6\xc5\xa1\xc4\xa2"
@@ -20542,23 +20504,25 @@ static __GLchipPatch gcChipPatches[] =
         "\xb3\x86\xb3\x84\xb1\x86\xaf\x85\xb4\x87\xb0\x85\xab\x9c\xa9\x9d"
         "\xa5\x92\xa5\x8c\xb7\xca"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
         gcChipPatch101,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch101, compat latest version, Detect Taiji Fragment brdf normal mapped shadowed.frag"
-        ", fragment shader replacement",
-#endif
     },
 
     /* Detect Antutu 3.x 3D case2 Fragment ... */
     {
         GC_CHIP_PATCH_ANTUTU_3x,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch11, Antutu 3.x 3D case2 Fragment, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\x8f\xfd\x98\xfb\x92\xe1\x88\xe7\x89\xe4\x81\xe5\x8c\xf9\x94\xe4"
         "\x8d\xe3\x97\xac\xdc\xae\xcb\xa8\xc1\xb2\xdb\xb4\xda\xb7\xd2\xb6"
         "\xdf\xaa\xc7\xb7\xd1\xbd\xd2\xb3\xc7\xfc\x89\xe7\x8e\xe8\x87\xf5"
@@ -20576,22 +20540,26 @@ static __GLchipPatch gcChipPatches[] =
         "\xd3\xa1\x8f\xfd\x9a\xf8\xd4\xa0\xc5\xbd\xfe\x91\xfd\x92\xe0\xce"
         "\xaf\x86\xbd\xc0"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch11,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch11, Antutu 3.x 3D case2 Fragment, hardware patch",
-#endif
     },
 
     /* Detect GLB25_release Fragment 0 ... */
     {
         GC_CHIP_PATCH_GLBENCH25_RELEASE,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch115, GLB25_release Fragment 0, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
 #if defined(__APPLE__)
         "\xdc\xb5\xd3\xbd\xd9\xbc\xda\x9d\xd1\x8e\xcb\x98\xbb\xdf\xba\xdc"
         "\xb5\xdb\xbe\xd6\xbf\xd8\xb0\xc0\xe3\x87\xe2\x84\xed\x83\xe6\x8b"
@@ -20764,18 +20732,20 @@ static __GLchipPatch gcChipPatches[] =
         "\xee\x80\xf6\xa9\xdb\xbe\xcd\xa2\xce\xbb\xcf\xa6\xc9\xa7\x9c"
 #endif
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch115,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch115, GLB25_release Fragment 0, hardware patch",
-#endif
     },
 
     /* Dynamic cloud shader on Nenamark2.4*/
     {
         GC_CHIP_PATCH_NENAMARK24,
+        "gcChipPatch118, Dynamic cloud shader on Nenamark2.4, hardware patch",
+
+        GLchipPatch_Hardware,
         gcvTRUE,
+        {
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xf3\x9d\xe9\x80\xbd"
         "\xd4\xba\xce\xe6\x87\xd8\xa9\xdc\xbd\xd9\x86\xe2\x83\xf7\x96\xcd"
         "\xfe\xa3\x8a\xb1\xc7\xa2\xc1\xf3\x9a\xf4\x92\xfd\xc0\xa1\xfe\x8e"
@@ -20807,24 +20777,30 @@ static __GLchipPatch gcChipPatches[] =
         "\xed\xc7\xef\x99\xfc\x9f\xab\x83\xf3\xd8\xa9\x87\xff\x86\xfc\xd0"
         "\xe1\xcf\xff\xd6\xff\xd6\xed\x90"
         ,
-        gcvNULL
-        ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+        gcvNULL,    /* FS  */
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch118,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch118, Dynamic cloud shader on Nenamark2.4, hardware patch",
-#endif
     },
 
     /* Detect nenamarkv2.4 Fragment 0 ... */
     {
         GC_CHIP_PATCH_NENAMARKV24,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
-        /* Fragment shader. */
+       "gcChipPatch120, Detect nenamarkv2.4 Fragment 0, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8e\xea\x83\xe5\xc6\xaf\xc9\xa7\xc3\xa6\xc0\x87\xcb"
@@ -20874,26 +20850,31 @@ static __GLchipPatch gcChipPatches[] =
         "\xb2\xc2\xb6\xde\x81\xe7\x86\xe5\x91\xfe\x8c\xa6\xd4\xb1\xd7\xbb"
         "\x95\xed\x94\xee\xc2\xa4\xd6\xb3\xc0\xe9\xd2\xaf"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch120,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch120, Detect nenamarkv2.4 Fragment 0, fragment shader replacement",
-#endif
     },
 
 #endif
 
     {
         GC_CHIP_PATCH_2714,
-        gcvTRUE
-        ,
+        "gcChipPatch2714, No description, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xf5\x80\xf4\xab\xc5"
         "\xaa\xd8\xb5\xd4\xb8\x85\xec\x82\xdd\xb3\xdc\xae\xc3\xa2\xce\xf5"
         "\x92\xfe\xa1\xf1\x9e\xed\x84\xf0\x99\xf6\x98\xa5\xc8\xbe\xce\xe4"
         "\x92\xf7\x94\xa0\x88\xe1\x8f\xd0\xa0\xcf\xbc\xd5\xa1\xc8\xa7\xc9"
         "\xe5\xd4\xfa\xca\xe3\xd8\xa5"
         ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xfd\x91\xce\x88\xfa"
         "\x9b\xfc\xbf\xd0\xbc\xd3\xa1\x9c\xea\x8f\xec\xd8\xf0\x92\xf3\x90"
         "\xfb\x9c\xee\x81\xf4\x9a\xfe\xa1\xc2\xad\xc1\xae\xdc\xf0\xc1\xef"
@@ -20901,18 +20882,19 @@ static __GLchipPatch gcChipPatches[] =
         "\xf6\xcb\xbd\xd8\xbb\x8f\xa7\xc8\xbd\xc9\x96\xf8\x97\xe5\x88\xe9"
         "\x85\xa9\x98\xb6\x86\xaf\x94\xe9"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch2714,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2714, No description, hardware patch",
-#endif
     },
 
     {
         GC_CHIP_PATCH_2715,
-        gcvTRUE
-        ,
+        "gcChipPatch2715, No description, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xfd\x91\xce\x9e\xf1"
         "\x82\xeb\x9f\xf6\x99\xf7\xca\xbc\xd9\xba\x8e\xa6\xcb\xb2\xe4\x81"
         "\xf3\x87\xe2\x9a\xb4\xcc\xe0\x8d\xf4\xa2\xc7\xb5\xc1\xa4\xdc\xf2"
@@ -20920,23 +20902,28 @@ static __GLchipPatch gcChipPatches[] =
         "\x96\xf2\xcf\xb9\xdc\xbf\x8d\xa5\xc8\xb1\xe7\x82\xf0\x84\xe1\x99"
         "\xb7\xcd\xe1\x8c\xf5\xa3\xc6\xb4\xc0\xa5\xdd\xf3\x84\xad\x96\xeb"
         ,
+
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xfd\x91\xce\x88\xfa"
         "\x9b\xfc\xbf\xd0\xbc\xd3\xa1\x9c\xe8\x8d\xf5\x81\xf4\x86\xe3\xd1"
         "\x95\xbd\xc9\xac\xd4\x97\xff\x9e\xec\x9f\xb3\xc5\x91\xf4\x8c\xcf"
         "\xa0\xcf\xbd\xd9\xf0\xda\xb9\xd6\xba\xd5\xa7\x9c\xe1"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch2715,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2715, No description, hardware patch",
-#endif
     },
 
     {
         GC_CHIP_PATCH_2715_2,
-        gcvTRUE
-        ,
+        "gcChipPatch2715, No description, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xfd\x91\xce\x9e\xf1"
         "\x82\xeb\x9f\xf6\x99\xf7\xca\xbc\xd9\xba\x8e\xa6\xcb\xb2\xe4\x81"
         "\xf3\x87\xe2\x9a\xb4\xcc\xe0\x8d\xf4\xa2\xc7\xb5\xc1\xa4\xdc\xf2"
@@ -20944,23 +20931,27 @@ static __GLchipPatch gcChipPatches[] =
         "\x8b\xe4\x96\xf2\xcf\xa2\xdb\x8f\xea\x92\xd1\xbe\xd1\xa3\xc7\xfc"
         "\x81"
         ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xfd\x91\xce\x88\xfa"
         "\x9b\xfc\xbf\xd0\xbc\xd3\xa1\x9c\xe8\x8d\xf5\x81\xf4\x86\xe3\xd1"
         "\x95\xbd\xc9\xac\xd4\x97\xff\x9e\xec\x9f\xb3\xc5\x91\xf4\x8c\xcf"
         "\xa0\xcf\xbd\xd9\xf0\xcb\xb6"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch2715,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2715, No description, hardware patch",
-#endif
     },
 
     {
         GC_CHIP_PATCH_2715_3,
-        gcvTRUE
-        ,
+        "gcChipPatch2715, No description, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xfd\x91\xce\x9e\xf1"
         "\x82\xeb\x9f\xf6\x99\xf7\xca\xbc\xd9\xba\x8e\xa6\x8b\xe6\x9f\xc9"
         "\xac\xde\xaa\xcf\xb7\x99\xe0\xcc\xa1\xd8\x8e\xeb\x99\xed\x88\xf0"
@@ -20968,23 +20959,27 @@ static __GLchipPatch gcChipPatches[] =
         "\xc9\xbb\xdf\xe2\x94\xf1\x92\xa0\x88\xe5\x9c\xca\xaf\xdd\xa9\xcc"
         "\xb4\x9a\xe0\x97\xbe\x85\xf8"
         ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xfd\x91\xce\x88\xfa"
         "\x9b\xfc\xbf\xd0\xbc\xd3\xa1\x9c\xe8\x8d\xf5\x81\xf4\x86\xe3\xd1"
         "\x95\xbd\xc9\xac\xd4\x97\xff\x9e\xec\x9f\xb3\xc5\x91\xf4\x8c\xcf"
         "\xa0\xcf\xbd\xd9\xf0\xda\xb9\xd6\xba\xd5\xa7\x9c\xe1"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch2715,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2715, No description, hardware patch",
-#endif
     },
 
     {
         GC_CHIP_PATCH_16,
-        gcvTRUE
-        ,
+        "gcChipPatch16, No description, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xec\x89\xea\xd9\xa9"
         "\xc6\xb5\xdc\xa8\xc1\xae\xc0\xfb\xd8\xb1\xd7\xb3\xd6\xb0\xe3\xa8"
         "\xed\xa1\xe4\xb0\xf1\xbd\xd0\xb1\xc5\xf1\xbc\x88\xb3\x90\xf4\x91"
@@ -21029,6 +21024,9 @@ static __GLchipPatch gcChipPatches[] =
         "\xf0\x98\xb6\xcf\xf2\x95\xf9\xa6\xf6\x99\xea\x83\xf7\x9e\xf1\x9f"
         "\xb1\xc6\xfd\xde\xbb\xd5\xb1\xd8\xbe\xc3"
         ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xfd\x91\xce\x88\xfa"
         "\x9b\xfc\xbf\xd0\xbc\xd3\xa1\x9c\xea\x8f\xec\xd8\xf0\xc0\xee\xdd"
         "\xf4\xcf\xec\x85\xe3\x87\xe2\x84\xed\x83\xe6\x82\xd0\x97\xd5\x8a"
@@ -21042,43 +21040,53 @@ static __GLchipPatch gcChipPatches[] =
         "\xef\xad\x85\xe2\x8e\xd1\x97\xe5\x84\xe3\xa0\xcf\xa0\xd2\xb6\x98"
         "\xe2\xcb\xf0\xd3\xb6\xd8\xbc\xd5\xb3\xce"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch16,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch16, No description, hardware patch",
-#endif
     },
 
     {
         GC_CHIP_PATCH_17,
-        gcvTRUE
-        ,
-        "\xdc\xb8\xdd\xbb\xd2\xbc\xd9\x8b\xcc\x8e\xd1\x94\xda\x99\xd6\x92"
-        "\xd7\x93\xb0\xd4\xb1\xd7\xbe\xd0\xb5\xe6\xae\xef\xab\xe4\xb3\xec"
-        "\xa1\xe0\xb0\x93\xf7\x92\xf4\x9d\xf3\x96\xc5\x8a\xcc\x98\xc7\x94"
-        "\xdc\x9d\xd9\x96\xc1"
-        ,
-        "\xdc\xb8\xdd\xbb\xd2\xbc\xd9\x8b\xcc\x8e\xd1\x94\xda\x99\xd6\x92"
-        "\xd7\x93\xb0\xd4\xb1\xd7\xbe\xd0\xb5\xe6\xae\xef\xab\xe4\xb3\xec"
-        "\xa1\xe0\xb0\x93\xf7\x92\xf4\x9d\xf3\x96\xc5\x8a\xcc\x98\xc7\x94"
-        "\xdc\x9d\xd9\x96\xc1"
-        ,
-        GLchipPatch_Hardware,
-        gcChipPatch17,
-#if gcdDUMP
-        /* Description */
         "gcChipPatch17, No description, hardware patch",
-#endif
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
+        "\xdc\xb8\xdd\xbb\xd2\xbc\xd9\x8b\xcc\x8e\xd1\x94\xda\x99\xd6\x92"
+        "\xd7\x93\xb0\xd4\xb1\xd7\xbe\xd0\xb5\xe6\xae\xef\xab\xe4\xb3\xec"
+        "\xa1\xe0\xb0\x93\xf7\x92\xf4\x9d\xf3\x96\xc5\x8a\xcc\x98\xc7\x94"
+        "\xdc\x9d\xd9\x96\xc1"
+        ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
+        "\xdc\xb8\xdd\xbb\xd2\xbc\xd9\x8b\xcc\x8e\xd1\x94\xda\x99\xd6\x92"
+        "\xd7\x93\xb0\xd4\xb1\xd7\xbe\xd0\xb5\xe6\xae\xef\xab\xe4\xb3\xec"
+        "\xa1\xe0\xb0\x93\xf7\x92\xf4\x9d\xf3\x96\xc5\x8a\xcc\x98\xc7\x94"
+        "\xdc\x9d\xd9\x96\xc1"
+        ,
+        gcvNULL,    /* CS  */
+        },
+
+        gcChipPatch17,
     },
     /* Detect GLB2.7 Fragment ... */
     {
         GC_CHIP_PATCH_GLBENCH27,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch2711, GLB2.7, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\x89\xe6\x8f\xeb\xcb\xa6\xc7\xae\xc0\xe8\xc1\xcb\xb0\xba\xd9\xb6"
         "\xd8\xab\xdf\xff\x96\xf8\x8c\xac\xc2\xe2\xdf\xff\xcb\xf0\xfa\x8c"
         "\xe9\x8a\xb9\x99\xf4\x9b\xef\x86\xe9\x87\xa7\x9a\xba\xce\xab\xd3"
@@ -21107,22 +21115,26 @@ static __GLchipPatch gcChipPatches[] =
         "\xa9\xc5\xaa\xd8\xf6\x8e\xf7\x8d\xad\x90\xb0\xd3\xbc\xd0\xbf\xcd"
         "\xf6\xfc\x81\x8b"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch2711,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2711, GLB2.7, fragment shader replacement",
-#endif
     },
 
     /* Detect GLB2.7.5 Fragment ... */
     {
         GC_CHIP_PATCH_GLBENCH275,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch2710, GLB2.7.5, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8e\xea\x83\xe5\xc6\xaf\xc9\xa7\xc3\xa6\xc0\x87\xcb"
@@ -21221,22 +21233,26 @@ static __GLchipPatch gcChipPatches[] =
         "\x98\xec\xc4\xaa\x83\xb8\xc5\xa2\xce\x91\xd7\xa5\xc4\xa3\xe0\x8f"
         "\xe3\x8c\xfe\xd0\xa8\xd1\xab\x96\xf5\x9a\xf6\x99\xeb\xd0\xad"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch2710,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2710, GLB2.7.5, fragment shader replacement",
-#endif
     },
 
     /* Detect GLB2.7.0 Fragment ... */
     {
         GC_CHIP_PATCH_GLBENCH270,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
-        /* Fragment shader. */
+        "gcChipPatch2710, GLB2.7.0, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8e\xea\x83\xe5\xc6\xaf\xc9\xa7\xc3\xa6\xc0\x87\xcb"
@@ -21336,20 +21352,25 @@ static __GLchipPatch gcChipPatches[] =
         "\xfc\xba\xc8\xa9\xce\x8d\xe2\x8e\xe1\x93\xbd\xc5\xbc\xc6\xfb\x98"
         "\xf7\x9b\xf4\x86\xbd\xc0"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch2710,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2710, GLB2.7.0, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_19,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
+        "gcChipPatch19, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8e\xea\x83\xe5\xc6\xaf\xc9\xa7\xc3\xa6\xc0\x87\xcb"
@@ -21782,20 +21803,25 @@ static __GLchipPatch gcChipPatches[] =
         "\xdd\xb1\xde\xac\x91\xe7\x82\xe1\xd5\xfd\xcc\xe2\xd2\xfb\xc0\xbd"
         "\x9e\xfb\x95\xf1\x98\xfe"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch19,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch19, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_19_2,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
+        "gcChipPatch19, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
 
         "\xdc\xb8\xdd\xbb\xd2\xbc\xd9\xf9\xb8\xf4\xa4\xec\xad\xf2\xa6\xe3"
         "\xb0\xe4\xee\xcd\xa9\xcc\xaa\xc3\xad\xc8\xe8\xae\xe1\xa6\xac\x8f"
@@ -21811,20 +21837,25 @@ static __GLchipPatch gcChipPatches[] =
         "\xf5\xb0\xe0\xa1\xf2\xa1\xab\x88\xe1\x87\xe3\x86\xe0\xc0\x87\xcb"
         "\x94\xd1\x82\x88"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch19,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch19, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_19_3,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
+        "gcChipPatch19, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8e\xea\x83\xe5\xc6\xaf\xc9\xa7\xc3\xa6\xc0\x87\xcb"
@@ -22256,20 +22287,25 @@ static __GLchipPatch gcChipPatches[] =
         "\x8a\xe5\x89\xe6\x94\xa9\xdf\xba\xd9\xed\xc5\xf4\xda\xea\xc3\xf8"
         "\x85\xa6\xc3\xad\xc9\xa0\xc6"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch19,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch19, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_19_4,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
+        "gcChipPatch19, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8e\xea\x83\xe5\xc6\xaf\xc9\xa7\xc3\xa6\xc0\x87\xcb"
@@ -22700,20 +22736,25 @@ static __GLchipPatch gcChipPatches[] =
         "\xc9\x8f\xfd\x9c\xfb\xb8\xd7\xbb\xd4\xa6\x9b\xed\x88\xeb\xdf\xf7"
         "\xc6\xe8\xd8\xf1\xca\xb7\x94\xf1\x9f\xfb\x92\xf4"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch19,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch19, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_19_5,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
+        "gcChipPatch19, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8e\xea\x83\xe5\xc6\xaf\xc9\xa7\xc3\xa6\xc0\x87\xcb"
@@ -23152,20 +23193,24 @@ static __GLchipPatch gcChipPatches[] =
         "\xb5\xd4\xb3\xf0\x9f\xf3\x9c\xee\xd3\xa5\xc0\xa3\x97\xbf\x8e\xa0"
         "\x90\xb9\x82\xff\xdc\xb9\xd7\xb3\xda\xbc"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
         gcChipPatch19,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch19, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_2701B,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
+        "gcChipPatch2701b, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xdd\xb3\xd6\xb2\xe0\xa5\xe9\xa0\xe5\xa3"
         "\xd5\xba\xd3\xb7\xc5\xa4\xdd\x82\xeb\x85\xf1\x94\xe6\x95\xf0\x93"
         "\xe7\xb8\xca\xa7\xf8\x94\xfd\x93\xf6\x97\xe5\xcd\xa4\xca\xa5\xd0"
@@ -23506,18 +23551,19 @@ static __GLchipPatch gcChipPatches[] =
         "\xa9\xdb\xe6\x90\xf5\x96\xa2\x8a\xbb\x95\xa5\x8c\xb7\xca\xe9\x8c"
         "\xe2\x86\xef\x89"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch2701b,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2701b, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_20,
-        gcvTRUE
-        ,
+        "gcChipPatch20, No description, shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xe8\x81\xe6\x8e\xfe\x98\xf4\x9b\xfa\x8e\xb5\x96"
         "\xf3\x9d\xf9\x90\xf6\x83\xed\x84\xe2\x8d\xff\x92\xfa\x93\xf4\x9c"
@@ -23542,6 +23588,12 @@ static __GLchipPatch gcChipPatches[] =
         "\xd9\xb8\xcc\xbe\xd7\xaf\x85\xe4\x90\xe2\xb4\xd1\xa3\xd7\xb2\xca"
         "\xf1\x8c"
         ,
+
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8e\xea\x83\xe5\x90\xfe\x97\xf1\x9e\xec\x81\xed\x82"
@@ -23575,22 +23627,27 @@ static __GLchipPatch gcChipPatches[] =
         "\xbd\xdc\xbb\xf8\x97\xfb\x94\xe6\xdb\xad\xc8\xab\x9f\xb7\xc1\xf5"
         "\x96\xf9\x95\xfa\x88\xa6\xde\xa7\xdd\xf1\xc0\xee\xde\xf7\xcc\xb1"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch20,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch20, No description, shader replacement",
-#endif
     },
 #if gcdGLB27_SHADER_REPLACE_OPTIMIZATION
 
     /* detect glb2.7.x fragment shader*/
     {
         GC_CHIP_PATCH_GLBENCH27X,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
+        "gcChipPatch2701a, glb2.7.x, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xdd\xb3\xd6\xb2\xe0\xa5\xe9\xa0\xe5\xa3"
         "\xd5\xba\xd3\xb7\xc5\xa4\xdd\x82\xeb\x85\xf1\x94\xe6\x95\xf0\x93"
         "\xe7\xb8\xca\xa7\xf8\x94\xfd\x93\xf6\x97\xe5\xcd\xa4\xca\xa5\xd0"
@@ -23930,19 +23987,26 @@ static __GLchipPatch gcChipPatches[] =
         "\xa4\x99\xef\x8a\xe9\xdd\xf5\xc4\xea\xda\xf3\xc8\xb5\x96\xf3\x9d"
         "\xf9\x90\xf6"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch2701a,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2701a, glb2.7.x, fragment shader replacement",
-#endif
     },
 
     /* Fragment for GLB2.7.5*/
     {
         GC_CHIP_PATCH_GLBENCH275_2,
+        "gcChipPatch2702, GLB2.7.5, fragment shader replacement",
+
+        GLchipPatch_Shader,
         gcvTRUE,
-        gcvNULL,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xec\x89\xea\xd8\xb9"
         "\x84\xac\xc3\xb6\xc2\x9d\xfe\x8b\xf9\x89\xe6\x95\xbb\xc3\xba\x95"
         "\xfa\x8f\xfb\xa4\xc7\xb2\xc0\xb0\xdf\xac\x82\xf5\xdc\xe7\x91\xf4"
@@ -23958,19 +24022,26 @@ static __GLchipPatch gcChipPatches[] =
         "\xa3\xe5\x97\xf6\x91\xd2\xbd\xd1\xbe\xcc\xf1\x87\xe2\x81\xb5\x9d"
         "\xf9\x90\xf6\x90\xbc\x8c\xa2\x92\xbe\x8e\xa0\x90\xb9\x82\xff"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch2702,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2702, GLB2.7.5, fragment shader replacement",
-#endif
     },
 
     /* Fragment for GLB2.7.0*/
     {
         GC_CHIP_PATCH_GLBENCH270_2,
+        "gcChipPatch2702, GLB2.7.0, fragment shader replacement",
+
+        GLchipPatch_Shader,
         gcvTRUE,
-        gcvNULL,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\x89\xe6\x8f\xeb\x86\xe7\x8e\xe0\xc8\xe1\x9a\xec\x89\xea\xd8\xb9"
         "\x84\xac\xc3\xb6\xc2\x9d\xfe\x8b\xf9\x89\xe6\x95\xbb\xc3\xba\x95"
         "\xfa\x8f\xfb\xa4\xc7\xb2\xc0\xb0\xdf\xac\x82\xf5\xdc\xe7\x91\xf4"
@@ -23987,18 +24058,25 @@ static __GLchipPatch gcChipPatches[] =
         "\xa1\x9c\xea\x8f\xec\xd8\xf0\x94\xfd\x9b\xfd\xd1\xe1\xcf\xff\xd3"
         "\xe3\xcd\xfd\xd4\xef\x92"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch2702,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2702, GLB2.7.0, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_2720,
+        "gcChipPatch2720, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
         gcvTRUE,
-        gcvNULL,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8e\xea\x83\xe5\x93\xf2\x80\xf9\x90\xfe\x99\xef\x8a"
@@ -24015,17 +24093,19 @@ static __GLchipPatch gcChipPatches[] =
         "\xb5\xd4\xb3\xde\xbb\xd5\xa1\xe2\x8d\xe1\x8e\xfc\xaa\xfa\xd6\xe7"
         "\xc9\xf9\xd0\xeb\x96\xeb"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch2720,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2720, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_2722,
+        "gcChipPatch2722, No description, shader replacement",
+
+        GLchipPatch_Shader,
         gcvTRUE,
+        {
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xe8\x81\xe6\x8e\xfe\x98\xf4\x9b\xfa\x8e\xb5\x96"
         "\xf3\x9d\xf9\x90\xf6\xd5\xbc\xda\xb4\xd0\xb5\xd3\x94\xd8\x87\xc2"
@@ -24050,6 +24130,11 @@ static __GLchipPatch gcChipPatches[] =
         "\x96\xad\xca\xa6\xf9\xa9\xc6\xb5\xdc\xa8\xc1\xae\xc0\xfd\x90\xe9"
         "\xbf\xda\xa8\xdc\xb9\xc1\xf5\xce\xb3"
         ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8e\xea\x83\xe5\xc6\xaf\xc9\xa7\xc3\xa6\xc0\x87\xcb"
@@ -24076,18 +24161,25 @@ static __GLchipPatch gcChipPatches[] =
         "\xd4\xb1\xd2\xe6\xce\xb8\xf4\x9d\xfa\x92\xe6\xca\xbc\xf0\x99\xfe"
         "\x96\xe2\xce\xb8\xf4\x9d\xfa\x92\xe6\xca\xfb\xd5\xe5\xcc\xf7\x8a"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch2722,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2722, No description, shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_2723,
+        "gcChipPatch2723, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
         gcvTRUE,
-        gcvNULL,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8c\xff\x9a\xb9\xdd\xb8\xde\xb7\xd9\xbc\xd1\xb4\xd0"
@@ -24291,20 +24383,27 @@ static __GLchipPatch gcChipPatches[] =
         "\xa7\xcb\xae\xcd\xb9\xdc\xb8\xeb\x80\xf9\xd5\xe4\xca\xfa\xd3\xe8"
         "\x95\xe8"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch2723,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2723, No description, fragment shader replacement",
-#endif
     },
 
 #endif
 
     {
         GC_CHIP_PATCH_22,
+        "gcChipPatch22, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
         gcvTRUE,
-        gcvNULL,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\x8a\xe4\x8d\xeb\x84\xf6\x9b\xf6\x93\xf7\x9e\xeb\x86\xf6\x9b\xfa"
         "\x8e\xba\xdc\xb1\x85\xbe\xc8\xa9\xdb\xa2\xcb\xa5\xc2\xaf\xca\xae"
         "\xc7\xb2\xdf\xaf\xd9\xbc\xdf\xeb\x9f\xfa\x82\xc1\xae\xc1\xb3\xd7"
@@ -24317,18 +24416,25 @@ static __GLchipPatch gcChipPatches[] =
         "\xd6\xfc\x88\xed\x95\xd6\xb9\xd6\xa4\xc0\xf0\xde\xa4\x8d\xa2\x90"
         "\xa5\x93\xbd\x8d\xa4\x8d\xa4\x9f\xe2"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch22,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch22, No description, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_23,
+        "gcChipPatch23, No description, fragment shader replacement",
+
+        GLchipPatch_Shader,
         gcvTRUE,
-        gcvNULL,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\x8a\xe4\x8d\xeb\x84\xf6\x9b\xf6\x93\xf7\x9e\xeb\x86\xf6\x9b\xfa"
         "\x8e\xba\xcd\xa8\xca\xad\xc1\x9e\xaa\x9c\xa9\x90\xf3\xc3\xa7\xc1"
         "\xf6\x90\xa1\x92\xa4\x96\xf3\x95\xae\xd8\xb9\xcb\xb2\xdb\xb5\xd2"
@@ -24349,21 +24455,26 @@ static __GLchipPatch gcChipPatches[] =
         "\x8d\xe9\xd8\xe0\xce\xb4\x9d\xb2\x80\xb5\x83\xad\x9d\xb4\x9d\xb4"
         "\x8f\xf2"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch23,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch23, No description, fragment shader replacement",
-#endif
     },
 
     /* glb2.1 shader source */
     {
         GC_CHIP_PATCH_GLBENCH21,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
+        "gcChipPatch2152, glb2.1, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8e\xea\x83\xe5\x90\xfe\x97\xf1\x9e\xec\x81\xec\x89"
@@ -24380,21 +24491,26 @@ static __GLchipPatch gcChipPatches[] =
         "\x88\xed\x8e\xba\x92\xe4\xd0\xb3\xdc\xb0\xdf\xad\x83\xfb\x82\xf8"
         "\xd4\xe5\xcb\xfb\xd2\xe9\x94"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch2152,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2152, glb2.1, fragment shader replacement",
-#endif
     },
 
     /* glb2.1 shader source */
     {
         GC_CHIP_PATCH_GLBENCH21_2,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
+        "gcChipPatch2153, glb2.1, fragment shader replacement and hardware patch",
+
+        GLchipPatch_Shader | GLchipPatch_Hardware,
+        gcvTRUE,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8e\xea\x83\xe5\x90\xfe\x97\xf1\x9e\xec\x81\xed\x82"
@@ -24497,21 +24613,25 @@ static __GLchipPatch gcChipPatches[] =
         "\x86\xb2\xd1\xbe\xd2\xbd\xcf\xe1\x99\xe0\x9a\xb6\x87\xa9\x99\xb0"
         "\x8b\xf6"
         ,
-        GLchipPatch_Shader | GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
         gcChipPatch2153,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2153, glb2.1, fragment shader replacement and hardware patch",
-#endif
     },
 
     /* glb2.1 shader source */
     {
         GC_CHIP_PATCH_GLBENCH21_3,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
+        "gcChipPatch2154, glb2.1, fragment shader replacement and hardware patch",
+
+        GLchipPatch_Shader | GLchipPatch_Hardware,
+        gcvTRUE,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\x99\xfd\x98\xfe\xb9\xf5\xaa\xef\xbc\xcc\xbe\xdb\xb8\xd1\xa2\xcb"
         "\xa4\xca\xa7\xc2\xa6\xcf\xba\xd7\xa7\xc1\xad\xc2\xa3\xd7\xec\xcf"
         "\xaa\xc4\xa0\xc9\xaf\xda\xb4\xdd\xbb\xd4\xa6\xcb\xa6\xc3\xa7\xce"
@@ -24592,21 +24712,26 @@ static __GLchipPatch gcChipPatches[] =
         "\xb8\xfb\x94\xf8\x97\xe5\xd8\xae\xcb\xa8\x9c\xb4\xc2\xf6\x95\xfa"
         "\x96\xf9\x8b\xa5\xdd\xa4\xde\xf2\xc3\xed\xdd\xf4\xcf\xb2"
         ,
-        GLchipPatch_Shader | GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch2154,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2154, glb2.1, fragment shader replacement and hardware patch",
-#endif
     },
 
     /* glb2.1 shader source */
     {
         GC_CHIP_PATCH_GLBENCH21_4,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
+        "gcChipPatch2155, glb2.1, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8e\xea\x83\xe5\x90\xfe\x97\xf1\x9e\xec\x81\xed\x82"
@@ -24640,21 +24765,25 @@ static __GLchipPatch gcChipPatches[] =
         "\xbd\xdc\xbb\xf8\x97\xfb\x94\xe6\xdb\xad\xc8\xab\x9f\xb7\xc1\xf5"
         "\x96\xf9\x95\xfa\x88\xa6\xde\xa7\xdd\xf1\xc0\xee\xde\xf7\xcc\xb1"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
         gcChipPatch2155,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2155, glb2.1, fragment shader replacement",
-#endif
     },
 
     /* glb2.1 shader source */
     {
         GC_CHIP_PATCH_GLBENCH21_5,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
+        "gcChipPatch2156, glb2.1, fragment shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8e\xea\x83\xe5\x90\xfe\x97\xf1\x9e\xec\x81\xec\x89"
@@ -24728,18 +24857,19 @@ static __GLchipPatch gcChipPatches[] =
         "\xe9\x85\xea\x98\xa5\xd3\xb6\xd5\xe1\xc9\xbf\x8b\xe8\x87\xeb\x84"
         "\xf6\xd8\xa0\xd9\xa3\x8f\xbe\x90\xa0\x89\xb2\xcf"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch2156,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2156, glb2.1, fragment shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_GFXBENCH30,
-        gcvTRUE
-        ,
+        "gcChipPatch300, Driver Overhead case of GFXBench 3.0, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
         "\x9e\xea\x9e\xec\x85\xe7\x92\xe6\x83\xf5\x90\xf3\xc7\xa6\xf9\x89"
         "\xe6\x95\xfc\x88\xe1\x8e\xe0\xdb\xba\xce\xba\xc8\xa1\xc3\xb6\xc2"
         "\xa7\xd1\xb4\xd7\xe5\x84\xdb\xaf\xca\xb2\xd1\xbe\xd1\xa3\xc7\x98"
@@ -24787,6 +24917,12 @@ static __GLchipPatch gcChipPatches[] =
         "\xe7\x9f\xfc\x93\xfc\x8e\xea\xb5\x85\xb8\xd9\x86\xf2\x97\xef\x8c"
         "\xe3\x8c\xfe\x9a\xc5\xf5\xce\xb3"
         ,
+
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\x8f\xfd\x98\xfb\x92\xe1\x88\xe7\x89\xe4\x81\xe5\x8c\xf9\x94\xe4"
         "\x82\xee\x81\xe0\x94\xaf\xd9\xb8\xca\xb3\xda\xb4\xd3\xa5\xc0\xa3"
         "\x91\xe7\xb8\xcc\xa9\xd1\xb2\xdd\xb2\xc0\xa4\xfb\xcb\xf0\x85\xeb"
@@ -24799,19 +24935,20 @@ static __GLchipPatch gcChipPatches[] =
         "\xc3\xb1\xd5\x8a\xba\x93\xb9\xcc\x93\xf0\x9f\xf3\x9c\xee\xb1\x81"
         "\xba\xc7"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch300,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch300, Driver Overhead case of GFXBench 3.0, hardware patch",
-#endif
     },
 
     /* gfxBench 3.0 Driver Overhead */
     {
         GC_CHIP_PATCH_GFXBENCH30_2,
-        gcvTRUE
-        ,
+        "gcChipPatch300, Driver Overhead case of GFXBench 3.0, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
         "\xa6\x85\xe0\x8c\xff\x9a\xb9\xdd\xb8\xde\xb7\xd9\xbc\xd1\xb4\xd0"
@@ -24862,6 +24999,11 @@ static __GLchipPatch gcChipPatches[] =
         "\xe1\x85\xa9\xc4\xbd\xeb\x8e\xfc\x88\xed\x95\xbb\xc1\xed\xdc\xf2"
         "\xc2\xeb\xd0\xad"
         ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
 
         "\xdc\xb5\xd3\xb7\xd2\xb4\xf3\xbf\xe0\xa5\xf6\x86\xf4\x91\xf2\x9b"
         "\xe8\x81\xee\x80\xed\x88\xec\x85\xf0\x9d\xed\x8b\xe7\x88\xe9\x9d"
@@ -24872,19 +25014,20 @@ static __GLchipPatch gcChipPatches[] =
         "\xea\x86\xe9\x9b\xa6\xd0\xb5\xd6\xe2\xca\xbc\xe3\x80\xef\x83\xec"
         "\x9e\xb0\xc8\xb1\xcb\xe7\xd6\xf8\xc8\xe1\xda\xa7"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch300,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch300, Driver Overhead case of GFXBench 3.0, hardware patch",
-#endif
     },
 
     /* gfxBench 3.1 Driver Overhead */
     {
         GC_CHIP_PATCH_GFXBENCH31_OVERHEAD,
-        gcvTRUE
-        ,
+        "gcChipPatch300, Driver Overhead case of GFXBench 3.0, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
         "\xaa\xce\xab\xcd\xa4\xca\xaf\x8f\xdc\x8a\xd5\xe6\xd6\xf6\xd6\xf6"
         "\xd6\xe7\xed\xce\xaa\xcf\xa9\xc0\xae\xcb\xeb\xbf\xe6\xb6\xf3\xac"
@@ -24938,6 +25081,11 @@ static __GLchipPatch gcChipPatches[] =
         "\xb4\xd6\xfb\x8d\xe8\x8b\xb8\x90\xa0\x8e\xbb\x92\xbe\x9e\xaf\x81"
         "\xb1\x98\xa3\xa9\xd4\xf4\xfe\xdd\xb8\xd6\xb2\xdb\xbd\xb7"
         ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
 
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
         "\xaa\xce\xab\xcd\xa4\xca\xaf\x8f\xdc\x8a\xd5\xe6\xd6\xf6\xd6\xf6"
@@ -24993,17 +25141,24 @@ static __GLchipPatch gcChipPatches[] =
         "\xb3\x9a\xb6\x96\xa7\x89\xb9\x90\xab\xa1\xdc\xfc\xf6\xd5\xb0\xde"
         "\xba\xd3\xb5\x95\x9f"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch300,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch300, Driver Overhead case of GFXBench 3.1, hardware patch",
-#endif
     },
     {
         GC_CHIP_PATCH_GFXBENCH31,
+        "GC_CHIP_PATCH_GFXBENCH31, highp, fragment shader patch",
+
+        GLchipPatch_Shader,
         gcvTRUE,
-        gcvNULL,
+        {
+        gcvNULL,     /* VS */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x95\xa5\x95\xf0\x83\xa0\xc4\xa1"
         "\xc7\xae\xc0\xa5\xf0\xa3\xe6\xb9\xec\xae\xe1\x92\xb1\xd5\xb0\xd6"
         "\xbf\xd1\xb4\xe7\xb1\xee\xdd\xec\xcf\xa6\xc0\xa4\xc1\xa7\xe0\xac"
@@ -25253,17 +25408,18 @@ static __GLchipPatch gcChipPatches[] =
         "\x90\xfe\xd7\xfe\x85\xf3\xce\xff\xd1\xe1\xda\xb8\xca\xaf\xce\xa5"
         "\x9e\xe3"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatchGFX31_Precision,
-#if gcdDUMP
-        /* Description */
-        "GC_CHIP_PATCH_GFXBENCH31, highp, fragment shader patch",
-#endif
     },
     {
         GC_CHIP_PATCH_GTF_INTVARYING,
-        gcvTRUE
-        ,
+        "gcChipPatchGTF_IntVarying, No description, shader replacement",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
         "\x96\xf8\x8e\xeb\x88\xbc\xca\xaf\xdd\xa9\xcc\xb4\xeb\x84\xe2\x84"
         "\xf7\x92\xe6\xdd\xb4\xda\xac\xc9\xaa\x9e\xf9\x8d\xeb\xb4\xe2\x87"
         "\xf5\x81\xe4\x9c\xa7\xc1\xad\xcc\xb8\xd7\xa2\xd6\xbf\xd1\xa5\xcc"
@@ -25274,6 +25430,11 @@ static __GLchipPatch gcChipPatches[] =
         "\xa1\xc4\xb6\xc2\xa7\xdf\xf4\x82\xe7\x95\xe1\x84\xfc\xa3\xcc\xaa"
         "\xcc\xbf\xda\xae\x95\xe8"
         ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\x8a\xe4\x8d\xeb\x84\xf6\x9b\xfd\x91\xfe\x9f\xeb\x86\xe7\x9f\xc0"
         "\xa9\xc7\xb4\xc0\xa1\xcf\xac\xc9\xba\x81\xe7\x8b\xea\x9e\xf7\x99"
         "\xf0\x9e\xea\x83\xed\x9e\xea\x8b\xe5\x86\xe3\xbc\xd5\xb1\x8a\xe5"
@@ -25284,20 +25445,25 @@ static __GLchipPatch gcChipPatches[] =
         "\xb2\xca\x95\xfc\x92\xe1\x95\xf4\x9a\xf9\x9c\xef\xc3\xf3\xdd\xed"
         "\xc1\xf1\xdf\xef\xc3\xf2\xdc\xec\xc5\xfe\x83"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatchGTF_IntVarying,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatchGTF_IntVarying, No description, shader replacement",
-#endif
     },
 
     {
         GC_CHIP_PATCH_GTF_DISCARDDRAW,
-        gcvTRUE
-        ,
-        gcvNULL
-        ,
+        "gcChipPatchGTF_DiscardDraw, No description, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+
+        /* FS  */
         "\x89\xe8\x9a\xe3\x8a\xe4\x83\xf5\x90\xf3\xc7\xa4\xcb\xa7\xc8\xba"
         "\x81\xf4\x9a\xf3\x95\xfa\x88\xe5\x8c\xe2\x96\xf4\xb0\xd9\xaa\xc9"
         "\xa8\xda\xbe\x85\xf3\x9c\xf5\x91\xfc\x9d\xf4\x9a\xb2\xc4\xab\xc2"
@@ -25305,47 +25471,61 @@ static __GLchipPatch gcChipPatches[] =
         "\x91\xfe\x92\xfd\x8f\xb4\xdd\xbb\x93\xf1\xb5\xdc\xaf\xcc\xad\xdf"
         "\xbb\x86\xbb\x8a\xa3\xd8\xbc\xd5\xa6\xc5\xa4\xd6\xb2\x89\xf4\x89"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatchGTF_DiscardDraw,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatchGTF_DiscardDraw, No description, hardware patch",
-#endif
     },
     {
         GC_CHIP_PATCH_A8_REPLACE,
+        "gcChipPatchA8_Replace, No description, vertex shader replacement",
+
+        GLchipPatch_Shader,
         gcvTRUE,
+        {
         /* #ifdef USE_IMMERSION16 */
         "\xdc\xb5\xd3\xb7\xd2\xb4\x94\xc1\x92\xd7\x88\xc1\x8c\xc1\x84\xd6"
         "\x85\xcc\x83\xcd\xfc\xca\xc0"
         ,
-        gcvNULL,
-        GLchipPatch_Shader,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+        gcvNULL,    /* FS  */
+        gcvNULL,    /* CS  */
+        },
         gcChipPatchA8_Replace,
-#if gcdDUMP
-          /* Description */
-          "gcChipPatchA8_Replace, No description, vertex shader replacement",
-#endif
     },
     {
         GC_CHIP_PATCH_CKZOMBIES2,
+        "gcChipPatchCKZombies2_Replace, No description, vertex shader patch",
+
+        GLchipPatch_Shader,
         gcvTRUE,
+        {
+        /* VS  */
         "\x8b\xe6\x96\xe0\x81\xf3\xac\x9d\xb3\xc9\xf4\xd4\xe4\xca\xfa\xc1"
         "\xcb\xac\xc0\x9f\xcf\xa0\xd3\xba\xce\xa7\xc8\xa6\x86\xbb\x9b\xef"
         "\x82\xf2\x84\xe5\x97\xc8\xf9\xc2\xc8"
         ,
-        gcvNULL,
-        GLchipPatch_Shader,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+        gcvNULL,    /* FS  */
+        gcvNULL,    /* CS  */
+        },
         gcChipPatchCKZombies2_Replace,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatchCKZombies2_Replace, No description, vertex shader patch",
-#endif
     },
     {
         GC_CHIP_PATCH_ANDROID_CTS_TEXTUREVIEW_REPLACE,
+        "gcChipPatchAndroidCTSTextureView_Replace, AndroidCTSTextureView, fragment shader replacement",
+
+        GLchipPatch_Shader,
         gcvTRUE,
-        gcvNULL,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "\x98\xf4\xab\xed\x9f\xfe\x99\xda\xb5\xd9\xb6\xc4\xe4\xd9\xf9\x8d"
         "\xe8\x90\xe4\x91\xe3\x86\xb4\xf0\xd8\xbc\xd5\xa1\xc9\xac\xde\x8d"
         "\xec\x81\xf1\x9d\xf8\x8a\xa6\x86\xe2\x8b\xff\x97\xf2\x80\xd4\xb1"
@@ -25355,32 +25535,37 @@ static __GLchipPatch gcChipPatches[] =
         "\xac\xcd\xbf\x93\xb3\x83\xad\x9d\xb1\x91\xa0\x8e\xbe\x97\xbe\x85"
         "\x8f"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
         gcChipPatchAndroidCTSTextureView_Replace,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatchAndroidCTSTextureView_Replace, AndroidCTSTextureView, fragment shader replacement",
-#endif
     },
     {
         GC_CHIP_PATCH_A8_REMOVE,
+        "gcChipPatchA8_Remove, No description, vertex shader patch",
+
+        GLchipPatch_Shader,
         gcvTRUE,
+        {
         "\x89\xd9\xb6\xc5\xeb\x91\xb1\x8c\xac\xda\x8a\xe5\x96\xb8\xcf\xef"
         "\xc5\xe5\xd5\xfb\xc2\xfb\xc2\xfb\xc2\xf9\xd9\xf6\xd9\xf9\x9f\xf0"
         "\x82\xe1\x84\xa4\xc9\xa8\xd0\xb9\xd4\xa1\xcc\xec\x88\xed\x9d\xe9"
         "\x81\x8b"
         ,
-        gcvNULL,
-        GLchipPatch_Shader,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+        gcvNULL,    /* FS  */
+        gcvNULL,    /* CS  */
+        },
         gcChipPatchA8_Remove,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatchA8_Remove, No description, vertex shader patch",
-#endif
     },
     {
         GC_CHIP_PATCH_2V2,
+        "gcChipPatch2v2, No description, vertex shader patch",
+
+        GLchipPatch_Hardware,
         gcvTRUE,
+        {
         "\x9e\xea\x9e\xec\x85\xe7\x92\xe6\x83\xee\x8b\xef\x86\xf3\x9e\xee"
         "\x98\xfd\x9e\xad\xcb\xa6\xf9\x89\xe6\x95\xfc\x88\xe1\x8e\xe0\xdb"
         "\xba\xce\xba\xc8\xa1\xc3\xb6\xc2\xa7\xca\xaf\xcb\xa2\xd7\xba\xca"
@@ -25397,18 +25582,25 @@ static __GLchipPatch gcChipPatches[] =
         "\xe2\x8d\xff\x92\xf3\x9f\xa2\xc4\xa9\xf6\x98\xf7\x85\xe8\x89\xe5"
         "\xde\xa3"
          ,
-         gcvNULL,
-         GLchipPatch_Hardware,
+         gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+        gcvNULL,    /* FS */
+        gcvNULL,    /* CS */
+        },
          gcChipPatch2v2,
-#if gcdDUMP
-         /* Description */
-         "gcChipPatch2v2, No description, vertex shader patch",
-#endif
     },
     {
         GC_CHIP_PATCH_2V2_PRECISION,
+        "gcChipPatch2v2_Precision, No description, fragment shader patch",
+
+        GLchipPatch_Shader,
         gcvTRUE,
-        gcvNULL,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
 "\x89\xe8\x9a\xe3\x8a\xe4\x83\xa3\xce\xab\xcf\xa6\xd3\xbe\xce\xee"
 "\x98\xfd\x9e\xad\x8d\xfb\xa4\xca\xa5\xd7\xba\xdb\xb7\x8c\x86\xf0"
 "\x91\xe3\x9a\xf3\x9d\xfa\xda\xb7\xd2\xb6\xdf\xaa\xc7\xb7\x97\xe1"
@@ -25442,18 +25634,18 @@ static __GLchipPatch gcChipPatches[] =
 "\xeb\x8e\xed\xde\xfe\xac\x8c\xb1\x91\xe3\x86\xe0\x8c\xe9\x8a\xfe"
 "\xd6\x80\xac\x8c\xc2\xeb\xd0\xda\xfa\xa8\x86\xff\xdf\xe2\xc2\xef"
 "\xbd\x93\xea\xd1\xdb",
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
         gcChipPatch2v2_Precision,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch2v2_Precision, No description, fragment shader patch",
-#endif
     },
 #if gcdUSE_WCLIP_PATCH
     {
         GC_CHIP_PATCH_PSC,
-        gcvTRUE
-         ,
+        "gcChipPatch_PSC, No description, hardware patch",
+
+        GLchipPatch_Hardware,
+        gcvTRUE,
+        {
         "\x9e\xea\x9e\xec\x85\xe7\x92\xe6\x83\xeb\x82\xe5\x8d\xfd\x8b\xee"
         "\x8d\xb9\xd8\x87\xf7\x98\xeb\x82\xf6\x9f\xf0\x9e\xa5\xc4\xb0\xc4"
         "\xb6\xdf\xbd\xc8\xbc\xd9\xb1\xd8\xbf\xd7\xa7\xc1\xad\xc2\xa3\xd7"
@@ -25508,19 +25700,23 @@ static __GLchipPatch gcChipPatches[] =
         "\xa6\xc3\xbb\xef\x8a\xf2\xa6\xd4\xb5\xdb\xa8\xce\xa1\xd3\xbe\x90"
         "\xe8\x91\xb8\x91\xaa\xd7"
          ,
-         gcvNULL,
-         GLchipPatch_Hardware,
+         gcvNULL,    /* TCS */
+         gcvNULL,    /* TES */
+         gcvNULL,    /* GS  */
+         gcvNULL,    /* FS  */
+         gcvNULL,    /* CS  */
+         },
          gcChipPatch_PSC,
-#if gcdDUMP
-         /* Description */
-         "gcChipPatch_PSC, No description, hardware patch",
-#endif
     },
 #endif
 
     {
         GC_CHIP_PATCH_VS_FLOATTEX_GTF,
+        "gcChipPatch_VSFloatTexGTF, VSFloatTexGTF, hardware patch",
+
+        GLchipPatch_Hardware,
         gcvTRUE,
+        {
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
         "\xa9\x89\xa9\x89\xa9\xdc\xb2\xdb\xbd\xd2\xa0\xcd\xed\x85\xec\x8b"
         "\xe3\x93\xb3\x93\xb3\xc0\xa1\xcc\xbc\xd0\xb5\xc7\xf5\xb1\x91\xb1"
@@ -25678,20 +25874,25 @@ static __GLchipPatch gcChipPatches[] =
         "\xb8\xcd\xa8\xdb\xfb\xc6\xe6\x95\xe7\x84\xdb\xaf\xca\xb2\xc6\xb3"
         "\xc1\xa4\xfb\x9f\xfe\x8a\xeb\xd0\xda\xa7"
         ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
         "\xff\x90\xf9\x9d\xbd\xd0\xb1\xd8\xb6\x9e\xb7\xbd\xc6\xbb"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch_VSFloatTexGTF,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch_VSFloatTexGTF, VSFloatTexGTF, hardware patch",
-#endif
     },
 
     {
         GC_CHIP_PATCH_VS_INTTEX_GTF,
+        "gcChipPatch_VSIntTexGTF, VSIntTexGTF, hardware patch",
+
+        GLchipPatch_Hardware,
         gcvTRUE,
+        {
             "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
             "\xa9\x89\xa9\x89\xa9\xdc\xb2\xdb\xbd\xd2\xa0\xcd\xed\x85\xec\x8b"
             "\xe3\x93\xb3\x93\xfa\x89\xe8\x85\xf5\x99\xfc\x8e\xbc\xf8\xd8\xf8"
@@ -25849,20 +26050,25 @@ static __GLchipPatch gcChipPatches[] =
             "\xf9\x9a\xc5\xb1\xd4\xac\xd8\xad\xdf\xba\xe5\x81\xe0\x94\xf5\xce"
             "\xc4\xb9"
         ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
         "\xff\x90\xf9\x9d\xbd\xd0\xb1\xd8\xb6\x9e\xb7\xbd\xc6\xbb"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch_VSIntTexGTF,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch_VSIntTexGTF, VSIntTexGTF, hardware patch",
-#endif
     },
 
     {
         GC_CHIP_PATCH_VS_UINTTEX_GTF,
+        "gcChipPatch_VSUIntTexGTF, VSUIntTexGTF, hardware patch",
+
+        GLchipPatch_Hardware,
         gcvTRUE,
+        {
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
         "\xa9\x89\xa9\x89\xa9\xdc\xb2\xdb\xbd\xd2\xa0\xcd\xed\x85\xec\x8b"
         "\xe3\x93\xb3\x93\xe6\x95\xf4\x99\xe9\x85\xe0\x92\xa0\xe4\xc4\xe4"
@@ -26019,20 +26225,25 @@ static __GLchipPatch gcChipPatches[] =
         "\xb6\xc5\xe5\xd8\xf8\x8b\xf9\x9a\xc5\xb1\xd4\xac\xd8\xad\xdf\xba"
         "\xe5\x81\xe0\x94\xf5\xce\xc4\xb9"
         ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
         "\xff\x90\xf9\x9d\xbd\xd0\xb1\xd8\xb6\x9e\xb7\xbd\xc6\xbb"
         ,
-        GLchipPatch_Hardware,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch_VSUIntTexGTF,
-#if gcdDUMP
-        /* Description */
-        "gcChipPatch_VSUIntTexGTF, VSUIntTexGTF, hardware patch",
-#endif
     },
 
     {
         GC_CHIP_PATCH_USER_CUBE_LOD,
+        "gcChipPatch_UserCubeLod, UserCubeLod, fragment shader replacement.",
+
+        GLchipPatch_Shader,
         gcvTRUE,
+        {
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
         "\xe0\x8e\xae\xc6\xaf\xc8\xa0\xd0\xf0\x86\xe3\x80\xb4\x94\xf5\xaa"
         "\xda\xb5\xc6\xaf\xdb\xb2\xdd\xb3\x88\x82\xeb\x85\xa5\xcd\xa4\xc3"
@@ -26045,6 +26256,9 @@ static __GLchipPatch gcChipPatches[] =
         "\x96\xf3\x8b\xc8\xa7\xc8\xba\xde\xfe\xc3\xe3\x82\xdd\xa9\xcc\xb4"
         "\xf7\x98\xf7\x85\xe1\xda\xd0\xad"
         ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
         "\xe5\x84\xfd\x92\xe7\x93\xbb\xd7\xb8\xdb\xba\xce\xa7\xc8\xa6\x86"
         "\xbb\x9b\xab\x82\xa2\xcd\xb8\xcc\xec\x81\xe4\x80\xe9\x9c\xf1\x81"
@@ -26069,13 +26283,18 @@ static __GLchipPatch gcChipPatches[] =
         "\x81\xa1\xd4\x8b\xe8\x87\xeb\x84\xf6\xb4\xdd\xbc\xcf\xf4\xfe\x83"
         ""
         ,
-         GLchipPatch_Shader,
-         gcChipPatch_UserCubeLod
+         gcvNULL,    /* CS  */
+        },
+        gcChipPatch_UserCubeLod
     },
 
     {
         GC_CHIP_PATCH_USER_CUBE_LOD_BIAS,
+        "gcChipPatch_UserCubeLodBias, UserCubeLod, fragment shader replacement.",
+
+        GLchipPatch_Shader,
         gcvTRUE,
+        {
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
         "\xe0\x8e\xae\xc6\xaf\xc8\xa0\xd0\xf0\x86\xe3\x80\xb4\x94\xf5\xaa"
         "\xda\xb5\xc6\xaf\xdb\xb2\xdd\xb3\x88\x82\xeb\x85\xa5\xcd\xa4\xc3"
@@ -26088,6 +26307,9 @@ static __GLchipPatch gcChipPatches[] =
         "\x96\xf3\x8b\xc8\xa7\xc8\xba\xde\xfe\xc3\xe3\x82\xdd\xa9\xcc\xb4"
         "\xf7\x98\xf7\x85\xe1\xda\xd0\xad"
         ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
         "\xe5\x84\xfd\x92\xe7\x93\xbb\xd7\xb8\xdb\xba\xce\xa7\xc8\xa6\x86"
         "\xbb\x9b\xab\x82\xa2\xcd\xb8\xcc\xec\x81\xe4\x80\xe9\x9c\xf1\x81"
@@ -26112,13 +26334,19 @@ static __GLchipPatch gcChipPatches[] =
         "\x9f\xed\xbe\xdd\xbc\xd0\xb5\x95\xbe\x9e\xeb\xb4\xd7\xb8\xd4\xbb"
         "\xc9\x8b\xe2\x83\xf0\xcb\xc1\xbc"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch_UserCubeLodBias
     },
 
     {
         GC_CHIP_PATCH_MAX_UBO_SIZE,
+        "gcChipPatch_MaxUBOSize, MaxUBOSize, fragment shader replacement.",
+
+        GLchipPatch_Shader,
         gcvTRUE,
+        {
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
         "\xaa\xc3\xa5\xc1\xa4\xc2\xe2\xa5\xe9\xb6\xf7\xa5\xe7\xb8\xcd\xa3"
         "\xca\xac\xc3\xb1\xdc\x83\xe1\x94\xf2\x94\xf1\x83\xdc\xb3\xd1\xbb"
@@ -26148,6 +26376,9 @@ static __GLchipPatch gcChipPatches[] =
         "\x83\xf5\x90\xf3\xc7\xef\xbf\xd0\xa3\x8f\xaf\x9f\xb3\x93\xa2\x8b"
         "\xb0\xba\xc7"
         ,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
         "\xf9\x8b\xee\x8d\xe4\x97\xfe\x91\xff\xdf\xb7\xde\xb9\xd1\xa1\x81"
         "\xe7\x8b\xe4\x85\xf1\xca\xc0\xb0\xc2\xa7\xc4\xad\xde\xb7\xd8\xb6"
@@ -26164,17 +26395,23 @@ static __GLchipPatch gcChipPatches[] =
         "\xc1\xa3\xfc\x99\xf5\x90\xfd\xa6\xcf\xa1\xc5\xa0\xd8\x85\xbe\xb4"
         "\xc9\xc3"
         ,
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
         gcChipPatch_MaxUBOSize
     },
 
     /* coc shader patch */
     {
         GC_CHIP_PATCH_COC_1,
-        gcvFALSE,
+        "gcChipPatch_CocShader, CocShader, fragment shader replacement",
 
-        /* vertex shader */
-        gcvNULL,
+        GLchipPatch_Shader,
+        gcvFALSE,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
 
         /* fragment shader */
         "#ifdef GL_ES"
@@ -26207,7 +26444,8 @@ static __GLchipPatch gcChipPatches[] =
         "gl_FragColor = vec4(1,1,1,3.0*gl_FragColor.r)*constColor;"
         "}",
 
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
         gcChipPatch_CocShader,
     },
 
@@ -26216,10 +26454,15 @@ static __GLchipPatch gcChipPatches[] =
        thus promote the input to highp for more precise result. */
     {
         GC_CHIP_PATCH_CTS_DOT,
-        gcvFALSE,
+        "GC_CHIP_PATCH_CTS_DOT, CTS_DOT, fragment shader replacement",
 
-        /* vertex shader */
-        gcvNULL,
+        GLchipPatch_Shader,
+        gcvFALSE,
+        {
+        gcvNULL,    /* VS  */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
 
         /* fragment shader */
         "#version 300 es\n"
@@ -26234,12 +26477,18 @@ static __GLchipPatch gcChipPatches[] =
          "o_out0 = floatBitsToUint(out0);\n"
         "}\n",
 
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
+
         gcChipPatch_DotShader,
     },
     {
         GC_CHIP_PATCH_TREX,
+        "GC_CHIP_PATCH_TREX, PATCH_TREX, vs shader replacement.",
+
+        GLchipPatch_Shader,
         gcvTRUE,
+        {
 
         /* vertex shader */
         "\xdc\xb8\xdd\xbb\xd2\xbc\xd9\xf9\xbd\xf8\xa8\xf7\xa3\xe6\xbe\xea"
@@ -26262,13 +26511,21 @@ static __GLchipPatch gcChipPatches[] =
         "\xc9\xe7\x9f\xe6\xc6\xec\xcc\xfc\xd2\xe7\xc7\xec\xcc\xfc\xd2\xe7"
         "\xdc\xd6\xab\xa1",
         /* fragment shader */
-        gcvNULL,
-        GLchipPatch_Shader,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+        gcvNULL,    /* FS  */
+        gcvNULL,    /* CS  */
+        },
         gcChipPatch_Trex,
     },
     {
         GC_CHIP_PATCH_MANHATTAN,
+        "GC_CHIP_PATCH_MANHATTAN, MANHATTAN, fragment shader replacement.",
+
+        GLchipPatch_Shader,
         gcvTRUE,
+        {
 
         /* vertex shader */
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
@@ -26361,13 +26618,21 @@ static __GLchipPatch gcChipPatches[] =
         "\xcd\xae\xc1\xae\xdc\xb8\x88\xa8\x95\xb5\xdc\xb2\xed\x99\xfc\x84"
         "\xe7\x88\xe7\x95\xf1\xc1\xfa\xf0\x8d\x87",
         /* fragment shader */
-        gcvNULL,
-        GLchipPatch_Shader,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+        gcvNULL,    /* FS  */
+        gcvNULL,    /* CS  */
+        },
         gcChipPatch_Manhattan,
     },
     {
         GC_CHIP_PATCH_BATCHCOUNT,
+        "GC_CHIP_PATCH_BATCHCOUNT, BATCHCOUNT, fragment shader replacement.",
+
+        GLchipPatch_Shader,
         gcvTRUE,
+        {
 
         /* vertex shader */
         "\x8a\xe4\x8d\xeb\x84\xf6\x9b\xbb\xd6\xb3\xd7\xbe\xcb\xa6\xd6\xf6"
@@ -26404,15 +26669,22 @@ static __GLchipPatch gcChipPatches[] =
         "\x81\xba\x9a\xb5\x9a\xba\xdb\xaf\xdb\xa9\xc0\xa2\xd7\xa3\xc6\xe6"
         "\xc1\x97\xf2\x80\xf4\x91\xe9\xc9\xbd\xd8\xa0\xd4\xa1\xd3\xb6\x96"
         "\xf5\x9a\xf5\x87\xe3\x8a\xe4\x85\xf1\x94\xb3\xb9\xc4\xce",
-        /* fragment shader */
-        gcvNULL,
-        GLchipPatch_Shader,
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+        gcvNULL,    /* FS  */
+        gcvNULL,    /* CS  */
+        },
         gcChipPatch_BatchCount,
     },
 
     {
         GC_CHIP_PATCH_NETFLIX_1,
+        "GC_CHIP_PATCH_NETFLIX_1, NETFLIX_1, fragment shader replacement.",
+
+        GLchipPatch_Shader,
         gcvFALSE,
+        {
 
         "uniform mat4   u_projectionMatrix;"
         "uniform mat4   u_mvMatrix;"
@@ -26426,6 +26698,9 @@ static __GLchipPatch gcChipPatches[] =
         "  v_texCoord.x = ( a_texCoord.x * u_ts.z ) + u_ts.x;"
         "  v_texCoord.y = ( a_texCoord.y * u_ts.w ) + u_ts.y;"
         "}",
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
 
         "#ifdef GL_ES"
         "precision highp float;"
@@ -26438,11 +26713,12 @@ static __GLchipPatch gcChipPatches[] =
         "  gl_FragColor = texture2D( s_texture, v_texCoord ) * u_opacity;"
         "}",
 
-        GLchipPatch_Shader,
+        gcvNULL,    /* CS  */
+        },
         gcChipPatch_Netflix1,
     },
 
-    {  GC_CHIP_PATCH_LAST, gcvFALSE, gcvNULL, gcvNULL, 0, gcvNULL }
+    {GC_CHIP_PATCH_LAST, gcvNULL, 0, gcvFALSE, {gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL}, gcvNULL}
 };
 
 static gctCONST_STRING
@@ -26785,34 +27061,29 @@ gcChipPatchLink(
         if (chipCtx->doPatchCondition[i])
         {
             __GLchipPatch *patch = &gcChipPatches[i];
-            gctCONST_STRING fromStages[__GLSL_STAGE_LAST] = {gcvNULL};
-
-            fromStages[__GLSL_STAGE_VS] = patch->fromVertex;
-            fromStages[__GLSL_STAGE_FS] = patch->fromFragment;
-            fromStages[__GLSL_STAGE_CS] = gcvNULL;
 
             for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
             {
                 if (ppShaders[stage] &&
                     ppShaders[stage]->shaderInfo.source &&
-                    fromStages[stage] &&
+                    patch->fromStages[stage] &&
                     gcSHADER_DoPatch((gcSHADER)ppShaders[stage]->shaderInfo.hBinary))
                 {
                     searchSrc[stage] = gcChipUtilFindString(patch->encrypted,
                                                             ppShaders[stage]->shaderInfo.source,
-                                                            fromStages[stage],
+                                                            patch->fromStages[stage],
                                                             &searchIndex);
                 }
             }
 
             /* Check if we need a VS+PS combined patch. */
-            if (fromStages[__GLSL_STAGE_VS] && fromStages[__GLSL_STAGE_FS])
+            if (patch->fromStages[__GLSL_STAGE_VS] && patch->fromStages[__GLSL_STAGE_FS])
             {
                 if (searchSrc[__GLSL_STAGE_VS] && searchSrc[__GLSL_STAGE_FS] && patch->handler)
                 {
-                    patch->handler(gc, programObject, &patchedSrcs[__GLSL_STAGE_VS], &patchedSrcs[__GLSL_STAGE_FS], gcvNULL);
+                    patch->handler(gc, programObject, patchedSrcs, gcvNULL);
 
-                    gcmDUMP(gcvNULL, "#[patchInfo 0x%04x %s]", chipCtx->patchId, patch->patchDescription);
+                    gcmDUMP(gcvNULL, "#[patchInfo 0x%04x %s]", chipCtx->patchId, patch->description);
                 }
             }
             else
@@ -26820,11 +27091,11 @@ gcChipPatchLink(
                 /* Check for per stage patch */
                 for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
                 {
-                    if (fromStages[stage] && searchSrc[stage] && patch->handler)
+                    if (patch->fromStages[stage] && searchSrc[stage] && patch->handler)
                     {
-                        patch->handler(gc, programObject, &patchedSrcs[__GLSL_STAGE_VS], &patchedSrcs[__GLSL_STAGE_FS], &replaceIndices[stage]);
+                        patch->handler(gc, programObject, patchedSrcs, &replaceIndices[stage]);
 
-                        gcmDUMP(gcvNULL, "#[patchInfo 0x%04x %s]", chipCtx->patchId, patch->patchDescription);
+                        gcmDUMP(gcvNULL, "#[patchInfo 0x%04x %s]", chipCtx->patchId, patch->description);
                         break;
                     }
                 }

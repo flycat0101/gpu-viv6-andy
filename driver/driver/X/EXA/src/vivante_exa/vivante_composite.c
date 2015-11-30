@@ -459,6 +459,7 @@ CalOrgBoxInfoWithoutMask(VIV2DBLITINFOPTR pBlt, int srcX, int srcY, int maskX, i
     int dstX, int dstY, int width, int height, VivBox *opBox)
 {
     gctUINT32 srcwidth,srcheight;
+    int src_x_t, src_y_t;
     int opWidth = width;
     int opHeight = height;
 
@@ -483,6 +484,29 @@ CalOrgBoxInfoWithoutMask(VIV2DBLITINFOPTR pBlt, int srcX, int srcY, int maskX, i
     pBlt->mDstBox.width = width;
     pBlt->mDstBox.height = height;
 
+
+    if ( pBlt->mRotation == gcvSURF_90_DEGREE )
+    {
+        src_x_t = -srcY + pixman_fixed_to_int ( ((struct pixman_transform *)pBlt->mTransform)->matrix[0][2] +  pixman_fixed_1 / 2 - pixman_fixed_e) - height;
+        src_y_t = srcX + pixman_fixed_to_int ( ((struct pixman_transform *)pBlt->mTransform)->matrix[1][2] +  pixman_fixed_1 / 2 - pixman_fixed_e);
+        srcX = src_x_t;
+        srcY = src_y_t;
+        /* Fix me for the next lines */
+        pBlt->mSrcSurfInfo.alpha = 1;
+        pBlt->mDstSurfInfo.alpha = 1;
+    }
+
+
+    if ( pBlt->mRotation == gcvSURF_270_DEGREE )
+    {
+        src_x_t = srcY + pixman_fixed_to_int (((struct pixman_transform *)pBlt->mTransform)->matrix[0][2] + pixman_fixed_1 / 2 - pixman_fixed_e);
+        src_y_t = -srcX + pixman_fixed_to_int (((struct pixman_transform *)pBlt->mTransform)->matrix[1][2] + pixman_fixed_1 / 2 - pixman_fixed_e) - width;
+        srcX = src_x_t;
+        srcY = src_y_t;
+        /* Fix me for the next lines */
+        pBlt->mSrcSurfInfo.alpha = 1;
+        pBlt->mDstSurfInfo.alpha = 1;
+    }
 
     pBlt->mSrcBox.x1 = srcX;
     pBlt->mSrcBox.y1 = srcY;
@@ -790,13 +814,10 @@ VivDoneComposite(PixmapPtr pDst) {
     VIV2DBLITINFOPTR pBlt = &pViv->mGrCtx.mBlitInfo;
 
     if ( pBlt && pBlt->mSwcmp )
-    {
-        pBlt->mSwcmp = FALSE;
         TRACE_EXIT();
-    }
-
+    pBlt->hwMask |= 0x1;
     VIV2DGPUFlushGraphicsPipe(&pViv->mGrCtx);
-    VIV2DGPUBlitComplete(&pViv->mGrCtx, TRUE);
+    VIV2DGPUBlitComplete(&pViv->mGrCtx, FALSE);
     TRACE_EXIT();
 }
 

@@ -1206,7 +1206,7 @@ gcoPROFILER_EndFrame(
             gcmWRITE_COUNTER(VPC_MCWRITEREQ8BPIPE, gcmCOUNTER(mc_total_write_req_8B_from_pipeline));
             gcmWRITE_COUNTER(VPC_MCAXIMINLATENCY, gcmCOUNTER(mc_axi_min_latency));
             gcmWRITE_COUNTER(VPC_MCAXIMAXLATENCY, gcmCOUNTER(mc_axi_max_latency));
-            gcmWRITE_COUNTER(VPC_MCAXIMAXLATENCY, gcmCOUNTER(mc_axi_total_latency));
+            gcmWRITE_COUNTER(VPC_MCAXITOTALLATENCY, gcmCOUNTER(mc_axi_total_latency));
             gcmWRITE_COUNTER(VPC_MCAXISAMPLECOUNT, gcmCOUNTER(mc_axi_sample_count));
             gcmWRITE_CONST(VPG_END);
 
@@ -1658,7 +1658,7 @@ OnError:
             gcmWRITE_COUNTER(VPC_MCWRITEREQ8BPIPE, gcmCOUNTERCOMPARE(mc_total_write_req_8B_from_pipeline));
             gcmWRITE_COUNTER(VPC_MCAXIMINLATENCY, gcmCOUNTERCOMPARE(mc_axi_min_latency));
             gcmWRITE_COUNTER(VPC_MCAXIMAXLATENCY, gcmCOUNTERCOMPARE(mc_axi_max_latency));
-            gcmWRITE_COUNTER(VPC_MCAXIMAXLATENCY, gcmCOUNTERCOMPARE(mc_axi_total_latency));
+            gcmWRITE_COUNTER(VPC_MCAXITOTALLATENCY, gcmCOUNTERCOMPARE(mc_axi_total_latency));
             gcmWRITE_COUNTER(VPC_MCAXISAMPLECOUNT, gcmCOUNTERCOMPARE(mc_axi_sample_count));
             gcmWRITE_CONST(VPG_END);
 

@@ -37,7 +37,7 @@ endif
 
 include $(AQROOT)/makefile.linux.def
 
-CC = $(CROSS_COMPILE)gcc
+CC ?= $(CROSS_COMPILE)gcc
 
 ################################################################################
 # Supply additional include directories.

@@ -43,6 +43,8 @@ BEGIN_EXTERN_C()
 
 #define GC_ICACHE_PREFETCH_TABLE_SIZE   8
 
+#define GC_DEFAULT_INLINE_LEVEL         2
+
 /*
  *   Re-compilation & Dynamic Linker data sturctures
  */
@@ -760,6 +762,24 @@ typedef enum _gceSHADER_FLAGS
 
     /* This is a seperated program link */
     gcvSHADER_SEPERATED_PROGRAM         = 0x40000,
+
+    /* set inline level 0 */
+    gcvSHADER_SET_INLINE_LEVEL_0        = 0x100000,
+
+    /* set inline level 1 */
+    gcvSHADER_SET_INLINE_LEVEL_1        = 0x200000,
+
+    /* set inline level 2 */
+    gcvSHADER_SET_INLINE_LEVEL_2        = 0x400000,
+
+    /* set inline level 3 */
+    gcvSHADER_SET_INLINE_LEVEL_3        = 0x800000,
+
+    /* set inline level 4 */
+    gcvSHADER_SET_INLINE_LEVEL_4        = 0x1000000,
+
+    /* resets inline level to default */
+    gcvSHADER_RESET_INLINE_LEVEL        = 0x2000000,
 }
 gceSHADER_FLAGS;
 
@@ -779,64 +799,34 @@ typedef enum _gceSHADER_OPTIMIZATION
     /*  No optimization. */
     gcvOPTIMIZATION_NONE,
 
-    /*  Flow graph construction. */
-    gcvOPTIMIZATION_CONSTRUCTION                = 1 << 0,
-
     /*  Dead code elimination. */
-    gcvOPTIMIZATION_DEAD_CODE                   = 1 << 1,
+    gcvOPTIMIZATION_DEAD_CODE                   = 1 << 0,
 
     /*  Redundant move instruction elimination. */
-    gcvOPTIMIZATION_REDUNDANT_MOVE              = 1 << 2,
+    gcvOPTIMIZATION_REDUNDANT_MOVE              = 1 << 1,
 
     /*  Inline expansion. */
-    gcvOPTIMIZATION_INLINE_EXPANSION            = 1 << 3,
+    gcvOPTIMIZATION_INLINE_EXPANSION            = 1 << 2,
 
     /*  Constant propagation. */
-    gcvOPTIMIZATION_CONSTANT_PROPAGATION        = 1 << 4,
+    gcvOPTIMIZATION_CONSTANT_PROPAGATION        = 1 << 3,
 
     /*  Redundant bounds/checking elimination. */
-    gcvOPTIMIZATION_REDUNDANT_CHECKING          = 1 << 5,
-
-    /*  Loop invariant movement. */
-    gcvOPTIMIZATION_LOOP_INVARIANT              = 1 << 6,
-
-    /*  Induction variable removal. */
-    gcvOPTIMIZATION_INDUCTION_VARIABLE          = 1 << 7,
-
-    /*  Common subexpression elimination. */
-    gcvOPTIMIZATION_COMMON_SUBEXPRESSION        = 1 << 8,
-
-    /*  Control flow/banch optimization. */
-    gcvOPTIMIZATION_CONTROL_FLOW                = 1 << 9,
+    gcvOPTIMIZATION_REDUNDANT_CHECKING          = 1 << 4,
 
     /*  Vector component operation merge. */
-    gcvOPTIMIZATION_VECTOR_INSTRUCTION_MERGE    = 1 << 10,
-
-    /*  Algebra simplificaton. */
-    gcvOPTIMIZATION_ALGEBRAIC_SIMPLIFICATION    = 1 << 11,
-
-    /*  Pattern matching and replacing. */
-    gcvOPTIMIZATION_PATTERN_MATCHING            = 1 << 12,
-
-    /*  Interprocedural constant propagation. */
-    gcvOPTIMIZATION_IP_CONSTANT_PROPAGATION     = 1 << 13,
-
-    /*  Interprecedural register optimization. */
-    gcvOPTIMIZATION_IP_REGISTRATION             = 1 << 14,
-
-    /*  Optimization option number. */
-    gcvOPTIMIZATION_OPTION_NUMBER               = 1 << 15,
+    gcvOPTIMIZATION_VECTOR_INSTRUCTION_MERGE    = 1 << 5,
 
     /*  Loadtime constant. */
-    gcvOPTIMIZATION_LOADTIME_CONSTANT           = 1 << 16,
+    gcvOPTIMIZATION_LOADTIME_CONSTANT           = 1 << 6,
 
     /*  MAD instruction optimization. */
-    gcvOPTIMIZATION_MAD_INSTRUCTION             = 1 << 17,
+    gcvOPTIMIZATION_MAD_INSTRUCTION             = 1 << 7,
 
-    gcvOPTIMIZATION_LOAD_SW_W                   = 1 << 18,
+    gcvOPTIMIZATION_LOAD_SW_W                   = 1 << 8,
 
     /*  Move code into conditional block if possile */
-    gcvOPTIMIZATION_CONDITIONALIZE              = 1 << 19,
+    gcvOPTIMIZATION_CONDITIONALIZE              = 1 << 9,
 
     /*  Expriemental: power optimization mode
         1. add extra dummy texld to tune performance
@@ -844,26 +834,30 @@ typedef enum _gceSHADER_OPTIMIZATION
         3. split high power vec3/vec4 instruciton to vec2/vec1 operation
         4. ...
      */
-    gcvOPTIMIZATION_POWER_OPTIMIZATION          = 1 << 20,
+    gcvOPTIMIZATION_POWER_OPTIMIZATION          = 1 << 10,
 
     /*  Optimize intrinsics */
-    gcvOPTIMIZATION_INTRINSICS                  = 1 << 21,
-
-    /*  Optimize varying packing */
-    gcvOPTIMIZATION_VARYINGPACKING              = 1 << 22,
+    gcvOPTIMIZATION_INTRINSICS                  = 1 << 11,
 
     /*  Loop rerolling */
-    gcvOPTIMIZATION_LOOP_REROLLING              = 1 << 23,
+    gcvOPTIMIZATION_LOOP_REROLLING              = 1 << 12,
 
     /*  Image patching: */
     /*     Inline functions using IMAGE_READ or IMAGE_WRITE. */
-    gcvOPTIMIZATION_IMAGE_PATCHING              = 1 << 24,
+    gcvOPTIMIZATION_IMAGE_PATCHING              = 1 << 13,
 
     /*  Optimize a recompiler shader. */
-    gcvOPTIMIZATION_RECOMPILER                  = 1 << 25,
+    gcvOPTIMIZATION_RECOMPILER                  = 1 << 14,
 
     /*  Constant argument propagation. */
-    gcvOPTIMIZATION_CONSTANT_ARGUMENT_PROPAGATION = 1 << 26,
+    gcvOPTIMIZATION_CONSTANT_ARGUMENT_PROPAGATION = 1 << 15,
+
+    /* Inline level setting. */
+    gcvOPTIMIZATION_INLINE_LEVEL_0              = 1 << 16,
+    gcvOPTIMIZATION_INLINE_LEVEL_1              = 1 << 17,
+    gcvOPTIMIZATION_INLINE_LEVEL_2              = 1 << 18,
+    gcvOPTIMIZATION_INLINE_LEVEL_3              = 1 << 19,
+    gcvOPTIMIZATION_INLINE_LEVEL_4              = 1 << 20,
 
     /*  Full optimization. */
     /*  Note that gcvOPTIMIZATION_LOAD_SW_W is off. */
@@ -871,11 +865,17 @@ typedef enum _gceSHADER_OPTIMIZATION
                                                   ~gcvOPTIMIZATION_LOAD_SW_W &
                                                   ~gcvOPTIMIZATION_POWER_OPTIMIZATION &
                                                   ~gcvOPTIMIZATION_IMAGE_PATCHING &
-                                                  ~gcvOPTIMIZATION_RECOMPILER
+                                                  ~gcvOPTIMIZATION_RECOMPILER &
+                                                  ~gcvOPTIMIZATION_INLINE_LEVEL_0 &
+                                                  ~gcvOPTIMIZATION_INLINE_LEVEL_1 &
+                                                  ~gcvOPTIMIZATION_INLINE_LEVEL_2 &
+                                                  ~gcvOPTIMIZATION_INLINE_LEVEL_3 &
+                                                  ~gcvOPTIMIZATION_INLINE_LEVEL_4
 ,
 
     /* Optimization Unit Test flag. */
     gcvOPTIMIZATION_UNIT_TEST                   = 1 << 31
+
 }
 gceSHADER_OPTIMIZATION;
 
@@ -1250,6 +1250,7 @@ typedef struct _gcOPTIMIZER_OPTION
 extern gcOPTIMIZER_OPTION theOptimizerOption;
 
 #define gcmGetOptimizerOption() gcGetOptimizerOption()
+#define gcmGetOptimizerOptionVariable() gcGetOptimizerOptionVariable()
 
 #define gcmOPT_DUMP_Start()     (gcmGetOptimizerOption()->_dumpStart)
 #define gcmOPT_DUMP_End()     (gcmGetOptimizerOption()->_dumpEnd)
@@ -1286,6 +1287,7 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_EnableLTC()          (gcmGetOptimizerOption()->enableLTC)
 #define gcmOPT_INLINERKIND()        (gcmGetOptimizerOption()->inlinerKind)
 #define gcmOPT_INLINELEVEL()        (gcmGetOptimizerOption()->inlineLevel)
+#define gcmOPT_SetINLINELEVEL(v)    (gcmGetOptimizerOptionVariable()->inlineLevel = (v))
 #define gcmOPT_INLINEDEPTHCOMP()    (gcmGetOptimizerOption()->inlineDepthComparison)
 #define gcmOPT_INLINEFORMATCONV()   (gcmGetOptimizerOption()->inlineFormatConversion)
 #define gcmOPT_DualFP16Mode()       (gcmGetOptimizerOption()->dual16Mode)
@@ -1589,6 +1591,9 @@ gcSetOptimizerOption(
 
 gcOPTIMIZER_OPTION *
 gcGetOptimizerOption(void);
+
+gcOPTIMIZER_OPTION *
+gcGetOptimizerOptionVariable(void);
 
 typedef gceSTATUS (*gctGLSLCompiler)(IN  gcoHAL Hal,
                                      IN  gctINT ShaderType,
@@ -7513,7 +7518,8 @@ gceSTATUS
 gcSHADER_InsertNOP2BeforeCode(
     IN OUT gcSHADER                Shader,
     OUT gctUINT                    CodeIndex,
-    OUT gctUINT                    AddCodeCount
+    OUT gctUINT                    AddCodeCount,
+    IN  gctBOOL                    ReplaceJmp
     );
 
 gceSTATUS

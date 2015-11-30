@@ -999,6 +999,8 @@ struct _gcoHARDWARE
     /* Temporary surface for 2D. */
     gcsSURF_INFO_PTR            temp2DSurf[gcdTEMP_SURFACE_NUMBER];
 
+    /*  The hardware need a read operation when faked generic attrib if no vs input . */
+    gcsSURF_NODE                tempBuffer;
     /* Filter blit. */
     struct __gcsLOADED_KERNEL_INFO
     {

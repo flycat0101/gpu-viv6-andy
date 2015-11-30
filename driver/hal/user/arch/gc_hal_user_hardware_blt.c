@@ -1090,7 +1090,6 @@ gcoHARDWARE_3DBlitBlt_v2(
     gcsPOINT_PTR rectSize = &Args->uArgs.v2.rectSize;
     gctUINT32   width = rectSize->x;
     gctUINT32   height = rectSize->y;
-    gctBOOL     dstConversion = srcInfo->dither3D;
     gctBOOL     bScale = gcvFALSE;
     gceSURF_FORMAT srcSurfaceFormat = srcInfo->format;
 
@@ -1335,9 +1334,8 @@ gcoHARDWARE_3DBlitBlt_v2(
  1:1)))
         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 24:23) - (0 ?
  24:23) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 24:23) - (0 ? 24:23) + 1))))))) << (0 ?
- 24:23))) | (((gctUINT32) ((gctUINT32) (dstConversion) & ((gctUINT32) ((((1 ?
- 24:23) - (0 ? 24:23) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 24:23) - (0 ? 24:23) + 1))))))) << (0 ?
- 24:23)))
+ 24:23))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 24:23) - (0 ? 24:23) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 24:23) - (0 ? 24:23) + 1))))))) << (0 ? 24:23)))
         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 19:19) - (0 ?
  19:19) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:19) - (0 ? 19:19) + 1))))))) << (0 ?
  19:19))) | (((gctUINT32) ((gctUINT32) (flipY) & ((gctUINT32) ((((1 ? 19:19) - (0 ?

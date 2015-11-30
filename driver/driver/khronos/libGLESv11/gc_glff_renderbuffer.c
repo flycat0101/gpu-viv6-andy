@@ -66,6 +66,7 @@ static gceSTATUS _DeleteRenderBuffer(
             {
                 /* Yes, 'decombine'. */
                 object->combined->combined = gcvNULL;
+                --object->surface->referenceCount;
             }
         }
     }
@@ -717,12 +718,6 @@ GL_API void GL_APIENTRY glDeleteRenderbuffersOES(
                     context->frameBuffer->stencil.target  = gcvNULL;
                     context->frameBuffer->dirty           = GL_TRUE;
                 }
-            }
-
-            if (((glsRENDER_BUFFER_PTR)wrapper->object)->surface)
-            {
-                gcmVERIFY_OK(gcoSURF_Destroy(((glsRENDER_BUFFER_PTR)wrapper->object)->surface));
-                ((glsRENDER_BUFFER_PTR)wrapper->object)->surface = gcvNULL;
             }
 
             /* Unbound the RBO from current immediately */

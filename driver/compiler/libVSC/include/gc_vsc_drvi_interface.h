@@ -27,6 +27,7 @@
 #define gcdSUPPORT_TESS_GS_SHADER   1
 #define gcdSUPPORT_OCL_1_2          1
 #define ENABLE_FULL_NEW_LINKER      (gcmOPT_UseVIRCodeGen() == VIRCG_FULL)
+#define TREAT_ES20_INTEGER_AS_FLOAT 1
 
 BEGIN_EXTERN_C()
 

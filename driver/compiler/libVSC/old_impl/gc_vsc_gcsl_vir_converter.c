@@ -3955,7 +3955,7 @@ _ConvSource2VirOperand(
     VIR_ScalarConstVal  virScalarVal;
     gctUINT             effectiveIndex;
     gctUINT             components;
-    VIR_TypeId          typeId;
+    VIR_TypeId          typeId, symTypeId;
     gcSL_ENABLE         enable;
     gctUINT             mode;
     gctUINT             opcode;
@@ -4039,6 +4039,7 @@ _ConvSource2VirOperand(
         gcmASSERT(effectiveIndex < Shader->uniformCount);
         symId = VirUniformIdArr[effectiveIndex];
         sym = VIR_Shader_GetSymFromId(VirShader, symId);
+        symTypeId = VIR_Type_GetIndex(VIR_Symbol_GetType(sym));
         if(VIR_Symbol_GetKind(sym) == VIR_SYM_SAMPLER) {
             typeId = VIR_Type_GetBaseTypeId(sym->type);
         }
@@ -4066,7 +4067,17 @@ _ConvSource2VirOperand(
                 gcvFALSE,
                 1,
                 VIR_PRECISION_DEFAULT);
-            typeId = VIR_Type_GetIndex(VIR_Symbol_GetType(sym));
+
+#if TREAT_ES20_INTEGER_AS_FLOAT
+            if (!(Shader->clientApiVersion == gcvAPI_OPENGL_ES20 &&
+                  (VIR_GetTypeFlag(typeId) & VIR_TYFLAG_ISFLOAT) &&
+                  (VIR_GetTypeFlag(symTypeId) & VIR_TYFLAG_ISINTEGER)))
+            {
+                typeId = symTypeId;
+            }
+#else
+            typeId = symTypeId;
+#endif
 
             VIR_Operand_SetSym(VirSrc, sym);
             VIR_Operand_SetType(VirSrc, typeId);

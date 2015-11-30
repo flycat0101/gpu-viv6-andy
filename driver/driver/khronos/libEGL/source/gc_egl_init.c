@@ -410,7 +410,7 @@ _FillIn(
             }
         }
     }
-
+#ifndef ANDROID
     /* No, 2D/3D implementation only. */
     else
     {
@@ -438,7 +438,7 @@ _FillIn(
             }
         }
     }
-
+#endif
     /* Advance to the next entry. */
     (*Index) ++;
 }
