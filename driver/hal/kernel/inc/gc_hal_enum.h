@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -324,11 +324,11 @@ typedef enum _gceFEATURE
     gcvFEATURE_V2_MSAA_COHERENCY_FIX,
     gcvFEATURE_BLOCK_SIZE_16x16,
     gcvFEATURE_TX_SUPPORT_DEC,
-    gcvFEATURE_MSAA_DECOMPRESSION,
+    gcvFEATURE_RSBLT_MSAA_DECOMPRESSION,
     gcvFEATURE_TILEFILLER_32TILE_ALIGNED,
     gcvFEATURE_GEOMETRY_SHADER,
     gcvFEATURE_HALTI5,
-    gcvFEATURE_32_ATTRIBUTES,
+    gcvFEATURE_PIPELINE_32_ATTRIBUTES,
     gcvFEATURE_USC,
     gcvFEATURE_CUBEMAP_ARRAY,
     gcvFEATURE_TX_DESCRIPTOR,
@@ -342,7 +342,7 @@ typedef enum _gceFEATURE
     gcvFEATURE_IMAGE_OUT_BOUNDARY_FIX,
     gcvFEATURE_TX_BORDER_CLAMP,
     gcvFEATURE_MSAA_SHADING,
-    gcvFEATURE_ADVANCED_SH_INST, /* FMA, loadAttrib, storeAttrib */
+    gcvFEATURE_ADVANCED_SH_INST,
     gcvFEATURE_LOD_FIX_FOR_BASELEVEL,
     gcvFEATURE_MULTIDRAW_INDIRECT,
     gcvFEATURE_DRAW_ELEMENTS_BASE_VERTEX,
@@ -388,12 +388,19 @@ typedef enum _gceFEATURE
     gcvFEATURE_TEXTURE_BIAS_LOD_FIX,
     gcvFEATURE_USE_GL_Z,
     gcvFEATURE_SUPPORT_INTEGER,
-    gcvFEATURE_SUPPORT_INTEGER_BRANCH,
+    /* PARTLY_SUPPORT_INTEGER_BRANCH:
+    **      chips can support all integer types for compare instructions, e.g, CMP, SELECT.
+    ** FULLLY_SUPPORT_INTEGER_BRANCH:
+    **      chips can support all integer types for JMP instruction.
+    ** If PARTLY_SUPPORT_INTEGER_BRANCH is TRUE but FULLLY_SUPPORT_INTEGER_BRANCH is FALSE,
+    ** then this chip can only support INT32/UINT32 JMP instruction.
+    */
+    gcvFEATURE_PARTLY_SUPPORT_INTEGER_BRANCH,
+    gcvFEATURE_FULLLY_SUPPORT_INTEGER_BRANCH,
     gcvFEATURE_SUPPORT_INTEGER_ATTRIBUTE,
     gcvFEATURE_SUPPORT_MOVAI,
     gcvFEATURE_NEED_FIX_FOR_CL_X,
     gcvFEATURE_NEED_FIX_FOR_CL_XE,
-    gcvFEATURE_HAS_FIX_FOR_ICACHE,
     gcvFEATURE_HAS_OUTPUT_COUNT_FIX,
     gcvFEATURE_VARYING_PACKING_LIMITATION,
     gcvFEATURE_HIGHP_VARYING_SHIFT,
@@ -414,7 +421,14 @@ typedef enum _gceFEATURE
     gcvFEATURE_VMSAA,
     gcvFEATURE_ROBUST_ATOMIC,
     gcvFEATURE_32F_COLORMASK_FIX,
+    gcvFEATURE_NEW_GPIPE,
+    gcvFEATURE_RS_NEW_BASEADDR,
+    gcvFEATURE_TX_DXT,
     gcvFEATURE_SH_FLAT_INTERPOLATION_DUAL16_FIX,
+    gcvFEATURE_EVIS,
+    gcvFEATURE_SH_SUPPORT_V4,
+    gcvFEATURE_SH_SUPPORT_ALPHA_KILL,
+    gcvFEATURE_PE_NO_ALPHA_TEST,
     gcvFEATURE_SH_SNAP2PAGE_MAXPAGES_FIX,
     gcvFEATURE_USC_FULLCACHE_FIX,
     gcvFEATURE_PE_64bit_FENCE_FIX,
@@ -423,11 +437,37 @@ typedef enum _gceFEATURE
     gcvFEATURE_BLT_64bpp_MASKED_CLEAR_FIX,
     gcvFEATURE_SH_PSO_MSAA1x_FIX,
     gcvFEATURE_USC_ATOMIC_FIX,
+    gcvFEATURE_SH_NO_INDEX_CONST_ON_A0,
+    gcvFEATURE_SH_NO_ONECONST_LIMIT,
+    gcvFEATURE_EVIS_NO_ABSDIFF,
+    gcvFEATURE_EVIS_NO_BITREPLACE,
+    gcvFEATURE_EVIS_NO_BOXFILTER,
+    gcvFEATURE_EVIS_NO_CORDIAC,
+    gcvFEATURE_EVIS_NO_DP32,
+    gcvFEATURE_EVIS_NO_FILTER,
+    gcvFEATURE_EVIS_NO_IADD,
+    gcvFEATURE_EVIS_NO_SELECTADD,
+    gcvFEATURE_EVIS_LERP_7OUTPUT,
+    gcvFEATURE_EVIS_ACCSQ_8OUTPUT,
     gcvFEATURE_ROBUSTNESS,
     gcvFEATURE_SECURITY,
+    gcvFEATURE_TX_YUV_ASSEMBLER_10BIT,
     gcvFEATURE_USC_GOS_ADDR_FIX,
+    gcvFEATURE_SUPPORT_MSAA2X,
     gcvFEATURE_TX_DESC_CACHE_CLOCKGATE_FIX,
+    gcvFEATURE_TX_INTEGER_COORDINATE,
+    gcvFEATURE_PSIO_SAMPLEMASK_IN_R0ZW_FIX,
+    gcvFEATURE_MULTI_CORE_BLOCK_SET_CONFIG,
+    gcvFEATURE_SH_IMG_LDST_ON_TEMP,
     gcvFEATURE_TX_INTEGER_COORDINATE_V2,
+    gcvFEATURE_COMPUTE_ONLY,
+    gcvFEATURE_SH_IMG_LDST_CLAMP,
+    gcvFEATURE_SH_ICACHE_ALLOC_COUNT_FIX,
+
+    gcvFEATURE_MSAA_OQ_FIX,
+
+    gcvFEATURE_PE_ENHANCEMENTS2,
+    gcvFEATURE_PSIO_MSAA_CL_FIX,
 
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */
@@ -448,7 +488,7 @@ gceSWWA;
 
 
 /* Option Set*/
-typedef enum _gceOPITON
+typedef enum _gceOPTION
 {
     /* HW setting. */
     gcvOPTION_PREFER_ZCONVERT_BYPASS = 0,
@@ -686,6 +726,9 @@ typedef enum _gceSURF_FORMAT
     gcvSURF_INDEX1              = 100,
     gcvSURF_INDEX4,
     gcvSURF_INDEX8,
+#if gcdVG_ONLY
+    gcvSURF_INDEX2,
+#endif
 
     /* RGB formats. */
     gcvSURF_A2R2G2B2            = 200,
@@ -777,6 +820,14 @@ typedef enum _gceSURF_FORMAT
     gcvSURF_YVYU,
     gcvSURF_VYUY,
     gcvSURF_AYUV,
+    gcvSURF_YUV420_10_ST,
+    gcvSURF_YUV420_TILE_ST,
+    gcvSURF_YUV420_TILE_10_ST,
+#if gcdVG_ONLY
+    gcvSURF_AYUY2,
+    gcvSURF_ANV12,
+    gcvSURF_ANV16,
+#endif
 
     /* Depth formats. */
     gcvSURF_D16                 = 600,
@@ -889,12 +940,12 @@ typedef enum _gceSURF_FORMAT
 
     gcvSURF_R32F_1_A8R8G8B8,
     gcvSURF_B32G32R32F_3_A8R8G8B8,
-
     gcvSURF_B10G11R11F_1_A8R8G8B8,
 
     gcvSURF_A32F_1_R32F,
     gcvSURF_L32F_1_R32F,
     gcvSURF_A32L32F_1_G32R32F,
+
 
 
     /* sRGB format. */
@@ -1490,7 +1541,7 @@ typedef enum _gceCACHE_MODE
 }
 gceCACHE_MODE;
 
-#define DEFAULT_CACHE_MODE    gcvCACHE_128
+#define DEFAULT_CACHE_MODE    gcvCACHE_256
 
 /* 2D pattern type. */
 typedef enum _gce2D_PATTERN
@@ -1810,7 +1861,8 @@ typedef enum _gceMULTI_GPU_RENDERING_MODE
     gcvMULTI_GPU_RENDERING_MODE_SPLIT_HEIGHT,
     gcvMULTI_GPU_RENDERING_MODE_INTERLEAVED_64x64,
     gcvMULTI_GPU_RENDERING_MODE_INTERLEAVED_128x64,
-    gcvMULTI_GPU_RENDERING_MODE_INTERLEAVED_128x128
+    gcvMULTI_GPU_RENDERING_MODE_INTERLEAVED_128x128,
+    gcvMULTI_GPU_RENDERING_MODE_INVALID
 }
 gceMULTI_GPU_RENDERING_MODE;
 
@@ -1911,6 +1963,31 @@ typedef enum _gceCORE
 gceCORE;
 
 
+typedef enum _gceADDRESS_AREA
+{
+    gcvADDRESS_AREA_NORMAL,
+    gcvADDRESS_AREA_SECURE,
+
+    gcvADDRESS_AREA_COUNT
+}
+gceADDRESS_AREA;
+
+typedef enum _gceSECURE_MODE
+{
+    /* For cores without gcvFEATURE_SECURITY. */
+    gcvSECURE_NONE,
+
+    /* Use registers added in gcvFEATURE_SECURITY in normal driver,
+    ** In this mode, GPU always works under non secure mode and
+    ** should not touch secure buffer. It is used to test basic function.
+    */
+    gcvSECURE_IN_NORMAL,
+
+    /* Make use of gcvFEATURE_SECURITY in trust application. */
+    gcvSECURE_IN_TA
+}
+gceSECURE_MODE;
+
 /*
 * Bit of a requirement is 1 means requirement is a must, 0 means requirement can
 * be ignored.
@@ -1951,6 +2028,9 @@ gceCORE;
 /* Command buffer usage. */
 #define gcvCOMMAND_2D   (1 << 0)
 #define gcvCOMMAND_3D   (1 << 1)
+
+/* Default chip ID means chip ID same as core index. */
+#define gcvCHIP_ID_DEFAULT             (~0U)
 
 /******************************************************************************\
 ****************************** Object Declarations *****************************

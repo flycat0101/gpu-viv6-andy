@@ -182,8 +182,6 @@ static __DRIdriver *OpenDriver(const char *driverName)
    if (geteuid() == getuid()) {
       /* don't allow setuid apps to use LIBGL_DRIVERS_PATH */
       libPaths = getenv("LIBGL_DRIVERS_PATH");
-      if (!libPaths)
-         libPaths = getenv("LIBGL_DRIVERS_DIR"); /* deprecated */
    }
    if (!libPaths)
       libPaths = DEFAULT_DRIVER_DIR;

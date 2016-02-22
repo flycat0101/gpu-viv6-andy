@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -148,6 +148,13 @@ hwcComposeG2D(
     {
         /* Do swap rectangle optimization. */
         gcmONERROR(_CopySwapRect(Context, Display));
+    }
+
+    /* Invalid swap rect means no change for current buffer. */
+    if (target->swapRect.left >= target->swapRect.right ||
+        target->swapRect.top  >= target->swapRect.bottom)
+    {
+        return gcvSTATUS_OK;
     }
 
 #else

@@ -531,7 +531,15 @@ unsigned *pped_count)
                 pos = options.find_first_of(" ", lastPos);
                 status = cloCOMPILER_SetLanguageVersion(Compiler,
                                                         (gctSTRING)options.substr(lastPos, pos - lastPos).c_str());
-                if(gcmIS_ERROR(status)) return status;
+                if(gcmIS_ERROR(status)) {
+                    cloCOMPILER_Report(Compiler,
+                                       0,
+                                       0,
+                                       clvREPORT_ERROR,
+                                       "unrecognized language version \"%s\" specified in option cl-std",
+                                       options.substr(lastPos, pos - lastPos).c_str());
+                    return gcvSTATUS_INTERFACE_ERROR;
+                }
             }
             else {
                 /* skip all other options */

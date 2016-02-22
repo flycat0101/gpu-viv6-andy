@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -438,6 +438,12 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     gctUINT64   start, end;
     gctFLOAT    pixelsPerSec = 0.0;
     gceSURF_FORMAT  format;
+    gctUINT     noMulEx = 1;
+
+    if (gcoHAL_IsFeatureAvailable(t2d->runtime->hal, gcvFEATURE_2D_MULTI_SOURCE_BLT_EX2))
+    {
+        noMulEx = 0;
+    }
 
     align = Array[frameNo].align;
     srcNum = Array[frameNo].srcNum;
@@ -483,6 +489,11 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         gcmONERROR(gco2D_SetSource(egn2D, &srcRect));
         gcmONERROR(gco2D_SetROP(egn2D, 0xCC, 0xCC));
 
+        if (!noMulEx)
+        {
+            gcmONERROR(gco2D_SetTargetRect(egn2D, &tmpRect));
+        }
+
         flag |= 0x1 << i;
     }
 
@@ -490,7 +501,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
     for (i=0; i<count; i++)
     {
-        gcmONERROR(gco2D_MultiSourceBlit(egn2D, flag, &tmpRect, 1));
+        gcmONERROR(gco2D_MultiSourceBlit(egn2D, flag, &tmpRect, noMulEx));
     }
 
     gcmONERROR(gco2D_Flush(egn2D));
@@ -569,6 +580,23 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     gctINT i;
     gctINT argc = runtime->argc;
     gctSTRING *argv = runtime->argv;
+
+    if (!gcoHAL_IsFeatureAvailable(runtime->hal, gcvFEATURE_2D_MULTI_SOURCE_BLT) &&
+        !gcoHAL_IsFeatureAvailable(runtime->hal, gcvFEATURE_2D_MULTI_SOURCE_BLT_EX) &&
+        !gcoHAL_IsFeatureAvailable(runtime->hal, gcvFEATURE_2D_MULTI_SRC_BLT_TO_UNIFIED_DST_RECT) &&
+        !gcoHAL_IsFeatureAvailable(runtime->hal, gcvFEATURE_2D_MULTI_SOURCE_BLT_EX2))
+    {
+        GalOutput(GalOutputType_Result | GalOutputType_Console, "MultiSrcBlit is not supported.\n");
+        runtime->notSupport = gcvTRUE;
+        return gcvFALSE;
+    }
+
+    if (gcoHAL_IsFeatureAvailable(runtime->hal, gcvFEATURE_2D_MULTI_SRC_BLT_TO_UNIFIED_DST_RECT))
+    {
+        gcmONERROR(gco2D_SetStateU32(runtime->engine2d,
+                                     gcv2D_STATE_MULTI_SRC_BLIT_UNIFIED_DST_RECT,
+                                     gcvTRUE));
+    }
 
     memset(t2d, 0, sizeof(Test2D));
 

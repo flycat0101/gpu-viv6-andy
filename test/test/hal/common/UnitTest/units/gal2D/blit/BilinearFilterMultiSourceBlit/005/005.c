@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -108,6 +108,34 @@ gceSURF_ROTATION sRotList[] =
     gcvSURF_FLIP_X,
     gcvSURF_FLIP_Y,
 };
+
+// return 0 when no difference; return 1 else.
+int PredictDiff(Test2D *t2d, gcsRECT* dst, gcsRECT* src)
+{
+    int ret = 0;
+    gctINT32 dstSizeX = dst->right  - dst->left;
+    gctINT32 dstSizeY = dst->bottom - dst->top;
+    gctINT32 srcSizeX = src->right - src->left;
+    gctINT32 srcSizeY = src->bottom - src->top;
+
+    gctUINT32 xFactor, yFactor;
+
+    gco2D_CalcStretchFactor(t2d->runtime->engine2d, srcSizeX, dstSizeX, &xFactor);
+    gco2D_CalcStretchFactor(t2d->runtime->engine2d, srcSizeY, dstSizeY, &yFactor);
+
+    if ((srcSizeX - dstSizeX * (xFactor >> 16)) << 16 !=
+        dstSizeX * (xFactor & 0xFFFF))
+    {
+        ret = 1;
+    }
+    if ((srcSizeY - dstSizeY * (yFactor >> 16)) << 16 !=
+        dstSizeY * (yFactor & 0xFFFF))
+    {
+        ret = 1;
+    }
+
+    return ret;
+}
 
 static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 {
@@ -266,8 +294,11 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     /* Compare the result of stretch blit and bilinear filter with no stretch. */
     if (memcmp(t2d->dstLgcAddr, t2d->tmpLgcAddr, t2d->dstStride * t2d->dstHeight))
     {
-        GalOutput(GalOutputType_Error | GalOutputType_Console,
-            "%s(%d) warning: results do not match.\n",__FUNCTION__, __LINE__);
+        if (!PredictDiff(t2d, &drect, &srect))
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console,
+                "%s(%d) warning: frame %d results do not match.\n",__FUNCTION__, __LINE__, frameNo);
+        }
     }
 
 OnError:

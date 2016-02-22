@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1700,6 +1700,276 @@ static void veglAppendVGResolve(
     while (gcvFALSE);
 }
 
+/* Find level-1 children images of an image. */
+static int
+FindChildImages(
+    vgsCONTEXT  *Context,
+    vgsIMAGE    *Image,
+    VGImage     **Children)
+{
+    int count = 0;
+    int i;
+    vgsIMAGE_PTR    image;
+    vgsOBJECT_CACHE_PTR objectCache;
+    vgsOBJECT_LIST_PTR objectList;
+    vgsOBJECT_PTR head;
+
+    gcmHEADER_ARG("context=0x%x image=0x%x children=0x%x",
+                  Context, Image, Children);
+
+    /* Count all image children. */
+    count = Image->childrenCount;
+
+    /* Get a shortcut to the object cache. */
+    objectCache = Context->objectCache;
+
+    /* Get a shortcut to the object list. */
+    objectList = &objectCache->cache[Image->object.type];
+
+    /* Capture all image children. */
+    if (count > 0 && Children != gcvNULL)
+    {
+        if (gcmIS_ERROR(gcoOS_Allocate(Context->os, sizeof(VGImage) * count, (gctPOINTER*) *Children)))
+        {
+            /* out-of-memory */
+            gcmFOOTER_ARG("return=%d", count);
+            return count;
+        }
+
+        count = 0;
+        for (i = 0; i < (int)(sizeof(objectList->head) / sizeof(objectList->head[0])); i++)
+        {
+            head = objectList->head[i];
+            while (head != gcvNULL)
+            {
+                image = (vgsIMAGE_PTR)head;
+                if ((image != Image) &&
+                    (image->parent == Image))
+                {
+                    (*Children)[count++] = (VGImage)image;
+                }
+                head = head->next;
+            }
+        }
+    }
+
+    /* Return the image children count. */
+    gcmFOOTER_ARG("return=%d", count);
+    return count;
+}
+
+/* Find and Count all child images, including child's child's child ... */
+static int
+FindAllImageDescents(
+    vgsCONTEXT  *context,
+    vgsIMAGE    *root,
+    VGImage     **descents
+    )
+{
+    VGImage     *children = gcvNULL;
+    VGImage     *currentSet = gcvNULL;
+    vgsIMAGE    *child_obj = gcvNULL;
+    int         count = 0;
+    int         currCount = 0;
+    int         currImage = 0;
+
+    gcmHEADER_ARG("context=0x%x root=0x%x descents=0x%x",
+                  context, root, descents);
+
+    /* Find the first level children. */
+    count = FindChildImages(context, root, &children);
+    if (children == gcvNULL)
+    {
+        *descents = gcvNULL;
+        gcmFOOTER_ARG("return=%d", count);
+        return count;
+    }
+
+    /* Access all found images to search for their children. */
+    currImage = 0;
+    do{
+        child_obj = (vgsIMAGE_PTR)children[currImage];
+        currCount = FindChildImages(context, child_obj, &currentSet);
+
+        /* If this image has children, add them to the children array. */
+        if (currCount > 0)
+        {
+            VGImage *temp;
+            if (gcmIS_ERROR(gcoOS_Allocate(context->os,
+                                        sizeof(VGImage) * (count + currCount),
+                                        (gctPOINTER*) &temp)))
+            {
+                gcmFATAL("%s(%d): gcoOS_Allocate failed", __FUNCTION__, __LINE__);
+                gcmFOOTER_ARG("return=%d", count);
+                return count;
+            }
+            gcoOS_MemCopy(temp, children, sizeof(VGImage) * count);     /*Copy the existing children.*/
+            gcoOS_MemCopy(temp + count, currentSet, sizeof(VGImage) * currCount);   /*Copy the newly found children.*/
+            gcmOS_SAFE_FREE(context->os, children);
+            children = temp;
+            count += currCount;
+        }
+
+        /* Move to the next image. */
+        currImage++;
+    }while( currImage < count);
+
+    /* Copy the result and return the count. */
+    if (descents != gcvNULL)
+    {
+        if (gcmIS_ERROR(gcoOS_Allocate(context->os,
+                                       sizeof(VGImage) * count,
+                                       (gctPOINTER*) descents)))
+        {
+            gcmFATAL("%s(%d): gcoOS_Allocate failed", __FUNCTION__, __LINE__);
+            gcmFOOTER_ARG("return=%d", count);
+            return count;
+        }
+
+        if (*descents != gcvNULL)
+        {
+            gcoOS_MemCopy(*descents, children, sizeof(VGImage) * count);
+        }
+    }
+    gcmOS_SAFE_FREE(context->os, children);
+
+    gcmFOOTER_ARG("return=%d", count);
+    return count;
+}
+
+static EGLenum
+veglCreateImageParentImage(
+    void * Context,
+    unsigned int Image,
+    void ** Images,
+    int * Count
+    )
+{
+    VGImage         *vgimages = gcvNULL;
+    vgsIMAGE        *vgimage_obj = gcvNULL;
+    vgsIMAGE        *child_obj = gcvNULL;
+    khrEGL_IMAGE    *khImage = gcvNULL;
+    int             childCount;
+    int             i;
+    gctINT32        referenceCount = 0;
+    vgsCONTEXT_PTR context = (vgsCONTEXT_PTR) Context;
+
+    gcmHEADER_ARG("Context=%p vgImage=%d Images=0x%x Count=0x%x",
+                  Context, Image, Images, Count);
+
+    if (!vgfVerifyUserObject(context, Image, vgvOBJECTTYPE_IMAGE))
+    {
+        gcmFOOTER_ARG("return=0x%x", EGL_BAD_ACCESS);
+        return EGL_BAD_ACCESS;
+    }
+
+
+    /* Test for VgImage validation. */
+    vgimage_obj = (vgsIMAGE_PTR)Image;
+
+    if  ((vgimage_obj == gcvNULL) ||
+         (vgimage_obj->parent != vgimage_obj))
+    {
+        gcmFOOTER_ARG("return=0x%x", EGL_BAD_ACCESS);
+        return EGL_BAD_ACCESS;
+    }
+
+    gcoSURF_QueryReferenceCount(vgimage_obj->surface, &referenceCount);
+    /* Test if surface is a sibling of any eglImage. */
+    if (referenceCount > 1)
+    {
+        gcmFOOTER_ARG("return=0x%x", EGL_BAD_ACCESS);
+        return EGL_BAD_ACCESS;
+    }
+
+    /* Get all child images. */
+    childCount = FindAllImageDescents(context, vgimage_obj, &vgimages);
+
+    /* Fill the results. */
+    *Count = childCount + 1;
+    if (gcmIS_ERROR(gcoOS_Allocate(context->os, sizeof(khrEGL_IMAGE) * (*Count), (gctPOINTER*)Images)))
+    {
+        gcmFOOTER_ARG("return=0x%x", EGL_BAD_ALLOC);
+        return EGL_BAD_ALLOC;
+    }
+
+    /* Fill the root image. */
+    {
+        child_obj = (vgsIMAGE_PTR)Image;
+        khImage = (khrEGL_IMAGE *) *Images;
+
+        khImage->magic = KHR_EGL_IMAGE_MAGIC_NUM;
+        khImage->type  = KHR_IMAGE_VG_IMAGE;
+        khImage->surface = vgimage_obj->surface;
+        khImage->u.vgimage.texSurface = gcvNULL;
+        /*Inc reference to surface. The egl's caller will do this.*/
+        /*gcoSURF_ReferenceSurface(khImage->surface);   */
+        khImage->u.vgimage.format = (gctUINT)vgimage_obj->format;
+        khImage->u.vgimage.allowedQuality = (gctUINT)vgimage_obj->allowedQuality;
+        khImage->u.vgimage.dirty = vgimage_obj->imageDirty;
+        khImage->u.vgimage.dirtyPtr = (gctINT32_PTR)vgimage_obj->imageDirtyPtr;
+        khImage->u.vgimage.rootOffsetX = vgimage_obj->origin.x;
+        khImage->u.vgimage.rootOffsetY = vgimage_obj->origin.y;
+        khImage->u.vgimage.rootWidth = vgimage_obj->size.width;
+        khImage->u.vgimage.rootHeight = vgimage_obj->size.height;
+
+        if (child_obj != gcvNULL)
+        {
+            khImage->u.vgimage.width = child_obj->size.width;
+            khImage->u.vgimage.height = child_obj->size.height;
+            khImage->u.vgimage.offset_x = child_obj->origin.x;
+            khImage->u.vgimage.offset_y = child_obj->origin.y;
+        }
+        else
+        {
+            khImage->u.vgimage.width = 0;
+            khImage->u.vgimage.height = 0;
+            khImage->u.vgimage.offset_x = 0;
+            khImage->u.vgimage.offset_y = 0;
+        }
+    }
+
+    /* Fill the child images. */
+    for (i = 1; i <= childCount; i++)
+    {
+        child_obj = (vgsIMAGE_PTR)vgimages[i - 1];
+        khImage = ((khrEGL_IMAGE *) *Images) + i;
+
+        khImage->magic = KHR_EGL_IMAGE_MAGIC_NUM;
+        khImage->type  = KHR_IMAGE_VG_IMAGE;
+        khImage->surface = vgimage_obj->surface;
+        khImage->u.vgimage.texSurface = vgimage_obj->surface;
+        khImage->u.vgimage.format = (gctUINT)vgimage_obj->format;
+        khImage->u.vgimage.allowedQuality = (gctUINT)vgimage_obj->allowedQuality;
+        khImage->u.vgimage.dirty = vgimage_obj->imageDirty;
+        khImage->u.vgimage.dirtyPtr = &khImage->u.vgimage.dirty;
+        khImage->u.vgimage.rootWidth = vgimage_obj->size.width;
+        khImage->u.vgimage.rootHeight = vgimage_obj->size.height;
+
+        if (child_obj != gcvNULL)
+        {
+            khImage->u.vgimage.width = child_obj->size.width;
+            khImage->u.vgimage.height = child_obj->size.height;
+            khImage->u.vgimage.offset_x = child_obj->origin.x;
+            khImage->u.vgimage.offset_y = child_obj->origin.y;
+        }
+        else
+        {
+            khImage->u.vgimage.width = 0;
+            khImage->u.vgimage.height = 0;
+            khImage->u.vgimage.offset_x = 0;
+            khImage->u.vgimage.offset_y = 0;
+        }
+    }
+
+    /* Free temporary resources. */
+    if (vgimages != gcvNULL)
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(context->os, vgimages));
+
+    gcmFOOTER_ARG("return=0x%x", EGL_SUCCESS);
+    return EGL_SUCCESS;
+}
+
 /*******************************************************************************
 **
 ** vgFlush
@@ -1792,7 +2062,7 @@ OpenVG_DISPATCH_TABLE =
 
     /* createImageTexture       */  gcvNULL,
     /* createImageRenderbuffer  */  gcvNULL,
-    /* createImageParentImage   */  gcvNULL,
+    /* createImageParentImage   */  veglCreateImageParentImage,
     /* bindTexImage             */  gcvNULL,
 
     /* profiler                 */  gcvNULL,

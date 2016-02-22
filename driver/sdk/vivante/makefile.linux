@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -42,6 +42,7 @@ INSTALL_DIR = $(SDK_DIR)/drivers
 # Set source directories.
 vpath %.c $(AQROOT)/hal/user
 vpath %.c $(AQROOT)/hal/os/$(OS_DIR)/user
+vpath %.c $(AQROOT)/hal/os/$(OS_DIR)/user/$(dir $(PLATFORM_CALLBACK))
 ifeq ($(VIVANTE_ENABLE_3D),1)
 vpath %.c $(AQROOT)/sdk/vdk
 vpath %.c $(AQROOT)/driver/khronos/libEGL/source
@@ -126,6 +127,14 @@ INC_DIR += \
 LIBS += -L$(X11_ARM_DIR)/lib -lX11 -lXext
 endif
 
+ifeq ($(EGL_API_GBM), 1)
+CFLAGS += \
+    $(shell $(PKG_CONFIG) --cflags libdrm gbm)
+
+LIBS += \
+    $(shell $(PKG_CONFIG) --libs libdrm gbm)
+endif
+
 CFLAGS += $(addprefix -I,$(INC_DIR))
 
 ifeq ($(VIVANTE_NO_VG), 1)
@@ -157,6 +166,7 @@ libGAL_SOURCE := $(wildcard \
 					$(AQROOT)/hal/user/*.c \
 					$(AQROOT)/hal/user/arch/*.c \
 					$(AQROOT)/hal/os/$(OS_DIR)/user/*.c \
+					$(AQROOT)/hal/os/$(OS_DIR)/user/$(PLATFORM_CALLBACK).c \
 					)
 
 OBJECTS += \
@@ -399,21 +409,22 @@ install: $(TARGET_OUTPUT) extra_install
 extra_install: $(TARGET_OUTPUT)
 	@-mkdir -p $(INSTALL_DIR)
 ifeq ($(gcdSTATIC_LINK), 0)
-ifeq ($(EGL_API_FB), 1)
-ifeq ($(EGL_API_WL), 1)
+  ifeq ($(EGL_API_FB)_$(EGL_API_WL), 1_0)
 	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.wl.so
-else
+  endif # EGL_API_FB
+  ifeq ($(EGL_API_FB)_$(EGL_API_WL), 1_1)
 	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.fb.so
-endif # EGL_API_WL
-else
-ifeq ($(EGL_API_DRI), 1)
+  endif # EGL_API_WL
+  ifeq ($(EGL_API_DRI), 1)
 	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.dri.so
-endif # EGL_API_DRI
-ifeq ($(EGL_API_X), 1)
+  endif # EGL_API_DRI
+  ifeq ($(EGL_API_X), 1)
 	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.x11.so
-endif # EGL_API_X
-ifeq ($(EGL_API_DFB), 1)
+  endif # EGL_API_X
+  ifeq ($(EGL_API_DFB), 1)
 	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.dfb.so
-endif # EGL_API_DFB
-endif # EGL_API_FB
+  endif # EGL_API_DFB
+  ifeq ($(EGL_API_GBM), 1)
+	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.gbm.so
+  endif # EGL_API_GBM
 endif # gcdSTATIC_LINK

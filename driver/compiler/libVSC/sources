@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -29,19 +29,21 @@ SOURCES= \
 	old_impl/gc_vsc_old_recompile.c \
 	old_impl/gc_vsc_old_linker.c \
 	old_impl/gc_vsc_old_hw_code_gen.c \
-	old_impl/gc_vsc_old_mc_dump.c \
 	old_impl/gc_vsc_old_hw_linker.c \
 	old_impl/gc_vsc_vir_gcsl_converter.c \
 	old_impl/gc_vsc_gcsl_vir_converter.c \
 	drvi/gc_vsc_drvi_compile.c \
+	drvi/gc_vsc_drvi_ep_dump.c \
 	drvi/gc_vsc_drvi_link.c \
 	chip/gc_vsc_chip_state_programming.c \
-	chip/gc_vsc_chip_desc.c \
+	chip/gc_vsc_chip_uarch_caps.c \
 	chip/gc_vsc_chip_mc_codec.c \
+	chip/gc_vsc_chip_mc_dump.c \
 	asm/gc_vsc_asm_al_codec.c \
 	utils/array/gc_vsc_utils_array.c \
 	utils/base/gc_vsc_utils_base_node.c \
 	utils/base/gc_vsc_utils_bit_op.c \
+	utils/base/gc_vsc_utils_data_digest.c \
 	utils/base/gc_vsc_utils_dump.c \
 	utils/base/gc_vsc_utils_err.c \
 	utils/base/gc_vsc_utils_math.c \
@@ -75,6 +77,7 @@ SOURCES= \
 	vir/ir/gc_vsc_vir_ir.c \
 	vir/ir/gc_vsc_vir_symbol_table.c \
 	vir/lower/gc_vsc_vir_hl_2_ml.c \
+	vir/lower/gc_vsc_vir_hl_2_ml_expand.c \
 	vir/lower/gc_vsc_vir_ml_2_ll.c \
 	vir/lower/gc_vsc_vir_ll_2_ll_expand.c \
 	vir/lower/gc_vsc_vir_ll_2_ll_scalar.c \

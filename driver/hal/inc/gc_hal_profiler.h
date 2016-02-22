@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -221,6 +221,7 @@ extern "C" {
 #define VPG_ES30_DRAW   0x210000
 #define VPG_VG11_TIME   0x220000
 #define VPG_FE          0x230000
+#define VPG_MULTI_GPU   0x240000
 #define VPG_END         0xff0000
 
 /* Info. */
@@ -404,6 +405,7 @@ extern "C" {
 
 #define VPC_ES30_DRAW_NO            (VPG_ES30_DRAW + 1)
 #define VPC_ES11_DRAW_NO            (VPG_ES11_DRAW + 1)
+#define VPC_ES30_GPU_NO             (VPG_MULTI_GPU + 1)
 #endif
 
 #if VIVANTE_PROFILER_ALL_COUNTER

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -353,12 +353,6 @@ sloIR_JUMP_Count(
     return gcvSTATUS_OK;
 }
 
-extern gctUINT
-_GetLogicalOperandCount(
-    IN slsDATA_TYPE * DataType,
-    IN gctBOOL bCalcTypeSize
-    );
-
 static gceSTATUS
 _CountVariableOrArray(
     IN sloCOMPILER Compiler,
@@ -384,7 +378,7 @@ _CountVariableOrArray(
 
     qualifier = Name->dataType->qualifiers.storage;
 
-    logicalRegCount = _GetLogicalCountForAnArray(DataType);
+    logicalRegCount = slsDATA_TYPE_GetLogicalCountForAnArray(DataType);
 
     switch (qualifier) {
     case slvSTORAGE_QUALIFIER_NONE:
@@ -438,12 +432,12 @@ _CountVariableOrArray(
         break;
 
     case slvSTORAGE_QUALIFIER_IN_IO_BLOCK:
-        logicalRegCount = _GetLogicalOperandCount(Name->dataType, gcvFALSE);
+        logicalRegCount = slsDATA_TYPE_GetLogicalOperandCount(Name->dataType, gcvFALSE);
         ObjectCounter->attributeCount += logicalRegCount;
         break;
 
     case slvSTORAGE_QUALIFIER_OUT_IO_BLOCK:
-        logicalRegCount = _GetLogicalOperandCount(Name->dataType, gcvFALSE);
+        logicalRegCount = slsDATA_TYPE_GetLogicalOperandCount(Name->dataType, gcvFALSE);
         ObjectCounter->outputCount += logicalRegCount;
         break;
 
@@ -481,7 +475,7 @@ _CountVariable(
 
     if (DataType->elementType == slvTYPE_STRUCT)
     {
-        count = _GetLogicalCountForAnArray(DataType);
+        count = slsDATA_TYPE_GetLogicalCountForAnArray(DataType);
 
         gcmASSERT(Name->dataType->fieldSpace);
         for (i = 0; i < count; i++) {
@@ -1047,7 +1041,7 @@ sloIR_POLYNARY_EXPR_Count(
     if (PolynaryExpr->type == slvPOLYNARY_FUNC_CALL)
     {
         /* Check if it is a atomic memory function. */
-        if (slsBUILT_IN_FUNC_HAS_FLAG(&(PolynaryExpr->funcName->u.funcInfo), slvBUILT_IN_FUNC_ATOMIC))
+        if (slsFUNC_HAS_FLAG(&(PolynaryExpr->funcName->u.funcInfo), slvFUNC_ATOMIC))
         {
             /* Currently always save atomic-related opcode into ATOMADD. */
             ObjectCounter->opcodeCount[slvOPCODE_ATOMADD]++;

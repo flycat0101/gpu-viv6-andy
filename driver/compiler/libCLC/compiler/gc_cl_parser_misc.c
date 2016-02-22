@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -93,9 +93,9 @@ IN gctCONST_STRING Options)
          _IndexKeywordStrings = clScanInitIndexToKeywordTableEntries();
     }
 
+    status = cloCOMPILER_MakeCurrent(Compiler, StringCount, Strings, Options);
     clScanInitLanguageVersion(cloCOMPILER_GetLanguageVersion(Compiler),
                               cloCOMPILER_GetExtension(Compiler));
-    status = cloCOMPILER_MakeCurrent(Compiler, StringCount, Strings, Options);
     if(gcmIS_ERROR(status)) return status;
 
 #ifdef SL_SCAN_ONLY
@@ -1273,15 +1273,18 @@ IN cloIR_EXPR RightOperand
                     return &resultConstant->exprBase;
                 }
             }
-            else if(clmDECL_IsArray(&LeftOperand->decl)) { /* variable indexing to array */
-                gctUINT elementCount;
+            else { /* variable indexing to array or vector elements */
+                if(clmDECL_IsArray(&LeftOperand->decl)) {
+                    gctUINT elementCount;
 
-                clmGetArrayElementCount(LeftOperand->decl.array, 0, elementCount);
-                if(elementCount > _cldMaxOperandCountToUseMemory) {
-                    status = clParseSetOperandAddressed(Compiler,
-                                                        LeftOperand);
-                    if (gcmIS_ERROR(status)) return gcvNULL;
+                    clmGetArrayElementCount(LeftOperand->decl.array, 0, elementCount);
+                    if(elementCount > _cldMaxOperandCountToUseMemory) {
+                        status = clParseSetOperandAddressed(Compiler,
+                                                            LeftOperand);
+                        if (gcmIS_ERROR(status)) return gcvNULL;
+                    }
                 }
+                leafName->u.variableInfo.indirectlyAddressed = gcvTRUE;
             }
         }
     }
@@ -1412,7 +1415,7 @@ IN cloIR_POLYNARY_EXPR PolynaryExpr
     }
 
     gcmASSERT(clmDECL_IsArray(&PolynaryExpr->exprBase.decl));
-        clmGetArrayElementCount(PolynaryExpr->exprBase.decl.array, 0, elementCount);
+    clmGetArrayElementCount(PolynaryExpr->exprBase.decl.array, 0, elementCount);
     if (operandCount != elementCount) {
         gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
@@ -2950,7 +2953,7 @@ IN OUT cloIR_EXPR *ResOperand
 
           resOperand = constVariableExpr;
        }
-       else if(clmDECL_IsAggregateType(&Operand->decl)) {
+       else if(clmDECL_IsAggregateTypeOverRegLimit(&Operand->decl)) {
           variableName = clParseFindLeafName(Compiler,
                                              Operand);
           if(variableName && variableName->type != clvPARAMETER_NAME) {
@@ -3709,9 +3712,9 @@ gctSIZE_T MaxOperandCount
                     if(subField->u.variableInfo.specifiedAttr & clvATTR_ALIGNED) {
                        alignment = subField->context.alignment;
                     }
-                    else alignment = clPermissibleAlignment(&subField->decl);
+                    else alignment = clPermissibleAlignment(Compiler, &subField->decl);
                  }
-                 else alignment = clPermissibleAlignment(&fieldName->decl);
+                 else alignment = clPermissibleAlignment(Compiler, &fieldName->decl);
               }
               if(structAlignment == 0) structAlignment = alignment;
               else {
@@ -3720,7 +3723,7 @@ gctSIZE_T MaxOperandCount
 
               byteOffset = clmALIGN(byteOffset, alignment, packed);
 
-              curSize = clsDECL_GetByteSize(&fieldName->decl);
+              curSize = clsDECL_GetByteSize(Compiler, &fieldName->decl);
               localSize = clmALIGN(localSize, alignment, packed);
 
               if(Decl->dataType->elementType == clvTYPE_UNION) {
@@ -4046,38 +4049,45 @@ _MakeTypeCastArgsAsConstant(
 cloCOMPILER Compiler,
 cloIR_TYPECAST_ARGS TypeCast,
 gctINT Dim,
-cloIR_CONSTANT Constant,
+clsDECL *ConstantDecl,
 cluCONSTANT_VALUE *ValStart,
 cluCONSTANT_VALUE *ValEnd
 )
 {
   gceSTATUS status = gcvSTATUS_OK;
-  cloIR_CONSTANT constant, constMember;
+  clsDECL *constantDecl;
+  cloIR_CONSTANT constMember;
   gctUINT i;
   cluCONSTANT_VALUE *valStart, *valEnd;
   cloIR_BASE member;
+  slsDLINK_LIST *structFields;
+  clsNAME *fieldName = gcvNULL;
+  clsDECL fieldDecl[1];
+  gctINT arrayElementCount = 0;
   gctUINT valueCount;
   gctUINT elementCount = 1;
   gctBOOL braced = gcvFALSE;
 
-  gcmASSERT(Constant);
+  gcmASSERT(ConstantDecl);
 
-  constant = Constant;
+  constantDecl = ConstantDecl;
   valStart = ValStart;
   valEnd = ValEnd;
 
   gcmASSERT(TypeCast->operands);
-  if(clmDECL_IsArray(&Constant->exprBase.decl)) {
+  if(clmDECL_IsArray(ConstantDecl)) {
     member = slsDLINK_LIST_First(&TypeCast->operands->members, struct _cloIR_BASE);
     if(cloIR_OBJECT_GetType(member) == clvIR_TYPECAST_ARGS) {
-       if((Dim + 1) < Constant->exprBase.decl.array.numDim) {
-          clmGetArrayElementCount(Constant->exprBase.decl.array, Dim + 1, elementCount);
+       if((Dim + 1) < ConstantDecl->array.numDim) {
+          clmGetArrayElementCount(ConstantDecl->array, Dim + 1, elementCount);
           braced = gcvTRUE;
           gcmASSERT(elementCount);
        }
     }
   }
-  valueCount = clsDECL_GetElementSize(&Constant->exprBase.decl) * elementCount;
+  valueCount = clsDECL_GetElementSize(ConstantDecl) * elementCount;
+  structFields = gcvNULL;
+  clmDECL_Initialize(fieldDecl, gcvNULL, (clsARRAY *)0, gcvNULL, gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
   FOR_EACH_DLINK_NODE(&TypeCast->operands->members, struct _cloIR_BASE, member) {
      switch(cloIR_OBJECT_GetType(member)) {
      case clvIR_CONSTANT:
@@ -4090,7 +4100,37 @@ cluCONSTANT_VALUE *ValEnd
                                            "number of initializers exceeds type defined"));
            return gcvSTATUS_INVALID_DATA;
         }
-        if(constMember->exprBase.decl.dataType->elementType == constant->exprBase.decl.dataType->elementType) {
+
+        if(clmDECL_IsStructOrUnion(ConstantDecl)) {
+            if(!structFields) {
+                structFields = &ConstantDecl->dataType->u.fieldSpace->names;
+                fieldName = (clsNAME *) structFields;
+            }
+
+            fieldName = (clsNAME *) ((slsDLINK_NODE *) fieldName)->next;
+            if((slsDLINK_NODE *)fieldName != structFields) {
+                constantDecl = &fieldName->decl;
+            }
+            else {
+                gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                                TypeCast->exprBase.base.lineNo,
+                                                TypeCast->exprBase.base.stringNo,
+                                                clvREPORT_ERROR,
+                                                "number of initializers exceeds type defined"));
+                return gcvSTATUS_INVALID_DATA;
+            }
+
+            if(clmDECL_IsStructOrUnion(constantDecl)) {
+                gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                                TypeCast->exprBase.base.lineNo,
+                                                TypeCast->exprBase.base.stringNo,
+                                                clvREPORT_ERROR,
+                                                "incorrect syntax in initializing struct elements"));
+                return gcvSTATUS_INVALID_DATA;
+            }
+        }
+
+        if(constMember->exprBase.decl.dataType->elementType == constantDecl->dataType->elementType) {
            for(i=0; i<constMember->valueCount; i++) {
               if(valStart < valEnd) {
                  *valStart++ = constMember->values[i];
@@ -4098,7 +4138,7 @@ cluCONSTANT_VALUE *ValEnd
            }
         }
         else {
-           status = clParseConstantTypeConvert(constMember, constant->exprBase.decl.dataType->elementType, valStart);
+           status = clParseConstantTypeConvert(constMember, constantDecl->dataType->elementType, valStart);
            if (gcmIS_ERROR(status)) {
                gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                                TypeCast->exprBase.base.lineNo,
@@ -4112,18 +4152,101 @@ cluCONSTANT_VALUE *ValEnd
         break;
 
      case clvIR_TYPECAST_ARGS:
-        valEnd = valStart + valueCount;
-        status = _MakeTypeCastArgsAsConstant(Compiler,
-                                             (cloIR_TYPECAST_ARGS) member,
-                                             braced ? Dim + 1 : Dim,
-                                             constant,
-                                             valStart,
-                                             valEnd);
-        if (gcmIS_ERROR(status)) {
-               return gcvSTATUS_INVALID_DATA;
+        if(clmDECL_IsUnderlyingStructOrUnion(constantDecl)) {
+            if(!structFields) {
+                structFields = &constantDecl->dataType->u.fieldSpace->names;
+                fieldName = (clsNAME *) structFields;
+            }
+
+            gcmASSERT(fieldName);
+            if(arrayElementCount == 0) {
+                if(fieldDecl->dataType == gcvNULL) {
+                    fieldName = (clsNAME *) ((slsDLINK_NODE *) fieldName)->next;
+                    if((slsDLINK_NODE *)fieldName != structFields) {
+                        *fieldDecl = fieldName->decl;
+                        clmGetArrayElementCount(fieldDecl->array, 0, arrayElementCount);
+                    }
+                }
+            }
+            if(arrayElementCount) {
+                clsDECL nonArrayDecl[1];
+                clmDECL_Initialize(nonArrayDecl,
+                                   fieldDecl->dataType,
+                                   (clsARRAY *)0,
+                                   fieldDecl->ptrDscr,
+                                   fieldDecl->ptrDominant,
+                                   fieldDecl->storageQualifier);
+
+                if (clmDECL_IsScalar(nonArrayDecl)) {
+                    status = _MakeTypeCastArgsAsConstant(Compiler,
+                                                         (cloIR_TYPECAST_ARGS) member,
+                                                         0,
+                                                         fieldDecl,
+                                                         valStart,
+                                                         valEnd);
+                    if (gcmIS_ERROR(status)) {
+                        return gcvSTATUS_INVALID_DATA;
+                    }
+                    valStart += clsDECL_GetSize(fieldDecl);
+                    gcmASSERT(valStart <= valEnd);
+                    /* reduce one dimension */
+                }
+                else {
+                    status = _MakeTypeCastArgsAsConstant(Compiler,
+                                                         (cloIR_TYPECAST_ARGS) member,
+                                                         0,
+                                                         nonArrayDecl,
+                                                         valStart,
+                                                         valEnd);
+                    if (gcmIS_ERROR(status)) {
+                        return gcvSTATUS_INVALID_DATA;
+                    }
+                    valStart += clsDECL_GetSize(nonArrayDecl);
+                    gcmASSERT(valStart <= valEnd);
+                    /* reduce one array element */
+                    gcmASSERT(arrayElementCount > 0);
+                    arrayElementCount--;
+                    if(arrayElementCount == 0) {
+                        fieldDecl->dataType = gcvNULL;
+                    }
+                }
+            }
+            else {
+                fieldName = (clsNAME *) ((slsDLINK_NODE *) fieldName)->next;
+                *fieldDecl = fieldName->decl;
+                if((slsDLINK_NODE *)fieldName != structFields) {
+                    status = _MakeTypeCastArgsAsConstant(Compiler,
+                                                         (cloIR_TYPECAST_ARGS) member,
+                                                         0,
+                                                         fieldDecl,
+                                                         valStart,
+                                                         valEnd);
+                    if (gcmIS_ERROR(status)) {
+                        return gcvSTATUS_INVALID_DATA;
+                    }
+                    valStart += clsDECL_GetSize(fieldDecl);
+                    gcmASSERT(valStart <= valEnd);
+                }
+                else {
+                    gcmASSERT(0);
+                    /*error*/
+                }
+            }
+        }
+        else {
+            status = _MakeTypeCastArgsAsConstant(Compiler,
+                                                 (cloIR_TYPECAST_ARGS) member,
+                                                 braced ? Dim + 1 : Dim,
+                                                 constantDecl,
+                                                 valStart,
+                                                 valEnd);
+            if (gcmIS_ERROR(status)) {
+                return gcvSTATUS_INVALID_DATA;
+            }
+            valStart += clsDECL_GetSize(constantDecl);
+            gcmASSERT(valStart <= valEnd);
         }
 
-        valStart = valEnd;
         break;
 
      case clvIR_POLYNARY_EXPR:
@@ -4829,7 +4952,9 @@ IN cloIR_EXPR Operand
 #if _CREATE_UNNAMED_CONSTANT_IN_MEMORY
       if(expr) {
          if(cloIR_OBJECT_GetType(&expr->base) == clvIR_CONSTANT &&
-            (clmDECL_IsAggregateType(&expr->decl) || clmDECL_IsExtendedVectorType(&expr->decl))) {
+            (clmDECL_IsAggregateTypeOverRegLimit(&expr->decl) ||
+             (clmDECL_IsExtendedVectorType(&expr->decl) &&
+              (clmDECL_IsPackedType(&expr->decl) || !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))))) {
             gceSTATUS status;
 
             status = _CreateUnnamedConstantExpr(Compiler,
@@ -4881,7 +5006,7 @@ IN clsDECL *Decl
 
 /* INITIALIZE THE CONSTANT WITH THE SIZE OF THE DECLARATION Decl */
    (void)gcoOS_ZeroMemory((gctPOINTER)constantValue, sizeof(cluCONSTANT_VALUE));
-   constantValue->uintValue = clsDECL_GetByteSize(Decl);
+   constantValue->uintValue = clsDECL_GetByteSize(Compiler, Decl);
    dataSize = _ParseCreateConstant(Compiler,
                                    StartToken->lineNo,
                                    StartToken->stringNo,
@@ -6727,7 +6852,8 @@ IN cloIR_EXPR RightOperand
                RightOperand = constVariableExpr;
            }
         }
-        else if(clmDECL_IsUnderlyingStructOrUnion(&LeftOperand->decl)) {
+        else if(clmDECL_IsUnderlyingStructOrUnion(&LeftOperand->decl) &&
+                clGetOperandCountForRegAlloc(&LeftOperand->decl) > _cldMaxOperandCountToUseMemory) {
            gcmASSERT(clmDECL_IsUnderlyingStructOrUnion(&RightOperand->decl));
            status = clParseSetOperandAddressed(Compiler,
                                                LeftOperand);
@@ -7191,7 +7317,9 @@ clsNAME *VariableName
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    if (clmDECL_IsUnderlyingStructOrUnion(&VariableName->decl)) {
+/*klc*/
+    if (clmDECL_IsUnderlyingStructOrUnion(&VariableName->decl) &&
+        (clGetOperandCountForRegAlloc(&VariableName->decl) > _cldMaxOperandCountToUseMemory)) {
        clsNAME_SPACE *nameSpace;
 
        nameSpace = VariableName->decl.dataType->u.fieldSpace;
@@ -7208,6 +7336,39 @@ clsNAME *VariableName
        }
     }
     return status;
+}
+
+static clsDECL *
+_HandleSpecialType(
+IN cloCOMPILER Compiler,
+IN clsDECL *Decl
+)
+{
+    gceSTATUS status;
+    clsDATA_TYPE dataType[1];
+    clsDECL *declPtr;
+
+    gcmASSERT(Decl);
+    declPtr = Decl;
+    switch(declPtr->dataType->type) {
+    case T_IMAGE2D_PTR_T:
+        *dataType = *declPtr->dataType;
+        dataType->type = T_IMAGE2D_T;
+        status = cloCOMPILER_CloneDataType(Compiler,
+                                           declPtr->dataType->accessQualifier,
+                                           declPtr->dataType->addrSpaceQualifier,
+                                           dataType,
+                                           &declPtr->dataType);
+        if (gcmIS_ERROR(status)) return gcvNULL;
+        status = clParseAddIndirectionOneLevel(Compiler, &declPtr->ptrDscr);
+        if (gcmIS_ERROR(status)) return gcvNULL;
+        break;
+
+    default:
+        break;
+    }
+
+    return declPtr;
 }
 
 static gceSTATUS
@@ -7246,7 +7407,7 @@ IN clsLexToken * Identifier
         break;
 
     default:
-        declPtr = &DeclOrDeclListPtr->decl;
+        declPtr = _HandleSpecialType(Compiler,  &DeclOrDeclListPtr->decl);
         break;
     }
 
@@ -7391,7 +7552,7 @@ IN cloIR_EXPR ArrayLengthExpr
         break;
 
     default:
-        declPtr = &DeclOrDeclListPtr->decl;
+        declPtr = _HandleSpecialType(Compiler, &DeclOrDeclListPtr->decl);
         break;
     }
 
@@ -7406,7 +7567,7 @@ IN cloIR_EXPR ArrayLengthExpr
             if (gcmIS_ERROR(status)) return status;
         }
     }
-    if (clmDATA_TYPE_IsImage(declPtr->dataType)) {
+    if (clmDECL_IsImage(declPtr)) {
         gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                         Identifier->lineNo,
                         Identifier->stringNo,
@@ -7500,7 +7661,7 @@ IN cloIR_EXPR ArrayLengthExpr
         break;
 
     default:
-        declPtr = &DeclOrDeclListPtr->decl;
+        declPtr = _HandleSpecialType(Compiler, &DeclOrDeclListPtr->decl);
         break;
     }
 
@@ -8613,7 +8774,8 @@ IN cloIR_EXPR InitExpr
                                          &constant);
         if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
 
-        if(clmDECL_IsUnderlyingStructOrUnion(&name->decl)) {
+        if (clmDECL_IsUnderlyingStructOrUnion(&name->decl) &&
+            (clGetOperandCountForRegAlloc(&name->decl) > _cldMaxOperandCountToUseMemory)) {
            gctSIZE_T written;
            clsVARIABLE_NESTING *nesting = gcvNULL;
 
@@ -8654,7 +8816,7 @@ IN cloIR_EXPR InitExpr
            status = _MakeTypeCastArgsAsConstant(Compiler,
                                                 typeCastArgs,
                                                 0,
-                                                constant,
+                                                &constant->exprBase.decl,
                                                 constant->values,
                                                 constant->values + constant->valueCount);
            if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
@@ -8702,6 +8864,17 @@ IN cloIR_EXPR InitExpr
      break;
 
   case clvIR_POLYNARY_EXPR:
+     {
+         cloIR_CONSTANT constantExpr = gcvNULL;
+
+         status = cloIR_POLYNARY_EXPR_Evaluate(Compiler,
+                                               (cloIR_POLYNARY_EXPR) &initExpr->base,
+                                               &constantExpr);
+
+         if (gcmIS_SUCCESS(status) && constantExpr != gcvNULL) {
+             initExpr = &constantExpr->exprBase;
+         }
+     }
      break;
 
   default:
@@ -8776,7 +8949,7 @@ IN cloIR_EXPR InitExpr
               return DeclOrDeclListPtr;
            }
            *dataType = *initExpr->decl.dataType;
-           dataType->elementType = name->decl.dataType->elementType;
+           dataType->type = name->decl.dataType->type;
            status = cloCOMPILER_CloneDataType(Compiler,
                                               initExpr->decl.dataType->accessQualifier,
                                               initExpr->decl.dataType->addrSpaceQualifier,
@@ -8789,8 +8962,10 @@ IN cloIR_EXPR InitExpr
            name->u.variableInfo.u.constant->variable = name;
            /* if constant variable's elements are not scalar, make this to be allocated in driver */
            if (!clmDECL_IsPointerType(&name->decl) &&
-               (clmDECL_IsAggregateType(&name->decl) || clmDECL_IsExtendedVectorType(&name->decl))) {
-         /* force constant variable to be in constant address space */
+               (clmDECL_IsAggregateTypeOverRegLimit(&name->decl) ||
+                (clmDECL_IsExtendedVectorType(&name->decl) &&
+                 (clmDECL_IsPackedType(&name->decl) || !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))))) {
+             /* force constant variable to be in constant address space */
              status = cloCOMPILER_CloneDataType(Compiler,
                                                 name->decl.dataType->accessQualifier,
                                                 clvQUALIFIER_CONSTANT,
@@ -8800,19 +8975,26 @@ IN cloIR_EXPR InitExpr
 
              status =  clsNAME_SetVariableAddressed(Compiler,
                                                     name);
-             if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
+             return DeclOrDeclListPtr;
            }
-           return DeclOrDeclListPtr;
+           else goto AssignLhs;
         }
 
 #if _CREATE_UNNAMED_CONSTANT_IN_MEMORY
-        else if(clmDECL_IsAggregateType(&name->decl) || clmDECL_IsExtendedVectorType(&name->decl)) {
+        if(clmDECL_IsAggregateTypeOverRegLimit(&name->decl) ||
+           (clmDECL_IsExtendedVectorType(&name->decl) &&
+            (clmDECL_IsPackedType(&name->decl) || !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)))) {
            status = _CreateUnnamedConstantExpr(Compiler,
                                                &name->decl,
                                                (cloIR_CONSTANT) (&initExpr->base),
                                                &initExpr);
 
            if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
+
+           if(clmDECL_IsExtendedVectorType(&name->decl) && !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) &&
+              !((cloIR_CONSTANT) (&initExpr->base))->allValuesEqual) {
+               name->u.variableInfo.isInitializedWithExtendedVectorConstant = gcvTRUE;
+           }
         }
 #endif
      }
@@ -8833,15 +9015,6 @@ IN cloIR_EXPR InitExpr
                               name,
                               initExpr);
     }
-    status = cloIR_BINARY_EXPR_Construct(Compiler,
-                                         name->lineNo,
-                                         name->stringNo,
-                                         clvBINARY_ASSIGN,
-                                         lhs,
-                                         initExpr,
-                                         &binaryExpr);
-
-    if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
 
     if(cloCOMPILER_IsExternSymbolsAllowed(Compiler) &&
        !clmDECL_IsPointerType(&name->decl) &&
@@ -8853,6 +9026,16 @@ IN cloIR_EXPR InitExpr
         /* clear the extern storage qualifier as it has been initialized */
         name->decl.storageQualifier &= ~clvSTORAGE_QUALIFIER_EXTERN;
     }
+
+AssignLhs:
+    status = cloIR_BINARY_EXPR_Construct(Compiler,
+                                         name->lineNo,
+                                         name->stringNo,
+                                         clvBINARY_ASSIGN,
+                                         lhs,
+                                         initExpr,
+                                         &binaryExpr);
+    if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
 
     initStatement = &binaryExpr->exprBase.base;
 
@@ -8906,7 +9089,7 @@ IN clsLexToken *Identifier
         break;
 
     default:
-        declPtr = &DeclOrDeclListPtr->decl;
+        declPtr = _HandleSpecialType(Compiler, &DeclOrDeclListPtr->decl);
         break;
     }
 
@@ -9202,7 +9385,7 @@ IN clsLexToken *Identifier
         break;
 
     default:
-        declPtr = Decl;
+        declPtr = _HandleSpecialType(Compiler, Decl);
         break;
     }
 
@@ -9282,7 +9465,7 @@ IN clsLexToken *Identifier
         break;
 
     default:
-        declPtr = Decl;
+        declPtr = _HandleSpecialType(Compiler, Decl);
         break;
     }
 
@@ -10778,23 +10961,21 @@ IN cloIR_SET Statements
         }
     }
     else if(firstFuncName->type == clvKERNEL_FUNC_NAME) {
-        gctUINT paramCount;
+        gctUINT argCount = 0;
         clsNAME *paramName;
 
         (void)cloCOMPILER_KernelFuncDefined(Compiler);
-        gcmVERIFY_OK(cloNAME_GetParamCount(Compiler,
-                                           firstFuncName,
-                                           &paramCount));
-        cloCOMPILER_SetMaxKernelFunctionArgs(Compiler, paramCount);
 
         FOR_EACH_DLINK_NODE(&firstFuncName->u.funcInfo.localSpace->names, clsNAME, paramName) {
             if (paramName->type != clvPARAMETER_NAME) break;
             if(clmDECL_IsPointerType(&paramName->decl) &&
                paramName->decl.dataType->addrSpaceQualifier == clvQUALIFIER_LOCAL) {
                cloCOMPILER_SetHasLocalMemoryKernelArg(Compiler);
-               break;
             }
+            argCount += clGetOperandCountForRegAllocByName(paramName);
         }
+
+        cloCOMPILER_SetMaxKernelFunctionArgs(Compiler, argCount);
     }
 }
 
@@ -10870,7 +11051,7 @@ IN clsLexToken * Identifier
         break;
 
     default:
-        declPtr = Decl;
+        declPtr = _HandleSpecialType(Compiler, Decl);
         break;
     }
 
@@ -11138,6 +11319,11 @@ IN clsDECL *Decl
         inTypeCast = gcvTRUE;
         break;
 
+    case T_UNIFORM:
+        accessQualifier = TypeQualifier->qualifier;
+        mustAtGlobalNameSpace = gcvTRUE;
+        break;
+
     case T_LOCAL:
         addrSpaceQualifier = TypeQualifier->qualifier;
         mustAtGlobalNameSpace = gcvFALSE;
@@ -11401,10 +11587,10 @@ IN clsDATA_TYPE * StructType
 
     if (StructType == gcvNULL) return gcvNULL;
     status = cloCOMPILER_CloneDataType(Compiler,
-                       clvQUALIFIER_NONE,
-                        clvQUALIFIER_NONE,
-                       StructType,
-                                           &dataType);
+                                       clvQUALIFIER_NONE,
+                                       clvQUALIFIER_NONE,
+                                       StructType,
+                                       &dataType);
     if (gcmIS_ERROR(status)) return gcvNULL;
     return dataType;
 }
@@ -11895,6 +12081,9 @@ IN slsDLINK_LIST * FieldDeclList
    else if(Decl->dataType->type == T_ENUM) {
       derivedType = Decl->dataType->u.enumerator;
    }
+   else {
+      declPtr = _HandleSpecialType(Compiler, declPtr);
+   }
 
    do {
       if (clmDECL_IsVoid(declPtr)) {
@@ -12131,13 +12320,18 @@ IN slsSLINK_LIST *TypeQualifierList,
 IN slsSLINK_LIST *PtrDscr
 )
 {
-   gcmASSERT(TypeQualifierList);
+   slsSLINK_LIST *typeQualifierList;
    gcmASSERT(PtrDscr);
+
+   typeQualifierList = TypeQualifierList;
+   if(typeQualifierList == gcvNULL) {
+       typeQualifierList = clParseEmptyTypeQualifierList(Compiler);
+   }
 
 /* Put pointer descriptors at head of new type qualifier list to maintain first in
    first out for expression evaluation later */
-   slmSLINK_LIST_Prepend(PtrDscr, TypeQualifierList);
-   return TypeQualifierList;
+   slmSLINK_LIST_Prepend(PtrDscr, typeQualifierList);
+   return typeQualifierList;
 }
 
 clsNAME *

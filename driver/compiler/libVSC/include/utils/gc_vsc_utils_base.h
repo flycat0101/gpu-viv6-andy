@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -75,6 +75,9 @@ void* vscBSNODE_GetContainedUserData(VSC_BASE_NODE* pBaseNode);
 gctINT vscFindPopulation(gctUINT uInt);
 gctINT vscFindLeastSigBit(gctUINT uInt);
 gctINT vscFindMostSigBit(gctUINT uInt);
+
+/* Some data-digest algorithms */
+gctUINT vscEvaluateCRC32(void *pData, gctUINT dataSizeInByte);
 
 #define vscMIN(a,b) (((a) < (b)) ? (a) : (b))
 #define vscMAX(a,b) (((a) > (b)) ? (a) : (b))

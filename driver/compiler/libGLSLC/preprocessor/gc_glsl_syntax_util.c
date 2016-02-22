@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -302,46 +302,62 @@ In    :    This function inputStream called just after the name of #define
 gceSTATUS
 ppoPREPROCESSOR_Define_BufferArgs(ppoPREPROCESSOR PP, ppoTOKEN* args, gctINT* argc)
 {
-    ppoTOKEN ntoken = gcvNULL;
-    ppoTOKEN colon    = gcvNULL;
-    ppoTOKEN lastone    = gcvNULL;
+    ppoTOKEN    ntoken = gcvNULL;
+    ppoTOKEN    colon    = gcvNULL;
+    ppoTOKEN    lastone    = gcvNULL;
     gctBOOL     boolean= gcvFALSE;
-    gceSTATUS    status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+    gctBOOL     firstToken = gcvTRUE;
+    gceSTATUS   status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
 
     gcmHEADER_ARG("PP=0x%x args=0x%x argc=0x%x", PP, args, argc);
 
-    gcmASSERT( (*args) == gcvNULL && (*argc) == 0 );
+    gcmASSERT((*args) == gcvNULL && (*argc) == 0);
 
-    while(1)
+    /* Get first token. */
+    gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace));
+
+    while (gcvTRUE)
     {
-        status = PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace);
+        /* If this token is a ')', return. */
+        if (ntoken->poolString == PP->keyword->rpara)
+        {
+            break;
+        }
+        /* If this token is a ',', then we expect that the next token is a ID. */
+        else if (ntoken->poolString == PP->keyword->comma)
+        {
+            gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+            ntoken = gcvNULL;
 
-        if(status != gcvSTATUS_OK)
-        {
-            gcmFOOTER();
-            return status;
+            if (firstToken)
+            {
+                ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR, "Id is expected.");
+                gcmONERROR(gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR);
+            }
+
+            /* Get the next token, expect a ID token. */
+            gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace));
+            if (ntoken->type != ppvTokenType_ID)
+            {
+                ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR, "Id is expected.");
+                gcmONERROR(gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR);
+            }
         }
-        /*Get One Para*/
-        if(ntoken->type != ppvTokenType_ID)
-        {
-            ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR, "Id is expected.");
-            gcmONERROR(gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR);
-        }
-        else
+        /* If this token is a ID, check this ID. */
+        else if (ntoken->type == ppvTokenType_ID)
         {
             /*Check if this para inputStream already in the list*/
             ppoTOKEN_STREAM_FindID(PP, *args,ntoken->poolString, &boolean);
-            if(boolean)
+            if (boolean)
             {
                 ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
                     "The formal para name should not be the same.%s.",ntoken->poolString);
                 gcmONERROR(gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR);
             }
-
             colon = ntoken;
 
             /*Add this formal para to the para stack.*/
-            if(*args)
+            if (*args)
             {
                 if (lastone == gcvNULL)
                     gcmONERROR(gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR);
@@ -352,45 +368,32 @@ ppoPREPROCESSOR_Define_BufferArgs(ppoPREPROCESSOR PP, ppoTOKEN* args, gctINT* ar
                 lastone = colon;
                 ++(*argc);
             }
-            else{
+            else
+            {
                 *args = colon;
                 lastone = *args;
                 ++(*argc);
             }
-        }
 
-        gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace));
+            /* Get the next token. */
+            gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace));
 
-        if(ntoken->poolString != PP->keyword->comma)
-        {
-            if(ntoken->poolString != PP->keyword->rpara)
+            /* Expect ',' or ')'. */
+            if (ntoken->poolString != PP->keyword->rpara &&
+                ntoken->poolString != PP->keyword->comma)
             {
-                ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
-                    "Need a ) here.");
+                ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR, "',' or ')' is expected.");
                 gcmONERROR(gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR);
             }
-            else
-            {
-                status = ppoTOKEN_Destroy(PP, ntoken);
-                if (gcmIS_SUCCESS(status))
-                {
-                    gcmFOOTER_NO();
-                    return gcvSTATUS_OK;
-                }
-                else
-                {
-                    gcmFOOTER();
-                    return status;
-                }
-            }
+        }
+        else
+        {
+            ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR, "Id is expected.");
+            gcmONERROR(gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR);
         }
 
-        gcmONERROR(
-            ppoTOKEN_Destroy(PP, ntoken)
-            );
-        ntoken = gcvNULL;
-
-    }/*while(1)*/
+        firstToken = gcvFALSE;
+    }
 
 OnError:
     if (ntoken != gcvNULL)
@@ -401,6 +404,7 @@ OnError:
     gcmFOOTER();
     return status;
 }
+
 /******************************************************************************\
 Buffer Actual Args
 When meet a macro call in texline, we call this function to collect

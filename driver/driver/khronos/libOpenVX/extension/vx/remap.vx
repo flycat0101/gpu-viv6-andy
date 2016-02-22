@@ -1,0 +1,31 @@
+#include "cl_viv_vx_ext.h"
+
+#define VXC_INTERPOLATION_TYPE_NEAREST_NEIGHBOR 0x4000
+#define VXC_INTERPOLATION_TYPE_BILINEAR 0x4001
+#define VXC_INTERPOLATION_TYPE_AREA 0x4000
+
+__kernel void remap
+(
+    __read_only image2d_t  	in_image,
+    vx_remap       			in_remap,
+	int		 				policy,
+    __write_only image2d_t 	out_image
+)
+{
+    const int pX = get_global_id(0);
+    const int pY = get_global_id(1);
+	int info = VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0);
+	vxc_uchar16 v;
+
+	if(policy == VXC_INTERPOLATION_TYPE_NEAREST_NEIGHBOR)
+	{
+		float2 loc;
+		float* ptr = in_remap.ptr + pY * 2 * in_remap.dst_width + pX * 2;
+		loc.x = *ptr;
+		loc.y = *(ptr + 1);
+
+		v = viv_intrinsic_vx_read_imageuc(in_image, (int2)convert_int2(loc));
+	}
+
+	viv_intrinsic_vxmc_write_imageuc(out_image, (int2)(pX, pY), v, info);
+}

@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -140,6 +140,10 @@ ifeq ($(EGL_API_DFB), 1)
   LIBS += -L$(DFB_DIR)/lib -ldirectfb -ldirect -lz
 endif
 
+ifeq ($(EGL_API_GBM), 1)
+  LIBS += $(shell $(PKG_CONFIG) --libs libdrm gbm)
+endif
+
 # Supply necessary libraries.
 LIBS += -lm -pthread -ldl -lrt
 
@@ -234,19 +238,21 @@ ifeq ($(VIVANTE_ENABLE_3D),1)
 endif
 	@-cd $(SDK_DIR)/include/HAL; echo "#include \"HAL/gc_hal.h\"" >aqHal.h; cd -
 ifeq ($(gcdSTATIC_LINK), 0)
-  ifeq ($(EGL_API_FB), 1)
-    ifeq ($(EGL_API_WL), 1)
-	@-cp -f $(TARGET_MODULE) $(INSTALL_DIR)/libGAL.wl.so
-    else
+  ifeq ($(EGL_API_FB)_$(EGL_API_WL), 1_0)
 	@-cp -f $(TARGET_MODULE) $(INSTALL_DIR)/libGAL.fb.so
-    endif # EGL_API_WL
-  else
-    ifeq ($(EGL_API_DRI), 1)
-	@-cp -f $(TARGET_MODULE) $(INSTALL_DIR)/libGAL.dri.so
-    else
-	@-cp -f $(TARGET_MODULE) $(INSTALL_DIR)/libGAL.x11.so
-    endif # EGL_API_DRI
   endif # EGL_API_FB
+  ifeq ($(EGL_API_FB)_$(EGL_API_WL), 1_1)
+	@-cp -f $(TARGET_MODULE) $(INSTALL_DIR)/libGAL.wl.so
+  endif # EGL_API_WL
+  ifeq ($(EGL_API_DRI), 1)
+	@-cp -f $(TARGET_MODULE) $(INSTALL_DIR)/libGAL.dri.so
+  endif # EGL_API_DRI
+  ifeq ($(EGL_API_X), 1)
+	@-cp -f $(TARGET_MODULE) $(INSTALL_DIR)/libGAL.x11.so
+  endif # EGL_API_X
+  ifeq ($(EGL_API_GBM), 1)
+	@-cp -f $(TARGET_MODULE) $(INSTALL_DIR)/libGAL.gbm.so
+  endif # EGL_API_GBM
 endif # gcdSTATIC_LINK
 
 ################################################################################

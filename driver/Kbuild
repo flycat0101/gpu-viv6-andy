@@ -2,7 +2,7 @@
 #
 #    The MIT License (MIT)
 #
-#    Copyright (c) 2014 - 2015 Vivante Corporation
+#    Copyright (c) 2014 - 2016 Vivante Corporation
 #
 #    Permission is hereby granted, free of charge, to any person obtaining a
 #    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 #
 #    The GPL License (GPL)
 #
-#    Copyright (C) 2014 - 2015 Vivante Corporation
+#    Copyright (C) 2014 - 2016 Vivante Corporation
 #
 #    This program is free software; you can redistribute it and/or
 #    modify it under the terms of the GNU General Public License
@@ -67,6 +67,7 @@ OS_KERNEL_DIR   := hal/os/linux/kernel
 ARCH_KERNEL_DIR := hal/kernel/arch
 ARCH_VG_KERNEL_DIR := hal/kernel/archvg
 HAL_KERNEL_DIR  := hal/kernel
+TA_DIR          := hal/security_v1
 HOST := $(shell hostname)
 
 # Get platform config path.
@@ -94,7 +95,7 @@ OBJS := $(OS_KERNEL_DIR)/gc_hal_kernel_device.o \
         $(OS_KERNEL_DIR)/gc_hal_kernel_allocator.o \
         $(OS_KERNEL_DIR)/allocator/default/gc_hal_kernel_allocator_user_memory.o \
         $(OS_KERNEL_DIR)/allocator/default/gc_hal_kernel_allocator_dma.o \
-        $(OS_KERNEL_DIR)/gc_hal_kernel_probe.o \
+        $(OS_KERNEL_DIR)/gc_hal_kernel_driver.o \
         $(OS_KERNEL_DIR)/platform/$(PLATFORM).o
 
 ifneq ($(CONFIG_DMA_SHARED_BUFFER),)
@@ -114,7 +115,8 @@ OBJS += $(HAL_KERNEL_DIR)/gc_hal_kernel.o \
         $(HAL_KERNEL_DIR)/gc_hal_kernel_heap.o \
         $(HAL_KERNEL_DIR)/gc_hal_kernel_mmu.o \
         $(HAL_KERNEL_DIR)/gc_hal_kernel_video_memory.o \
-        $(HAL_KERNEL_DIR)/gc_hal_kernel_power.o
+        $(HAL_KERNEL_DIR)/gc_hal_kernel_power.o \
+        $(HAL_KERNEL_DIR)/gc_hal_kernel_security_v1.o
 
 OBJS += $(ARCH_KERNEL_DIR)/gc_hal_kernel_context.o \
         $(ARCH_KERNEL_DIR)/gc_hal_kernel_hardware.o
@@ -147,6 +149,12 @@ endif
 ifneq ($(CUSTOMER_ALLOCATOR_OBJS),)
 OBJS += $(CUSTOMER_ALLOCATOR_OBJS)
 endif
+
+OBJS += $(OS_KERNEL_DIR)/gc_hal_kernel_security_channel_emulator.o \
+        $(TA_DIR)/gc_hal_ta.o \
+        $(TA_DIR)/gc_hal_ta_hardware.o \
+        $(TA_DIR)/gc_hal_ta_mmu.o \
+        $(TA_DIR)/os/emulator/gc_hal_ta_emulator.o
 
 ifeq ($(KERNELRELEASE), )
 
@@ -251,12 +259,6 @@ else
 EXTRA_CFLAGS += -DgcdENABLE_VG=1
 endif
 
-ifeq ($(ENABLE_OUTER_CACHE_PATCH), 1)
-EXTRA_CFLAGS += -DgcdENABLE_OUTER_CACHE_PATCH=1
-else
-EXTRA_CFLAGS += -DgcdENABLE_OUTER_CACHE_PATCH=0
-endif
-
 ifeq ($(USE_BANK_ALIGNMENT), 1)
     EXTRA_CFLAGS += -DgcdENABLE_BANK_ALIGNMENT=1
     ifneq ($(BANK_BIT_START), 0)
@@ -287,12 +289,15 @@ EXTRA_CFLAGS += -I$(AQROOT)/hal/kernel/arch
 EXTRA_CFLAGS += -I$(AQROOT)/hal/kernel/inc
 EXTRA_CFLAGS += -I$(AQROOT)/hal/os/linux/kernel
 EXTRA_CFLAGS += -I$(AQROOT)/$(ALLOCATOR_ARRAY_H_LOCATION)
+EXTRA_CFLAGS += -I$(AQROOT)/hal/security_v1/
 
 ifeq ($(VIVANTE_ENABLE_VG), 1)
 EXTRA_CFLAGS += -I$(AQROOT)/hal/kernel/archvg
 endif
 
 EXTRA_CFLAGS += -DHOST=\"$(HOST)\"
+
+EXTRA_CFLAGS += -DgcdENABLE_TRUST_APPLICATION=1
 
 obj-m = $(MODULE_NAME).o
 

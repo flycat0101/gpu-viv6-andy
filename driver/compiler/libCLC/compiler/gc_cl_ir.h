@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -19,6 +19,7 @@
 #define cldMAX_VECTOR_COMPONENT  16    /*maximum number of components in a vector */
 #define cldBASIC_VECTOR_SIZE    4      /*Size of a basic vector object: any sized vector
                                          will need to be a multiple of this */
+#define cldBASIC_VECTOR_BYTE_SIZE (cldBASIC_VECTOR_SIZE * cldMachineBytesPerWord)
 #define cldMAX_ARRAY_DIMENSION  4      /*maximum number of dimension for array allowed */
 
 
@@ -200,12 +201,14 @@ typedef enum _cleELEMENT_TYPE
     clvTYPE_SHORT_PACKED,
     clvTYPE_USHORT_PACKED,
     clvTYPE_HALF_PACKED,
+    clvTYPE_IMAGE2D_PTR_T,
     clvTYPE_SIU_GEN,  /* All non generic types should be defined before this */
     clvTYPE_I_GEN,
     clvTYPE_U_GEN,
     clvTYPE_IU_GEN,
     clvTYPE_F_GEN,
-    clvTYPE_GEN
+    clvTYPE_GEN,
+    clvTYPE_GEN_PACKED,
 } cltELEMENT_TYPE;
 
 #define cldFirstGenType clvTYPE_SIU_GEN
@@ -259,6 +262,14 @@ typedef enum _cleELEMENT_TYPE
 
 #define clmIsElementTypeSampler(EType) \
  ((EType) == clvTYPE_SAMPLER_T)
+
+#define clmIsElementTypeImage(EType) \
+    ((EType) == clvTYPE_IMAGE2D_T || \
+     (EType) == clvTYPE_IMAGE3D_T || \
+     (EType) == clvTYPE_IMAGE1D_T || \
+     (EType) == clvTYPE_IMAGE2D_ARRAY_T || \
+     (EType) == clvTYPE_IMAGE1D_ARRAY_T || \
+     (EType) == clvTYPE_IMAGE1D_BUFFER_T)
 
 #define clmIsElementTypeEvent(EType) \
  ((EType) == clvTYPE_EVENT_T)
@@ -402,6 +413,7 @@ typedef struct _clsDECL
 
 gctUINT
 clPermissibleAlignment(
+cloCOMPILER Compiler,
 clsDECL *Decl
 );
 
@@ -451,11 +463,13 @@ IN clsDECL * Decl
 
 gctSIZE_T
 clsDECL_GetByteSize(
+IN cloCOMPILER Compiler,
 IN clsDECL * Decl
 );
 
 gctSIZE_T
 clsDECL_GetElementByteSize(
+IN cloCOMPILER Compiler,
 IN clsDECL * Decl,
 OUT gctUINT * Alignment,
 OUT gctBOOL * Packed
@@ -463,7 +477,14 @@ OUT gctBOOL * Packed
 
 gctSIZE_T
 clsDECL_GetPointedToByteSize(
+IN cloCOMPILER Compiler,
 IN clsDECL * Decl
+);
+
+gctSIZE_T
+clGetVectorElementByteSize(
+IN cloCOMPILER Compiler,
+IN cltELEMENT_TYPE ElementType
 );
 
 gctSIZE_T
@@ -559,12 +580,7 @@ IN clsDECL * RDecl
      (DataType)->elementType == clvTYPE_UNION)
 
 #define clmDATA_TYPE_IsImage(DataType) \
-    ((DataType)->elementType == clvTYPE_IMAGE2D_T || \
-     (DataType)->elementType == clvTYPE_IMAGE3D_T || \
-     (DataType)->elementType == clvTYPE_IMAGE1D_T || \
-     (DataType)->elementType == clvTYPE_IMAGE2D_ARRAY_T || \
-     (DataType)->elementType == clvTYPE_IMAGE1D_ARRAY_T || \
-     (DataType)->elementType == clvTYPE_IMAGE1D_BUFFER_T)
+    clmIsElementTypeImage((DataType)->elementType)
 
 #define clmDATA_TYPE_IsSampler(DataType) \
     ((DataType)->type == T_SAMPLER_T)
@@ -726,13 +742,13 @@ IN clsDECL * RDecl
 
 #define clmDECL_IsImage(Decl) \
     (clmDATA_TYPE_IsImage((Decl)->dataType) && \
-        (Decl)->ptrDscr == gcvNULL && \
-        (Decl)->array.numDim == 0)
+     (Decl)->ptrDscr == gcvNULL && \
+     (Decl)->array.numDim == 0)
 
 #define clmDECL_IsSampler(Decl) \
     (clmDATA_TYPE_IsSampler((Decl)->dataType) && \
-        (Decl)->ptrDscr == gcvNULL && \
-        (Decl)->array.numDim == 0)
+     (Decl)->ptrDscr == gcvNULL && \
+     (Decl)->array.numDim == 0)
 
 #define clmDECL_IsTypeDef(Decl) \
     ((Decl)->dataType->elementType == clvTYPE_TYPEDEF)
@@ -862,6 +878,8 @@ typedef struct _clsNAME
         gctBOOL  allocated;  /* variable's memory has been allocated */
         gctBOOL  inInterfaceBlock;  /* variable has put into interface block */
         gctBOOL  isUnnamedConstant;  /* variable is an unnamed constant */
+        gctBOOL  isInitializedWithExtendedVectorConstant;  /* variable is initialized with constant */
+        gctBOOL  indirectlyAddressed;  /* variable whose elements are indirectly addressed */
       } variableInfo;
       struct { /* enum, struct, union or typedefs */
         cltATTR_FLAGS  specifiedAttr;
@@ -1557,6 +1575,7 @@ struct _cloIR_CONSTANT
     cluCONSTANT_VALUE * values;
     gctSTRING buffer;
     clsNAME * variable;
+    gcUNIFORM uniform;
     gctBOOL allValuesEqual;
 };
 
@@ -2064,6 +2083,9 @@ clGetIRPolynaryExprTypeName(
     IN clePOLYNARY_EXPR_TYPE PolynaryExprType
     );
 
+gctCONST_STRING
+clGetElementTypeName(IN cltELEMENT_TYPE ElementType);
+
 gceSTATUS
 cloIR_POLYNARY_EXPR_Construct(
     IN cloCOMPILER Compiler,
@@ -2130,6 +2152,7 @@ cloIR_POLYNARY_EXPR_Evaluate(
 
 gctSIZE_T
 clAlignMemory(
+cloCOMPILER Compiler,
 clsNAME *Variable,
 gctSIZE_T MemorySize
 );

@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -47,6 +47,7 @@ LOCAL_SRC_FILES += \
     gc_hal_user_hardware_engine.c \
     gc_hal_user_hardware_frag_proc.c \
     gc_hal_user_hardware_texture.c \
+    gc_hal_user_hardware_texture_upload.c \
     gc_hal_user_hardware_stream.c \
     gc_hal_user_hardware_composition.c
 

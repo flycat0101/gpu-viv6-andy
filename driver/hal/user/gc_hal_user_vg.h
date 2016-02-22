@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -313,17 +313,6 @@ gcoVGHARDWARE_Commit(
     IN gctBOOL Stall
     );
 
-/* Resolve. */
-gceSTATUS
-gcoVGHARDWARE_ResolveRect(
-    IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR SrcInfo,
-    IN gcsSURF_INFO_PTR DestInfo,
-    IN gcsPOINT_PTR SrcOrigin,
-    IN gcsPOINT_PTR DestOrigin,
-    IN gcsPOINT_PTR RectSize
-    );
-
 /* Query the identity of the hardware. */
 gceSTATUS
 gcoVGHARDWARE_QueryChipIdentity(
@@ -352,7 +341,7 @@ gcoVGHARDWARE_QueryTargetCaps(
 /* Query the tile size of the given surface. */
 gceSTATUS
 gcoVGHARDWARE_GetSurfaceTileSize(
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     OUT gctINT32 * TileWidth,
     OUT gctINT32 * TileHeight
     );
@@ -381,7 +370,7 @@ gcoVGHARDWARE_QueryTileStatus(
 gceSTATUS
 gcoVGHARDWARE_EnableTileStatus(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gctUINT32 TileStatusAddress
     );
 
@@ -389,7 +378,7 @@ gcoVGHARDWARE_EnableTileStatus(
 gceSTATUS
 gcoVGHARDWARE_DisableTileStatus(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gctBOOL CommitAndStall
     );
 
@@ -397,14 +386,14 @@ gcoVGHARDWARE_DisableTileStatus(
 gceSTATUS
 gcoVGHARDWARE_FlushTileStatus(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface
+    IN gcoSURF Surface
     );
 
 /* Mark surface as dirty. */
 gceSTATUS
 gcoVGHARDWARE_InvalidateSurface(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface
+    IN gcoSURF Surface
     );
 
 /* Lock a surface. */
@@ -540,8 +529,8 @@ gcoVGHARDWARE_ConvertPixel(
 gceSTATUS
 gcoVGHARDWARE_CopyPixels(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Source,
-    IN gcsSURF_INFO_PTR Target,
+    IN gcoSURF Source,
+    IN gcoSURF Target,
     IN gctINT SourceX,
     IN gctINT SourceY,
     IN gctINT TargetX,
@@ -754,7 +743,7 @@ gcoVGHARDWARE_FlushVgMask(
 gceSTATUS
 gcoVGHARDWARE_SetVgMask(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Mask
+    IN gcoSURF Mask
     );
 
 gceSTATUS
@@ -854,7 +843,7 @@ gcoVGHARDWARE_SetPaintPattern(
 gceSTATUS
 gcoVGHARDWARE_SetPaintImage(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Image,
+    IN gcoSURF Image,
     IN gceTILE_MODE TileMode,
     IN gceIMAGE_FILTER Filter,
     IN gctUINT32 FillColor
@@ -863,7 +852,7 @@ gcoVGHARDWARE_SetPaintImage(
 gceSTATUS
 gcoVGHARDWARE_SetVgTarget(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Target
+    IN gcoSURF Target
     );
 
 gceSTATUS
@@ -929,7 +918,7 @@ gcoVGHARDWARE_VgClear(
 gceSTATUS
 gcoVGHARDWARE_DrawImage(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Image,
+    IN gcoSURF Image,
     IN gcsVG_RECT_PTR SrcRect,
     IN gcsVG_RECT_PTR TrgRect,
     IN gceIMAGE_FILTER Filter,
@@ -941,7 +930,7 @@ gceSTATUS
 gcoVGHARDWARE_TesselateImage(
     IN gcoVGHARDWARE Hardware,
     IN gctBOOL SoftwareTesselation,
-    IN gcsSURF_INFO_PTR Image,
+    IN gcoSURF Image,
     IN gcsVG_RECT_PTR Rectangle,
     IN gceIMAGE_FILTER Filter,
     IN gctBOOL Mask,
@@ -953,7 +942,7 @@ gcoVGHARDWARE_TesselateImage(
 gceSTATUS
 gcoVGHARDWARE_DrawSurfaceToImage(
     IN gcoVGHARDWARE Hardware,
-    IN const gcsSURF_INFO_PTR Image,
+    IN const gcoSURF Image,
     IN const gcsVG_RECT_PTR SrcRectangle,
     IN const gcsVG_RECT_PTR DstRectangle,
     IN gceIMAGE_FILTER Filter,
@@ -965,8 +954,8 @@ gcoVGHARDWARE_DrawSurfaceToImage(
 gceSTATUS
 gcoVGHARDWARE_VgBlit(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Source,
-    IN gcsSURF_INFO_PTR Target,
+    IN gcoSURF Source,
+    IN gcoSURF Target,
     IN gcsVG_RECT_PTR SrcRect,
     IN gcsVG_RECT_PTR TrgRect,
     IN gceIMAGE_FILTER Filter,
@@ -995,8 +984,8 @@ gcoVGHARDWARE_SetColorMatrix(
 gceSTATUS
 gcoVGHARDWARE_ColorMatrix(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Source,
-    IN gcsSURF_INFO_PTR Target,
+    IN gcoSURF Source,
+    IN gcoSURF Target,
     IN const gctFLOAT * Matrix,
     IN gceCHANNEL ColorChannels,
     IN gctBOOL FilterLinear,
@@ -1010,8 +999,8 @@ gcoVGHARDWARE_ColorMatrix(
 gceSTATUS
 gcoVGHARDWARE_SeparableConvolve(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Source,
-    IN gcsSURF_INFO_PTR Target,
+    IN gcoSURF Source,
+    IN gcoSURF Target,
     IN gctINT KernelWidth,
     IN gctINT KernelHeight,
     IN gctINT ShiftX,
@@ -1035,8 +1024,8 @@ gcoVGHARDWARE_SeparableConvolve(
 gceSTATUS
 gcoVGHARDWARE_GaussianBlur(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Source,
-    IN gcsSURF_INFO_PTR Target,
+    IN gcoSURF Source,
+    IN gcoSURF Target,
     IN gctFLOAT StdDeviationX,
     IN gctFLOAT StdDeviationY,
     IN gceTILE_MODE TilingMode,
@@ -1063,6 +1052,42 @@ gcoVGHARDWARE_GetProductName(
     IN OUT gctSTRING *ProductName
     );
 
+#if gcdVG_ONLY
+/* Color Key States. */
+gceSTATUS
+gcoVGHARDWARE_SetColorKey(
+    IN gcoVGHARDWARE Hardware,
+    IN gctUINT32     Values[28],
+    IN gctBOOL       Enables[4]
+    );
+
+/* Index Color States. */
+gceSTATUS
+gcoVGHARDWARE_SetColorIndexTable(
+    IN gcoVGHARDWARE Hardware,
+    IN gctUINT32     *Values,
+    IN gctINT32      Count
+    );
+
+/* VG RS feature. */
+gceSTATUS
+gcoVGHARDWARE_ResolveRect(
+    IN gcoVGHARDWARE    Hardware,
+    IN gcoSURF          Source,
+    IN gcoSURF          Target,
+    IN gctINT32         SX,
+    IN gctINT32         SY,
+    IN gctINT32         DX,
+    IN gctINT32         DY,
+    IN gctINT32         Width,
+    IN gctINT32         Height,
+    IN gctINT32         Src_uv,
+    IN gctINT32         Src_standard,
+    IN gctINT32         Dst_uv,
+    IN gctINT32         Dst_standard,
+    IN gctINT32         Dst_alpha
+    );
+#endif
 
 /******************************************************************************\
 ******************************** gcoVGBUFFER Object *******************************

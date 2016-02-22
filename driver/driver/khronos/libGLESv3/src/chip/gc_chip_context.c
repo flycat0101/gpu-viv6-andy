@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -151,28 +151,6 @@ OnError:
 }
 
 
-__GL_INLINE gceSTATUS
-gcChipGetResetTimeStamp(
-    __GLcontext *gc,
-    __GLchipContext *chipCtx
-    )
-{
-    gceSTATUS status;
-    gctUINT64 resetTimeStamp = 0;
-
-    gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
-
-    gcmONERROR(gcoHAL_QueryResetTimeStamp(&resetTimeStamp));
-
-    if (resetTimeStamp != chipCtx->resetTimeStamp)
-    {
-        chipCtx->resetTimeStamp = resetTimeStamp;
-    }
-
-OnError:
-    gcmFOOTER();
-    return status;
-}
 
 __GL_INLINE gceSTATUS
 gcChipGetSampleLocations(
@@ -530,7 +508,8 @@ gcChipInitExtension(
 
         if (chipCtx->patchId == gcvPATCH_GTFES30 || chipCtx->patchId == gcvPATCH_DEQP)
         {
-            if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_ASTC_FIX) == gcvSTATUS_TRUE)
+            if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_ASTC) &&
+                gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_ASTC_FIX) == gcvSTATUS_TRUE)
             {
                 __glExtension[__GL_EXTID_KHR_texture_compression_astc_ldr].bEnabled = GL_TRUE;
             }
@@ -556,6 +535,8 @@ gcChipInitExtension(
         __glExtension[__GL_EXTID_KHR_blend_equation_advanced].bEnabled = GL_TRUE;
         __glExtension[__GL_EXTID_OES_texture_storage_multisample_2d_array].bEnabled = GL_TRUE;
         __glExtension[__GL_EXTID_OES_shader_image_atomic].bEnabled = GL_TRUE;
+        __glExtension[__GL_EXTID_EXT_primitive_bounding_box].bEnabled = GL_TRUE;
+        __glExtension[__GL_EXTID_OES_primitive_bounding_box].bEnabled = GL_TRUE;
         __glExtension[__GL_EXTID_KHR_debug].bEnabled = GL_TRUE;
         __glExtension[__GL_EXTID_KHR_robustness].bEnabled = GL_TRUE;
 
@@ -601,10 +582,6 @@ gcChipInitExtension(
 
             __glExtension[__GL_EXTID_OES_tessellation_shader].bEnabled = gcvTRUE;
             __glExtension[__GL_EXTID_OES_tessellation_point_size].bEnabled = gcvTRUE;
-
-            __glExtension[__GL_EXTID_EXT_primitive_bounding_box].bEnabled = GL_TRUE;
-            __glExtension[__GL_EXTID_OES_primitive_bounding_box].bEnabled = GL_TRUE;
-
         }
 
         if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_DRAW_ELEMENTS_BASE_VERTEX) == gcvSTATUS_TRUE)
@@ -802,6 +779,14 @@ gcChipInitChipFeature(
     chipFeature->txDefaultValueFix = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_DEFAULT_VALUE_FIX);
 
     chipFeature->hasCommandPrefetch = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_COMMAND_PREFETCH);
+
+    chipFeature->hasYuvAssembler10bit = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_YUV_ASSEMBLER_10BIT);
+
+    chipFeature->supportMSAA2X = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SUPPORT_MSAA2X);
+
+    chipFeature->hasSecurity = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SECURITY);
+
+    chipFeature->hasRobustness = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_ROBUSTNESS);
 
     /* Get Halti support level */
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_HALTI5))
@@ -1010,7 +995,7 @@ __glChipQueryFormatInfo(
 
     if (samples)
     {
-        size = __GL_MIN(gcmCOUNTOF(formatMapInfo->samples), (unsigned int)bufsize);
+        size = __GL_MIN((numbSamples?4:1), bufsize);
         size = __GL_MIN(size, numbSamples);
         __GL_MEMCOPY(samples, formatMapInfo->samples, size * sizeof(GLint));
     }
@@ -1044,7 +1029,16 @@ __glChipGetDeviceConstants(
     tsAvailable = (gcvSTATUS_TRUE == gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TESSELLATION));
     gsAvailable = (gcvSTATUS_TRUE == gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_GEOMETRY_SHADER));
 
-    if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI2) ||
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_HALTI5) &&
+        tsAvailable &&
+        gsAvailable)
+    {
+        gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION32);
+        constants->GLSLVersion =__GL_GLSL_VERSION32;
+        constants->majorVersion = 3;
+        constants->minorVersion = 2;
+    }
+    else if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI2) ||
         (chipModel == gcv900 && chipRevision == 0x5250))
     {
         gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION31);
@@ -1689,6 +1683,11 @@ __glChipCreateContext(
 
     gcChipInitChipFeature(gc, chipCtx);
 
+    /* Only enable stencil opt for those conformance tests */
+    chipCtx->needStencilOpt = chipCtx->patchId == gcvPATCH_GTFES30 ||
+                              chipCtx->patchId == gcvPATCH_DEQP    ||
+                              chipCtx->patchId == gcvPATCH_ANTUTUGL3;
+
 #if VIVANTE_PROFILER
     if (__glesApiProfileMode >= 1)
     {
@@ -1701,7 +1700,7 @@ __glChipCreateContext(
     }
 
     /* Get the 3D engine pointer. */
-    gcmONERROR(gco3D_Construct(chipCtx->hal, &chipCtx->engine));
+    gcmONERROR(gco3D_Construct(chipCtx->hal, gc->imports.robustAccess, &chipCtx->engine));
 
     /* Set API type to OpenGL. */
     gcmONERROR(gco3D_SetAPI(chipCtx->engine, (__GL_API_VERSION_ES20 == gc->apiVersion) ?
@@ -1716,6 +1715,7 @@ __glChipCreateContext(
         /* Reduce FBO size to shorten CTS time */
         constants->maxTextureSize = 2048;
         constants->maxRenderBufferSize = 2048;
+        constants->maxNumTextureLevels = __glFloorLog2(constants->maxTextureSize) + 1;
 
         constants->shaderCaps.maxVertUniformVectors = constants->shaderCaps.maxVertUniformVectors > 256 ?
                                                       constants->shaderCaps.maxVertUniformVectors : 256;
@@ -1853,9 +1853,9 @@ __glChipCreateContext(
     gcChipGetPatchConditionTb(gc);
 #endif
 
-    gcmONERROR(gcChipGetResetTimeStamp(gc, chipCtx));
-
     gcmONERROR(gcChipGetSampleLocations(gc, chipCtx));
+
+    chipCtx->robust = (gc->imports.robustAccess && chipCtx->chipFeature.hasRobustness);
 
 OnError:
     if (gcmIS_ERROR(status) && chipCtx)
@@ -1906,19 +1906,31 @@ __glChipGetGraphicsResetStatus(
     {
         __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
         gceSTATUS status;
+        gctBOOL innocent = gcvTRUE;
 
-        GLuint64 lastResetTimeStamp = chipCtx->resetTimeStamp;
+        status = gco3D_QueryReset(chipCtx->engine, &innocent);
 
-        gcmONERROR(gcChipGetResetTimeStamp(gc, chipCtx));
-
-        /* Just set UNKNOWN reson for simplicity */
-        if (lastResetTimeStamp != chipCtx->resetTimeStamp)
+        if (gcvSTATUS_TRUE == status)
         {
-            retVal = GL_UNKNOWN_CONTEXT_RESET_EXT;
+            /* GPU was reseted */
+            if (chipCtx->chipFeature.hasSecurity)
+            {
+                if (innocent)
+                {
+                    retVal = GL_INNOCENT_CONTEXT_RESET;
+                }
+                else
+                {
+                    retVal = GL_GUILTY_CONTEXT_RESET;
+                }
+            }
+            else
+            {
+                retVal = GL_UNKNOWN_CONTEXT_RESET;
+            }
         }
     }
 
-OnError:
     gcmFOOTER_ARG("return=0x%04x", retVal);
     return retVal;
 }

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -144,19 +144,6 @@ void vgfPaintMatrixVerifyCurrent(
     IN vgsPAINT_PTR Paint,
     IN vgsMATRIX_PTR SurfaceToPaint
     );
-
-gcmINLINE  gctFIXED vgfFloatToFixed(
-    IN gctFLOAT r
-    );
-
-gcmINLINE  gctFLOAT vgfFixedToFloat(
-    IN gctFIXED r
-    );
-
-gcmINLINE  gctFIXED vgfFixedMul(
-        IN gctFIXED r1,
-        IN gctFIXED r2
-);
 
 #ifdef __cplusplus
 }

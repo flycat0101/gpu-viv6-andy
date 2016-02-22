@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -409,7 +409,7 @@ gcChipUtilsDumpSurface(
         }
 
         /* Resolve render target to linear surface. */
-        if (gcmIS_ERROR(gcoSURF_ResolveRect_v2(surfView, &tgtView, &rlvArgs)))
+        if (gcmIS_ERROR(gcoSURF_ResolveRect(surfView, &tgtView, &rlvArgs)))
         {
             gcsSURF_BLIT_ARGS cpuBltArgs;
 
@@ -448,9 +448,9 @@ gcChipUtilsDumpSurface(
                 blitArgs.dstRect.right  = width;
                 blitArgs.dstRect.bottom = height;
                 blitArgs.filterMode     = gcvTEXTURE_POINT;
-                gcmERR_BREAK(gcoSURF_DrawBlit_v2(surfView, &resolveRTView, &blitArgs));
+                gcmERR_BREAK(gcoSURF_DrawBlit(surfView, &resolveRTView, &blitArgs));
 
-                gcmERR_BREAK(gcoSURF_ResolveRect_v2(&resolveRTView, &tgtView, &rlvArgs));
+                gcmERR_BREAK(gcoSURF_ResolveRect(&resolveRTView, &tgtView, &rlvArgs));
             }
 
             gcmERR_BREAK(status);
@@ -592,7 +592,7 @@ gcChipUtilsVerifyRT(
             gcmONERROR(gcoSURF_Unlock(rtView->surf, logical[0]));
             gcmONERROR(gcoSURF_GetInfo(rtView->surf, gcvSURF_INFO_SLICESIZE, &sliceSize));
 
-            gcmDUMP(gcvNULL, "#verify rt%d", index);
+            gcmDUMP(gcvNULL, "#[info: verify rt%d", index);
             gcmDUMP_BUFFER(gcvNULL,
                            "verify",
                            physical[0] + gcChipGetSurfOffset(rtView),
@@ -611,7 +611,7 @@ gcChipUtilsVerifyRT(
         gcmONERROR(gcoSURF_Unlock(chipCtx->drawDepthView.surf, logical[0]));
         gcmONERROR(gcoSURF_GetInfo(chipCtx->drawDepthView.surf, gcvSURF_INFO_SLICESIZE, &sliceSize));
 
-        gcmDUMP(gcvNULL, "#verify depth");
+        gcmDUMP(gcvNULL, "#[info: verify depth");
         gcmDUMP_BUFFER(gcvNULL,
                        "verify",
                        physical[0] + gcChipGetSurfOffset(&chipCtx->drawDepthView),
@@ -660,7 +660,6 @@ gcChipUtilsVerifyImagesCB(
             if (pImageUnit2Uniform->numUniform + pExtraImageUnit2Uniform->numUniform > 0)
             {
                 gcsSURF_VIEW texView;
-                GLint zOffset;
                 gctINT32 offset = 0;
                 gctINT32 sliceSize = 0;
                 gctINT32 layerSize = 0;
@@ -671,13 +670,12 @@ gcChipUtilsVerifyImagesCB(
                 gctUINT8 i;
                 GLuint sliceNumbers = 1;
 
-                zOffset = (texObj->targetIndex == __GL_TEXTURE_3D_INDEX) ? imageUnit->actualLayer : 0;
-                texView = gcChipGetTextureSurface(chipCtx, texObj, imageUnit->level, imageUnit->actualLayer, zOffset);
+                texView = gcChipGetTextureSurface(chipCtx, texObj, imageUnit->level, imageUnit->actualLayer);
 
                 if ((imageUnit->type != __GL_IMAGE_2D) && !imageUnit->singleLayered)
                 {
                     texView.firstSlice = 0;
-                    sliceNumbers = texView.surf->info.requestD;
+                    sliceNumbers = texView.surf->requestD;
                 }
 
                 gcmONERROR(gcoSURF_Lock(texView.surf, physical, logical));
@@ -690,11 +688,11 @@ gcChipUtilsVerifyImagesCB(
                 for (i = 0; i < formatInfo->layers; i++)
                 {
                     GLuint j;
-                    gcmDUMP(gcvNULL, "#verify image multi-layer%d", i);
+                    gcmDUMP(gcvNULL, "#[info: verify image multi-layer%d", i);
 
                     for (j = 0; j < sliceNumbers; j++)
                     {
-                        gcmDUMP(gcvNULL, "#verify image slice[%d]", j);
+                        gcmDUMP(gcvNULL, "#[info: verify image slice[%d]", j);
                         gcmDUMP_BUFFER(gcvNULL,
                                        "verify",
                                        physical[0] + offset +  layerSize * i,
@@ -778,7 +776,7 @@ gcChipUtilsDumpTexture(
             gctUINT fileNameOffset = 0;
             gcsSURF_FORMAT_INFO_PTR formatInfo;
 
-            surfView = gcChipGetTextureSurface(chipCtx, tex, level, slice, slice);
+            surfView = gcChipGetTextureSurface(chipCtx, tex, level, slice);
             if (!surfView.surf)
             {
                 break;
@@ -801,16 +799,11 @@ gcChipUtilsDumpTexture(
                                             ));
             gcmERR_BREAK(gcChipUtilsDumpSurface(gc, &surfView, fileName, gcvFALSE));
 
-            if (tex->targetIndex == __GL_TEXTURE_2D_INDEX || tex->targetIndex == __GL_TEXTURE_2D_MS_INDEX)
-            {
-                break;
-            }
-
             ++slice;
         } while (gcvTRUE);
 
         slice = 0;
-        surfView = gcChipGetTextureSurface(chipCtx, tex, ++level, slice, slice);
+        surfView = gcChipGetTextureSurface(chipCtx, tex, ++level, slice);
         if (!surfView.surf)
         {
             break;

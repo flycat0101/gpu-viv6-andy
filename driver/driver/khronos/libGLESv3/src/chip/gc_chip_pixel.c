@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -103,40 +103,43 @@ gcChipProcessPixelStore(
     gctSIZE_T skipImgs,
     gctSIZE_T *pRowStride,
     gctSIZE_T *pImgHeight,
-    const GLvoid** pBuf
+    gctSIZE_T *pSkipBytes
     )
 {
-
     gctSIZE_T bpp = 0;
     gctSIZE_T rowStride = 0;
-    gctSIZE_T imgStride = 0;
-    gctSIZE_T imgLength = packMode->lineLength ? (gctSIZE_T)packMode->lineLength : width;
+    gctSIZE_T imgLength = packMode->lineLength  ? (gctSIZE_T)packMode->lineLength  : width;
     gctSIZE_T imgHeight = packMode->imageHeight ? (gctSIZE_T)packMode->imageHeight : height;
-    const GLbyte* buf = *pBuf;
 
     gcmHEADER_ARG("gc=0x%x packMode=0x%x width=%u height=%u format=0x%04x type=0x%04x "
-                  "skipImgs=%u pRowStride=0x%x pImgHeight=0x%x pBuf=0x%x",
+                  "skipImgs=%u pRowStride=0x%x pImgHeight=0x%x pSkipBytes=0x%x",
                   gc, packMode, width, height, format, type, skipImgs,
-                  pRowStride, pImgHeight, pBuf);
+                  pRowStride, pImgHeight, pSkipBytes);
 
     /* pixel store unpack parameters */
     gcChipUtilGetImageFormat(format, type, gcvNULL, &bpp);
 
     rowStride = gcmALIGN(bpp * imgLength / 8, packMode->alignment);
-    imgStride = rowStride * imgHeight;
-    *pBuf = (GLbyte*)buf
-          + skipImgs * imgStride                /* skip images */
-          + packMode->skipLines * rowStride     /* skip lines */
-          + packMode->skipPixels * bpp / 8;     /* skip pixels */
 
     if (pRowStride)
     {
         *pRowStride = rowStride;
     }
+
     if (pImgHeight)
     {
         *pImgHeight = imgHeight;
     }
+
+    if (pSkipBytes)
+    {
+        gctSIZE_T imgStride = rowStride * imgHeight;
+
+        *pSkipBytes = skipImgs * imgStride                /* skip images */
+                    + packMode->skipLines * rowStride     /* skip lines */
+                    + packMode->skipPixels * bpp / 8;     /* skip pixels */
+    }
+
     gcmFOOTER_NO();
 }
 
@@ -321,13 +324,16 @@ __glChipReadPixels(
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     gcsSURF_VIEW srcView = {gcvNULL, 0, 1};
     gcsSURF_VIEW dstView = {gcvNULL, 0, 1};
-    gcsSURF_RESOLVE_ARGS rlvArgs = {0};
     gceSURF_FORMAT wrapformat = gcvSURF_UNKNOWN;
     GLint right, bottom;
     gctUINT w, h;
     GLint dx, dy, sx, sy, Width, Height;
     gctUINT dstWidth, dstHeight;
     __GLbufferObject *packBufObj = gcvNULL;
+    __GLchipVertexBufferInfo *packBufInfo = gcvNULL;
+    gctUINT32 physicalAddress = gcvINVALID_ADDRESS;
+    gctPOINTER logicalAddress = buf;
+    gctSIZE_T skipOffset = 0;
     GLuint lineLength = ps->packModes.lineLength ? ps->packModes.lineLength : (GLuint)width;
     GLuint imageHeight = ps->packModes.imageHeight ? ps->packModes.imageHeight : (GLuint)height;
     __GLformatInfo *formatInfo;
@@ -346,7 +352,7 @@ __glChipReadPixels(
     ** If we read a face of a cube or one of array texture, we should set surface offset
     ** And all surface function should take offset into consideration
     */
-    srcView = gcChipMasterSyncFromShadow(gc, &chipCtx->readRtView, GL_TRUE);
+    srcView = gcChipFboSyncFromShadowSurface(gc, &chipCtx->readRtView, GL_TRUE);
 
     switch (type)
     {
@@ -420,20 +426,28 @@ __glChipReadPixels(
         wrapformat = formatMapInfo->requestFormat;
     }
 
+    gcChipProcessPixelStore(gc, &ps->packModes, (gctSIZE_T)width, (gctSIZE_T)height,
+                            format, type, 0, gcvNULL, gcvNULL, &skipOffset);
+
     /* The image is from pack buffer object? */
     packBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_PACK_BUFFER_INDEX].boundBufObj;
     if (packBufObj)
     {
-        gcmONERROR(gcChipProcessPBO(gc, packBufObj, (const GLvoid**)&buf));
+        packBufInfo = (__GLchipVertexBufferInfo *)(packBufObj->privateData);
+        GL_ASSERT(packBufInfo);
+        gcmONERROR(gcoBUFOBJ_Lock(packBufInfo->bufObj, &physicalAddress, &logicalAddress));
+        gcmONERROR(gcoBUFOBJ_GetFence(packBufInfo->bufObj, gcvFENCE_TYPE_WRITE));
+
+        skipOffset += __GL_PTR2SIZE(buf);
+        physicalAddress += (gctUINT32)skipOffset;
     }
-    gcChipProcessPixelStore(gc, &ps->packModes, (gctSIZE_T)width, (gctSIZE_T)height,
-                            format, type, 0, gcvNULL, gcvNULL, (const GLvoid**)&buf);
+    logicalAddress = (gctPOINTER)((gctINT8_PTR)logicalAddress + skipOffset);
 
     /* Create the wrapper surface. */
     gcmONERROR(gcoSURF_Construct(gcvNULL, width, height, 1, gcvSURF_BITMAP,
                                  wrapformat, gcvPOOL_USER, &dstView.surf));
     gcmONERROR(gcoSURF_ResetSurWH(dstView.surf, width, height, lineLength, imageHeight, wrapformat));
-    gcmONERROR(gcoSURF_WrapSurface(dstView.surf, ps->packModes.alignment, buf, gcvINVALID_ADDRESS));
+    gcmONERROR(gcoSURF_WrapSurface(dstView.surf, ps->packModes.alignment, logicalAddress, physicalAddress));
 
     gcmONERROR(gcoSURF_GetSize(srcView.surf, &w, &h, gcvNULL));
     right  = gcmMIN(x + width,  (gctINT) w);
@@ -460,25 +474,39 @@ __glChipReadPixels(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    rlvArgs.version = gcvHAL_ARG_VERSION_V2;
-    rlvArgs.uArgs.v2.yInverted   = chipCtx->readYInverted;
-    rlvArgs.uArgs.v2.srcOrigin.x = sx;
-    rlvArgs.uArgs.v2.srcOrigin.y = chipCtx->readYInverted ? (GLint)(h - (sy + Height)) : sy;
-    rlvArgs.uArgs.v2.dstOrigin.x = dx;
-    rlvArgs.uArgs.v2.dstOrigin.y = dy;
-    rlvArgs.uArgs.v2.rectSize.x  = Width;
-    rlvArgs.uArgs.v2.rectSize.y  = Height;
-    rlvArgs.uArgs.v2.numSlices   = 1;
-    rlvArgs.uArgs.v2.dump        = gcvTRUE;
-    gcmONERROR(gcoSURF_CopyPixels_v2(&srcView, &dstView, &rlvArgs));
+    do {
+        gcsSURF_RESOLVE_ARGS rlvArgs = {0};
+
+        rlvArgs.version = gcvHAL_ARG_VERSION_V2;
+        rlvArgs.uArgs.v2.yInverted   = chipCtx->readYInverted;
+        rlvArgs.uArgs.v2.srcOrigin.x = sx;
+        rlvArgs.uArgs.v2.srcOrigin.y = chipCtx->readYInverted ? (GLint)(h - (sy + Height)) : sy;
+        rlvArgs.uArgs.v2.dstOrigin.x = dx;
+        rlvArgs.uArgs.v2.dstOrigin.y = dy;
+        rlvArgs.uArgs.v2.rectSize.x  = Width;
+        rlvArgs.uArgs.v2.rectSize.y  = Height;
+        rlvArgs.uArgs.v2.numSlices   = 1;
+        rlvArgs.uArgs.v2.dump        = gcvTRUE;
+
+        if (packBufObj)
+        {
+            if (gcmIS_SUCCESS(gcoSURF_ResolveRect(&srcView, &dstView, &rlvArgs)))
+            {
+                break;
+            }
+        }
+        gcmERR_BREAK(gcoSURF_CopyPixels(&srcView, &dstView, &rlvArgs));
+    }
+    while (gcvFALSE);
 
 OnError:
-    if (packBufObj) /* The image is from pack buffer object */
+    if (packBufInfo && gcvINVALID_ADDRESS != physicalAddress) /* The image is from pack buffer object */
     {
         /* CPU cache will not be flushed in HAL, bc HAL only see wrapped user pool surface.
         ** Instead it will be flushed when unlock the packed buffer as non-user pool node.
         */
-        gcmVERIFY_OK(gcChipPostProcessPBO(gc, packBufObj, GL_TRUE));
+        gcmVERIFY_OK(gcoBUFOBJ_Unlock(packBufInfo->bufObj));
+        gcmVERIFY_OK(gcoBUFOBJ_CPUCacheOperation(packBufInfo->bufObj, gcvCACHE_CLEAN));
     }
 
     if (dstView.surf)

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -12,7 +12,6 @@
 
 
 #include "gc_vsc.h"
-#include "chip/gc_vsc_chip_mc_codec.h"
 
 /* Since MC inst layout defined in AQShader.h by HW is not friendly with SW, we define
    auxiliary structures to codec MC binary. It must be changed if HW's design is changed.
@@ -55,21 +54,17 @@
       codecing extOpcode, any inst layout will be casted into ALU_3_SRCS_INST layout to codec
       those extra info (that means relative reserved ones might be written with non-zero value).
 
-   5. MSB5 of word0 (samplerSlot as usual in normal layouts) has special meaning for NORM_MUL.
-      If that 5bits are zero, result of NORM_MUL will generate INF for (0 * INF), otherwise,
-      0 is generated for (0 * INF). For the purpose of this opcode which handling normalize(0),
-      so we need always set that 5bits non-zero. Note that, that MSB5 are reserved in NORM_MUL
-      layout, so we will cast to VSC_MC_SAMPLE_INST when codecing (that means relative reserved
-      one might be written with non-zero value).
+   5.
 
    6. Since we use 3-srcs ALU inst layout to codec load_attr, but load_attr has a special bNeedUscSync
       bit (bit-30 of word0) to indicate whether needs USC level data sync, so we need cast 3-srcs ALU
       inst to store_attr inst layout to do codec for this bit.
 
-   7. MSB5 of word0 (samplerSlot as usual in normal layouts) has special meaning for MUL. If that
-      5bits are zero, result of MUL will generate INF for (0 * INF), otherwise, 0 is generated for
-      (0 * INF). Note that, that MSB5 are reserved in MUL layout, so we will cast to VSC_MC_SAMPLE_INST
-      when codecing (that means relative reserved one might be written with non-zero value).
+   7. MSB5 of word0 (samplerSlot as usual in normal layouts) has special meaning for mul/norm_mul/
+      mad/mullo/dst/dp/norm_dp. If that 5bits are zero, result of these insts will generate INF for
+      (0 * INF), otherwise, 0 is generated for (0 * INF). Note that, that MSB5 are reserved in these
+      insts' layout, so we will cast to VSC_MC_SAMPLE_INST when codecing (that means relative reserved
+      one might be written with non-zero value).
 
    8. Since we use 3-srcs ALU inst layout to codec atomic operations, but atomic operations have a
       special bAccessLocalStorage bit (bit-8 of word1) to indicate whether the operation will act on
@@ -111,18 +106,21 @@ typedef union _VSC_MC_ALU_3_SRCS_INST
     {
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        condOpCode            : 5;
-        gctUINT        bDstModSat            : 1;
+        gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
-        gctUINT        reserved0             : 5; /* Must be zero'ed for non load_attr, for load_attr, see NOTE 6 */
+        gctUINT        reserved0             : 5; /* For load_attr, see NOTE 6;
+                                                     For mad, see NOTE 7;
+                                                     For others, must be zero'ed */
 
         gctUINT        roundMode             : 2;
         gctUINT        bPackMode             : 1;
         gctUINT        reserved1             : 4; /* Must be zero'ed */
         gctUINT        bSkipForHelperKickoff : 1;
-        gctUINT        reserved2             : 3; /* Must be zero'ed for non-atomics. For atomics, see NOTE 8 */
+        gctUINT        reserved2             : 2; /* Must be zero'ed for non-atomics. For atomics, see NOTE 8 */
+        gctUINT        bDenorm               : 1;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
         gctUINT        src0RegNo             : 9;
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
@@ -165,12 +163,12 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC1_INST
     {
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        condOpCode            : 5;
-        gctUINT        bDstModSat            : 1;
+        gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1;
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
-        gctUINT        reserved0             : 5; /* Must be zero'ed for non NORM_MUL/MUL, otherwise, see NOTE 5/7 */
+        gctUINT        reserved0             : 5; /* Must be zero'ed for non NORM_MUL/MUL/MULLO/DST/DP, otherwise, see NOTE 7 */
 
         gctUINT        roundMode             : 2;
         gctUINT        bPackMode             : 1;
@@ -215,7 +213,7 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC2_INST
     {
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
-        gctUINT        bDstModSat            : 1;
+        gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
@@ -263,7 +261,7 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC1_SRC2_INST
     {
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
-        gctUINT        bDstModSat            : 1;
+        gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
@@ -310,12 +308,12 @@ typedef union _VSC_MC_ALU_1_SRC_SRC0_INST
     {
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
-        gctUINT        bDstModSat            : 1;
+        gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
-        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        reserved1             : 5; /* Must be zero'ed for non NORM_DP, otherwise, see NOTE 7 */
 
         gctUINT        roundMode             : 2;
         gctUINT        bPackMode             : 1;
@@ -355,7 +353,7 @@ typedef union _VSC_MC_ALU_1_SRC_SRC1_INST
     {
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
-        gctUINT        bDstModSat            : 1;
+        gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
@@ -400,7 +398,7 @@ typedef union _VSC_MC_ALU_1_SRC_SRC2_INST
     {
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
-        gctUINT        bDstModSat            : 1;
+        gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
@@ -442,7 +440,7 @@ typedef union _VSC_MC_PACK_INST
     {
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
-        gctUINT        bDstModSat            : 1;
+        gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
@@ -493,7 +491,7 @@ typedef union _VSC_MC_SAMPLE_INST
     {
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
-        gctUINT        bDstModSat            : 1;
+        gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
@@ -544,7 +542,7 @@ typedef union _VSC_MC_SAMPLE_EXT_INST
     {
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
-        gctUINT        bDstModSat            : 1;
+        gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
@@ -593,7 +591,7 @@ typedef union _VSC_MC_LD_INST
     {
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
-        gctUINT        bDstModSat            : 1;
+        gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
@@ -627,11 +625,11 @@ typedef union _VSC_MC_LD_INST
         gctUINT        instTypeBit1_2        : 2;
 
         gctUINT        src1Type              : 3;
-        gctUINT        reserved4             : 10;/* Must be zero'ed */
+        gctUINT        reserved3             : 10;/* Must be zero'ed */
         gctUINT        dstRegNoBit7          : 1;
-        gctUINT        reserved5             : 10;/* Must be zero'ed */
+        gctUINT        reserved4             : 10;/* Must be zero'ed */
         gctUINT        dstRegNoBit8          : 1;
-        gctUINT        reserved6             : 6; /* Must be zero'ed */
+        gctUINT        reserved5             : 6; /* Must be zero'ed */
         gctUINT        dstType               : 1;
     } inst;
 
@@ -646,12 +644,12 @@ typedef union _VSC_MC_IMG_LD_INST
     {
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
-        gctUINT        bDstModSat            : 1;
+        gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
-        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        reserved1             : 5; /* For non-evis-mode, must be zero'ed; otherwise, see NOTE 9 */
 
         gctUINT        reserved2             : 7; /* Must be zero'ed for non-evis mode, otherwise, see NOTE 9 */
         gctUINT        bSkipForHelperKickoff : 1;
@@ -738,7 +736,7 @@ typedef union _VSC_MC_ST_INST
         gctUINT        threadTypeBit1        : 1;
         gctUINT        src2RelAddr           : 3;
         gctUINT        src2Type              : 3;
-        gctUINT        reserved4             : 1; /* Must be zero'ed */
+        gctUINT        reserved3             : 1; /* Must be zero'ed */
     } inst;
 
     gctUINT            data[4];
@@ -752,8 +750,8 @@ typedef union _VSC_MC_IMG_ST_INST
     {
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 17;/* Must be zero'ed */
-        gctUINT        writeMask             : 4;
-        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        writeMask             : 4; /* For evis-mode, see Note 9 */
+        gctUINT        reserved1             : 5; /* For non-evis-mode, must be zero'ed; otherwise, see NOTE 9 */
 
         gctUINT        reserved2             : 7; /* Must be zero'ed for non-evis mode, otherwise, see NOTE 9 */
         gctUINT        bSkipForHelperKickoff : 1;
@@ -801,7 +799,7 @@ typedef union _VSC_MC_IMG_ATOM_INST
     {
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
-        gctUINT        bDstModSat            : 1;
+        gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
@@ -904,7 +902,7 @@ typedef union _VSC_MC_SELECT_MAP_INST
     {
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
-        gctUINT        bDstModSat            : 1;
+        gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid, see rangeToMatch for more info */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
@@ -1171,7 +1169,7 @@ typedef union _VSC_MC_EMIT_INST
     {
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
-        gctUINT        bDstModSat            : 1;
+        gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
@@ -1221,7 +1219,7 @@ typedef union _VSC_MC_EVIS_INST
     {
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode, and base-opcode must be 0x45 */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
-        gctUINT        bDstModSat            : 1;
+        gctUINT        bResultSat            : 1;
         gctUINT        bDstValid             : 1; /* Must be valid */
         gctUINT        extEvisOpCodeBit0_2   : 3; /* Together with extEvisOpCodeBit3 and extEvisOpCodeBit4_5 to extEvisOpCode */
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
@@ -1325,6 +1323,10 @@ typedef enum _VSC_MC_CODEC_TYPE
     VSC_MC_CODEC_TYPE_EVIS
 }VSC_MC_CODEC_TYPE;
 
+#define MC_SRC0_BIT   1
+#define MC_SRC1_BIT   2
+#define MC_SRC2_BIT   4
+
 typedef gctBOOL (*PFN_MC_ENCODER)(VSC_MC_CODEC*, VSC_MC_CODEC_TYPE, VSC_MC_CODEC_INST*, VSC_MC_INST*);
 typedef gctBOOL (*PFN_MC_DECODER)(VSC_MC_CODEC*, VSC_MC_CODEC_TYPE, VSC_MC_INST*, VSC_MC_CODEC_INST*);
 
@@ -1338,11 +1340,13 @@ static VSC_MC_CODEC_TYPE _GetBranchCodecType(VSC_MC_CODEC* pMcCodec,
                                              void* pRefInInst,
                                              VSC_MC_CODEC_MODE codecMode)
 {
-    VSC_MC_CODEC_INST* pInCodecHelperInst = (VSC_MC_CODEC_INST*)pRefInInst;
-    VSC_MC_INST*       pMcInst = (VSC_MC_INST*)pRefInInst;
+    VSC_MC_CODEC_INST* pInCodecHelperInst;
+    VSC_MC_INST*       pMcInst;
 
     if (codecMode == VSC_MC_CODEC_MODE_ENCODE)
     {
+        pInCodecHelperInst = (VSC_MC_CODEC_INST*)pRefInInst;
+
         if (pInCodecHelperInst->src[pInCodecHelperInst->srcCount - 1].regType ==
             0x7)
         {
@@ -1370,6 +1374,8 @@ static VSC_MC_CODEC_TYPE _GetBranchCodecType(VSC_MC_CODEC* pMcCodec,
     }
     else
     {
+        pMcInst = (VSC_MC_INST*)pRefInInst;
+
         if (pMcInst->tri_srcs_alu_inst.inst.bSrc2Valid)
         {
             if (pMcInst->tri_srcs_alu_inst.inst.src2Type == 0x7)
@@ -1392,11 +1398,13 @@ static VSC_MC_CODEC_TYPE _GetCallCodecType(VSC_MC_CODEC* pMcCodec,
                                            void* pRefInInst,
                                            VSC_MC_CODEC_MODE codecMode)
 {
-    VSC_MC_CODEC_INST* pInCodecHelperInst = (VSC_MC_CODEC_INST*)pRefInInst;
-    VSC_MC_INST*       pMcInst = (VSC_MC_INST*)pRefInInst;
+    VSC_MC_CODEC_INST* pInCodecHelperInst;
+    VSC_MC_INST*       pMcInst;
 
     if (codecMode == VSC_MC_CODEC_MODE_ENCODE)
     {
+        pInCodecHelperInst = (VSC_MC_CODEC_INST*)pRefInInst;
+
         if (pInCodecHelperInst->src[pInCodecHelperInst->srcCount - 1].regType ==
             0x7)
         {
@@ -1416,6 +1424,8 @@ static VSC_MC_CODEC_TYPE _GetCallCodecType(VSC_MC_CODEC* pMcCodec,
     }
     else
     {
+        pMcInst = (VSC_MC_INST*)pRefInInst;
+
         if (pMcInst->tri_srcs_alu_inst.inst.bSrc2Valid)
         {
             return VSC_MC_CODEC_TYPE_INDIRECT_CALL;
@@ -1427,11 +1437,9 @@ static VSC_MC_CODEC_TYPE _GetCallCodecType(VSC_MC_CODEC* pMcCodec,
     }
 }
 
-static VSC_MC_CODEC_TYPE _GetExtendedOpcodeCodeType(VSC_MC_CODEC* pMcCodec,
-                                                    gctUINT baseOpcode,
-                                                    gctUINT extOpcode,
-                                                    void* pRefInInst,
-                                                    VSC_MC_CODEC_MODE codecMode)
+static VSC_MC_CODEC_TYPE _GetExtendedOpcodeCodecType(VSC_MC_CODEC* pMcCodec,
+                                                     gctUINT baseOpcode,
+                                                     gctUINT extOpcode)
 {
     if (baseOpcode == 0x7F)
     {
@@ -1441,6 +1449,8 @@ static VSC_MC_CODEC_TYPE _GetExtendedOpcodeCodeType(VSC_MC_CODEC* pMcCodec,
             return VSC_MC_CODEC_TYPE_EMIT;
 
         case 0x02:
+        case 0x0F:
+        case 0x10:
             return VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_ALU;
 
         case 0x03:
@@ -1450,6 +1460,7 @@ static VSC_MC_CODEC_TYPE _GetExtendedOpcodeCodeType(VSC_MC_CODEC* pMcCodec,
 
         case 0x04:
         case 0x0D:
+        case 0x0E:
             return VSC_MC_CODEC_TYPE_SAMPLE_EXT;
         }
     }
@@ -1460,12 +1471,6 @@ static VSC_MC_CODEC_TYPE _GetExtendedOpcodeCodeType(VSC_MC_CODEC* pMcCodec,
         case 0x01:
         case 0x06:
             return VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_ALU;
-
-        case 0x08:
-        case 0x09:
-        case 0x0A:
-        case 0x0B:
-            return VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC2_ALU;
 
         case 0x02:
         case 0x03:
@@ -1478,11 +1483,15 @@ static VSC_MC_CODEC_TYPE _GetExtendedOpcodeCodeType(VSC_MC_CODEC* pMcCodec,
         case 0x0F:
         case 0x10:
         case 0x11:
-        case 0x12:
-        case 0x13:
-        case 0x14:
-        case 0x15:
+        case 0x0B:
         case 0x16:
+        case 0x0A:
+        case 0x15:
+        case 0x09:
+        case 0x14:
+        case 0x08:
+        case 0x13:
+        case 0x12:
             return VSC_MC_CODEC_TYPE_3_SRCS_ALU;
         }
     }
@@ -1610,8 +1619,10 @@ static VSC_MC_CODEC_TYPE _GetMcCodecType(VSC_MC_CODEC* pMcCodec,
     case 0x1A:
     case 0x70:
     case 0x7C:
+    case 0x6F:
     case MC_AUXILIARY_OP_CODE_TEXLD_LOD:        /* From 0x6F */
     case MC_AUXILIARY_OP_CODE_TEXLD_LOD_PCF:    /* From 0x6F */
+    case 0x18:
     case MC_AUXILIARY_OP_CODE_TEXLD_BIAS:       /* From 0x18 */
     case MC_AUXILIARY_OP_CODE_TEXLD_BIAS_PCF:   /* From 0x18 */
     case MC_AUXILIARY_OP_CODE_TEXLD_PLAIN:      /* From 0x18 */
@@ -1622,9 +1633,9 @@ static VSC_MC_CODEC_TYPE _GetMcCodecType(VSC_MC_CODEC* pMcCodec,
     case MC_AUXILIARY_OP_CODE_TEXLD_U_BIAS:     /* From 0x7B */
     case MC_AUXILIARY_OP_CODE_TEXLD_U_F_B_PLAIN:/* From 0x7B */
     case MC_AUXILIARY_OP_CODE_TEXLD_U_F_B_BIAS:  /* From 0x7B */
+    case 0x7D:
     case MC_AUXILIARY_OP_CODE_TEXLD_GATHER:     /* From 0x7D */
     case MC_AUXILIARY_OP_CODE_TEXLD_GATHER_PCF: /* From 0x7D */
-
     case 0x4B:
     case 0x49:
     case 0x4A:
@@ -1674,13 +1685,13 @@ static VSC_MC_CODEC_TYPE _GetMcCodecType(VSC_MC_CODEC* pMcCodec,
 
     case 0x7F:
     case 0x45:
-        return _GetExtendedOpcodeCodeType(pMcCodec, baseOpcode, extOpcode, pRefInInst, codecMode);
+        return _GetExtendedOpcodeCodecType(pMcCodec, baseOpcode, extOpcode);
     }
 
     return VSC_MC_CODEC_TYPE_UNKNOWN;
 }
 
-static gctUINT _MapSampleAuxOpcodeToHwOpcode(gctUINT auxOpcode)
+static gctUINT _MapSampleAuxOpcodeToHwOpcode(VSC_MC_CODEC* pMcCodec, gctUINT auxOpcode)
 {
     if (auxOpcode >= MC_AUXILIARY_OP_CODE_TEXLD_LOD &&
         auxOpcode <= MC_AUXILIARY_OP_CODE_TEXLD_LOD_PCF)
@@ -1715,6 +1726,93 @@ static gctUINT _MapSampleAuxOpcodeToHwOpcode(gctUINT auxOpcode)
     return auxOpcode;
 }
 
+static gctUINT _MapSampleHwOpcodeToAuxOpcode(VSC_MC_CODEC* pMcCodec,
+                                             gctUINT sampleHwOpcode,
+                                             gctUINT srcIdx1And2MaskOfMc,
+                                             gctUINT texldUModeReg)
+{
+    gctUINT texldUMode;
+
+    if (sampleHwOpcode == 0x6F)
+    {
+        if (srcIdx1And2MaskOfMc & (1 << 2))
+        {
+            return MC_AUXILIARY_OP_CODE_TEXLD_LOD_PCF;
+        }
+        else if (srcIdx1And2MaskOfMc & (1 << 1))
+        {
+            return MC_AUXILIARY_OP_CODE_TEXLD_LOD;
+        }
+    }
+    else if (sampleHwOpcode == 0x18)
+    {
+        if (srcIdx1And2MaskOfMc & (1 << 1) && srcIdx1And2MaskOfMc & (1 << 2))
+        {
+            return MC_AUXILIARY_OP_CODE_TEXLD_BIAS_PCF;
+        }
+        else if (srcIdx1And2MaskOfMc & (1 << 1))
+        {
+            return MC_AUXILIARY_OP_CODE_TEXLD_BIAS;
+        }
+        else if (srcIdx1And2MaskOfMc & (1 << 2))
+        {
+            return MC_AUXILIARY_OP_CODE_TEXLD_PCF;
+        }
+        else if (srcIdx1And2MaskOfMc == 0)
+        {
+            return MC_AUXILIARY_OP_CODE_TEXLD_PLAIN;
+        }
+    }
+    else if (sampleHwOpcode == 0x7B /* 0x7B */)
+    {
+        if (pMcCodec->pHwCfg->hwFeatureFlags.hasUniversalTexldV2)
+        {
+            if (srcIdx1And2MaskOfMc & (1 << 1))
+            {
+                return MC_AUXILIARY_OP_CODE_TEXLD_U_F_B_BIAS;
+            }
+            else if (srcIdx1And2MaskOfMc & (1 << 2))
+            {
+                return MC_AUXILIARY_OP_CODE_TEXLD_U_F_B_PLAIN;
+            }
+        }
+        else
+        {
+            texldUMode = (texldUModeReg >> 12) & 0x3;
+
+            if (srcIdx1And2MaskOfMc & (1 << 1))
+            {
+                if (texldUMode == 0x1)
+                {
+                    return MC_AUXILIARY_OP_CODE_TEXLD_U_LOD;
+                }
+                else if (texldUMode == 0x2)
+                {
+                    return MC_AUXILIARY_OP_CODE_TEXLD_U_BIAS;
+                }
+            }
+            else if (srcIdx1And2MaskOfMc & (1 << 2))
+            {
+                gcmASSERT(texldUMode == 0x0);
+                return MC_AUXILIARY_OP_CODE_TEXLD_U_PLAIN;
+            }
+        }
+    }
+    else if (sampleHwOpcode == 0x7D)
+    {
+        if (srcIdx1And2MaskOfMc & (1 << 2))
+        {
+            return MC_AUXILIARY_OP_CODE_TEXLD_GATHER_PCF;
+        }
+        else if (srcIdx1And2MaskOfMc & (1 << 1))
+        {
+            return MC_AUXILIARY_OP_CODE_TEXLD_GATHER;
+        }
+    }
+
+    return sampleHwOpcode;
+}
+
 static gctUINT _MapLdStAuxOpcodeToHwOpcode(gctUINT auxOpcode)
 {
     if (auxOpcode == MC_AUXILIARY_OP_CODE_USC_STORE)
@@ -1740,6 +1838,30 @@ static gctUINT _MapLdStAuxOpcodeToHwOpcode(gctUINT auxOpcode)
     return auxOpcode;
 }
 
+static gctUINT _MapLdStHwOpcodeToAuxOpcode(gctUINT ldStHwOpcode, gctBOOL bDstEnabled)
+{
+    if (bDstEnabled)
+    {
+        if (ldStHwOpcode == 0x33)
+        {
+            return MC_AUXILIARY_OP_CODE_USC_STORE;
+        }
+        else if (ldStHwOpcode == 0x7A)
+        {
+            return MC_AUXILIARY_OP_CODE_USC_IMG_STORE;
+        }
+        else if (ldStHwOpcode == 0x35)
+        {
+            return MC_AUXILIARY_OP_CODE_USC_IMG_STORE_3D;
+        }
+        else if (ldStHwOpcode == 0x42)
+        {
+            return MC_AUXILIARY_OP_CODE_USC_STORE_ATTR;
+        }
+    }
+
+    return ldStHwOpcode;
+}
 
 /* src of cond-op is always from src0 */
 static gctUINT _condOp2SrcCount[] =
@@ -1794,7 +1916,6 @@ static gctBOOL _IsSupportCondOp(gctUINT baseOpcode, gctUINT extOpcode)
     return gcvFALSE;
 }
 
-
 static void _EncodeExtendedOpcode(gctUINT baseOpcode,
                                   gctUINT extOpcode,
                                   VSC_MC_INST* pMcInst)
@@ -1820,26 +1941,40 @@ static void _EncodeExtendedOpcode(gctUINT baseOpcode,
     }
 }
 
+static gctUINT _DecodeExtendedOpcode(VSC_MC_INST* pMcInst, gctUINT baseOpcode)
+{
+    gctUINT extOpcode = NOT_ASSIGNED;
 
-#define ENCODE_BASE_OPCODE(pMcInst, baseOpcode)                                           \
-        (pMcInst)->no_opnd_inst.inst.baseOpcodeBit0_5 = ((baseOpcode) & 0x3F);            \
+    if (baseOpcode == 0x7F)
+    {
+        extOpcode = pMcInst->no_opnd_inst.inst.extOpcode;
+    }
+    else if (baseOpcode == 0x45)
+    {
+        extOpcode = pMcInst->evis_inst.inst.extEvisOpCodeBit0_2 |
+                    (pMcInst->evis_inst.inst.extEvisOpCodeBit3 << 3) |
+                    (pMcInst->evis_inst.inst.extEvisOpCodeBit4_5 << 4);
+    }
+
+    return extOpcode;
+}
+
+#define ENCODE_BASE_OPCODE(pMcInst, baseOpcode)                                               \
+        (pMcInst)->no_opnd_inst.inst.baseOpcodeBit0_5 = ((baseOpcode) & 0x3F);                \
         (pMcInst)->no_opnd_inst.inst.baseOpcodeBit6   = (((baseOpcode) >> 6) & 0x01);
 
-#define DECODE_BASE_OPCODE(pMcInst)                                                       \
-        ((pMcInst)->no_opnd_inst.inst.baseOpcodeBit0_5 |                                  \
+#define DECODE_BASE_OPCODE(pMcInst)                                                           \
+        ((pMcInst)->no_opnd_inst.inst.baseOpcodeBit0_5 |                                      \
          ((pMcInst)->no_opnd_inst.inst.baseOpcodeBit6 << 6))
 
-#define ENCODE_EXT_OPCODE(pMcInst, baseOpcode, extOpcode)                                 \
-    if ((baseOpcode) == 0x7F || (baseOpcode) == 0x45) \
-    {                                                                                     \
-        _EncodeExtendedOpcode((baseOpcode), (extOpcode), (VSC_MC_INST*)(pMcInst));        \
-    }
+#define ENCODE_EXT_OPCODE(pMcInst, baseOpcode, extOpcode)                                     \
+        if ((baseOpcode) == 0x7F || (baseOpcode) == 0x45) \
+        {                                                                                     \
+            _EncodeExtendedOpcode((baseOpcode), (extOpcode), (VSC_MC_INST*)(pMcInst));        \
+        }
 
-#define DECODE_EXT_OPCODE(pMcInst, baseOpcode, extOpcode)                                 \
-    if ((baseOpcode) == 0x7F)                                         \
-    {                                                                                     \
-        (extOpcode) = _DecodeExtendedOpcode((VSC_MC_INST*)(pMcInst));                     \
-    }
+#define DECODE_EXT_OPCODE(pMcInst, baseOpcode)                                                \
+        _DecodeExtendedOpcode((VSC_MC_INST*)(pMcInst), (baseOpcode));
 
 static gctUINT _Conver32BitImm_2_20BitImm(VSC_MC_CODEC_IMM_VALUE immValue,
                                           gctUINT immType)
@@ -1853,7 +1988,7 @@ static gctUINT _Conver32BitImm_2_20BitImm(VSC_MC_CODEC_IMM_VALUE immValue,
         break;
 
     case 0x1:
-            imm20Bit = (immValue.si & 0xFFFFF);
+        imm20Bit = (immValue.si & 0xFFFFF);
         break;
 
     case 0x2:
@@ -1866,6 +2001,31 @@ static gctUINT _Conver32BitImm_2_20BitImm(VSC_MC_CODEC_IMM_VALUE immValue,
     }
 
     return imm20Bit;
+}
+
+static VSC_MC_CODEC_IMM_VALUE _Conver20BitImm_2_32BitImm(gctUINT raw20BitImmValue,
+                                                         gctUINT immType)
+{
+    VSC_MC_CODEC_IMM_VALUE immValue;
+
+    immValue.f = 0;
+
+    switch (immType)
+    {
+    case 0x0:
+        immValue.ui = vscCvtS11E8FloatToS23E8Float(raw20BitImmValue);
+        break;
+
+    case 0x1:
+        immValue.si = raw20BitImmValue;
+        break;
+
+    case 0x2:
+    case 0x3:
+        immValue.ui = raw20BitImmValue;
+    }
+
+    return immValue;
 }
 
 static void _EncodeImmData(VSC_MC_INST* pMcInst,
@@ -1905,6 +2065,47 @@ static void _EncodeImmData(VSC_MC_INST* pMcInst,
     }
 }
 
+static VSC_MC_CODEC_IMM_VALUE _DecodeImmData(VSC_MC_INST* pMcInst,
+                                             gctUINT srcIdx,
+                                             gctUINT* pImmType)
+{
+    gctUINT                raw20BitImmValue = 0;
+
+    gcmASSERT(srcIdx < 3);
+
+    if (srcIdx == 0)
+    {
+        raw20BitImmValue = pMcInst->tri_srcs_alu_inst.inst.src0RegNo;
+        raw20BitImmValue |= (pMcInst->tri_srcs_alu_inst.inst.src0Swizzle << 9);
+        raw20BitImmValue |= (pMcInst->tri_srcs_alu_inst.inst.bSrc0ModNeg << 17);
+        raw20BitImmValue |= (pMcInst->tri_srcs_alu_inst.inst.bSrc0ModAbs << 18);
+        raw20BitImmValue |= ((pMcInst->tri_srcs_alu_inst.inst.src0RelAddr & 0x01) << 19);
+
+        *pImmType = (pMcInst->tri_srcs_alu_inst.inst.src0RelAddr >> 1);
+    }
+    else if (srcIdx == 1)
+    {
+        raw20BitImmValue = pMcInst->tri_srcs_alu_inst.inst.src1RegNo;
+        raw20BitImmValue |= (pMcInst->tri_srcs_alu_inst.inst.src1Swizzle << 9);
+        raw20BitImmValue |= (pMcInst->tri_srcs_alu_inst.inst.bSrc1ModNeg << 17);
+        raw20BitImmValue |= (pMcInst->tri_srcs_alu_inst.inst.bSrc1ModAbs << 18);
+        raw20BitImmValue |= ((pMcInst->tri_srcs_alu_inst.inst.src1RelAddr & 0x01) << 19);
+
+        *pImmType = (pMcInst->tri_srcs_alu_inst.inst.src1RelAddr >> 1);
+    }
+    else
+    {
+        raw20BitImmValue = pMcInst->tri_srcs_alu_inst.inst.src2RegNo;
+        raw20BitImmValue |= (pMcInst->tri_srcs_alu_inst.inst.src2Swizzle << 9);
+        raw20BitImmValue |= (pMcInst->tri_srcs_alu_inst.inst.bSrc2ModNeg << 17);
+        raw20BitImmValue |= (pMcInst->tri_srcs_alu_inst.inst.bSrc2ModAbs << 18);
+        raw20BitImmValue |= ((pMcInst->tri_srcs_alu_inst.inst.src2RelAddr & 0x01) << 19);
+
+        *pImmType = (pMcInst->tri_srcs_alu_inst.inst.src2RelAddr >> 1);
+    }
+
+    return _Conver20BitImm_2_32BitImm(raw20BitImmValue, *pImmType);
+}
 
 static void _EncodeDst(VSC_MC_CODEC* pMcCodec,
                        VSC_MC_CODEC_DST* pMcCodecDst,
@@ -1913,7 +2114,6 @@ static void _EncodeDst(VSC_MC_CODEC* pMcCodec,
 {
     pMcInst->tri_srcs_alu_inst.inst.bDstValid = gcvTRUE;
     pMcInst->tri_srcs_alu_inst.inst.dstType = pMcCodecDst->regType;
-    pMcInst->tri_srcs_alu_inst.inst.bDstModSat = pMcCodecDst->bSaturated;
 
     if (bEvisMode)
     {
@@ -1946,6 +2146,43 @@ static void _EncodeDst(VSC_MC_CODEC* pMcCodec,
     }
 }
 
+static gctBOOL _DecodeDst(VSC_MC_CODEC* pMcCodec,
+                          VSC_MC_INST* pMcInst,
+                          gctBOOL bEvisMode,
+                          VSC_MC_CODEC_DST* pMcCodecDst)
+{
+    if (!pMcInst->tri_srcs_alu_inst.inst.bDstValid)
+    {
+        return gcvFALSE;
+    }
+
+    pMcCodecDst->regType = pMcInst->tri_srcs_alu_inst.inst.dstType;
+
+    if (bEvisMode)
+    {
+        pMcCodecDst->u.evisDst.startCompIdx = pMcInst->evis_inst.inst.startDstCompIdx;
+        pMcCodecDst->u.evisDst.compIdxRange = pMcInst->evis_inst.inst.endDstCompIdx -
+                                              pMcInst->evis_inst.inst.startDstCompIdx + 1;
+    }
+    else
+    {
+        pMcCodecDst->u.nmlDst.indexingAddr = pMcInst->tri_srcs_alu_inst.inst.dstRelAddr;
+        pMcCodecDst->u.nmlDst.writeMask = pMcInst->tri_srcs_alu_inst.inst.writeMask;
+    }
+
+    if (pMcCodec->bDual16ModeEnabled)
+    {
+        pMcCodecDst->regNo = pMcInst->tri_srcs_alu_inst.inst.dstRegNoBit0_6;
+    }
+    else
+    {
+        pMcCodecDst->regNo = pMcInst->tri_srcs_alu_inst.inst.dstRegNoBit0_6;
+        pMcCodecDst->regNo |= (pMcInst->tri_srcs_alu_inst.inst.dstRegNoBit7 << 7);
+        pMcCodecDst->regNo |= (pMcInst->tri_srcs_alu_inst.inst.dstRegNoBit8 << 8);
+    }
+
+    return gcvTRUE;
+}
 
 static void _EncodeSrc(VSC_MC_CODEC* pMcCodec,
                        gctUINT srcIdx,
@@ -2023,6 +2260,101 @@ static void _EncodeSrc(VSC_MC_CODEC* pMcCodec,
     }
 }
 
+static gctBOOL _DecodeSrc(VSC_MC_CODEC* pMcCodec,
+                          gctUINT* pSrcIdx,
+                          gctUINT  expectedSrcIdxMask,
+                          VSC_MC_INST* pMcInst,
+                          gctBOOL bEvisMode,
+                          VSC_MC_CODEC_SRC* pMcCodecSrc)
+{
+    /* Skip untouched srcs */
+    while (*pSrcIdx < 3)
+    {
+        if (*pSrcIdx == 0 && pMcInst->tri_srcs_alu_inst.inst.bSrc0Valid && (expectedSrcIdxMask & MC_SRC0_BIT))
+        {
+            break;
+        }
+        else if (*pSrcIdx == 1 && pMcInst->tri_srcs_alu_inst.inst.bSrc1Valid && (expectedSrcIdxMask & MC_SRC1_BIT))
+        {
+            break;
+        }
+        else if (*pSrcIdx == 2 && pMcInst->tri_srcs_alu_inst.inst.bSrc2Valid && (expectedSrcIdxMask & MC_SRC2_BIT))
+        {
+            break;
+        }
+
+        (*pSrcIdx) ++;
+    }
+
+    /* No available srcs any more */
+    if (*pSrcIdx >= 3)
+    {
+        return gcvFALSE;
+    }
+
+    /* Decode now */
+    if (*pSrcIdx == 0)
+    {
+        pMcCodecSrc->regType = pMcInst->tri_srcs_alu_inst.inst.src0Type;
+
+        if (pMcCodecSrc->regType != 0x7)
+        {
+            pMcCodecSrc->u.reg.regNo = pMcInst->tri_srcs_alu_inst.inst.src0RegNo;
+            pMcCodecSrc->u.reg.indexingAddr = pMcInst->tri_srcs_alu_inst.inst.src0RelAddr;
+
+            if (!bEvisMode)
+            {
+                pMcCodecSrc->u.reg.swizzle = pMcInst->tri_srcs_alu_inst.inst.src0Swizzle;
+                pMcCodecSrc->u.reg.bAbs = pMcInst->tri_srcs_alu_inst.inst.bSrc0ModAbs;
+                pMcCodecSrc->u.reg.bNegative = pMcInst->tri_srcs_alu_inst.inst.bSrc0ModNeg;
+            }
+        }
+    }
+    else if (*pSrcIdx == 1)
+    {
+        pMcCodecSrc->regType = pMcInst->tri_srcs_alu_inst.inst.src1Type;
+
+        if (pMcCodecSrc->regType != 0x7)
+        {
+            pMcCodecSrc->u.reg.regNo = pMcInst->tri_srcs_alu_inst.inst.src1RegNo;
+            pMcCodecSrc->u.reg.swizzle = pMcInst->tri_srcs_alu_inst.inst.src1Swizzle;
+            pMcCodecSrc->u.reg.indexingAddr = pMcInst->tri_srcs_alu_inst.inst.src1RelAddr;
+
+            if (!bEvisMode)
+            {
+                pMcCodecSrc->u.reg.bAbs = pMcInst->tri_srcs_alu_inst.inst.bSrc1ModAbs;
+                pMcCodecSrc->u.reg.bNegative = pMcInst->tri_srcs_alu_inst.inst.bSrc1ModNeg;
+            }
+        }
+    }
+    else if (*pSrcIdx == 2)
+    {
+        pMcCodecSrc->regType = pMcInst->tri_srcs_alu_inst.inst.src2Type;
+
+        if (pMcCodecSrc->regType != 0x7)
+        {
+            pMcCodecSrc->u.reg.regNo = pMcInst->tri_srcs_alu_inst.inst.src2RegNo;
+            pMcCodecSrc->u.reg.swizzle = pMcInst->tri_srcs_alu_inst.inst.src2Swizzle;
+            pMcCodecSrc->u.reg.indexingAddr = pMcInst->tri_srcs_alu_inst.inst.src2RelAddr;
+
+            if (!bEvisMode)
+            {
+                pMcCodecSrc->u.reg.bAbs = pMcInst->tri_srcs_alu_inst.inst.bSrc2ModAbs;
+                pMcCodecSrc->u.reg.bNegative = pMcInst->tri_srcs_alu_inst.inst.bSrc2ModNeg;
+            }
+        }
+    }
+
+    if (pMcCodecSrc->regType == 0x7)
+    {
+        pMcCodecSrc->u.imm.immData = _DecodeImmData(pMcInst, *pSrcIdx, &pMcCodecSrc->u.imm.immType);
+    }
+
+    /* Move on to next src for next iteration */
+    (*pSrcIdx) ++;
+
+    return gcvTRUE;
+}
 
 static void _EncodeInstType(VSC_MC_CODEC* pMcCodec,
                             VSC_MC_CODEC_TYPE mcCodecType,
@@ -2040,6 +2372,24 @@ static void _EncodeInstType(VSC_MC_CODEC* pMcCodec,
     }
 }
 
+static gctUINT _DecodeInstType(VSC_MC_CODEC* pMcCodec,
+                               VSC_MC_CODEC_TYPE mcCodecType,
+                               VSC_MC_INST* pMcInst)
+{
+    gctUINT     instType;
+
+    instType = pMcInst->tri_srcs_alu_inst.inst.instTypeBit0;
+    instType |= (pMcInst->tri_srcs_alu_inst.inst.instTypeBit1_2 << 1);
+
+    if (mcCodecType == VSC_MC_CODEC_TYPE_LOAD ||
+        mcCodecType == VSC_MC_CODEC_TYPE_STORE)
+    {
+        /* There is an extra 4th bit for inst type */
+        instType |= (pMcInst->load_inst.inst.instTypeBit3 << 3);
+    }
+
+    return instType;
+}
 
 static void _EncodeThreadType(VSC_MC_CODEC* pMcCodec,
                               VSC_MC_CODEC_TYPE mcCodecType,
@@ -2066,6 +2416,33 @@ static void _EncodeThreadType(VSC_MC_CODEC* pMcCodec,
     }
 }
 
+static gctUINT _DecodeThreadType(VSC_MC_CODEC* pMcCodec,
+                                 VSC_MC_CODEC_TYPE mcCodecType,
+                                 VSC_MC_INST* pMcInst)
+{
+    gctUINT    threadType = 0;
+
+    if (pMcCodec->bDual16ModeEnabled)
+    {
+        if (mcCodecType == VSC_MC_CODEC_TYPE_STORE ||
+            mcCodecType == VSC_MC_CODEC_TYPE_IMG_STORE ||
+            mcCodecType == VSC_MC_CODEC_TYPE_STORE_ATTR ||
+            mcCodecType == VSC_MC_CODEC_TYPE_DIRECT_BRANCH_1 ||
+            mcCodecType == VSC_MC_CODEC_TYPE_INDIRECT_BRANCH ||
+            mcCodecType == VSC_MC_CODEC_TYPE_INDIRECT_CALL)
+        {
+            threadType = pMcInst->store_inst.inst.threadTypeBit0;
+            threadType |= (pMcInst->store_inst.inst.threadTypeBit1 << 1);
+        }
+        else
+        {
+            threadType = pMcInst->tri_srcs_alu_inst.inst.dstRegNoBit7;
+            threadType |= (pMcInst->tri_srcs_alu_inst.inst.dstRegNoBit8 << 1);
+        }
+    }
+
+    return threadType;
+}
 
 static gctBOOL _Common_Encode_Mc_Alu_Inst(VSC_MC_CODEC* pMcCodec,
                                           VSC_MC_CODEC_TYPE mcCodecType,
@@ -2094,6 +2471,7 @@ static gctBOOL _Common_Encode_Mc_Alu_Inst(VSC_MC_CODEC* pMcCodec,
     /* Inst ctrl */
     _EncodeInstType(pMcCodec, mcCodecType, pOutMcInst, pInCodecHelperInst->instCtrl.instType);
     _EncodeThreadType(pMcCodec, mcCodecType, pOutMcInst, pInCodecHelperInst->instCtrl.threadType);
+    pOutMcInst->tri_srcs_alu_inst.inst.bResultSat = pInCodecHelperInst->instCtrl.bResultSat;
     if (bEvisMode)
     {
         /* EVIS insts have evis-state and sourceBin */
@@ -2110,13 +2488,62 @@ static gctBOOL _Common_Encode_Mc_Alu_Inst(VSC_MC_CODEC* pMcCodec,
     return gcvTRUE;
 }
 
+static gctBOOL _Common_Decode_Mc_Alu_Inst(VSC_MC_CODEC* pMcCodec,
+                                          VSC_MC_CODEC_TYPE mcCodecType,
+                                          VSC_MC_INST* pInMcInst,
+                                          gctUINT expectedMcSrcIdxMask,
+                                          VSC_MC_CODEC_INST* pOutCodecHelperInst)
+{
+    gctUINT           srcIdxOfHelperInst, srcIdxOfMc = 0;
+    gctBOOL           bEvisMode;
+
+    /* Opcode */
+    pOutCodecHelperInst->baseOpcode = DECODE_BASE_OPCODE(pInMcInst);
+
+    bEvisMode = (pOutCodecHelperInst->baseOpcode == 0x45);
+
+    /* Dst */
+    pOutCodecHelperInst->bDstValid = _DecodeDst(pMcCodec, pInMcInst, bEvisMode, &pOutCodecHelperInst->dst);
+
+    /* Src */
+    for (srcIdxOfHelperInst = 0; ; srcIdxOfHelperInst ++)
+    {
+        if (!_DecodeSrc(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, pInMcInst,
+                        bEvisMode, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
+        {
+            break;
+        }
+
+        pOutCodecHelperInst->srcCount = srcIdxOfHelperInst + 1;
+    }
+
+    /* Inst ctrl */
+    pOutCodecHelperInst->instCtrl.instType = _DecodeInstType(pMcCodec, mcCodecType, pInMcInst);
+    pOutCodecHelperInst->instCtrl.threadType = _DecodeThreadType(pMcCodec, mcCodecType, pInMcInst);
+    pOutCodecHelperInst->instCtrl.bResultSat = pInMcInst->tri_srcs_alu_inst.inst.bResultSat;
+    if (bEvisMode)
+    {
+        /* EVIS insts have evis-state and sourceBin */
+        pOutCodecHelperInst->instCtrl.u.visionCtrl.evisState = pInMcInst->evis_inst.inst.evisState;
+        pOutCodecHelperInst->instCtrl.u.visionCtrl.startSrcCompIdx = pInMcInst->evis_inst.inst.startSrcCompIdx;
+
+    }
+    else
+    {
+        pOutCodecHelperInst->instCtrl.roundingMode = pInMcInst->tri_srcs_alu_inst.inst.roundMode;
+        pOutCodecHelperInst->instCtrl.bPacked = pInMcInst->tri_srcs_alu_inst.inst.bPackMode;
+    }
+
+    return gcvTRUE;
+}
+
 static gctBOOL _Common_Encode_Mc_Sample_Inst(VSC_MC_CODEC* pMcCodec,
                                              VSC_MC_CODEC_TYPE mcCodecType,
                                              VSC_MC_CODEC_INST* pInCodecHelperInst,
                                              VSC_MC_INST* pOutMcInst)
 {
     /* Opcode */
-    ENCODE_BASE_OPCODE(pOutMcInst, _MapSampleAuxOpcodeToHwOpcode(pInCodecHelperInst->baseOpcode));
+    ENCODE_BASE_OPCODE(pOutMcInst, _MapSampleAuxOpcodeToHwOpcode(pMcCodec, pInCodecHelperInst->baseOpcode));
 
     /* Dst */
     _EncodeDst(pMcCodec, &pInCodecHelperInst->dst, gcvFALSE, pOutMcInst);
@@ -2171,6 +2598,64 @@ static gctBOOL _Common_Encode_Mc_Sample_Inst(VSC_MC_CODEC* pMcCodec,
     /* Inst ctrl */
     _EncodeInstType(pMcCodec, mcCodecType, pOutMcInst, pInCodecHelperInst->instCtrl.instType);
     _EncodeThreadType(pMcCodec, mcCodecType, pOutMcInst, pInCodecHelperInst->instCtrl.threadType);
+    pOutMcInst->sample_inst.inst.bResultSat = pInCodecHelperInst->instCtrl.bResultSat;
+
+    return gcvTRUE;
+}
+
+static gctBOOL _Common_Decode_Mc_Sample_Inst(VSC_MC_CODEC* pMcCodec,
+                                             VSC_MC_CODEC_TYPE mcCodecType,
+                                             VSC_MC_INST* pInMcInst,
+                                             gctUINT expectedMcSrcIdxMask,
+                                             VSC_MC_CODEC_INST* pOutCodecHelperInst)
+{
+    gctUINT           baseOpcode;
+    gctUINT           srcIdxOfHelperInst, srcIdxOfMc = 0;
+    gctUINT           srcIdx1And2MaskOfMc = 0; /* Mask srcIdx == 1 and srcIdx == 2 */
+    gctUINT           texldUModeReg = 0;
+
+    /* Opcode */
+    baseOpcode = DECODE_BASE_OPCODE(pInMcInst);
+
+    /* Dst */
+    pOutCodecHelperInst->bDstValid = _DecodeDst(pMcCodec, pInMcInst, gcvFALSE, &pOutCodecHelperInst->dst);
+
+    /* Src */
+    pOutCodecHelperInst->src[0].regType = MC_AUXILIARY_SRC_TYPE_SAMPLER;
+    pOutCodecHelperInst->src[0].u.reg.regNo = pInMcInst->sample_inst.inst.samplerSlot;
+    pOutCodecHelperInst->src[0].u.reg.swizzle = pInMcInst->sample_inst.inst.samplerSwizzle;
+    pOutCodecHelperInst->src[0].u.reg.indexingAddr = pInMcInst->sample_inst.inst.samplerRelAddr;
+    pOutCodecHelperInst->srcCount = 1;
+
+    _DecodeSrc(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, pInMcInst, gcvFALSE, &pOutCodecHelperInst->src[1]);
+    pOutCodecHelperInst->srcCount ++;
+
+    for (srcIdxOfHelperInst = 2; ; srcIdxOfHelperInst ++)
+    {
+        if (!_DecodeSrc(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, pInMcInst,
+                        gcvFALSE, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
+        {
+            break;
+        }
+
+        if (baseOpcode == 0x7B && (srcIdxOfMc - 1) == 2)
+        {
+            gcmASSERT(pOutCodecHelperInst->src[srcIdxOfHelperInst].regType == 0x7);
+
+            texldUModeReg = pOutCodecHelperInst->src[srcIdxOfHelperInst].u.imm.immData.ui;
+        }
+
+        srcIdx1And2MaskOfMc |= (1 << (srcIdxOfMc - 1));
+        pOutCodecHelperInst->srcCount = srcIdxOfHelperInst + 1;
+    }
+
+    /* Inst ctrl */
+    pOutCodecHelperInst->instCtrl.instType = _DecodeInstType(pMcCodec, mcCodecType, pInMcInst);
+    pOutCodecHelperInst->instCtrl.threadType = _DecodeThreadType(pMcCodec, mcCodecType, pInMcInst);
+    pOutCodecHelperInst->instCtrl.bResultSat = pInMcInst->sample_inst.inst.bResultSat;
+
+    /* Map sample hw-opcode to sample aux-opcode based on different src-idx */
+    pOutCodecHelperInst->baseOpcode = _MapSampleHwOpcodeToAuxOpcode(pMcCodec, baseOpcode, srcIdx1And2MaskOfMc, texldUModeReg);
 
     return gcvTRUE;
 }
@@ -2204,24 +2689,96 @@ static gctBOOL _Common_Encode_Mc_Load_Store_Inst(VSC_MC_CODEC* pMcCodec,
     pOutMcInst->load_inst.inst.bAccessLocalStorage = pInCodecHelperInst->instCtrl.u.maCtrl.bAccessLocalStorage;
     if (!bForImgLS)
     {
+        gcmASSERT(!bEvisMode);
+
         pOutMcInst->load_inst.inst.bPackMode = pInCodecHelperInst->instCtrl.bPacked;
-        pOutMcInst->load_inst.inst.bDenorm = pInCodecHelperInst->instCtrl.u.maCtrl.u.lsCtrl.bDenorm;
+        pOutMcInst->load_inst.inst.bDenorm = pInCodecHelperInst->instCtrl.bDenorm;
         pOutMcInst->load_inst.inst.bOffsetX3 = pInCodecHelperInst->instCtrl.u.maCtrl.u.lsCtrl.bOffsetX3;
         pOutMcInst->load_inst.inst.offsetLeftShift = pInCodecHelperInst->instCtrl.u.maCtrl.u.lsCtrl.offsetLeftShift;
     }
-    if (pInCodecHelperInst->baseOpcode == 0x46)
-    {
-        ((VSC_MC_INST*)pOutMcInst)->img_atom_inst.inst.atomicMode = pInCodecHelperInst->instCtrl.u.maCtrl.u.imgAtomCtrl.atomicMode;
-        ((VSC_MC_INST*)pOutMcInst)->img_atom_inst.inst.b3dImgMode = pInCodecHelperInst->instCtrl.u.maCtrl.u.imgAtomCtrl.b3dImgMode;
-    }
-    if (bEvisMode)
+    else if (bEvisMode)
     {
         /* Always mark LSB1 of evis-state to be enabled */
         ((VSC_MC_INST*)pOutMcInst)->evis_inst.inst.evisState = 0x01;
     }
 
+    if (pInCodecHelperInst->baseOpcode == 0x46)
+    {
+        ((VSC_MC_INST*)pOutMcInst)->img_atom_inst.inst.atomicMode = pInCodecHelperInst->instCtrl.u.maCtrl.u.imgAtomCtrl.atomicMode;
+        ((VSC_MC_INST*)pOutMcInst)->img_atom_inst.inst.b3dImgMode = pInCodecHelperInst->instCtrl.u.maCtrl.u.imgAtomCtrl.b3dImgMode;
+    }
+
     _EncodeInstType(pMcCodec, mcCodecType, pOutMcInst, pInCodecHelperInst->instCtrl.instType);
     _EncodeThreadType(pMcCodec, mcCodecType, pOutMcInst, pInCodecHelperInst->instCtrl.threadType);
+
+    if (pInCodecHelperInst->bDstValid || bForImgLS)
+    {
+        pOutMcInst->load_inst.inst.bResultSat = pInCodecHelperInst->instCtrl.bResultSat;
+    }
+
+    return gcvTRUE;
+}
+
+static gctBOOL _Common_Decode_Mc_Load_Store_Inst(VSC_MC_CODEC* pMcCodec,
+                                                 VSC_MC_CODEC_TYPE mcCodecType,
+                                                 VSC_MC_INST* pInMcInst,
+                                                 gctUINT expectedMcSrcIdxMask,
+                                                 gctBOOL bForImgLS,
+                                                 VSC_MC_CODEC_INST* pOutCodecHelperInst)
+{
+    gctUINT           baseOpcode;
+    gctUINT           srcIdxOfHelperInst, srcIdxOfMc = 0;
+    gctBOOL           bEvisMode = bForImgLS ? (pInMcInst->evis_inst.inst.evisState == 0x01) : gcvFALSE;
+
+    /* Opcode */
+    baseOpcode = DECODE_BASE_OPCODE(pInMcInst);
+
+    /* Dst */
+    pOutCodecHelperInst->bDstValid = _DecodeDst(pMcCodec, pInMcInst, bEvisMode, &pOutCodecHelperInst->dst);
+
+    /* Src */
+    for (srcIdxOfHelperInst = 0; ; srcIdxOfHelperInst ++)
+    {
+        if (!_DecodeSrc(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, pInMcInst,
+                        gcvFALSE, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
+        {
+            break;
+        }
+
+        pOutCodecHelperInst->srcCount = srcIdxOfHelperInst + 1;
+    }
+
+    /* Inst ctrl */
+    pOutCodecHelperInst->instCtrl.bSkipForHelperKickoff = pInMcInst->load_inst.inst.bSkipForHelperKickoff;
+    pOutCodecHelperInst->instCtrl.u.maCtrl.bAccessLocalStorage = pInMcInst->load_inst.inst.bAccessLocalStorage;
+    if (!bForImgLS)
+    {
+        pOutCodecHelperInst->instCtrl.bPacked = pInMcInst->load_inst.inst.bPackMode;
+        pOutCodecHelperInst->instCtrl.bDenorm = pInMcInst->load_inst.inst.bDenorm;
+        pOutCodecHelperInst->instCtrl.u.maCtrl.u.lsCtrl.bOffsetX3 = pInMcInst->load_inst.inst.bOffsetX3;
+        pOutCodecHelperInst->instCtrl.u.maCtrl.u.lsCtrl.offsetLeftShift = pInMcInst->load_inst.inst.offsetLeftShift;
+    }
+    else
+    {
+        pOutCodecHelperInst->instCtrl.u.maCtrl.bUnderEvisMode = bEvisMode;
+    }
+
+    if (baseOpcode == 0x46)
+    {
+        pOutCodecHelperInst->instCtrl.u.maCtrl.u.imgAtomCtrl.atomicMode = pInMcInst->img_atom_inst.inst.atomicMode;
+        pOutCodecHelperInst->instCtrl.u.maCtrl.u.imgAtomCtrl.b3dImgMode = pInMcInst->img_atom_inst.inst.b3dImgMode;
+    }
+
+    pOutCodecHelperInst->instCtrl.instType = _DecodeInstType(pMcCodec, mcCodecType, pInMcInst);
+    pOutCodecHelperInst->instCtrl.threadType = _DecodeThreadType(pMcCodec, mcCodecType, pInMcInst);
+
+    if (pOutCodecHelperInst->bDstValid || bForImgLS)
+    {
+        pOutCodecHelperInst->instCtrl.bResultSat = pInMcInst->load_inst.inst.bResultSat;
+    }
+
+    /* Map ld/st hw-opcode to ld/st aux-opcode based on whether dst is enabled */
+    pOutCodecHelperInst->baseOpcode = _MapLdStHwOpcodeToAuxOpcode(baseOpcode, pOutCodecHelperInst->bDstValid);
 
     return gcvTRUE;
 }
@@ -2249,7 +2806,7 @@ static gctBOOL _Encode_Mc_3_Srcs_Alu_Inst(VSC_MC_CODEC* pMcCodec,
 {
     gctUINT srcMap[3];
 
-    gcmASSERT(pInCodecHelperInst->bDstValid);
+    gcmASSERT(IS_ATOMIC_MC_OPCODE(pInCodecHelperInst->baseOpcode) || pInCodecHelperInst->bDstValid);
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_3_SRCS_ALU);
 
     if (_IsSupportCondOp(pInCodecHelperInst->baseOpcode, pInCodecHelperInst->extOpcode))
@@ -2306,15 +2863,11 @@ static gctBOOL _Encode_Mc_3_Srcs_Alu_Inst(VSC_MC_CODEC* pMcCodec,
     ENCODE_EXT_OPCODE(pOutMcInst, pInCodecHelperInst->baseOpcode, pInCodecHelperInst->extOpcode);
     pOutMcInst->inst.condOpCode = pInCodecHelperInst->instCtrl.condOpCode;
 
-    /* Atomic operations may skip for helper pixel, also atomics might access local memory, not always global memory */
-    if (pInCodecHelperInst->baseOpcode == 0x65      ||
-        pInCodecHelperInst->baseOpcode == 0x66     ||
-        pInCodecHelperInst->baseOpcode == 0x67 ||
-        pInCodecHelperInst->baseOpcode == 0x68      ||
-        pInCodecHelperInst->baseOpcode == 0x69      ||
-        pInCodecHelperInst->baseOpcode == 0x6A       ||
-        pInCodecHelperInst->baseOpcode == 0x6B      ||
-        pInCodecHelperInst->baseOpcode == 0x6C)
+    /* Atomic operations may
+       1. skip for helper pixel,
+       2. access local memory, not always global memory
+     */
+    if (IS_ATOMIC_MC_OPCODE(pInCodecHelperInst->baseOpcode))
     {
         pOutMcInst->inst.bSkipForHelperKickoff = pInCodecHelperInst->instCtrl.bSkipForHelperKickoff;
         ((VSC_MC_INST*)pOutMcInst)->load_inst.inst.bAccessLocalStorage = pInCodecHelperInst->instCtrl.u.maCtrl.bAccessLocalStorage;
@@ -2326,6 +2879,17 @@ static gctBOOL _Encode_Mc_3_Srcs_Alu_Inst(VSC_MC_CODEC* pMcCodec,
         ((VSC_MC_INST*)pOutMcInst)->store_attr_inst.inst.bNeedUscSync =
                                          pInCodecHelperInst->instCtrl.u.bNeedUscSync ? 1 : 0;
     }
+
+    /* MAD uses MSB5 of word0 as control bit to control result of (0 * INF) */
+    if (pInCodecHelperInst->baseOpcode == 0x02)
+    {
+        if (pInCodecHelperInst->instCtrl.u.bInfX0ToZero)
+        {
+            ((VSC_MC_INST*)pOutMcInst)->sample_inst.inst.samplerSlot = 1;
+        }
+    }
+
+    pOutMcInst->inst.bDenorm = pInCodecHelperInst->instCtrl.bDenorm;
 
     return _Common_Encode_Mc_Alu_Inst(pMcCodec, mcCodecType, pInCodecHelperInst, &srcMap[0], (VSC_MC_INST*)pOutMcInst);
 }
@@ -2357,11 +2921,19 @@ static gctBOOL _Encode_Mc_2_Srcs_Src0_Src1_Alu_Inst(VSC_MC_CODEC* pMcCodec,
     ENCODE_EXT_OPCODE(pOutMcInst, pInCodecHelperInst->baseOpcode, pInCodecHelperInst->extOpcode);
     pOutMcInst->inst.condOpCode = pInCodecHelperInst->instCtrl.condOpCode;
 
-    if ((pInCodecHelperInst->baseOpcode == 0x03 && pInCodecHelperInst->instCtrl.u.bInfX0ToZero) ||
-        (pInCodecHelperInst->baseOpcode == 0x77))
+    if (pInCodecHelperInst->baseOpcode == 0x03 ||
+        pInCodecHelperInst->baseOpcode == 0x77 ||
+        pInCodecHelperInst->baseOpcode == 0x29 ||
+        pInCodecHelperInst->baseOpcode == 0x04 ||
+        pInCodecHelperInst->baseOpcode == 0x73 ||
+        pInCodecHelperInst->baseOpcode == 0x05 ||
+        pInCodecHelperInst->baseOpcode == 0x06)
     {
-        /* MUL/NORM_MUL use MSB5 of word0 as control bit to control result of (0 * INF) */
-        ((VSC_MC_INST*)pOutMcInst)->sample_inst.inst.samplerSlot = 1;
+        /* NORM_MUL/MUL/MULLO/DST/DP use MSB5 of word0 as control bit to control result of (0 * INF) */
+        if (pInCodecHelperInst->instCtrl.u.bInfX0ToZero)
+        {
+            ((VSC_MC_INST*)pOutMcInst)->sample_inst.inst.samplerSlot = 1;
+        }
     }
 
     if (pInCodecHelperInst->baseOpcode == 0x29)
@@ -2430,6 +3002,17 @@ static gctBOOL _Encode_Mc_1_Src_Src0_Alu_Inst(VSC_MC_CODEC* pMcCodec,
     gcmASSERT(pInCodecHelperInst->srcCount == 1);
 
     ENCODE_EXT_OPCODE(pOutMcInst, pInCodecHelperInst->baseOpcode, pInCodecHelperInst->extOpcode);
+
+    /* NORM_DP uses MSB5 of word0 as control bit to control result of (0 * INF) */
+    if (pInCodecHelperInst->baseOpcode == 0x74 ||
+        pInCodecHelperInst->baseOpcode == 0x75 ||
+        pInCodecHelperInst->baseOpcode == 0x76)
+    {
+        if (pInCodecHelperInst->instCtrl.u.bInfX0ToZero)
+        {
+            ((VSC_MC_INST*)pOutMcInst)->sample_inst.inst.samplerSlot = 1;
+        }
+    }
 
     return _Common_Encode_Mc_Alu_Inst(pMcCodec, mcCodecType, pInCodecHelperInst, &srcMap[0], (VSC_MC_INST*)pOutMcInst);
 }
@@ -2507,6 +3090,7 @@ static gctBOOL _Encode_Mc_Pack_Inst(VSC_MC_CODEC* pMcCodec,
                     pInCodecHelperInst->instCtrl.instType);
     _EncodeThreadType(pMcCodec, VSC_MC_CODEC_TYPE_PACK, (VSC_MC_INST*)pOutMcInst,
                       pInCodecHelperInst->instCtrl.threadType);
+    pOutMcInst->inst.bResultSat = pInCodecHelperInst->instCtrl.bResultSat;
 
     return gcvTRUE;
 }
@@ -2592,8 +3176,21 @@ static gctBOOL _Encode_Mc_Img_Store_Inst(VSC_MC_CODEC* pMcCodec,
     if (pInCodecHelperInst->baseOpcode != MC_AUXILIARY_OP_CODE_USC_IMG_STORE &&
         pInCodecHelperInst->baseOpcode != MC_AUXILIARY_OP_CODE_USC_IMG_STORE_3D)
     {
-        /* Normal img-store must have full memory writemask */
-        pOutMcInst->inst.writeMask = WRITEMASK_ALL;
+        if (pInCodecHelperInst->instCtrl.u.maCtrl.bUnderEvisMode)
+        {
+            /*  Why has no channel to be written? */
+            gcmASSERT(pInCodecHelperInst->dst.u.evisDst.compIdxRange > 0);
+
+            ((VSC_MC_INST*)pOutMcInst)->evis_inst.inst.startDstCompIdx = pInCodecHelperInst->dst.u.evisDst.startCompIdx;
+            ((VSC_MC_INST*)pOutMcInst)->evis_inst.inst.endDstCompIdx = pInCodecHelperInst->dst.u.evisDst.startCompIdx +
+                                                                       pInCodecHelperInst->dst.u.evisDst.compIdxRange - 1;
+
+        }
+        else
+        {
+            /* Normal img-store without evis mode must have full memory writemask */
+            pOutMcInst->inst.writeMask = WRITEMASK_ALL;
+        }
     }
 
     return _Common_Encode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, pInCodecHelperInst, gcvTRUE, (VSC_MC_INST*)pOutMcInst);
@@ -2625,6 +3222,7 @@ static gctBOOL _Encode_Mc_Store_Attr_Inst(VSC_MC_CODEC* pMcCodec,
     /* Opcode */
     ENCODE_BASE_OPCODE((VSC_MC_INST*)pOutMcInst, _MapLdStAuxOpcodeToHwOpcode(pInCodecHelperInst->baseOpcode));
 
+    /* Dst */
     if (pInCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_USC_STORE_ATTR)
     {
         _EncodeDst(pMcCodec, &pInCodecHelperInst->dst, gcvFALSE, (VSC_MC_INST*)pOutMcInst);
@@ -2678,6 +3276,7 @@ static gctBOOL _Encode_Mc_Select_Map_Inst(VSC_MC_CODEC* pMcCodec,
     pOutMcInst->inst.bCompSel = pInCodecHelperInst->instCtrl.u.smCtrl.bCompSel;
     _EncodeInstType(pMcCodec, mcCodecType, (VSC_MC_INST*)pOutMcInst, pInCodecHelperInst->instCtrl.instType);
     _EncodeThreadType(pMcCodec, mcCodecType, (VSC_MC_INST*)pOutMcInst, pInCodecHelperInst->instCtrl.threadType);
+    pOutMcInst->inst.bResultSat = pInCodecHelperInst->instCtrl.bResultSat;
 
     return gcvTRUE;
 }
@@ -2895,6 +3494,7 @@ static gctBOOL _Encode_Mc_Emit_Inst(VSC_MC_CODEC* pMcCodec,
     _EncodeInstType(pMcCodec, VSC_MC_CODEC_TYPE_EMIT, (VSC_MC_INST*)pOutMcInst,
                     pInCodecHelperInst->instCtrl.instType);
     pOutMcInst->inst.bNeedRestartPrim = pInCodecHelperInst->instCtrl.u.bNeedRestartPrim;
+    pOutMcInst->inst.bResultSat = pInCodecHelperInst->instCtrl.bResultSat;
 
     return gcvTRUE;
 }
@@ -2934,10 +3534,13 @@ static PFN_MC_ENCODER _pfn_mc_encoder[] =
 
 static gctBOOL _Decode_Mc_No_Opnd_Inst(VSC_MC_CODEC* pMcCodec,
                                        VSC_MC_CODEC_TYPE mcCodecType,
-                                       VSC_MC_NO_OPERAND_INST* pInMCInst,
+                                       VSC_MC_NO_OPERAND_INST* pInMcInst,
                                        VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_NO_OPND);
+
+    pOutCodecHelperInst->baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
+    pOutCodecHelperInst->extOpcode = DECODE_EXT_OPCODE((VSC_MC_INST*)pInMcInst, pOutCodecHelperInst->baseOpcode);
 
     return gcvTRUE;
 }
@@ -2947,9 +3550,38 @@ static gctBOOL _Decode_Mc_3_Srcs_Alu_Inst(VSC_MC_CODEC* pMcCodec,
                                           VSC_MC_ALU_3_SRCS_INST* pInMcInst,
                                           VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT  baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
+    gctUINT  expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT | MC_SRC2_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_3_SRCS_ALU);
 
-    return gcvTRUE;
+    pOutCodecHelperInst->extOpcode = DECODE_EXT_OPCODE((VSC_MC_INST*)pInMcInst, baseOpcode);
+    pOutCodecHelperInst->instCtrl.condOpCode = pInMcInst->inst.condOpCode;
+
+    /* Atomic operations may skip for helper pixel, also atomics might access local memory, not always global memory */
+    if (IS_ATOMIC_MC_OPCODE(baseOpcode))
+    {
+        pOutCodecHelperInst->instCtrl.bSkipForHelperKickoff = pInMcInst->inst.bSkipForHelperKickoff;
+        pOutCodecHelperInst->instCtrl.u.maCtrl.bAccessLocalStorage = ((VSC_MC_INST*)pInMcInst)->load_inst.inst.bAccessLocalStorage;
+    }
+
+    /* Load_attr needs a sync bit */
+    if (baseOpcode == 0x78)
+    {
+        pOutCodecHelperInst->instCtrl.u.bNeedUscSync = ((VSC_MC_INST*)pInMcInst)->store_attr_inst.inst.bNeedUscSync;
+    }
+
+    if (baseOpcode == 0x02)
+    {
+        if (((VSC_MC_INST*)pInMcInst)->sample_inst.inst.samplerSlot)
+        {
+            pOutCodecHelperInst->instCtrl.u.bInfX0ToZero = gcvTRUE;
+        }
+    }
+
+    pOutCodecHelperInst->instCtrl.bDenorm = pInMcInst->inst.bDenorm;
+
+    return _Common_Decode_Mc_Alu_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst, expectedMcSrcIdxMask, pOutCodecHelperInst);
 }
 
 static gctBOOL _Decode_Mc_2_Srcs_Src0_Src1_Alu_Inst(VSC_MC_CODEC* pMcCodec,
@@ -2957,9 +3589,29 @@ static gctBOOL _Decode_Mc_2_Srcs_Src0_Src1_Alu_Inst(VSC_MC_CODEC* pMcCodec,
                                                     VSC_MC_ALU_2_SRCS_SRC0_SRC1_INST* pInMcInst,
                                                     VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT  baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
+    gctUINT  expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_ALU);
 
-    return gcvTRUE;
+    pOutCodecHelperInst->extOpcode = DECODE_EXT_OPCODE((VSC_MC_INST*)pInMcInst, baseOpcode);
+    pOutCodecHelperInst->instCtrl.condOpCode = pInMcInst->inst.condOpCode;
+
+    if (baseOpcode == 0x03 ||
+        baseOpcode == 0x77 ||
+        baseOpcode == 0x29 ||
+        baseOpcode == 0x04 ||
+        baseOpcode == 0x73 ||
+        baseOpcode == 0x05 ||
+        baseOpcode == 0x06)
+    {
+        if (((VSC_MC_INST*)pInMcInst)->sample_inst.inst.samplerSlot)
+        {
+            pOutCodecHelperInst->instCtrl.u.bInfX0ToZero = gcvTRUE;
+        }
+    }
+
+    return _Common_Decode_Mc_Alu_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst, expectedMcSrcIdxMask, pOutCodecHelperInst);
 }
 
 static gctBOOL _Decode_Mc_2_Srcs_Src0_Src2_Alu_Inst(VSC_MC_CODEC* pMcCodec,
@@ -2967,9 +3619,14 @@ static gctBOOL _Decode_Mc_2_Srcs_Src0_Src2_Alu_Inst(VSC_MC_CODEC* pMcCodec,
                                                     VSC_MC_ALU_2_SRCS_SRC0_SRC2_INST* pInMcInst,
                                                     VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT  baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
+    gctUINT  expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC2_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC2_ALU);
 
-    return gcvTRUE;
+    pOutCodecHelperInst->extOpcode = DECODE_EXT_OPCODE((VSC_MC_INST*)pInMcInst, baseOpcode);
+
+    return _Common_Decode_Mc_Alu_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst, expectedMcSrcIdxMask, pOutCodecHelperInst);
 }
 
 static gctBOOL _Decode_Mc_2_Srcs_Src1_Src2_Alu_Inst(VSC_MC_CODEC* pMcCodec,
@@ -2977,9 +3634,11 @@ static gctBOOL _Decode_Mc_2_Srcs_Src1_Src2_Alu_Inst(VSC_MC_CODEC* pMcCodec,
                                                     VSC_MC_ALU_2_SRCS_SRC1_SRC2_INST* pInMcInst,
                                                     VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT  expectedMcSrcIdxMask = MC_SRC1_BIT | MC_SRC2_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_2_SRCS_SRC1_SRC2_ALU);
 
-    return gcvTRUE;
+    return _Common_Decode_Mc_Alu_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst, expectedMcSrcIdxMask, pOutCodecHelperInst);
 }
 
 static gctBOOL _Decode_Mc_1_Src_Src0_Alu_Inst(VSC_MC_CODEC* pMcCodec,
@@ -2987,9 +3646,24 @@ static gctBOOL _Decode_Mc_1_Src_Src0_Alu_Inst(VSC_MC_CODEC* pMcCodec,
                                               VSC_MC_ALU_1_SRC_SRC0_INST* pInMcInst,
                                               VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT  baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
+    gctUINT  expectedMcSrcIdxMask = MC_SRC0_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_1_SRC_SRC0_ALU);
 
-    return gcvTRUE;
+    pOutCodecHelperInst->extOpcode = DECODE_EXT_OPCODE((VSC_MC_INST*)pInMcInst, baseOpcode);
+
+    if (baseOpcode == 0x74 ||
+        baseOpcode == 0x75 ||
+        baseOpcode == 0x76)
+    {
+        if (((VSC_MC_INST*)pInMcInst)->sample_inst.inst.samplerSlot)
+        {
+            pOutCodecHelperInst->instCtrl.u.bInfX0ToZero = gcvTRUE;
+        }
+    }
+
+    return _Common_Decode_Mc_Alu_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst, expectedMcSrcIdxMask, pOutCodecHelperInst);
 }
 
 static gctBOOL _Decode_Mc_1_Src_Src1_Alu_Inst(VSC_MC_CODEC* pMcCodec,
@@ -2997,9 +3671,14 @@ static gctBOOL _Decode_Mc_1_Src_Src1_Alu_Inst(VSC_MC_CODEC* pMcCodec,
                                               VSC_MC_ALU_1_SRC_SRC1_INST* pInMcInst,
                                               VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT  baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
+    gctUINT  expectedMcSrcIdxMask = MC_SRC1_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_1_SRC_SRC1_ALU);
 
-    return gcvTRUE;
+    pOutCodecHelperInst->extOpcode = DECODE_EXT_OPCODE((VSC_MC_INST*)pInMcInst, baseOpcode);
+
+    return _Common_Decode_Mc_Alu_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst, expectedMcSrcIdxMask, pOutCodecHelperInst);
 }
 
 static gctBOOL _Decode_Mc_1_Src_Src2_Alu_Inst(VSC_MC_CODEC* pMcCodec,
@@ -3007,9 +3686,11 @@ static gctBOOL _Decode_Mc_1_Src_Src2_Alu_Inst(VSC_MC_CODEC* pMcCodec,
                                               VSC_MC_ALU_1_SRC_SRC2_INST* pInMcInst,
                                               VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT  expectedMcSrcIdxMask = MC_SRC2_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_1_SRC_SRC2_ALU);
 
-    return gcvTRUE;
+    return _Common_Decode_Mc_Alu_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst, expectedMcSrcIdxMask, pOutCodecHelperInst);
 }
 
 static gctBOOL _Decode_Mc_Pack_Inst(VSC_MC_CODEC* pMcCodec,
@@ -3017,7 +3698,34 @@ static gctBOOL _Decode_Mc_Pack_Inst(VSC_MC_CODEC* pMcCodec,
                                     VSC_MC_PACK_INST* pInMcInst,
                                     VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT           srcIdxOfHelperInst, srcIdxOfMc = 0;
+    gctUINT           expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT | MC_SRC2_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_PACK);
+
+    /* Opcode */
+    pOutCodecHelperInst->baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
+
+    /* Dst */
+    pOutCodecHelperInst->bDstValid = _DecodeDst(pMcCodec, (VSC_MC_INST*)pInMcInst, gcvFALSE, &pOutCodecHelperInst->dst);
+
+    /* Src */
+    for (srcIdxOfHelperInst = 0; ; srcIdxOfHelperInst ++)
+    {
+        if (!_DecodeSrc(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
+                        gcvFALSE, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
+        {
+            break;
+        }
+
+        pOutCodecHelperInst->srcCount = srcIdxOfHelperInst + 1;
+    }
+
+    /* Inst ctrl */
+    pOutCodecHelperInst->instCtrl.u.srcSelect = pInMcInst->inst.srcSelect;
+    pOutCodecHelperInst->instCtrl.instType = _DecodeInstType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
+    pOutCodecHelperInst->instCtrl.threadType = _DecodeThreadType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
+    pOutCodecHelperInst->instCtrl.bResultSat = pInMcInst->inst.bResultSat;
 
     return gcvTRUE;
 }
@@ -3027,9 +3735,11 @@ static gctBOOL _Decode_Mc_Sample_Inst(VSC_MC_CODEC* pMcCodec,
                                       VSC_MC_SAMPLE_INST* pInMcInst,
                                       VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT  expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT | MC_SRC2_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_SAMPLE);
 
-    return gcvTRUE;
+    return _Common_Decode_Mc_Sample_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst, expectedMcSrcIdxMask, pOutCodecHelperInst);
 }
 
 static gctBOOL _Decode_Mc_Sample_Ext_Inst(VSC_MC_CODEC* pMcCodec,
@@ -3037,9 +3747,14 @@ static gctBOOL _Decode_Mc_Sample_Ext_Inst(VSC_MC_CODEC* pMcCodec,
                                           VSC_MC_SAMPLE_EXT_INST* pInMcInst,
                                           VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT  baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
+    gctUINT  expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_SAMPLE_EXT);
 
-    return gcvTRUE;
+    pOutCodecHelperInst->extOpcode = DECODE_EXT_OPCODE((VSC_MC_INST*)pInMcInst, baseOpcode);
+
+    return _Common_Decode_Mc_Sample_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst, expectedMcSrcIdxMask, pOutCodecHelperInst);
 }
 
 static gctBOOL _Decode_Mc_Load_Inst(VSC_MC_CODEC* pMcCodec,
@@ -3047,9 +3762,12 @@ static gctBOOL _Decode_Mc_Load_Inst(VSC_MC_CODEC* pMcCodec,
                                     VSC_MC_LD_INST* pInMcInst,
                                     VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT  expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_LOAD);
 
-    return gcvTRUE;
+    return _Common_Decode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst,
+                                             expectedMcSrcIdxMask, gcvFALSE, pOutCodecHelperInst);
 }
 
 static gctBOOL _Decode_Mc_Img_Load_Inst(VSC_MC_CODEC* pMcCodec,
@@ -3057,9 +3775,12 @@ static gctBOOL _Decode_Mc_Img_Load_Inst(VSC_MC_CODEC* pMcCodec,
                                         VSC_MC_IMG_LD_INST* pInMcInst,
                                         VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT  expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT | MC_SRC2_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_IMG_LOAD);
 
-    return gcvTRUE;
+    return _Common_Decode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst,
+                                             expectedMcSrcIdxMask, gcvTRUE, pOutCodecHelperInst);
 }
 
 static gctBOOL _Decode_Mc_Store_Inst(VSC_MC_CODEC* pMcCodec,
@@ -3067,9 +3788,21 @@ static gctBOOL _Decode_Mc_Store_Inst(VSC_MC_CODEC* pMcCodec,
                                      VSC_MC_ST_INST* pInMcInst,
                                      VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctBOOL  bRet;
+    gctUINT  expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT | MC_SRC2_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_STORE);
 
-    return gcvTRUE;
+    bRet = _Common_Decode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst,
+                                             expectedMcSrcIdxMask, gcvFALSE, pOutCodecHelperInst);
+
+    if (pOutCodecHelperInst->baseOpcode != MC_AUXILIARY_OP_CODE_USC_STORE)
+    {
+        /* Normal store has a special memory writemask */
+        pOutCodecHelperInst->dst.u.nmlDst.writeMask = pInMcInst->inst.writeMask;
+    }
+
+    return bRet;
 }
 
 static gctBOOL _Decode_Mc_Img_Store_Inst(VSC_MC_CODEC* pMcCodec,
@@ -3077,9 +3810,26 @@ static gctBOOL _Decode_Mc_Img_Store_Inst(VSC_MC_CODEC* pMcCodec,
                                          VSC_MC_ST_INST* pInMcInst,
                                          VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctBOOL  bRet;
+    gctUINT  expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT | MC_SRC2_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_IMG_STORE);
 
-    return gcvTRUE;
+    bRet = _Common_Decode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst,
+                                             expectedMcSrcIdxMask, gcvTRUE, pOutCodecHelperInst);
+
+    if (pOutCodecHelperInst->baseOpcode != MC_AUXILIARY_OP_CODE_USC_IMG_STORE &&
+        pOutCodecHelperInst->baseOpcode != MC_AUXILIARY_OP_CODE_USC_IMG_STORE_3D)
+    {
+        if (pOutCodecHelperInst->instCtrl.u.maCtrl.bUnderEvisMode)
+        {
+            pOutCodecHelperInst->dst.u.evisDst.startCompIdx = ((VSC_MC_INST*)pInMcInst)->evis_inst.inst.startDstCompIdx;
+            pOutCodecHelperInst->dst.u.evisDst.compIdxRange = ((VSC_MC_INST*)pInMcInst)->evis_inst.inst.endDstCompIdx -
+                                                              ((VSC_MC_INST*)pInMcInst)->evis_inst.inst.startDstCompIdx + 1;
+        }
+    }
+
+    return bRet;
 }
 
 static gctBOOL _Decode_Mc_Img_Atom_Inst(VSC_MC_CODEC* pMcCodec,
@@ -3087,9 +3837,12 @@ static gctBOOL _Decode_Mc_Img_Atom_Inst(VSC_MC_CODEC* pMcCodec,
                                          VSC_MC_IMG_ATOM_INST* pInMcInst,
                                          VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT  expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT | MC_SRC2_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_IMG_ATOM);
 
-    return gcvTRUE;
+    return _Common_Decode_Mc_Load_Store_Inst(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst,
+                                             expectedMcSrcIdxMask, gcvTRUE, pOutCodecHelperInst);
 }
 
 static gctBOOL _Decode_Mc_Store_Attr_Inst(VSC_MC_CODEC* pMcCodec,
@@ -3097,7 +3850,43 @@ static gctBOOL _Decode_Mc_Store_Attr_Inst(VSC_MC_CODEC* pMcCodec,
                                           VSC_MC_STORE_ATTR_INST* pInMcInst,
                                           VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT           baseOpcode;
+    gctUINT           srcIdxOfHelperInst, srcIdxOfMc = 0;
+    gctUINT           expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT | MC_SRC2_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_STORE_ATTR);
+
+    /* Opcode */
+    baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
+
+    /* Dst */
+    pOutCodecHelperInst->bDstValid = _DecodeDst(pMcCodec, (VSC_MC_INST*)pInMcInst, gcvFALSE, &pOutCodecHelperInst->dst);
+    if (!pOutCodecHelperInst->bDstValid)
+    {
+        /* Normal store_attr has a special memory writemask */
+        pOutCodecHelperInst->dst.u.nmlDst.writeMask = pInMcInst->inst.writeMask;
+    }
+
+    /* Usc sync bit */
+    pOutCodecHelperInst->instCtrl.u.bNeedUscSync = pInMcInst->inst.bNeedUscSync;
+
+    /* Src */
+    for (srcIdxOfHelperInst = 0; ; srcIdxOfHelperInst ++)
+    {
+        if (!_DecodeSrc(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
+                        gcvFALSE, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
+        {
+            break;
+        }
+
+        pOutCodecHelperInst->srcCount = srcIdxOfHelperInst + 1;
+    }
+
+    pOutCodecHelperInst->instCtrl.instType = _DecodeInstType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
+    pOutCodecHelperInst->instCtrl.threadType = _DecodeThreadType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
+
+    /* Map st-att hw-opcode to st-att aux-opcode based on whether dst is enabled */
+    pOutCodecHelperInst->baseOpcode = _MapLdStHwOpcodeToAuxOpcode(baseOpcode, pOutCodecHelperInst->bDstValid);
 
     return gcvTRUE;
 }
@@ -3107,7 +3896,35 @@ static gctBOOL _Decode_Mc_Select_Map_Inst(VSC_MC_CODEC* pMcCodec,
                                           VSC_MC_SELECT_MAP_INST* pInMcInst,
                                           VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT           srcIdxOfHelperInst, srcIdxOfMc = 0;
+    gctUINT           expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT | MC_SRC2_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_SELECT_MAP);
+
+    /* Opcode */
+    pOutCodecHelperInst->baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
+
+    /* Dst */
+    pOutCodecHelperInst->bDstValid = _DecodeDst(pMcCodec, (VSC_MC_INST*)pInMcInst, gcvFALSE, &pOutCodecHelperInst->dst);
+
+    /* Src */
+    for (srcIdxOfHelperInst = 0; ; srcIdxOfHelperInst ++)
+    {
+        if (!_DecodeSrc(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
+                        gcvFALSE, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
+        {
+            break;
+        }
+
+        pOutCodecHelperInst->srcCount = srcIdxOfHelperInst + 1;
+    }
+
+    /* Inst ctrl */
+    pOutCodecHelperInst->instCtrl.u.smCtrl.rangeToMatch = pInMcInst->inst.rangeToMatch;
+    pOutCodecHelperInst->instCtrl.u.smCtrl.bCompSel = pInMcInst->inst.bCompSel;
+    pOutCodecHelperInst->instCtrl.instType = _DecodeInstType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
+    pOutCodecHelperInst->instCtrl.threadType = _DecodeThreadType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
+    pOutCodecHelperInst->instCtrl.bResultSat = pInMcInst->inst.bResultSat;
 
     return gcvTRUE;
 }
@@ -3117,7 +3934,40 @@ static gctBOOL _Decode_Mc_Direct_Branch_0_Inst(VSC_MC_CODEC* pMcCodec,
                                                VSC_MC_DIRECT_BRANCH_0_INST* pInMcInst,
                                                VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT           srcIdxOfHelperInst, srcIdxOfMc = 0, branchTargetSrcIdx;
+    gctUINT           expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_DIRECT_BRANCH_0);
+
+    /* Opcode */
+    pOutCodecHelperInst->baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
+
+    /* Src */
+    for (srcIdxOfHelperInst = 0; ; srcIdxOfHelperInst ++)
+    {
+        if (!_DecodeSrc(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
+                        gcvFALSE, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
+        {
+            break;
+        }
+
+        pOutCodecHelperInst->srcCount = srcIdxOfHelperInst + 1;
+    }
+
+    branchTargetSrcIdx = _condOp2SrcCount[pInMcInst->inst.condOpCode];
+    gcmASSERT(pOutCodecHelperInst->srcCount == branchTargetSrcIdx);
+
+    /* Branch target */
+    pOutCodecHelperInst->src[branchTargetSrcIdx].regType = 0x7;
+    pOutCodecHelperInst->src[branchTargetSrcIdx].u.imm.immType = 0x2;
+    pOutCodecHelperInst->src[branchTargetSrcIdx].u.imm.immData.ui = pInMcInst->inst.branchTarget;
+    pOutCodecHelperInst->srcCount ++;
+
+    /* Inst ctrl */
+    pOutCodecHelperInst->instCtrl.condOpCode = pInMcInst->inst.condOpCode;
+    pOutCodecHelperInst->instCtrl.bPacked = pInMcInst->inst.bPackMode;
+    pOutCodecHelperInst->instCtrl.u.loopOpType = pInMcInst->inst.loopOpType;
+    pOutCodecHelperInst->instCtrl.instType = _DecodeInstType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
 
     return gcvTRUE;
 }
@@ -3127,7 +3977,48 @@ static gctBOOL _Decode_Mc_Direct_Branch_1_Inst(VSC_MC_CODEC* pMcCodec,
                                                VSC_MC_DIRECT_BRANCH_1_INST* pInMcInst,
                                                VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT           srcIdxOfHelperInst, srcIdxOfMc = 0;
+    gctUINT           branchTargetSrcIdx = _condOp2SrcCount[pInMcInst->inst.condOpCode];
+    gctUINT           branchTarget20Bit;
+    gctUINT           expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT | MC_SRC2_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_DIRECT_BRANCH_1);
+
+    /* Opcode */
+    pOutCodecHelperInst->baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
+
+    /* Src */
+    for (srcIdxOfHelperInst = 0; ; srcIdxOfHelperInst ++)
+    {
+        if (pOutCodecHelperInst->srcCount == branchTargetSrcIdx)
+        {
+            break;
+        }
+
+        if (!_DecodeSrc(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
+                        gcvFALSE, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
+        {
+            break;
+        }
+
+        pOutCodecHelperInst->srcCount = srcIdxOfHelperInst + 1;
+    }
+
+    /* Branch target */
+    branchTarget20Bit = pInMcInst->inst.branchTargetBit0_8;
+    branchTarget20Bit |= (pInMcInst->inst.branchTargetBit9_18 << 9);
+    branchTarget20Bit |= (pInMcInst->inst.branchTargetBit19 << 19);
+    pOutCodecHelperInst->src[branchTargetSrcIdx].regType = 0x7;
+    pOutCodecHelperInst->src[branchTargetSrcIdx].u.imm.immType = pInMcInst->inst.immType;
+    pOutCodecHelperInst->src[branchTargetSrcIdx].u.imm.immData = _Conver20BitImm_2_32BitImm(branchTarget20Bit,
+                                                                                            pInMcInst->inst.immType);
+    pOutCodecHelperInst->srcCount ++;
+
+    /* Inst ctrl */
+    pOutCodecHelperInst->instCtrl.condOpCode = pInMcInst->inst.condOpCode;
+    pOutCodecHelperInst->instCtrl.bPacked = pInMcInst->inst.bPackMode;
+    pOutCodecHelperInst->instCtrl.instType = _DecodeInstType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
+    pOutCodecHelperInst->instCtrl.threadType = _DecodeThreadType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
 
     return gcvTRUE;
 }
@@ -3137,7 +4028,24 @@ static gctBOOL _Decode_Mc_Indirect_Branch_Inst(VSC_MC_CODEC* pMcCodec,
                                                VSC_MC_INDIRECT_BRANCH_INST* pInMcInst,
                                                VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT           srcIdxOfBranchTarget = 2;
+    gctUINT           expectedMcSrcIdxMask = MC_SRC2_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_INDIRECT_BRANCH);
+
+    /* Opcode */
+    pOutCodecHelperInst->baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
+
+    /* Branch target */
+    _DecodeSrc(pMcCodec, &srcIdxOfBranchTarget, expectedMcSrcIdxMask,
+               (VSC_MC_INST*)pInMcInst, gcvFALSE, &pOutCodecHelperInst->src[0]);
+    pOutCodecHelperInst->srcCount = 1;
+
+    /* Inst ctrl */
+    pOutCodecHelperInst->instCtrl.condOpCode = pInMcInst->inst.condOpCode;
+    pOutCodecHelperInst->instCtrl.bPacked = pInMcInst->inst.bPackMode;
+    pOutCodecHelperInst->instCtrl.instType = _DecodeInstType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
+    pOutCodecHelperInst->instCtrl.threadType = _DecodeThreadType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
 
     return gcvTRUE;
 }
@@ -3149,6 +4057,15 @@ static gctBOOL _Decode_Mc_Direct_Call_Inst(VSC_MC_CODEC* pMcCodec,
 {
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_DIRECT_CALL);
 
+    /* Opcode */
+    pOutCodecHelperInst->baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
+
+    /* Call target */
+    pOutCodecHelperInst->src[0].regType = 0x7;
+    pOutCodecHelperInst->src[0].u.imm.immType = 0x2;
+    pOutCodecHelperInst->src[0].u.imm.immData.ui = pInMcInst->inst.callTarget;
+    pOutCodecHelperInst->srcCount = 1;
+
     return gcvTRUE;
 }
 
@@ -3157,7 +4074,22 @@ static gctBOOL _Decode_Mc_Indirect_Call_Inst(VSC_MC_CODEC* pMcCodec,
                                              VSC_MC_INDIRECT_CALL_INST* pInMcInst,
                                              VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT           srcIdxOfCallTarget = 2;
+    gctUINT           expectedMcSrcIdxMask = MC_SRC2_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_INDIRECT_CALL);
+
+    /* Opcode */
+    pOutCodecHelperInst->baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
+
+    /* Call target */
+    _DecodeSrc(pMcCodec, &srcIdxOfCallTarget, expectedMcSrcIdxMask,
+               (VSC_MC_INST*)pInMcInst, gcvFALSE, &pOutCodecHelperInst->src[0]);
+    pOutCodecHelperInst->srcCount = 1;
+
+    /* Inst ctrl */
+    pOutCodecHelperInst->instCtrl.instType = _DecodeInstType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
+    pOutCodecHelperInst->instCtrl.threadType = _DecodeThreadType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
 
     return gcvTRUE;
 }
@@ -3167,7 +4099,27 @@ static gctBOOL _Decode_Mc_Loop_Inst(VSC_MC_CODEC* pMcCodec,
                                     VSC_MC_LOOP_INST* pInMcInst,
                                     VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT           srcIdxOfMc = 1;
+    gctUINT           expectedMcSrcIdxMask = MC_SRC1_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_LOOP);
+
+    /* Opcode */
+    pOutCodecHelperInst->baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
+
+    /* Src */
+    _DecodeSrc(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask,
+               (VSC_MC_INST*)pInMcInst, gcvFALSE, &pOutCodecHelperInst->src[0]);
+    pOutCodecHelperInst->srcCount = 1;
+
+    /* Loop target */
+    pOutCodecHelperInst->src[1].regType = 0x7;
+    pOutCodecHelperInst->src[1].u.imm.immType = 0x2;
+    pOutCodecHelperInst->src[1].u.imm.immData.ui = pInMcInst->inst.branchTarget;
+    pOutCodecHelperInst->srcCount ++;
+
+    /* Inst ctrl */
+    pOutCodecHelperInst->instCtrl.instType = _DecodeInstType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
 
     return gcvTRUE;
 }
@@ -3177,7 +4129,34 @@ static gctBOOL _Decode_Mc_Emit_Inst(VSC_MC_CODEC* pMcCodec,
                                     VSC_MC_EMIT_INST* pInMcInst,
                                     VSC_MC_CODEC_INST* pOutCodecHelperInst)
 {
+    gctUINT           srcIdxOfHelperInst, srcIdxOfMc = 0;
+    gctUINT           expectedMcSrcIdxMask = MC_SRC0_BIT | MC_SRC1_BIT;
+
     gcmASSERT(mcCodecType == VSC_MC_CODEC_TYPE_EMIT);
+
+    /* Opcode */
+    pOutCodecHelperInst->baseOpcode = DECODE_BASE_OPCODE((VSC_MC_INST*)pInMcInst);
+    pOutCodecHelperInst->extOpcode = DECODE_EXT_OPCODE((VSC_MC_INST*)pInMcInst, pOutCodecHelperInst->baseOpcode);
+
+    /* Dst */
+    pOutCodecHelperInst->bDstValid = _DecodeDst(pMcCodec, (VSC_MC_INST*)pInMcInst, gcvFALSE, &pOutCodecHelperInst->dst);
+
+    /* Src */
+    for (srcIdxOfHelperInst = 0; ; srcIdxOfHelperInst ++)
+    {
+        if (!_DecodeSrc(pMcCodec, &srcIdxOfMc, expectedMcSrcIdxMask, (VSC_MC_INST*)pInMcInst,
+                        gcvFALSE, &pOutCodecHelperInst->src[srcIdxOfHelperInst]))
+        {
+            break;
+        }
+
+        pOutCodecHelperInst->srcCount = srcIdxOfHelperInst + 1;
+    }
+
+    /* Inst ctrl */
+    pOutCodecHelperInst->instCtrl.instType = _DecodeInstType(pMcCodec, mcCodecType, (VSC_MC_INST*)pInMcInst);
+    pOutCodecHelperInst->instCtrl.u.bNeedRestartPrim = pInMcInst->inst.bNeedRestartPrim;
+    pOutCodecHelperInst->instCtrl.bResultSat = pInMcInst->inst.bResultSat;
 
     return gcvTRUE;
 }
@@ -3222,17 +4201,18 @@ static void _dbgStopHere()
 
 static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCodecHelperInst)
 {
-    gctUINT srcIdx, i, firstCstRegNo;
-    gctBOOL bFirstCstRegIndexing;
+    gctUINT  srcIdx, i, firstCstRegNo;
+    gctBOOL  bFirstCstRegIndexing;
+    gctUINT8 src2Format;
 
     if (pCodecHelperInst->instCtrl.instType == 0x1)
     {
         if (pCodecHelperInst->baseOpcode != 0x72 &&
             pCodecHelperInst->baseOpcode != 0x32 &&
-            pCodecHelperInst->baseOpcode != 0x33 &&
             pCodecHelperInst->baseOpcode != MC_AUXILIARY_OP_CODE_USC_STORE &&
             pCodecHelperInst->baseOpcode != MC_AUXILIARY_OP_CODE_USC_IMG_STORE &&
             pCodecHelperInst->baseOpcode != MC_AUXILIARY_OP_CODE_USC_IMG_STORE_3D &&
+            pCodecHelperInst->baseOpcode != 0x33 &&
             pCodecHelperInst->baseOpcode != 0x79 &&
             pCodecHelperInst->baseOpcode != 0x34 &&
             pCodecHelperInst->baseOpcode != 0x7A &&
@@ -3296,7 +4276,7 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
                 GotoError();
             }
 
-            /* Except src2 of branch and src1 of I2I/CONV, all other imm src must be V16 imm under daul-t */
+            /* Except src2 of branch, all other imm src must be V16 imm under daul-t */
             for (srcIdx = 0; srcIdx < pCodecHelperInst->srcCount; srcIdx ++)
             {
                 if (pCodecHelperInst->src[srcIdx].regType == 0x7)
@@ -3383,7 +4363,7 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
     }
 
     /* Check constant reg file read port limitation */
-    if (pCodecHelperInst->srcCount >= 2)
+    if (pCodecHelperInst->srcCount >= 2 && !pMcCodec->pHwCfg->hwFeatureFlags.noOneConstLimit)
     {
         for (i = 0; i < pCodecHelperInst->srcCount - 1; i ++)
         {
@@ -3421,7 +4401,7 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
         }
     }
 
-    /* Image related inst, src0 must be constant reg */
+    /* Image related inst, for elder chips, src0 must be constant reg */
      if (pCodecHelperInst->baseOpcode == 0x79 ||
          pCodecHelperInst->baseOpcode == 0x34 ||
          pCodecHelperInst->baseOpcode == 0x7A ||
@@ -3431,9 +4411,12 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
          pCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_USC_IMG_STORE_3D ||
          pCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_USC_IMG_STORE)
     {
-        if (pCodecHelperInst->src[0].regType != 0x2)
+        if (!pMcCodec->pHwCfg->hwFeatureFlags.canSrc0OfImgLdStBeTemp)
         {
-            GotoError();
+            if (pCodecHelperInst->src[0].regType != 0x2)
+            {
+                GotoError();
+            }
         }
     }
 
@@ -3449,12 +4432,167 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
         }
     }
 
-    /* For EVIS inst, src0 can not be imm */
+    /* For EVIS inst */
     if (pCodecHelperInst->baseOpcode == 0x45)
     {
+        /* Not all HWs support EVIS mode */
+        if (!pMcCodec->pHwCfg->hwFeatureFlags.supportEVIS)
+        {
+            GotoError();
+        }
+
+        /* Src0 can not be imm */
         if (pCodecHelperInst->src[0].regType == 0x7)
         {
             GotoError();
+        }
+
+        /* When src0 is temp256, src1’s swizzle has to be XYZW */
+        if (pCodecHelperInst->src[0].regType == 0x1)
+        {
+            if (pCodecHelperInst->src[1].regType != 0x7)
+            {
+                if (pCodecHelperInst->src[1].u.reg.swizzle != 0xE4)
+                {
+                    GotoError();
+                }
+            }
+        }
+
+        /* For DPx related opcodes, src2 must be 4-consecutive-constant type */
+        if (pCodecHelperInst->extOpcode == 0x08 ||
+            pCodecHelperInst->extOpcode == 0x09 ||
+            pCodecHelperInst->extOpcode == 0x0A ||
+            pCodecHelperInst->extOpcode == 0x0B ||
+            pCodecHelperInst->extOpcode == 0x12 ||
+            pCodecHelperInst->extOpcode == 0x13 ||
+            pCodecHelperInst->extOpcode == 0x14 ||
+            pCodecHelperInst->extOpcode == 0x15 ||
+            pCodecHelperInst->extOpcode == 0x16)
+        {
+            if (pCodecHelperInst->src[2].regType != 0x4)
+            {
+                GotoError();
+            }
+        }
+
+        /* Bit-extract/Bit-replace only support u8/u16/u32 type */
+        if (pCodecHelperInst->extOpcode == 0x10 ||
+            pCodecHelperInst->extOpcode == 0x11)
+        {
+            if (pCodecHelperInst->instCtrl.instType != 0x7 &&
+                pCodecHelperInst->instCtrl.instType != 0x6 &&
+                pCodecHelperInst->instCtrl.instType != 0x5)
+            {
+                GotoError();
+            }
+        }
+
+        /* Specials for evis-atomic-add */
+        if (pCodecHelperInst->extOpcode == 0x0F)
+        {
+            /* SourceBin must be 0 */
+            if (pCodecHelperInst->instCtrl.u.visionCtrl.startSrcCompIdx != 0)
+            {
+                GotoError();
+            }
+
+            /* Format of src2 has special requiremnt for different inst-type */
+            src2Format = pCodecHelperInst->instCtrl.u.visionCtrl.evisState & 0x7;
+            if (pCodecHelperInst->instCtrl.instType == 0x7)
+            {
+                if (src2Format != 0x7)
+                {
+                    GotoError();
+                }
+            }
+            else if (pCodecHelperInst->instCtrl.instType == 0x6)
+            {
+                if (src2Format != 0x7 &&
+                    src2Format != 0x6)
+                {
+                    GotoError();
+                }
+            }
+            else if (pCodecHelperInst->instCtrl.instType == 0x5)
+            {
+                if (src2Format != 0x7 &&
+                    src2Format != 0x6 &&
+                    src2Format != 0x5)
+                {
+                    GotoError();
+                }
+            }
+            else if (pCodecHelperInst->instCtrl.instType == 0x2)
+            {
+                if (src2Format == 0x5)
+                {
+                    GotoError();
+                }
+            }
+        }
+    }
+
+    /* Not all HWs support EVIS mode */
+    if (pCodecHelperInst->baseOpcode == 0x79 ||
+        pCodecHelperInst->baseOpcode == 0x34 ||
+        pCodecHelperInst->baseOpcode == 0x7A ||
+        pCodecHelperInst->baseOpcode == 0x35 ||
+        pCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_USC_IMG_STORE ||
+        pCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_USC_IMG_STORE_3D)
+    {
+        if (pCodecHelperInst->instCtrl.u.maCtrl.bUnderEvisMode &&
+            !pMcCodec->pHwCfg->hwFeatureFlags.supportEVIS)
+        {
+            GotoError();
+        }
+    }
+
+    /* Not all HWs support FMA/HALF_MIX */
+    if (pCodecHelperInst->baseOpcode == 0x30 ||
+        (pCodecHelperInst->baseOpcode == 0x7F &&
+         pCodecHelperInst->extOpcode == 0x0F))
+    {
+        if (!pMcCodec->pHwCfg->hwFeatureFlags.supportAdvancedInsts)
+        {
+            GotoError();
+        }
+    }
+
+    /* Not all HWs support img_atom */
+    if (pCodecHelperInst->baseOpcode == 0x46)
+    {
+        if (!pMcCodec->pHwCfg->hwFeatureFlags.supportImgAtomic)
+        {
+            GotoError();
+        }
+    }
+
+    /* For TEXLD_U related insts, src2 of MC must be an imm. This is a pure SW limitation, and does
+       not impact HW. The reason of this SW limitation is because HW uses src2 to parse TEXLD_U mode
+       to differenciate MC_AUXILIARY_OP_CODE_TEXLD_U_LOD and MC_AUXILIARY_OP_CODE_TEXLD_U_BIAS (as well
+       as MC_AUXILIARY_OP_CODE_TEXLD_U_PLAIN), but for mc-decoder, if src2 of MC is not an imm src, we
+       then can not differenciate them, so we limit src2 of MC to be imm */
+    if (pCodecHelperInst->baseOpcode >= MC_AUXILIARY_OP_CODE_TEXLD_U_PLAIN &&
+        pCodecHelperInst->baseOpcode <= MC_AUXILIARY_OP_CODE_TEXLD_U_BIAS)
+    {
+        if (pCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_TEXLD_U_PLAIN)
+        {
+            /* Src2 must be imm */
+            if (pCodecHelperInst->src[2].regType != 0x7)
+            {
+                GotoError();
+            }
+        }
+
+        if (pCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_TEXLD_U_LOD ||
+            pCodecHelperInst->baseOpcode == MC_AUXILIARY_OP_CODE_TEXLD_U_BIAS)
+        {
+            /* Src3 must be imm */
+            if (pCodecHelperInst->src[3].regType != 0x7)
+            {
+                GotoError();
+            }
         }
     }
 
@@ -3466,13 +4604,15 @@ OnError:
 
 void vscMC_BeginCodec(VSC_MC_CODEC* pMcCodec,
                       VSC_HW_CONFIG* pHwCfg,
-                      gctBOOL bDual16ModeEnabled)
+                      gctBOOL bDual16ModeEnabled,
+                      gctBOOL bCanReverseEngineCheck)
 {
     gcmASSERT(pHwCfg->hwFeatureFlags.supportDual16 || !bDual16ModeEnabled);
 
     pMcCodec->pHwCfg = pHwCfg;
     pMcCodec->bInit = gcvTRUE;
     pMcCodec->bDual16ModeEnabled = bDual16ModeEnabled;
+    pMcCodec->bCanReverseEngineCheck = bCanReverseEngineCheck;
 }
 
 void vscMC_EndCodec(VSC_MC_CODEC* pMcCodec)
@@ -3566,6 +4706,10 @@ gctBOOL vscMC_DecodeInst(VSC_MC_CODEC*                pMcCodec,
     VSC_MC_INST*      pMcInst = (VSC_MC_INST*)pInMCInst;
     VSC_MC_CODEC_TYPE mcCodecType;
     gctUINT           baseOpcode, extOpcode;
+    gctBOOL           bDecodeSucc;
+#if (_DEBUG || DEBUG)
+    VSC_MC_RAW_INST   reMcInst;
+#endif
 
     gcmASSERT(pMcCodec->bInit);
 
@@ -3573,7 +4717,7 @@ gctBOOL vscMC_DecodeInst(VSC_MC_CODEC*                pMcCodec,
     memset(pOutCodecHelperInst, 0, sizeof(VSC_MC_CODEC_INST));
 
     baseOpcode = DECODE_BASE_OPCODE(pMcInst);
-    extOpcode = pMcInst->no_opnd_inst.inst.extOpcode;
+    extOpcode = DECODE_EXT_OPCODE(pMcInst, baseOpcode);
 
     /* Check codec type based on opcode */
     mcCodecType = _GetMcCodecType(pMcCodec,
@@ -3589,6 +4733,19 @@ gctBOOL vscMC_DecodeInst(VSC_MC_CODEC*                pMcCodec,
 
     /* Now go to different encode path for each different opcode codec-category
        to do real decoding */
-    return _pfn_mc_decoder[mcCodecType](pMcCodec, mcCodecType, pMcInst, pOutCodecHelperInst);
+    bDecodeSucc = _pfn_mc_decoder[mcCodecType](pMcCodec, mcCodecType, pMcInst, pOutCodecHelperInst);
+
+#if (_DEBUG || DEBUG)
+    /* We try to send decoded helper-inst into encoder to get a new mc-inst, then
+       compare this new mc-inst with coming-in mc-inst. We expect these two mc-insts
+       are totally same. */
+    if (pMcCodec->bCanReverseEngineCheck)
+    {
+        vscMC_EncodeInst(pMcCodec, pOutCodecHelperInst, &reMcInst);
+        gcmASSERT(memcmp(&reMcInst, pInMCInst, sizeof(VSC_MC_RAW_INST)) == 0);
+    }
+#endif
+
+    return bDecodeSucc;
 }
 

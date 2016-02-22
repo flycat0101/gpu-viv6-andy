@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -531,6 +531,9 @@ typedef struct _gcLINKTREE
 {
     /* Pointer to the gcSHADER object. */
     gcSHADER                        shader;
+
+    /* Process name of this shader. */
+    gcePATCH_ID                     patchID;
 
     /* Link flags */
     gceSHADER_FLAGS                 flags;
@@ -1076,6 +1079,7 @@ struct _gcsCODE_GENERATOR
     gctINT                          instanceIdIndex;
 
     gctBOOL                         isConstOutOfMemory;
+    gctBOOL                         isRegOutOfResource;
 };
 
 /****************************************************************
@@ -1194,7 +1198,7 @@ gcSHADER_EvaluateLTCValueWithinLinkTime(
 gceSTATUS
 gcSHADER_Conv2VIR(
     IN gcSHADER Shader,
-    IN VSC_HW_CONFIG    *hwCfg,
+    IN VSC_HW_CONFIG * hwCfg,
     IN OUT VIR_Shader* VirShader
     );
 
@@ -1259,6 +1263,14 @@ gcSHADER_LinkBuiltinLibrary(
 /* link a builtin function */
 gceSTATUS
 gcSHADER_LinkLibFunction(
+    IN OUT gcSHADER         Shader,
+    IN     gcSHADER         Library,
+    IN     gctCONST_STRING  FunctionName,
+    OUT    gcFUNCTION *     Function
+    );
+/* find a builtin function */
+gceSTATUS
+gcSHADER_FindLibFunction(
     IN OUT gcSHADER         Shader,
     IN     gcSHADER         Library,
     IN     gctCONST_STRING  FunctionName,

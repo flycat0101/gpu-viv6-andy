@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -1997,6 +1997,25 @@ gckOS_DumpBuffer(
             userLocked = gcvTRUE;
         }
         /* Else, let it pass through. */
+
+        /* Some format check. */
+        if ((Size > 2)
+         && (buffer[0] == '@' || buffer[0] == '#')
+         && (buffer[1] != '[')
+        )
+        {
+            /* No error tolerence in parser, so we stop on error to make noise. */
+            for (;;)
+            {
+                gcmkPRINT(
+                    "[galcore]: %s(%d): Illegal dump message %s\n",
+                    __FUNCTION__, __LINE__,
+                    buffer
+                    );
+
+                gckOS_Delay(Os, 10 * 1000);
+            }
+        }
     }
     else
     {
@@ -2073,8 +2092,8 @@ gckOS_DumpBuffer(
             if (buffer[i] == ']')
             {
                 /* End of a user dump. */
-                gcmkUNLOCKSECTION(lockHandle);
                 userLocked = gcvFALSE;
+                gcmkUNLOCKSECTION(lockHandle);
 
                 break;
             }

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -440,6 +440,28 @@ static gceSTATUS _Set_uFlipPointSprite(
     return status;
 }
 
+static gceSTATUS _Set_uAlphaRef(
+    glsCONTEXT_PTR Context,
+    gcUNIFORM Uniform
+    )
+{
+    GLfloat valueArray;
+    gceSTATUS status;
+    gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
+    status = glfSetUniformFromFloats(
+        Uniform,
+        Context->currProgram->hints,
+        &Context->alphaStates.testReference,
+        gcvNULL,
+        gcvNULL,
+        gcvNULL,
+        &valueArray,
+        1
+        );
+    gcmFOOTER();
+    return status;
+}
+
 /*******************************************************************************
 ** Uniform access helpers.
 */
@@ -634,6 +656,28 @@ static gceSTATUS _Using_uFlipPointSprite(
     return status;
 }
 
+static gceSTATUS _Using_uAlphaRef(
+    glsCONTEXT_PTR Context,
+    glsFSCONTROL_PTR ShaderControl
+    )
+{
+    gceSTATUS status;
+    gcmHEADER_ARG("Context=0x%x ShaderControl=0x%x", Context, ShaderControl);
+
+    status = glfUsingUniform(
+        ShaderControl->i,
+        "uAplhaRef",
+        gcSHADER_FLOAT_X1,
+        1,
+        _Set_uAlphaRef,
+        &Context->fsUniformDirty.uAlphaRefDirty,
+        &glmUNIFORM_WRAP(FS, uAlphaRef)
+        );
+
+    gcmFOOTER();
+
+    return status;
+}
 
 /*******************************************************************************
 ** Varying access helpers.
@@ -878,7 +922,7 @@ static gceSTATUS _Assign_oColor(
         gcSHADER_FLOAT_X4,
         1,
         TempRegister,
-        gcSHADER_PRECISION_DEFAULT
+        gcSHADER_PRECISION_HIGH
         );
     gcmFOOTER();
     return status;
@@ -3557,6 +3601,78 @@ static gceSTATUS _RoundResult(
     return status;
 }
 
+static gceSTATUS _DoAlphaTest(
+    glsCONTEXT_PTR Context,
+    glsFSCONTROL_PTR ShaderControl
+    )
+{
+    gceSTATUS status;
+    gcmHEADER_ARG("Context=0x%x ShaderControl=0x%x", Context, ShaderControl);
+
+    do
+    {
+        /* Allocate Uniform */
+        glmUSING_UNIFORM(uAlphaRef);
+
+        switch (Context->alphaStates.testFunction)
+        {
+            case glvNEVER:
+                glmOPCODE_BRANCH(KILL, ALWAYS, 0);
+                break;
+
+            case glvLESS:
+                glmOPCODE_BRANCH(KILL, GREATER_OR_EQUAL, 0);
+                    glmTEMP(ShaderControl->oColor, WWWW, gcSHADER_PRECISION_HIGH);
+                    glmUNIFORM(FS, uAlphaRef, XXXX);
+                break;
+
+            case glvEQUAL :
+                glmOPCODE_BRANCH(KILL, NOT_EQUAL, 0);
+                    glmTEMP(ShaderControl->oColor, WWWW, gcSHADER_PRECISION_HIGH);
+                    glmUNIFORM(FS, uAlphaRef, XXXX);
+                break;
+
+            case glvLESSOREQUAL :
+                glmOPCODE_BRANCH(KILL, GREATER, 0);
+                    glmTEMP(ShaderControl->oColor, WWWW, gcSHADER_PRECISION_HIGH);
+                    glmUNIFORM(FS, uAlphaRef, XXXX);
+                break;
+
+            case glvGREATER :
+                glmOPCODE_BRANCH(KILL, LESS_OR_EQUAL, 0);
+                    glmTEMP(ShaderControl->oColor, WWWW, gcSHADER_PRECISION_HIGH);
+                    glmUNIFORM(FS, uAlphaRef, XXXX);
+                break;
+
+            case glvNOTEQUAL:
+                glmOPCODE_BRANCH(KILL, EQUAL, 0);
+                    glmTEMP(ShaderControl->oColor, WWWW, gcSHADER_PRECISION_HIGH);
+                    glmUNIFORM(FS, uAlphaRef, XXXX);
+                break;
+
+            case glvGREATEROREQUAL:
+                glmOPCODE_BRANCH(KILL, LESS, 0);
+                    glmTEMP(ShaderControl->oColor, WWWW, gcSHADER_PRECISION_HIGH);
+                    glmUNIFORM(FS, uAlphaRef, XXXX);
+                break;
+
+            /**
+            case glvALWAYS:
+                break;
+            */
+
+            default:
+                break;
+        }
+    }
+    while (gcvFALSE);
+
+    gcmFOOTER();
+
+    /* Return status. */
+    return status;
+}
+
 
 /*******************************************************************************
 **
@@ -3718,6 +3834,12 @@ gceSTATUS glfGenerateFSFixedFunction(
         if (Context->fsRoundingEnabled)
         {
             gcmERR_BREAK(_RoundResult(Context, &fsControl));
+        }
+
+        if (Context->hashAlphaTest &&
+            Context->alphaStates.testEnabled)
+        {
+            gcmERR_BREAK(_DoAlphaTest(Context, &fsControl));
         }
 
         /* Map output. */

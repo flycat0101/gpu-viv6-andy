@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -17,7 +17,7 @@
 
 VX_INTERNAL_API vx_bool vxoMemory_Allocate(vx_context context, vx_memory memory)
 {
-    vx_uint32 planeIndex, dimIndex;
+    vx_int32 planeIndex, dimIndex;
 
     vxmASSERT(context);
     vxmASSERT(memory);
@@ -26,9 +26,9 @@ VX_INTERNAL_API vx_bool vxoMemory_Allocate(vx_context context, vx_memory memory)
 
     memory->allocated = vx_true_e;
 
-    for (planeIndex = 0; planeIndex < memory->planeCount; planeIndex++)
+    for (planeIndex = 0; (vx_uint32) planeIndex < memory->planeCount; planeIndex++)
     {
-        vx_uint32   size = sizeof(vx_uint8);
+        vx_size     size = sizeof(vx_uint8);
         gceSTATUS   status;
 
         if (memory->strides[planeIndex][VX_DIM_CHANNEL] != 0)
@@ -36,13 +36,13 @@ VX_INTERNAL_API vx_bool vxoMemory_Allocate(vx_context context, vx_memory memory)
             size = (vx_size)abs(memory->strides[planeIndex][VX_DIM_CHANNEL]);
         }
 
-        for (dimIndex = 0; dimIndex < memory->dimCount; dimIndex++)
+        for (dimIndex = 0; (vx_uint32)dimIndex < memory->dimCount; dimIndex++)
         {
             memory->strides[planeIndex][dimIndex] = (vx_int32)size;
             size *= (vx_size)abs(memory->dims[planeIndex][dimIndex]);
         }
 
-        status = gcoVX_AllocateMemory(size, (gctUINT32_PTR)&memory->logicals[planeIndex],
+        status = gcoVX_AllocateMemory((gctUINT32)size, (gctUINT32_PTR)&memory->logicals[planeIndex],
                                         (gctUINT32_PTR)&memory->physicals[planeIndex],
                                         &memory->nodePtrs[planeIndex]);
 

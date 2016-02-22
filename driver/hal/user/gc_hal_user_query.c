@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -728,7 +728,6 @@ gcoHAL_QueryTextureCaps(
                                           NonPowerOfTwo,
                                           VertexSamplers,
                                           PixelSamplers,
-                                          gcvNULL,
                                           gcvNULL);
 
     gcmFOOTER_ARG("status=%d *MaxWidth=%u *MaxHeight=%u *MaxDepth=%u *Cubic=%d "
@@ -776,54 +775,10 @@ gcoHAL_QueryTextureMaxAniso(
                                           gcvNULL,
                                           gcvNULL,
                                           gcvNULL,
-                                          MaxAnisoValue,
-                                          gcvNULL);
+                                          MaxAnisoValue);
 
     gcmFOOTER_ARG("status=%d *MaxAnisoValue=%u",
                   status, gcmOPT_VALUE(MaxAnisoValue));
-    return status;
-}
-
-/*******************************************************************************
-**
-**  gcoHAL_QueryTextureTexldPerCycle
-**
-**  Query the texture capabilities.
-**
-**  INPUT:
-**
-**      gcoHAL Hal
-**          Pointer to a gcoHAL object.
-**
-**  OUTPUT:
-**
-**      gctUINT * MaxAnisoValue
-**          Pointer to a variable receiving the number of texld per cycle.
-*/
-gceSTATUS
-gcoHAL_QueryTextureTexldPerCycle(
-    IN gcoHAL Hal,
-    OUT gctUINT * TexldPerCycle
-    )
-{
-    gceSTATUS status;
-
-    gcmHEADER();
-
-    /* Query the hardware. */
-    status = gcoHARDWARE_QueryTextureCaps(gcvNULL,
-                                          gcvNULL,
-                                          gcvNULL,
-                                          gcvNULL,
-                                          gcvNULL,
-                                          gcvNULL,
-                                          gcvNULL,
-                                          gcvNULL,
-                                          gcvNULL,
-                                          TexldPerCycle);
-
-    gcmFOOTER_ARG("status=%d *TexldPerCycle=%u",
-                  status, gcmOPT_VALUE(TexldPerCycle));
     return status;
 }
 
@@ -1142,7 +1097,8 @@ gceSTATUS
 gcoHAL_QueryCoreCount(
     IN gcoHAL Hal,
     IN gceHARDWARE_TYPE Type,
-    OUT gctUINT *Count
+    OUT gctUINT *Count,
+    OUT gctUINT_PTR ChipIDs
     )
 {
     gctUINT i;
@@ -1153,6 +1109,9 @@ gcoHAL_QueryCoreCount(
     {
         if (gcPLS.hal->chipTypes[i] == Type)
         {
+            /* Get chip ID of nth GPU of this Type. */
+            ChipIDs[*Count] = gcPLS.hal->chipIDs[i];
+
             *Count += 1;
         }
     }
@@ -1276,9 +1235,6 @@ gcoHAL_QueryChipLimits(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    /* Restore the current hardware type */
-    gcmVERIFY_OK(gcoHAL_SetHardwareType(gcvNULL, currentType));
-
     if (Limits != gcvNULL)
     {
         Limits->chipModel   = chipModel;
@@ -1287,9 +1243,11 @@ gcoHAL_QueryChipLimits(
         Limits->maxSamples  = maxSamples;
     }
 
-    return gcvSTATUS_OK;
+    status = gcvSTATUS_OK;
 
 OnError:
+	/* Restore the current hardware type */
+    gcmVERIFY_OK(gcoHAL_SetHardwareType(gcvNULL, currentType));
     return status;
 
 }

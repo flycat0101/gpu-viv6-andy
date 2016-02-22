@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -226,6 +226,9 @@ static clsKEYWORD KeywordTable[] =
     {"_viv_half8_packed",    T_HALF8_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"_viv_half16_packed",   T_HALF16_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"_viv_half32_packed",   T_HALF32_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_gentype_packed",  T_GENTYPE_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_image2d_array_t", T_IMAGE2D_PTR_T,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_uniform",         T_UNIFORM,             0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
 };
 
 #define _cldMaxRepetitiveError   5
@@ -436,6 +439,9 @@ OUT clsLexToken *Token
         switch (tokenType) {
         case T_CONSTANT:
                    Token->u.qualifier = clvQUALIFIER_CONSTANT;
+                   break;
+        case T_UNIFORM:
+                   Token->u.qualifier = clvQUALIFIER_UNIFORM;
                    break;
         case T_LOCAL:
                    Token->u.qualifier = clvQUALIFIER_LOCAL;
@@ -924,7 +930,7 @@ OUT clsLexToken * Token
                                     "unsupported vivante packed data type : '%s'",
                                     Symbol));
     Token->type = T_RESERVED_KEYWORD;
-   return T_RESERVED_KEYWORD;
+    return T_RESERVED_KEYWORD;
 }
 
 static gctINT nValue[] =  {2, 3, 4, 8, 16};  /* supported n-value of reserved vector data type*/

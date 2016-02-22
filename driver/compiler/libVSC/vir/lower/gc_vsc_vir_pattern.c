@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -229,7 +229,7 @@ _Pattern_GetOperandByPattern(
             return gcvNULL;
         }
 
-        VIR_Operand_Iterator_Init(Inst, &opndIter);
+        VIR_Operand_Iterator_Init(Inst, &opndIter, gcvFALSE);
 
         for (i = 0, opnd = VIR_Operand_Iterator_First(&opndIter);
             i < VIR_PATTERN_OPND_COUNT && opnd != gcvNULL;
@@ -539,7 +539,7 @@ _Pattern_isMatched(
             if (!isMatched)   break;
 
 
-            VIR_Operand_Iterator_Init(curInst, &opndIter);
+            VIR_Operand_Iterator_Init(curInst, &opndIter, gcvFALSE);
 
             for (j = 0, curOpnd = VIR_Operand_Iterator_First(&opndIter);
                 j < VIR_PATTERN_OPND_COUNT;
@@ -685,6 +685,11 @@ _Pattern_ReplaceNormal(
 
             if (ptnOpnd == 0)
             {
+                /* newly generated sources need to be generated first */
+                if (j > 0 && replacedPtnInst->function[j] != gcvNULL)
+                {
+                    replacedPtnInst->function[j](Context, insertedInst, _Pattern_GetOperand(insertedInst, j));
+                }
                 continue;
             }
             /* Temp register */
@@ -722,6 +727,7 @@ _Pattern_ReplaceNormal(
                     VIR_Operand_SetSym(opnd, sym);
                     VIR_Operand_SetOpKind(opnd, VIR_OPND_SYMBOL);
                     VIR_Operand_SetEnable(opnd, VIR_ENABLE_XYZW);
+                    VIR_Operand_SetPrecision(opnd, VIR_Symbol_GetPrecision(sym));
 
                     /* to-do: make the pattern more flexible to set the dst's type
                        based on the flag. Currently, there is only a simple flag
@@ -758,6 +764,7 @@ _Pattern_ReplaceNormal(
                         if (templeteOpnd != gcvNULL)
                         {
                             VIR_Operand_SetType(opnd, VIR_Operand_GetType(templeteOpnd));
+                            VIR_Symbol_SetType(sym, VIR_Shader_GetTypeFromId(Context->shader, VIR_Operand_GetType(templeteOpnd)));
                             if (VIR_Operand_isLvalue(templeteOpnd))
                             {
                                 VIR_Operand_SetEnable(opnd, VIR_Operand_GetEnable(templeteOpnd));

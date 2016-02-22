@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -518,6 +518,7 @@ static void CDECL Destroy(Test2D *t2d)
 
 const gceFEATURE FeatureList[]=
 {
+    gcvFEATURE_2D_MULTI_SOURCE_BLT,
     gcvFEATURE_2D_MULTI_SOURCE_BLT_EX,
     gcvFEATURE_ANDROID_ONLY,
 };

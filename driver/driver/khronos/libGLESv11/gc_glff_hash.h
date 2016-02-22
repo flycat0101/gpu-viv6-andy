@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -226,9 +226,8 @@ typedef struct _glsHASHKEY
 
     /*--- 32-bit boundary --------------------------------------------------------*/
     gctUINT32    hashTexCopy3D                           : 1;  /* [ 0:0] */
-
-    /*--- 32-bit boundary --------------------------------------------------------*/
-    gctUINT32    hashShadingModel                        : 1;  /* [ 0: 0] */
+    gctUINT32    hashShadingModel                        : 1;  /* [ 1: 1] */
+    gctUINT32    hashAlphaFunc                           : 3;  /* [ 2: 4]*/
 }
 glsHASHKEY;
 

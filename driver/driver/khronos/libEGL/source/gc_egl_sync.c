@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -139,11 +139,11 @@ veglCreateSync(
     sync = pointer;
 
     /* Initialize context. */
-    sync->resObj.signature         = EGL_SYNC_SIGNATURE;
+    sync->resObj.signature  = EGL_SYNC_SIGNATURE;
     sync->type              = type;
     sync->condition         = EGL_SYNC_PRIOR_COMMANDS_COMPLETE;
-#if gcdANDROID_NATIVE_FENCE_SYNC
     sync->signal            = gcvNULL;
+#if gcdANDROID_NATIVE_FENCE_SYNC
     sync->pt                = gcvNULL;
     sync->fenceFD           = EGL_NO_NATIVE_FENCE_FD_ANDROID;
 #endif
@@ -173,9 +173,8 @@ veglCreateSync(
             sync->condition = EGL_SYNC_NATIVE_FENCE_SIGNALED_ANDROID;
             break;
         }
-        /* else same as fence sync object. */
 
-    case EGL_SYNC_FENCE:
+        /* Create native fence sync. */
         status = gcoOS_CreateSyncPoint(gcvNULL, &sync->pt);
 
         if (gcmIS_ERROR(status))
@@ -213,7 +212,7 @@ veglCreateSync(
         gcoHAL_Commit(gcvNULL, gcvFALSE);
         break;
 
-#else
+#endif
 
     case EGL_SYNC_FENCE:
         status = gcoOS_CreateSignal(gcvNULL, gcvTRUE, &sync->signal);
@@ -239,7 +238,6 @@ veglCreateSync(
         gcoHAL_ScheduleEvent(gcvNULL, &iface);
         gcoHAL_Commit(gcvNULL, gcvFALSE);
         break;
-#endif
 
     default:
         thread->error = EGL_BAD_ATTRIBUTE;
@@ -395,7 +393,7 @@ veglClientWaitSync(
     VEGLSync sync;
     gceSTATUS status;
     gctUINT32 wait;
-    EGLint result;
+    EGLint result = EGL_TIMEOUT_EXPIRED;
 
     /* Get thread data. */
     thread = veglGetThreadData();
@@ -441,30 +439,35 @@ veglClientWaitSync(
     /* Check flags */
     if (flags & EGL_SYNC_FLUSH_COMMANDS_BIT)
     {
-        /* Check if the sync is unsignaled */
+        /*
+         * This is optimization:
+         * Check if the sync is already signaled. If it is, there's no
+         * need to flush again.
+         */
 #if gcdANDROID_NATIVE_FENCE_SYNC
         if (sync->fenceFD != EGL_NO_NATIVE_FENCE_FD_ANDROID)
         {
             /* ANDROID_native_fence_sync or KHR_fence_sync */
-            status = gcoOS_ClientWaitNativeFence(gcvNULL,
-                                                sync->fenceFD,
-                                                0);
+            status = gcoOS_ClientWaitNativeFence(gcvNULL, sync->fenceFD, 0);
         }
         else
 #endif
         {
             /* Other sync types. */
-            status = gcoOS_WaitSignal(gcvNULL,
-                                      sync->signal,
-                                      0);
+            status = gcoOS_WaitSignal(gcvNULL, sync->signal, 0);
         }
 
-        if (status == gcvSTATUS_TIMEOUT)
+        if (gcmIS_SUCCESS(status))
         {
-            /* Flush */
+            /* Already signaled. */
+            result = EGL_CONDITION_SATISFIED;
+        }
+        else if (status == gcvSTATUS_TIMEOUT)
+        {
+            /* Flush as parameter required if not signaled. */
             _Flush(thread);
         }
-        else if (gcmIS_ERROR(status))
+        else
         {
             /* Error. */
             thread->error = EGL_BAD_ACCESS;
@@ -472,40 +475,43 @@ veglClientWaitSync(
         }
     }
 
-    /* Wait the signal */
-    wait = (timeout == (EGLTime) EGL_FOREVER)
-         ? gcvINFINITE
-         : (gctUINT32) gcoMATH_DivideUInt64(timeout, 1000000ull);
+    if (result != EGL_CONDITION_SATISFIED)
+    {
+        /* Wait the signal */
+        wait = (timeout == (EGLTime) EGL_FOREVER)
+             ? gcvINFINITE
+             : (gctUINT32) gcoMATH_DivideUInt64(timeout, 1000000ull);
 
 #if gcdANDROID_NATIVE_FENCE_SYNC
-    if (sync->fenceFD != EGL_NO_NATIVE_FENCE_FD_ANDROID)
-    {
-        /* Wait on external fence fd. */
-        status = gcoOS_ClientWaitNativeFence(gcvNULL, sync->fenceFD, wait);
-    }
-    else
+        if (sync->fenceFD != EGL_NO_NATIVE_FENCE_FD_ANDROID)
+        {
+            /* Wait external fence fd. */
+            status = gcoOS_ClientWaitNativeFence(gcvNULL, sync->fenceFD, wait);
+        }
+        else
 #endif
-    {
-        /* Wait on signal. */
-        status = gcoOS_WaitSignal(gcvNULL, sync->signal, wait);
-    }
+        {
+            /* Wait on signal. */
+            status = gcoOS_WaitSignal(gcvNULL, sync->signal, wait);
+        }
 
-    if (gcmIS_SUCCESS(status))
-    {
-        /* Signaled. */
-        result = EGL_CONDITION_SATISFIED;
-    }
-    else if (status == gcvSTATUS_TIMEOUT)
-    {
-        /* Timeout. */
-        result = EGL_TIMEOUT_EXPIRED;
-    }
-    else
-    {
-        /* Error. */
-        result = EGL_TIMEOUT_EXPIRED;
-        thread->error = EGL_BAD_ACCESS;
-        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        if (gcmIS_SUCCESS(status))
+        {
+            /* Signaled. */
+            result = EGL_CONDITION_SATISFIED;
+        }
+        else if (status == gcvSTATUS_TIMEOUT)
+        {
+            /* Timeout. */
+            result = EGL_TIMEOUT_EXPIRED;
+        }
+        else
+        {
+            /* Error. */
+            result = EGL_TIMEOUT_EXPIRED;
+            thread->error = EGL_BAD_ACCESS;
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
     }
 
     /* Success. */
@@ -586,9 +592,7 @@ veglGetSyncAttrib(
 #if gcdANDROID_NATIVE_FENCE_SYNC
         if (sync->fenceFD != EGL_NO_NATIVE_FENCE_FD_ANDROID)
         {
-            status = gcoOS_ClientWaitNativeFence(gcvNULL,
-                                                 sync->fenceFD,
-                                                 0);
+            status = gcoOS_ClientWaitNativeFence(gcvNULL, sync->fenceFD, 0);
 
             if (gcmIS_SUCCESS(status))
             {
@@ -611,9 +615,7 @@ veglGetSyncAttrib(
         }
 #endif
 
-        status = gcoOS_WaitSignal(gcvNULL,
-                                    sync->signal,
-                                    0);
+        status = gcoOS_WaitSignal(gcvNULL, sync->signal, 0);
 
         if (gcmIS_SUCCESS(status))
         {
@@ -635,12 +637,18 @@ veglGetSyncAttrib(
         break;
 
     case EGL_SYNC_CONDITION:
-        if (sync->type != EGL_SYNC_FENCE)
+        switch (sync->type)
         {
+        case EGL_SYNC_FENCE:
+        case EGL_SYNC_NATIVE_FENCE_ANDROID:
+            *value = sync->condition;
+            break;
+
+        default:
             thread->error = EGL_BAD_ATTRIBUTE;
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            break;
         }
-        *value = sync->condition;
         break;
 
     default:
@@ -722,8 +730,9 @@ veglWaitSync(
 
     /*
      * TODO:
-     * Need to wait fence(s) from other hardware, such as VG, 2D, etc.
-     * Currently there's no such case on android.
+     * We don't have server wait.
+     * Can not support server wait on EGL_KHR_reusable_sync and
+     * EGL_ANDROID_native_fence_sync (external fd).
      */
 
     /* Success. */
@@ -824,7 +833,7 @@ eglGetSyncAttrib(
     gcmFOOTER_ARG("return=%d", result);
     VEGL_TRACE_API_POST(GetSyncAttrib)(dpy, sync, attribute, value, (value ? *value : 0));
     gcmDUMP_API("${EGL eglGetSyncAttrib 0x%08X 0x%08X 0x%08X := 0x%08X}",
-                dpy, sync, attribute, (value ? *value : gcvNULL));
+                dpy, sync, attribute, (value ? *value : 0));
 
     return result;
 }
@@ -941,15 +950,15 @@ eglGetSyncAttribKHR(
     /* Call internal function. */
     result = veglGetSyncAttrib(dpy, (EGLSync) sync, attribute, pointer);
 
-    if (result == gcvTRUE)
+    if (result == EGL_TRUE)
     {
-        *value = (EGLint) *pointer;
+        *value = (EGLint) value0;
     }
 
     gcmFOOTER_ARG("return=%d", result);
     VEGL_TRACE_API_POST(GetSyncAttribKHR)(dpy, (EGLSync) sync, attribute, value, (value ? *value : 0));
     gcmDUMP_API("${EGL eglGetSyncAttribKHR 0x%08X 0x%08X 0x%08X := 0x%08X}",
-                dpy, sync, attribute, (value ? *value : gcvNULL));
+                dpy, sync, attribute, (value ? *value : 0));
 
     return result;
 }
@@ -1132,37 +1141,29 @@ eglDupNativeFenceFDANDROID(
     sync = (VEGLSync)veglGetResObj(dpy, (VEGLResObj*)&dpy->syncStack, (EGLResObj)Sync, EGL_SYNC_SIGNATURE);
 
     /* Test for valid EGLSync structure. */
-    if (sync == gcvNULL)
+    if ((sync == gcvNULL) || sync->type != EGL_SYNC_NATIVE_FENCE_ANDROID)
     {
-        /* Bad display. */
+        /* Bad parameter. */
         thread->error = EGL_BAD_PARAMETER;
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    switch (sync->type)
+    if (sync->fenceFD == EGL_NO_NATIVE_FENCE_FD_ANDROID)
     {
-    case EGL_SYNC_FENCE:
-    case EGL_SYNC_NATIVE_FENCE_ANDROID:
-        if (sync->fenceFD == EGL_NO_NATIVE_FENCE_FD_ANDROID)
-        {
-            thread->error = EGL_BAD_PARAMETER;
-            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-        }
-
-        if (gcmIS_ERROR(gcoOS_DupFD(gcvNULL, sync->fenceFD, &fenceFD)))
-        {
-            fenceFD = EGL_NO_NATIVE_FENCE_FD_ANDROID;
-            thread->error = EGL_BAD_ALLOC;
-        }
-        gcmDUMP_API("${EGL eglDupNativeFenceFDANDROID 0x%08X 0x%08X := 0x%08X",
-                    Display, Sync, fenceFD);
-        gcmFOOTER_ARG("%d", fenceFD);
-        return fenceFD;
-
-    default:
         thread->error = EGL_BAD_PARAMETER;
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
+
+    if (gcmIS_ERROR(gcoOS_DupFD(gcvNULL, sync->fenceFD, &fenceFD)))
+    {
+        fenceFD = EGL_NO_NATIVE_FENCE_FD_ANDROID;
+        thread->error = EGL_BAD_ALLOC;
+    }
+    gcmDUMP_API("${EGL eglDupNativeFenceFDANDROID 0x%08X 0x%08X := 0x%08X",
+                Display, Sync, fenceFD);
+    gcmFOOTER_ARG("%d", fenceFD);
+    return fenceFD;
+
 OnError:
     gcmFOOTER_ARG("%d", EGL_NO_NATIVE_FENCE_FD_ANDROID);
     return EGL_NO_NATIVE_FENCE_FD_ANDROID;

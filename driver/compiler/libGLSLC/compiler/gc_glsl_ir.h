@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -44,6 +44,9 @@ typedef gceSTATUS (*slsBuiltInFuncCheck)(
     IN struct _slsNAME * FuncName,
     IN struct _sloIR_POLYNARY_EXPR * PolynaryExpr
     );
+
+typedef gceSTATUS (*slsBuiltInEvaluateFunc)(void *);
+typedef gceSTATUS (*slsBuiltInGenCodeFunc)(void *);
 
 /* Data type */
 typedef enum _sleSTORAGE_QUALIFIER
@@ -91,9 +94,9 @@ typedef enum _slePRECISION_QUALIFIER
 {
     slvPRECISION_QUALIFIER_DEFAULT    = 0,    /* Must be zero */
 
-    slvPRECISION_QUALIFIER_HIGH,
-    slvPRECISION_QUALIFIER_MEDIUM,
     slvPRECISION_QUALIFIER_LOW,
+    slvPRECISION_QUALIFIER_MEDIUM,
+    slvPRECISION_QUALIFIER_HIGH,
     slvPRECISION_QUALIFIER_ANY,
 } slePRECISION_QUALIFIER;
 
@@ -493,17 +496,33 @@ typedef struct _slsQUALIFIERS
 #define slsQUALIFIERS_GET_AUXILIARY(q)      ((q)->auxiliary)
 #define slsQUALIFIERS_SET_AUXILIARY(q, a)   ((q)->auxiliary = (a))
 
-typedef enum _sleBUILT_IN_FUNC_FLAG
+typedef enum _sleFUNC_FLAG
 {
-    slvBUILT_IN_FUNC_NONE               = 0x0000,
-    slvBUILT_IN_FUNC_ATOMIC             = 0x0001,
+    slvFUNC_NONE                = 0x0000,       /* none */
+    slvFUNC_ATOMIC              = 0x0001,       /* atomic functions. */
+    slvFUNC_HAS_MEM_ACCESS      = 0x0002,       /* has memory access. */
+    slvFUNC_HAS_VAR_ARG         = 0x0004,       /* has var argument. */
+    slvFUNC_HAS_VOID_PARAM      = 0x0010,       /* has void param. */
+    slvFUNC_IS_INTRINSIC        = 0x0020,       /* is an intrinsic function. */
+    slvFUNC_DEFINED             = 0x0040,       /* is defined before. */
+    slvFUNC_TREAT_FLOAT_AS_INT  = 0x0080,       /* treat float as int. */
 } sleBUILT_IN_FUNC_FLAG;
 
-typedef gctUINT8 sltBUILT_IN_FUNC_FLAG;
+typedef gctUINT8 sltFUNC_FLAG;
 
-#define slsBUILT_IN_FUNC_HAS_FLAG(q, f)        ((q)->flags & (f))
-#define slsBUILT_IN_FUNC_SET_FLAG(q, f)        ((q)->flags |= (f))
-#define slsBUILT_IN_FUNC_RESET_FLAG(q, f)      ((q)->flags &= ~(f))
+#define slsFUNC_HAS_FLAG(q, f)        ((q)->flags & (f))
+#define slsFUNC_SET_FLAG(q, f)        ((q)->flags |= (f))
+#define slsFUNC_RESET_FLAG(q, f)      ((q)->flags &= ~(f))
+
+typedef enum _sleIB_FLAG
+{
+    slvIB_NONE                  = 0x0000,       /* none */
+    slvIB_SHARED                = 0x0001,       /* block for shared variables. */
+} sleIB_FLAG;
+
+#define slsIB_HAS_FLAG(q, f)          ((q)->flags & (f))
+#define slsIB_SET_FLAG(q, f)          ((q)->flags |= (f))
+#define slsIB_RESET_FLAG(q, f)        ((q)->flags &= ~(f))
 
 typedef struct _slsDATA_TYPE
 {
@@ -630,6 +649,22 @@ gctBOOL
 slsDATA_TYPE_IsArrayHasImplicitLength(
     IN sloCOMPILER Compiler,
     IN slsDATA_TYPE * DataType
+    );
+
+gcSHADER_TYPE
+slsDATA_TYPE_ConvElementDataType(
+    IN slsDATA_TYPE * DataType
+    );
+
+gctINT
+slsDATA_TYPE_GetLogicalCountForAnArray(
+    IN slsDATA_TYPE * DataType
+    );
+
+gctUINT
+slsDATA_TYPE_GetLogicalOperandCount(
+    IN slsDATA_TYPE * DataType,
+    IN gctBOOL bCalcTypeSize
     );
 
 #define slmPromoteIntToVector(IntValue, Vz, Res)  \
@@ -1006,9 +1041,7 @@ slsDATA_TYPE_IsArrayHasImplicitLength(
      slsDATA_TYPE_IsUnderlyingIOBlock(dataType))
 
 #define slmDATA_TYPE_IsHigherPrecision(dataType1, dataType2) \
-        (((dataType1)->qualifiers.precision == slvPRECISION_QUALIFIER_DEFAULT) ? gcvFALSE : \
-         (((dataType2)->qualifiers.precision == slvPRECISION_QUALIFIER_DEFAULT) ? gcvTRUE : \
-          ((dataType1)->qualifiers.precision < (dataType2)->qualifiers.precision)))
+    ((dataType1)->qualifiers.precision >= (dataType2)->qualifiers.precision)
 
 #define slmIsElementTypeSamplerArray(EType) \
       (((EType) == slvTYPE_ISAMPLER2DARRAY) || \
@@ -1173,19 +1206,15 @@ typedef struct _slsNAME
             struct _slsNAME_SPACE *         localSpace;
             /* function's body name space. */
             struct _slsNAME_SPACE *         functionBodySpace;
-            gctBOOL                         isFuncDef;
-            gctBOOL                         hasVoidParameter;
             struct _sloIR_SET     *         funcBody;
-            gctBOOL                         hasVarArg;
-            gctBOOL                         hasMemoryAccess;
-            /* whether this is an intrinsic call */
-            gctBOOL                         isIntrinsicCall;
             gceINTRINSICS_KIND              intrinsicKind;
             /* this is used to find the builtin function in library */
             sltPOOL_STRING                  mangled_symbol;
             slsBuiltInFuncCheck             function;
+            slsBuiltInEvaluateFunc          evaluate;
+            slsBuiltInGenCodeFunc           genCode;
             /* Function flag. */
-            sltBUILT_IN_FUNC_FLAG           flags;
+            sltFUNC_FLAG                    flags;
         }
         funcInfo;
 
@@ -1193,12 +1222,15 @@ typedef struct _slsNAME
         struct
         {
             slsDLINK_LIST                   members;
-            union {
+            union
+            {
                 gcsUNIFORM_BLOCK            uniformBlock;
                 gcsSTORAGE_BLOCK            storageBlock;
                 gcsIO_BLOCK                 ioBlock;
                 gcsINTERFACE_BLOCK_INFO *   interfaceBlockInfo;
-            } u;
+            }
+            u;
+            sleIB_FLAG                      flags;
         }
         interfaceBlockContent;
     }

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -210,8 +210,8 @@ VX_INTERNAL_API vx_bool vxoParameterValue_BindToDelay(vx_reference value, vx_nod
 
 VX_INTERNAL_API vx_bool vxoParameterValue_UnbindFromDelay(vx_reference value, vx_node node, vx_uint32 index)
 {
-    vx_delay           delay;
-    vx_uint32          paramListIndex;
+    vx_delay  delay;
+    vx_uint32 paramListIndex;
     vx_delay_parameter param;
 
     vxmASSERT(value);

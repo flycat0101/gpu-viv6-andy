@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -71,6 +71,8 @@
 #endif
 
 static gckGALDEVICE galDevice;
+
+extern gcTA globalTA;
 
 /******************************************************************************\
 ******************************** Debugfs Support *******************************
@@ -765,6 +767,7 @@ _AllocateMemory(
     )
 {
     gceSTATUS status;
+    gctPHYS_ADDR_T physAddr;
 
     gcmkHEADER_ARG("Device=0x%x Bytes=%lu", Device, Bytes);
 
@@ -777,7 +780,11 @@ _AllocateMemory(
         Device->os, gcvFALSE, &Bytes, Physical, Logical
         ));
 
-    *PhysAddr = ((PLINUX_MDL)*Physical)->dmaHandle;
+    gcmkONERROR(gckOS_GetPhysicalAddress(
+        Device->os, *Logical, &physAddr
+        ));
+
+    gcmkSAFECASTPHYSADDRT(*PhysAddr, physAddr);
 
     /* Success. */
     gcmkFOOTER_ARG(
@@ -824,7 +831,7 @@ _SetupVidMem(
     )
 {
     gceSTATUS status;
-    gctUINT32 physAddr;
+    gctUINT32 physAddr = ~0U;
     gckGALDEVICE device = Device;
     struct resource* mem_region;
 
@@ -992,10 +999,19 @@ static int threadRoutine(void *ctxt)
 {
     gckGALDEVICE device = galDevice;
     gceCORE core = (gceCORE) ctxt;
+    gctUINT i;
 
     gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_DRIVER,
                    "Starting isr Thread with extension=%p",
                    device);
+
+    /* Make kernel update page table of this thread to include entry related to command buffer.*/
+    for (i = 0; i < gcdCOMMAND_QUEUES; i++)
+    {
+        gctUINT32 data = *(gctUINT32_PTR)device->kernels[core]->command->queues[i].logical;
+
+        data = 0;
+    }
 
     for (;;)
     {
@@ -1305,12 +1321,17 @@ gckGALDEVICE_Construct(
     /* Construct the gckDEVICE object for os independent core management. */
     gcmkONERROR(gckDEVICE_Construct(device->os, &device->device));
 
+    if (device->irqLines[gcvCORE_MAJOR] != -1)
+    {
+        gcmkONERROR(gctaOS_ConstructOS(device->os, &device->taos));
+        gcmkONERROR(gcTA_Construct(device->taos, &globalTA));
+    }
 
     gcmkONERROR(_SetupVidMem(device, ContiguousBase, ContiguousSize, BankSize, Args));
 
     if (device->irqLines[gcvCORE_MAJOR] != -1)
     {
-        gcmkONERROR(gckDEVICE_AddCore(device->device, gcvCORE_MAJOR, device, &device->kernels[gcvCORE_MAJOR]));
+        gcmkONERROR(gckDEVICE_AddCore(device->device, gcvCORE_MAJOR, Args->chipIDs[gcvCORE_MAJOR], device, &device->kernels[gcvCORE_MAJOR]));
 
         /* Setup the ISR manager. */
         gcmkONERROR(gckHARDWARE_SetIsrManager(
@@ -1345,7 +1366,7 @@ gckGALDEVICE_Construct(
 
     if (device->irqLines[gcvCORE_2D] != -1)
     {
-        gcmkONERROR(gckDEVICE_AddCore(device->device, gcvCORE_2D, device, &device->kernels[gcvCORE_2D]));
+        gcmkONERROR(gckDEVICE_AddCore(device->device, gcvCORE_2D, gcvCHIP_ID_DEFAULT, device, &device->kernels[gcvCORE_2D]));
 
         /* Verify the hardware type */
         gcmkONERROR(gckHARDWARE_GetType(device->kernels[gcvCORE_2D]->hardware, &type));
@@ -1388,7 +1409,7 @@ gckGALDEVICE_Construct(
     if (device->irqLines[gcvCORE_VG] != -1)
     {
 #if gcdENABLE_VG
-        gcmkONERROR(gckDEVICE_AddCore(device->device, gcvCORE_VG, device, &device->kernels[gcvCORE_VG]));
+        gcmkONERROR(gckDEVICE_AddCore(device->device, gcvCORE_VG, gcvCHIP_ID_DEFAULT, device, &device->kernels[gcvCORE_VG]));
 
         gcmkONERROR(gckVGHARDWARE_SetPowerManagement(
             device->kernels[gcvCORE_VG]->vg->hardware,
@@ -1406,7 +1427,7 @@ gckGALDEVICE_Construct(
     {
         if (Args->irqs[i] != -1)
         {
-            gckDEVICE_AddCore(device->device, i, device, &device->kernels[i]);
+            gckDEVICE_AddCore(device->device, i, Args->chipIDs[i], device, &device->kernels[i]);
         }
     }
 
@@ -1703,6 +1724,18 @@ gckGALDEVICE_Destroy(
         {
             gcmkVERIFY_OK(gckDEVICE_Destroy(Device->os, Device->device));
             Device->device = gcvNULL;
+        }
+
+        if (globalTA)
+        {
+            gcTA_Destroy(globalTA);
+            globalTA = gcvNULL;
+        }
+
+        if (Device->taos)
+        {
+            gcmkVERIFY_OK(gctaOS_DestroyOS(Device->taos));
+            Device->taos = gcvNULL;
         }
 
         /* Destroy the gckOS object. */

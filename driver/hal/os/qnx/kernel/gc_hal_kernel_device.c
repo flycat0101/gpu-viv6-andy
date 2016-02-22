@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -649,7 +649,7 @@ gckGALDEVICE_Construct(
 
     if (IrqLine != -1)
     {
-        gckDEVICE_AddCore(device->device, gcvCORE_MAJOR, device, &device->kernels[gcvCORE_MAJOR]);
+        gckDEVICE_AddCore(device->device, gcvCORE_MAJOR, gcvCHIP_ID_DEFAULT, device, &device->kernels[gcvCORE_MAJOR]);
 
         gcmkONERROR(
                 gckHARDWARE_SetFastClear(device->kernels[gcvCORE_MAJOR]->hardware,
@@ -671,7 +671,7 @@ gckGALDEVICE_Construct(
 
     if (IrqLine2D != -1)
     {
-        gckDEVICE_AddCore(device->device, gcvCORE_2D, device, &device->kernels[gcvCORE_2D]);
+        gckDEVICE_AddCore(device->device, gcvCORE_2D, gcvCHIP_ID_DEFAULT,device, &device->kernels[gcvCORE_2D]);
 
         /* Verify the hardware type */
         gcmkONERROR(gckHARDWARE_GetType(device->kernels[gcvCORE_2D]->hardware, &type));
@@ -700,7 +700,7 @@ gckGALDEVICE_Construct(
     if (IrqLineVG != -1)
     {
 #if gcdENABLE_VG
-        gckDEVICE_AddCore(device->device, gcvCORE_VG, device, &device->kernels[gcvCORE_VG]);
+        gckDEVICE_AddCore(device->device, gcvCORE_VG, gcvCHIP_ID_DEFAULT, device, &device->kernels[gcvCORE_VG]);
 
         gcmkONERROR(gckVGHARDWARE_SetPowerManagement(
             device->kernels[gcvCORE_VG]->vg->hardware,
@@ -957,7 +957,7 @@ OnError:
     /* Roll back. */
 
     /* Destroy the gckKERNEL object. */
-    if ( Device != gcvNULL)
+    if (Device != gcvNULL)
     {
         gcmkVERIFY_OK(gckGALDEVICE_Destroy(*Device));
     }

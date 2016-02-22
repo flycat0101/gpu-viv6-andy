@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2708,7 +2708,7 @@ gcoOS_SwapBuffersXwinEx(
         rlvArgs.uArgs.v2.rectSize.y = *Height;
         rlvArgs.uArgs.v2.numSlices  = 1;
 
-        status = gcoSURF_ResolveRect_v2(&rtView, &tgtView, &rlvArgs);
+        status = gcoSURF_ResolveRect(&rtView, &tgtView, &rlvArgs);
         if (gcmIS_ERROR(status))
         {
             goto ENDXWINEX;
@@ -2795,7 +2795,7 @@ gcoOS_SwapBuffersXwinAsync(
         rlvArgs.uArgs.v2.rectSize.y = *Height;
         rlvArgs.uArgs.v2.numSlices  = 1;
 
-        status = gcoSURF_ResolveRect_v2(&rtView, &tgtView, &rlvArgs);
+        status = gcoSURF_ResolveRect(&rtView, &tgtView, &rlvArgs);
         if (gcmIS_ERROR(status))
         {
             goto ENDXWINEX;
@@ -2891,7 +2891,7 @@ gcoOS_SwapBuffersXwin(
         rlvArgs.uArgs.v2.rectSize.y = *Height;
         rlvArgs.uArgs.v2.numSlices  = 1;
 
-        status = gcoSURF_ResolveRect_v2(&rtView, &tgtView, &rlvArgs);
+        status = gcoSURF_ResolveRect(&rtView, &tgtView, &rlvArgs);
         if (gcmIS_ERROR(status))
         {
             goto ENDXWIN;
@@ -3120,7 +3120,7 @@ static gceSTATUS _SwapBuffersWithDirectMode(
                     gcsSURF_VIEW rtView = {RenderTarget, 0, 1};
                     gcsSURF_VIEW wrapView = {wrapsurf, 0, 1};
 
-                    status = gcoSURF_ResolveRect_v2(&rtView, &wrapView, gcvNULL);
+                    status = gcoSURF_ResolveRect(&rtView, &wrapView, gcvNULL);
                     gcoHAL_Commit(gcvNULL, gcvFALSE);
                 }
 
@@ -3218,7 +3218,7 @@ gcoOS_SwapBuffersUnityEx(
         rlvArgs.uArgs.v2.rectSize.y = *Height;
         rlvArgs.uArgs.v2.numSlices  = 1;
 
-        status = gcoSURF_ResolveRect_v2(&rtView, &tgtView, &rlvArgs);
+        status = gcoSURF_ResolveRect(&rtView, &tgtView, &rlvArgs);
         if (gcmIS_ERROR(status))
         {
             gcmFOOTER();
@@ -3374,7 +3374,7 @@ gcoOS_SwapBuffersUnity(
         rlvArgs.uArgs.v2.rectSize.y = *Height;
         rlvArgs.uArgs.v2.numSlices  = 1;
 
-        status = gcoSURF_ResolveRect_v2(&rtView, &tgtView, &rlvArgs);
+        status = gcoSURF_ResolveRect(&rtView, &tgtView, &rlvArgs);
         if (gcmIS_ERROR(status))
         {
             gcmFOOTER();

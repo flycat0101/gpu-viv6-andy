@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -45,6 +45,7 @@ typedef enum _sleOPCODE
 
     /* Texture Operations */
     slvOPCODE_TEXTURE_LOAD,
+    slvOPCODE_TEXTURE_LOAD_U,
     slvOPCODE_TEXTURE_LOAD_PROJ,
     slvOPCODE_TEXTURE_LOAD_PCF,
     slvOPCODE_TEXTURE_LOAD_PCFPROJ,
@@ -183,7 +184,9 @@ typedef enum _sleOPCODE
     slvOPCODE_EMIT_VERTEX,
     slvOPCODE_END_PRIMITIVE,
 
-    slvOPCODE_TEXTURE_LOAD_U,
+    /* local memory */
+    slvOPCODE_LOAD_L,
+    slvOPCODE_STORE_L,
 
     /* The max opcode. */
     slvOPCODE_MAXOPCODE
@@ -443,11 +446,6 @@ slsLOGICAL_REG;
                                            SelectionContext)); \
         } while (gcvFALSE); \
      }
-
-gctINT
-_GetLogicalCountForAnArray(
-    IN slsDATA_TYPE * DataType
-    );
 
 gceSTATUS
 slsNAME_AllocLogicalRegs(

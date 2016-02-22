@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -37,6 +37,7 @@ typedef struct VIR_IS_INSTSCHED
 {
     VIR_Shader* shader;
     VSC_HW_CONFIG*  hwCfg;
+    VSC_HW_UARCH_CAPS* hwUArchCaps;
     VIR_BASIC_BLOCK* curr_bb;
     VIR_DEF_USAGE_INFO* du_info;
     VSC_IS_DepDag* curr_dep_dag;
@@ -55,6 +56,8 @@ typedef struct VIR_IS_INSTSCHED
 #define VSC_IS_InstSched_SetShader(is, s)                   ((is)->shader = (s))
 #define VSC_IS_InstSched_GetHwCfg(is)                       ((is)->hwCfg)
 #define VSC_IS_InstSched_SetHwCfg(is, h)                    ((is)->hwCfg = (h))
+#define VSC_IS_InstSched_GetHwUArchCaps(is)                 ((is)->hwUArchCaps)
+#define VSC_IS_InstSched_SetHwUArchCaps(is, h)              ((is)->hwUArchCaps = (h))
 #define VSC_IS_InstSched_GetCurrBB(is)                      ((is)->curr_bb)
 #define VSC_IS_InstSched_SetCurrBB(is, b)                   ((is)->curr_bb = (b))
 #define VSC_IS_InstSched_GetDUInfo(is)                      ((is)->du_info)

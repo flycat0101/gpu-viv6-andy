@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -366,6 +366,7 @@ VX_INTERNAL_API vx_status vxoReference_Release(
         vxTrace(VX_TRACE_REF, "vxoReference_Release():"
                 " the reference count of the referece obejct, %p, is released to 0", ref);
 
+
         vxoReference_Destroy(ref);
     }
 
@@ -521,7 +522,6 @@ vx_status vxQuerySurfaceNode(vx_reference reference,
         }
         break;
     case VX_TYPE_SCALAR:
-        vxAccessScalarValue((vx_scalar)reference, *ptr);
         {
             vx_scalar scalar = (vx_scalar)reference;
             if(scalar->node != NULL && scalar->value != NULL)

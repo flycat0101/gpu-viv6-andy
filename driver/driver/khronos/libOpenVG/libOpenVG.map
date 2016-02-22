@@ -97,6 +97,9 @@
 		vgDrawWarpedImageVIV;
         vgLoadMatrixInvImage;
         vgCreateImageConstVIV;
+		vgCreateImageDirectVIV;
+		vgInvalidateImageDirectVIV;
+		vgResolveImageVIV;
 
 		vguLine;
 		vguPolygon;

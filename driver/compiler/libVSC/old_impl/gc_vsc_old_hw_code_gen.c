@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -355,10 +355,8 @@ _hasHalti4_orPerf(
     IN OUT gctUINT32_PTR States
     )
 {
-    gcePATCH_ID patchID = gcvPATCH_INVALID;
-    gcoHAL_GetPatchID(gcvNULL, &patchID);
-
-    return CodeGen->hasHalti4 || !(patchID == gcvPATCH_DEQP || patchID == gcvPATCH_OESCTS);
+    return CodeGen->hasHalti4 ||
+        !(Tree->patchID == gcvPATCH_DEQP || Tree->patchID == gcvPATCH_OESCTS);
 }
 
 static gctBOOL
@@ -1888,6 +1886,7 @@ long_ulong_first_add_store(
     return gcvTRUE;
 }
 
+#if !_SUPPORT_LONG_ULONG_DATA_TYPE
 static gctBOOL
 long_ulong_second_store_zero_2(
     IN gcLINKTREE Tree,
@@ -1928,6 +1927,7 @@ long_ulong_second_store_zero_2(
     }
     return gcvTRUE;
 }
+#endif
 
 static gctBOOL
 int_value_type0_const_4(
@@ -4385,7 +4385,7 @@ _shaderNeedIntSupport(
     IN OUT gctUINT32_PTR States
     )
 {
-    return (CodeGen->clShader || CodeGen->computeShader || CodeGen->haltiShader || CodeGen->dxShader);
+    return gcvTRUE;
 }
 
 static gctBOOL
@@ -5285,7 +5285,7 @@ canUseSelectCmpSetInst(
     {
         if (CodeGen->clShader)
         {
-            if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SUPPORT_INTEGER_BRANCH))
+            if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_PARTLY_SUPPORT_INTEGER_BRANCH))
             {
                 return gcvTRUE;
             }
@@ -5348,10 +5348,8 @@ rtz_for_HW_bug(
     if (CodeGen->hasSHEnhancements2)
     {
         gctUINT value = (((((gctUINT32) (States[1])) >> (0 ? 2:0)) & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1)))))) );
-        gcePATCH_ID patchID = gcvPATCH_INVALID;
-        gcoHAL_GetPatchID(gcvNULL, &patchID);
 
-        if (!(patchID == gcvPATCH_DEQP || patchID == gcvPATCH_OESCTS))
+        if (!(Tree->patchID == gcvPATCH_DEQP || Tree->patchID == gcvPATCH_OESCTS))
         {
             value = (value & 0x4) | 0x1;
             States[1] = ((((gctUINT32) (States[1])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -5372,10 +5370,7 @@ _GFX27Patch(
     IN OUT gctUINT32 * States
     )
 {
-    gcePATCH_ID patchID = gcvPATCH_INVALID;
-    gcoHAL_GetPatchID(gcvNULL, &patchID);
-
-    if (patchID == gcvPATCH_GLBM27)
+    if (Tree->patchID == gcvPATCH_GLBM27)
     {
         return gcvTRUE;
     }
@@ -12646,7 +12641,7 @@ _source0_is_constant(
     IN OUT gctUINT32 * States
     )
 {
-    if (gctOPT_hasFeature(FB_DISABLE_MERGE_CONST))
+    if (gcmOPT_hasFeature(FB_DISABLE_MERGE_CONST))
     {
         return gcvFALSE;
     }
@@ -17629,7 +17624,7 @@ _isI2I_int2ulong_sat(
 
     srcFormat = gcmSL_SOURCE_GET(Instruction->source0, Format);
     formatDst = gcmSL_TARGET_GET(Instruction->temp, Format);
-    if((srcFormat == gcSL_INT32) && (formatDst == gcSL_UINT64)) return gcvTRUE;
+    if((srcFormat == gcSL_INT32 || srcFormat == gcSL_INT16 || srcFormat == gcSL_INT8) && (formatDst == gcSL_UINT64)) return gcvTRUE;
     else return gcvFALSE;
 }
 
@@ -17682,7 +17677,7 @@ _isI2I_int2longulong(
         return gcvFALSE;
     }
 
-    if((srcFormat == gcSL_INT32) && (formatDst == gcSL_INT64 || formatDst == gcSL_UINT64)) return gcvTRUE;
+    if((srcFormat == gcSL_INT32 || srcFormat == gcSL_INT16 || srcFormat == gcSL_INT8) && (formatDst == gcSL_INT64 || formatDst == gcSL_UINT64)) return gcvTRUE;
     else return gcvFALSE;
 }
 
@@ -17715,9 +17710,6 @@ int2longulong_rshift(
     gctINT index = 0;
     gctUINT8 swizzle = 0;
     gcSL_TYPE constType;
-    gcSL_FORMAT format;
-
-    format = gcmSL_TARGET_GET(Instruction->temp, Format);
 
     gcmVERIFY_OK(_AddConstantIVec1(Tree,
                                     CodeGen,
@@ -17760,7 +17752,7 @@ int2longulong_sign_bit_set(
     return gcvTRUE;
 }
 
-/* uint 2 long or ulong */
+/* unsigned 2 long or ulong */
 static gctBOOL
 _isI2I_uint2longulong(
     IN gcLINKTREE Tree,
@@ -17773,7 +17765,7 @@ _isI2I_uint2longulong(
 
     srcFormat = gcmSL_SOURCE_GET(Instruction->source0, Format);
     formatDst = gcmSL_TARGET_GET(Instruction->temp, Format);
-    if((srcFormat == gcSL_UINT32) && (formatDst == gcSL_INT64 || formatDst == gcSL_UINT64)) return gcvTRUE;
+    if((srcFormat == gcSL_UINT32 || srcFormat == gcSL_UINT16 || srcFormat == gcSL_UINT8) && (formatDst == gcSL_INT64 || formatDst == gcSL_UINT64)) return gcvTRUE;
     else return gcvFALSE;
 }
 
@@ -19120,7 +19112,19 @@ const gcsSL_PATTERN patterns_COPY[] =
     { 0 }
 };
 
-/* 0x8A gcSL_IMAGE_ADDR_3D */
+/* 0x8A gcSL_LOAD_L */
+const gcsSL_PATTERN patterns_LOADL[] =
+{
+    { 0 }
+};
+
+/* 0x8B gcSL_STORE_L */
+const gcsSL_PATTERN patterns_STOREL[] =
+{
+    { 0 }
+};
+
+/* 0x8C gcSL_IMAGE_ADDR_3D */
 const gcsSL_PATTERN patterns_IMAGE_ADDR_3D[] =
 {
     /*
@@ -19133,19 +19137,19 @@ const gcsSL_PATTERN patterns_IMAGE_ADDR_3D[] =
     { 0 }
 };
 
-/* 0x8B  Get sampler's lodminmax */
+/* 0x8D  Get sampler's lodminmax */
 const gcsSL_PATTERN patterns_GET_SAMPLER_LMM[] =
 {
     { 0 }
 };
 
-/* 0x8C  Get sampler's levelbasesize */
+/* 0x8E  Get sampler's levelbasesize */
 const gcsSL_PATTERN patterns_GET_SAMPLER_LBS[] =
 {
     { 0 }
 };
 
-/* 0x8D  TEXLD_U */
+/* 0x8F  TEXLD_U */
 const gcsSL_PATTERN patterns_TEXLD_U[] =
 {
     { 0 }
@@ -19291,10 +19295,12 @@ const gcsSL_PATTERN_PTR  patterns[] =
     patterns_MOV_LONG, /* 0x87 gcSL_MOV_LONG */
     patterns_MADSAT, /* 0x88 gcSL_MADSAT */
     patterns_COPY, /* 0x89 gcSL_COPY */
-    patterns_IMAGE_ADDR_3D, /* 0x8A gcSL_IMAGE_ADDR_3D */
-    patterns_GET_SAMPLER_LMM,/* 0x8B gcSL_GET_SAMPLER_LMM */
-    patterns_GET_SAMPLER_LBS,/* 0x8C gcSL_GET_SAMPLER_LBS */
-    patterns_TEXLD_U, /* 0x8D gcSL_TEXLD_U */
+    patterns_LOADL, /* 0x8A gcSL_LOAD_L */
+    patterns_STOREL, /* 0x8B gcSL_STORE_L */
+    patterns_IMAGE_ADDR_3D, /* 0x8C gcSL_IMAGE_ADDR_3D */
+    patterns_GET_SAMPLER_LMM,/* 0x8D gcSL_GET_SAMPLER_LMM */
+    patterns_GET_SAMPLER_LBS,/* 0x8E gcSL_GET_SAMPLER_LBS */
+    patterns_TEXLD_U, /* 0x8F gcSL_TEXLD_U */
 };
 
 #ifdef WIN32

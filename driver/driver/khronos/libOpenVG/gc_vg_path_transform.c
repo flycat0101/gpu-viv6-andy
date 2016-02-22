@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -869,6 +869,7 @@ static gceSTATUS _TransformArc(
         p[1] =   vgmMAT(Transform, 1, 0) * elps00 + vgmMAT(Transform, 1, 1) * elps10;
         q[0] =   vgmMAT(Transform, 1, 0) * elps01 + vgmMAT(Transform, 1, 1) * elps11;
         q[1] = - vgmMAT(Transform, 0, 0) * elps01 - vgmMAT(Transform, 0, 1) * elps11;
+
         /* Compute the squared length of the vectors. */
         pDot = p[0] * p[0] + p[1] * p[1];
         qDot = q[0] * q[0] + q[1] * q[1];

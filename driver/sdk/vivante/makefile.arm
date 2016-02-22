@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -121,7 +121,6 @@ INC_DIR += \
         $(AQROOT)/driver/khronos/libGLESv3/include/chip \
         $(AQROOT)/driver/khronos/libGLESv3/include/glcore \
 
-
 INC_DIR += \
 	$(AQROOT)/driver/khronos/libEGL/os \
 	$(AQROOT)/driver/khronos/libEGL/source \
@@ -131,7 +130,7 @@ INC_DIR += \
 	$(AQROOT)/compiler/libGLSLC/inc
 endif
 
-  	CFLAGS += -DGL_GLEXT_PROTOTYPES -D_LINUX_
+CFLAGS += -DGL_GLEXT_PROTOTYPES -D_LINUX_
 
 CFLAGS += $(addprefix -I,$(INC_DIR) $(SYS_INC))
 

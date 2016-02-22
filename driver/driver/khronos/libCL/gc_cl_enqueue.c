@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -15,7 +15,6 @@
 
 #define __NEXT_MSG_ID__     010319
 
-#define _USE_HW_TEXLD_      1
 
 /*****************************************************************************\
 |*                         Supporting functions                              *|
@@ -520,13 +519,21 @@ clfDynamicPatchKernel(
     gctUINT                 binarySize;
     gcSHADER                kernelBinary;
     gctUINT                 bufferSize = 0;
-    gctPOINTER              buffer, pointer = gcvNULL;
+    gctPOINTER              buffer = gcvNULL, pointer = gcvNULL;
     gcsHINT_PTR             hints = gcvNULL;
     clsKernelStates_PTR     patchedStates = gcvNULL;
     clsPatchDirective_PTR   patchDirective;
     clsPatchDirective_PTR   patchDirective1;
     gcPatchDirective_PTR    gcPatchDirective = gcvNULL;
     gctUINT                 oldNumArgs, numToUpdate = *NumArgs, i;
+    gctUINT                 isScalar = 0;
+    gceSHADER_FLAGS         flags = gcvSHADER_RESOURCE_USAGE | gcvSHADER_OPTIMIZER | gcvSHADER_REMOVE_UNUSED_UNIFORMS;
+#if BUILD_OPENCL_FP
+    gctBOOL                 reLinkNeed = gcvFALSE;
+    gctPOINTER              orgArgs = gcvNULL;
+    gceCHIPMODEL            chipModel;
+    gctUINT32               chipRevision;
+#endif
 
     struct _imageData {
         gctUINT             physical;   /* GPU address is 32-bit. */
@@ -635,6 +642,7 @@ clfDynamicPatchKernel(
                 bytes = sizeof(cl_uint);
                 clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
                 *((cl_uint*)argument->data) = patchDirective1->patchValue.longULong->channelCount;
+                isScalar = patchDirective->patchValue.longULong->channelCount == 1 ? 1 : 0;
                 argument->uniform    = GetShaderUniform(kernelBinary, patchDirective1->patchValue.longULong->channelCountIndex);
                 argument->size       = bytes;
                 argument->set        = gcvTRUE;
@@ -644,7 +652,11 @@ clfDynamicPatchKernel(
         return gcvSTATUS_OK;
     }
 
-   /* Save program binary into buffer */
+#if BUILD_OPENCL_FP
+    gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
+DoReLink:
+#endif
+    /* Save program binary into buffer */
     clmONERROR(gcSHADER_SaveEx((gcSHADER)Kernel->states.binary, gcvNULL, &binarySize),
                CL_OUT_OF_HOST_MEMORY);
     clmONERROR(gcoOS_Allocate(gcvNULL, binarySize, &pointer),
@@ -666,7 +678,6 @@ clfDynamicPatchKernel(
                CL_OUT_OF_HOST_MEMORY);
 
     GetShaderMaxKernelFunctionArgs(kernelBinary) = 0;
-
 
     for (patchDirective = RecompilePatchDirectives;
          patchDirective;
@@ -947,6 +958,7 @@ clfDynamicPatchKernel(
                     clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
 
                     *((gctUINT*)argument->data) = patchDirective->patchValue.longULong->channelCount;
+                    isScalar = patchDirective->patchValue.longULong->channelCount == 1 ? 1 : 0;
                     argument->uniform    = gcUniform1;
                     argument->size       = bytes;
                     argument->set        = gcvTRUE;
@@ -966,12 +978,21 @@ clfDynamicPatchKernel(
         }
     }
 
+#if BUILD_OPENCL_FP
+    if(((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008)) && (reLinkNeed == gcvFALSE))
+    {
+        gcoOS_Allocate(gcvNULL,  numToUpdate * gcmSIZEOF(clsArgument), &orgArgs);
+        gcoOS_MemCopy(orgArgs, *Args, numToUpdate * gcmSIZEOF(clsArgument));
+    }
+#endif
+
     /* Recompile shader */
     gcmASSERT(Kernel->context->platform->compiler11);
     gcSetCLCompiler(Kernel->context->platform->compiler11);
 
     clmONERROR(gcSHADER_DynamicPatch(kernelBinary,
-                                     gcPatchDirective),
+                                     gcPatchDirective,
+                                     isScalar),
                                      CL_OUT_OF_HOST_MEMORY);
 
     gcDestroyPatchDirective(&gcPatchDirective);
@@ -983,12 +1004,41 @@ clfDynamicPatchKernel(
                                CL_OUT_OF_HOST_MEMORY);*/
 
     /* Assume all dead code is removed by optimizer. */
-    clmONERROR(gcLinkKernel(kernelBinary,
-                            gcvSHADER_RESOURCE_USAGE /*| gcvSHADER_DEAD_CODE*/ | gcvSHADER_OPTIMIZER | gcvSHADER_REMOVE_UNUSED_UNIFORMS,
-                            &bufferSize,
-                            &buffer,
-                            &hints),
-                            CL_OUT_OF_RESOURCES);
+    status = gcLinkKernel(kernelBinary,
+                          flags,
+                          &bufferSize,
+                          &buffer,
+                          &hints);
+
+#if BUILD_OPENCL_FP
+    if((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008))
+    {
+        if((status == gcvSTATUS_NOT_FOUND || status == gcvSTATUS_OUT_OF_RESOURCES) && gcmOPT_INLINELEVEL() != 4)
+        {
+            bufferSize = 0;
+            gcSHADER_Destroy(kernelBinary);
+            flags |= gcvSHADER_SET_INLINE_LEVEL_4;
+            gcoOS_Free(gcvNULL, *Args);
+            *Args = orgArgs;
+            *NumArgs = numToUpdate;
+            reLinkNeed = gcvTRUE;
+            goto DoReLink;
+        }
+        if(reLinkNeed == gcvTRUE)
+        {
+            reLinkNeed = gcvFALSE;
+        }
+        else
+        {
+            gcmOS_SAFE_FREE(gcvNULL, orgArgs);
+        }
+    }
+#endif
+
+    if (gcmIS_ERROR(status))
+    {
+        clmRETURN_ERROR(CL_OUT_OF_RESOURCES);
+    }
 
     clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsKernelStates), &pointer),
                CL_OUT_OF_HOST_MEMORY);
@@ -1024,6 +1074,13 @@ OnError:
     {
         gcmOS_SAFE_FREE(gcvNULL, pointer);
     }
+
+#if BUILD_OPENCL_FP
+    if(orgArgs)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, orgArgs);
+    }
+#endif
     return status;
 }
 
@@ -4529,77 +4586,7 @@ gctBOOL gcNeedRecomile64(
 
     return recompile;
 }
-/* To check the vectory size of a type (vec1/2/3/4, 1 means scalar). */
-static
-gctUINT gcGetInstSrcComponentCount(
-    gcSHADER    Shader,
-    gctUINT     Type,
-    gctUINT16   Index,
-    gctUINT     Swizzle
-)
-{
-    gctUINT count = 0;
-    gcSHADER_TYPE   shaderType;
-    gctUINT32       arrayLen = 0;
 
-    switch (Type)
-    {
-    case gcSL_TEMP:
-        {
-            /* For a temp source, always 4. */
-            return 4;
-        }
-        break;
-
-    case gcSL_UNIFORM:
-        {
-            gcUNIFORM   uniform;
-            gcSHADER_GetUniform(Shader, Index, &uniform);
-            gcUNIFORM_GetType(uniform, &shaderType, &arrayLen);
-        }
-        break;
-
-    case gcSL_ATTRIBUTE:
-        {
-            gcATTRIBUTE attrib;
-            gcSHADER_GetAttribute(Shader, Index, &attrib);
-            gcATTRIBUTE_GetType(Shader, attrib, &shaderType, &arrayLen);
-        }
-        break;
-
-    case gcSL_CONSTANT:
-        {
-            /* Per Shuxi, constant is always scalar? */
-            return 1;
-        }
-        break;
-
-    default:
-        gcmASSERT(0);
-        return 0;
-        break;
-    }
-
-    if ((shaderType >= gcSHADER_INT64_X1) &&
-        (shaderType <= gcSHADER_INT64_X4))
-    {
-        count = (gctUINT)(shaderType - gcSHADER_INT64_X1);
-    }
-    else
-    if ((shaderType >= gcSHADER_UINT64_X1) &&
-        (shaderType <= gcSHADER_UINT64_X4))
-    {
-        count = (gctUINT)(shaderType - gcSHADER_UINT64_X1);
-    }
-    else
-    {
-        count = 0;
-        gcmASSERT(0);   /* Only works for long/ulong. */
-    }
-    count *= arrayLen;
-
-    return count;
-}
 #endif
 
 CL_API_ENTRY cl_int CL_API_CALL
@@ -4794,8 +4781,7 @@ clEnqueueNDRangeKernel(
                         patchRealGlobalWorkSize, &patchDirective),
                        CL_INVALID_GLOBAL_WORK_SIZE);
         }
-
-        /* reset the variable for the chips which just support 16 bit global id*/
+        /* for type of globalworksize patch, always do recompile */
         Kernel->isPatched = gcvFALSE;
     }
 
@@ -5075,11 +5061,9 @@ clEnqueueNDRangeKernel(
 #endif
             gctUINT count = 0;
             gctUINT i;
-#if _USE_HW_TEXLD_
             gctUINT vsSamplers = 0, psSamplers = 0;
             gctINT maxSampler = 0, sampler = 0;
-            gcSHADER_KIND shadeType;
-#endif
+            gcSHADER_KIND shadeType = gcSHADER_TYPE_UNKNOWN;
 
             for (i = 0; i < GetKFunctionISamplerCount(kernelFunction); i++)
             {
@@ -5115,35 +5099,36 @@ clEnqueueNDRangeKernel(
                 }
             }
 
-#if _USE_HW_TEXLD_
-            gcmONERROR(
-                gcoHAL_QuerySamplerBase(gcvNULL,
-                                        &vsSamplers,
-                                        gcvNULL,
-                                        &psSamplers,
-                                        gcvNULL));
-
-            /* Determine starting sampler index. */
-            shadeType = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_CL_PS_WALKER)
-                ? GetShaderType(kernelBinary) : gcSHADER_TYPE_VERTEX;
-
-            if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SAMPLER_BASE_OFFSET))
+            if (CommandQueue->device->deviceInfo.computeOnlyGpu != gcvTRUE)  /*use texld*/
             {
-                sampler = 0;
-            }
-            else
-            {
-                sampler = (shadeType == gcSHADER_TYPE_VERTEX)
-                        ? psSamplers
-                        : 0;
-            }
+                gcmONERROR(
+                    gcoHAL_QuerySamplerBase(gcvNULL,
+                                            &vsSamplers,
+                                            gcvNULL,
+                                            &psSamplers,
+                                            gcvNULL));
 
-            /* Determine maximum sampler index. */
-            /* Note that CL kernel can use all samplers if unified. */
-            maxSampler = (shadeType == gcSHADER_TYPE_FRAGMENT)
-                       ? psSamplers
-                       : psSamplers + vsSamplers;
-#endif
+                /* Determine starting sampler index. */
+                shadeType = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_CL_PS_WALKER)
+                    ? GetShaderType(kernelBinary) : gcSHADER_TYPE_VERTEX;
+
+                if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SAMPLER_BASE_OFFSET))
+                {
+                    sampler = 0;
+                }
+                else
+                {
+                    sampler = (shadeType == gcSHADER_TYPE_VERTEX)
+                            ? psSamplers
+                            : 0;
+                }
+
+                /* Determine maximum sampler index. */
+                /* Note that CL kernel can use all samplers if unified. */
+                maxSampler = (shadeType == gcSHADER_TYPE_FRAGMENT)
+                           ? psSamplers
+                           : psSamplers + vsSamplers;
+            }
 
             for (i = 0; i < GetKFunctionISamplerCount(kernelFunction); i++)
             {
@@ -5165,10 +5150,8 @@ clEnqueueNDRangeKernel(
                     clsMem_PTR              image;
                     clsImageHeader_PTR      imageHeader;
                     gctUINT                 samplerValue;
-#if _USE_HW_TEXLD_
                     cleSAMPLER              normalizedMode;
                     cleSAMPLER              filterMode;
-#endif
                     gctUINT                 channelDataType;
                     gctUINT                 channelOrder;
 
@@ -5198,39 +5181,40 @@ clEnqueueNDRangeKernel(
                     {
                         samplerValue = *((gctUINT *) NDRangeKernel->args[GetImageSamplerType(imageSampler)].data);
                     }
-#if _USE_HW_TEXLD_
-                    normalizedMode = samplerValue & CLK_NORMALIZED_COORDS_TRUE;
-                    filterMode  = samplerValue & 0xF00;
-
-                    /* Check channel data type. */
-                    /* TODO - gc4000 can handle more data types. */
-                    if ((sampler < maxSampler) &&
-                        (channelDataType == CL_UNORM_INT8))
+                    if (CommandQueue->device->deviceInfo.computeOnlyGpu != gcvTRUE)  /*use texld*/
                     {
-                        arg->needImageSampler = gcvTRUE;
-                        arg->image            = image;
-                        arg->samplerValue     = samplerValue;
+                        normalizedMode = samplerValue & CLK_NORMALIZED_COORDS_TRUE;
+                        filterMode  = samplerValue & 0xF00;
 
-                        if ((image->type != CL_MEM_OBJECT_IMAGE3D)
-#if BUILD_OPENCL_12
-                            &&
-                            (image->type != CL_MEM_OBJECT_IMAGE2D_ARRAY)
-                            &&
-                            (image->type != CL_MEM_OBJECT_IMAGE1D_ARRAY)
-#endif
-                            )
+                        /* Check channel data type. */
+                        /* TODO - gc4000 can handle more data types. */
+                        if ((sampler < maxSampler) &&
+                            (channelDataType == CL_UNORM_INT8))
                         {
-                            /* Check filter mode and normalized mode. */
-                            if ((filterMode == CLK_FILTER_NEAREST) &&
-                                (normalizedMode == CLK_NORMALIZED_COORDS_TRUE) &&
-                                ((shadeType != gcSHADER_TYPE_VERTEX) || (samplerValue & 0xF) != CLK_ADDRESS_CLAMP))
+                            arg->needImageSampler = gcvTRUE;
+                            arg->image            = image;
+                            arg->samplerValue     = samplerValue;
+
+                            if ((image->type != CL_MEM_OBJECT_IMAGE3D)
+#if BUILD_OPENCL_12
+                                &&
+                                (image->type != CL_MEM_OBJECT_IMAGE2D_ARRAY)
+                                &&
+                                (image->type != CL_MEM_OBJECT_IMAGE1D_ARRAY)
+#endif
+                                )
                             {
-                                ++sampler;
-                                continue;
+                                /* Check filter mode and normalized mode. */
+                                if ((filterMode == CLK_FILTER_NEAREST) &&
+                                    (normalizedMode == CLK_NORMALIZED_COORDS_TRUE) &&
+                                    ((shadeType != gcSHADER_TYPE_VERTEX) || (samplerValue & 0xF) != CLK_ADDRESS_CLAMP))
+                                {
+                                    ++sampler;
+                                    continue;
+                                }
                             }
                         }
                     }
-#endif
 
                     /* Use SW function to replace texld. */
                     arg->needImageSampler = gcvFALSE;
@@ -5282,6 +5266,26 @@ clEnqueueNDRangeKernel(
 
         NDRangeKernel->states = Kernel->patchedStates;
         Kernel->isPatched = gcvTRUE;
+        if((Kernel->states.hints == gcvNULL) && (Kernel->patchedStates->hints != gcvNULL))
+        {
+            Kernel->states.hints = Kernel->patchedStates->hints;
+            if (Kernel->states.hints->threadWalkerInPS)
+            {
+                Kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, Kernel->states.hints->fsMaxTemp)) *
+                    4 * Kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+            }
+            else
+            {
+                Kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, Kernel->states.hints->vsMaxTemp)) *
+                                        4 * Kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+            }
+
+            /* maxWorkGroupSize should not over the device's maxWorkGroupSize. */
+            if (Kernel->maxWorkGroupSize > Kernel->program->devices[0]->deviceInfo.maxWorkGroupSize)
+            {
+                Kernel->maxWorkGroupSize = Kernel->program->devices[0]->deviceInfo.maxWorkGroupSize;
+            }
+        }
     }
     else if(patchDirective && (Kernel->isPatched == gcvTRUE))
     {

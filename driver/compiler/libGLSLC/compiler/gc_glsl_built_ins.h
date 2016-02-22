@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -23,7 +23,8 @@
 gceSTATUS
 slLoadBuiltIns(
     IN sloCOMPILER Compiler,
-    IN sleSHADER_TYPE ShaderType
+    IN sleSHADER_TYPE ShaderType,
+    IN gctBOOL LoadPrecisionOnly
     );
 
 gceSTATUS
@@ -57,6 +58,19 @@ slGenBuiltInFunctionCode(
     IN slsGEN_CODE_PARAMETERS * OperandsParameters,
     IN slsIOPERAND * IOperand,
     IN OUT slsGEN_CODE_PARAMETERS * Parameters
+    );
+
+gceSTATUS
+slConstructIVEC2Array4(
+    IN sloCOMPILER Compiler,
+    OUT slsDATA_TYPE** DataType
+    );
+
+gceSTATUS
+slFuncCheckForInterpolate(
+    IN sloCOMPILER Compiler,
+    IN struct _slsNAME * FuncName,
+    IN struct _sloIR_POLYNARY_EXPR * PolynaryExpr
     );
 
 #endif /* __gc_glsl_built_ins_h_ */

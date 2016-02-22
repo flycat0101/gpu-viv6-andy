@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -1076,11 +1076,11 @@ gckEVENT_AddList(
 
     case gcvHAL_FREE_VIRTUAL_COMMAND_BUFFER:
         buffer = (gckVIRTUAL_COMMAND_BUFFER_PTR)gcmNAME_TO_PTR(Interface->u.FreeVirtualCommandBuffer.physical);
-        if (buffer != gcvNULL && buffer->userLogical)
+        if (buffer != gcvNULL && buffer->virtualBuffer.userLogical)
         {
             gcmkONERROR(gckOS_DestroyUserVirtualMapping(
                             Event->os,
-                            buffer->physical,
+                            buffer->virtualBuffer.physical,
                             (gctSIZE_T) Interface->u.FreeVirtualCommandBuffer.bytes,
                             gcmUINT64_TO_PTR(Interface->u.FreeVirtualCommandBuffer.logical)));
         }
@@ -1477,7 +1477,8 @@ OnError:
 gceSTATUS
 gckEVENT_CommitDone(
     IN gckEVENT Event,
-    IN gceKERNEL_WHERE FromWhere
+    IN gceKERNEL_WHERE FromWhere,
+    IN gckCONTEXT Context
     )
 {
     gceSTATUS status;
@@ -1489,6 +1490,8 @@ gckEVENT_CommitDone(
     gcmkVERIFY_OBJECT(Event, gcvOBJ_EVENT);
 
     iface.command = gcvHAL_COMMIT_DONE;
+
+    iface.u.CommitDone.context = gcmPTR_TO_UINT64(Context);
 
     /* Append it to the queue. */
     gcmkONERROR(gckEVENT_AddList(Event, &iface, FromWhere, gcvFALSE, gcvTRUE));
@@ -1706,6 +1709,8 @@ gckEVENT_Submit(
 #if !gcdNULL_DRIVER
     gctUINT32 bytes;
     gctPOINTER buffer;
+    gctUINT32 executeBytes;
+    gctUINT32 flushBytes;
 #endif
 
 #if gcdINTERRUPT_STATISTIC
@@ -1716,8 +1721,6 @@ gckEVENT_Submit(
     gctPOINTER reservedBuffer;
 #endif
 
-    gctUINT32 flushBytes;
-    gctUINT32 executeBytes;
     gckHARDWARE hardware;
 
     gceKERNEL_FLUSH flush = gcvFALSE;
@@ -2358,9 +2361,11 @@ gckEVENT_Notify(
 
         if ((pending & 0x40000000) && Event->kernel->hardware->mmuVersion)
         {
+#if gcdUSE_MMU_EXCEPTION
             gckHARDWARE_DumpMMUException(Event->kernel->hardware);
 
             gckHARDWARE_DumpGPUState(Event->kernel->hardware);
+#endif
 
             pending &= 0xBFFFFFFF;
         }
@@ -2770,6 +2775,15 @@ gckEVENT_Notify(
 #endif
 
             case gcvHAL_COMMIT_DONE:
+                if (kernel->hardware->gpuProfiler == gcvTRUE
+                  && kernel->profileEnable == gcvTRUE
+                )
+                {
+                    gckHARDWARE_UpdateContextProfile(
+                        kernel->hardware,
+                        gcmUINT64_TO_PTR(record->info.u.CommitDone.context)
+                        );
+                }
                 break;
 
             default:
@@ -3021,6 +3035,19 @@ gckEVENT_Stop(
     gcmkONERROR(gckHARDWARE_End(
         Event->kernel->hardware, Logical, waitSize
         ));
+
+#if USE_KERNEL_VIRTUAL_BUFFERS
+    if (Event->kernel->virtualCommandBuffer)
+    {
+        gcmkONERROR(gckKERNEL_GetGPUAddress(
+            Event->kernel,
+            Logical,
+            gcvFALSE,
+            Event->kernel->command->virtualMemory,
+            &Event->kernel->hardware->lastEnd
+            ));
+    }
+#endif
 
 #if gcdNONPAGED_MEMORY_CACHEABLE
     /* Flush the cache for the END. */

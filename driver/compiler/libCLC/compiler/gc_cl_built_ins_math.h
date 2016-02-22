@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -650,6 +650,7 @@ _GenFullProfileRootnCode(
    /*Now normal case. x != 0, x != Inf, x != Nan, (y > 0), x > 0 || (x<0 && y Odd) */
 
     /* r7 = 1/r0, precise enough*/
+        intermROperands[0].dataType.elementType = clvTYPE_FLOAT;
         status = clGenGenericCode1(Compiler,
                 PolynaryExpr->exprBase.base.lineNo,
                 PolynaryExpr->exprBase.base.stringNo,
@@ -2315,7 +2316,7 @@ _GenSinCode(
                        tempRegIndex,
                        gcvNULL);
     for(i = 0; i<7; i++){
-        clsIOPERAND_Initialize(&intermIOperands[20+i], clmGenCodeDataType(T_UINT), tempRegIndex + (gctREG_INDEX)i);
+        clsIOPERAND_Initialize(Compiler, &intermIOperands[20+i], clmGenCodeDataType(T_UINT), tempRegIndex + (gctREG_INDEX)i);
     }
     for(i = 5; i>=1; i--){
         /* Not (MulHi)*/
@@ -2431,10 +2432,11 @@ _GenSinCode(
 
 
     /* get index */
-    clsROPERAND_InitializeTempReg(&regROperand,
-                              clvQUALIFIER_NONE,
-                              clmGenCodeDataType(T_UINT),
-                              tempRegIndex);
+    clsROPERAND_InitializeTempReg(Compiler,
+                                  &regROperand,
+                                  clvQUALIFIER_NONE,
+                                  clmGenCodeDataType(T_UINT),
+                                  tempRegIndex);
 
     wordRegIndex = wordStartIOperand.tempRegIndex;
     regROperand.arrayIndex.mode = clvINDEX_REG;
@@ -2520,10 +2522,11 @@ _GenSinCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* shift the next word of the six segments */
-    clsROPERAND_InitializeTempReg(&regTwoROperand,
-                              clvQUALIFIER_NONE,
-                              clmGenCodeDataType(T_UINT),
-                              tempRegIndex);
+    clsROPERAND_InitializeTempReg(Compiler,
+                                  &regTwoROperand,
+                                  clvQUALIFIER_NONE,
+                                  clmGenCodeDataType(T_UINT),
+                                  tempRegIndex);
 
 
     wordRegTwoIndex = wordStartTwoIOperand.tempRegIndex;
@@ -2811,10 +2814,11 @@ _GenSinCode(
     clsROPERAND_InitializeUsingIOperand(&reducedROperand, &reducedIOperand);
 
     /* get index */
-    clsROPERAND_InitializeTempReg(&regThreeROperand,
-                              clvQUALIFIER_NONE,
-                              clmGenCodeDataType(T_UINT),
-                              tempRegIndex);
+    clsROPERAND_InitializeTempReg(Compiler,
+                                  &regThreeROperand,
+                                  clvQUALIFIER_NONE,
+                                  clmGenCodeDataType(T_UINT),
+                                  tempRegIndex);
 
     wordRegThreeIndex = wordStartThreeIOperand.tempRegIndex;
     regThreeROperand.arrayIndex.mode = clvINDEX_REG;
@@ -2899,10 +2903,11 @@ _GenSinCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* shift the next word of the six segments */
-    clsROPERAND_InitializeTempReg(&regFourROperand,
-                              clvQUALIFIER_NONE,
-                              clmGenCodeDataType(T_UINT),
-                              tempRegIndex);
+    clsROPERAND_InitializeTempReg(Compiler,
+                                  &regFourROperand,
+                                  clvQUALIFIER_NONE,
+                                  clmGenCodeDataType(T_UINT),
+                                  tempRegIndex);
 
     wordRegFourIndex = wordStartFourIOperand.tempRegIndex;
     regFourROperand.arrayIndex.mode = clvINDEX_REG;
@@ -4413,7 +4418,7 @@ _GenCosCode(
                        tempRegIndex,
                        gcvNULL);
     for(i = 0; i<7; i++){
-        clsIOPERAND_Initialize(&intermIOperands[20+i], clmGenCodeDataType(T_UINT), tempRegIndex + (gctREG_INDEX)i);
+        clsIOPERAND_Initialize(Compiler, &intermIOperands[20+i], clmGenCodeDataType(T_UINT), tempRegIndex + (gctREG_INDEX)i);
     }
     for(i = 5; i>=1; i--){
         /* Not (MulHi)*/
@@ -4529,10 +4534,11 @@ _GenCosCode(
 
 
     /* get index */
-    clsROPERAND_InitializeTempReg(&regROperand,
-                              clvQUALIFIER_NONE,
-                              clmGenCodeDataType(T_UINT),
-                              tempRegIndex);
+    clsROPERAND_InitializeTempReg(Compiler,
+                                  &regROperand,
+                                  clvQUALIFIER_NONE,
+                                  clmGenCodeDataType(T_UINT),
+                                  tempRegIndex);
 
     wordRegIndex = wordStartIOperand.tempRegIndex;
     regROperand.arrayIndex.mode = clvINDEX_REG;
@@ -4618,10 +4624,11 @@ _GenCosCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* shift the next word of the six segments */
-    clsROPERAND_InitializeTempReg(&regTwoROperand,
-                              clvQUALIFIER_NONE,
-                              clmGenCodeDataType(T_UINT),
-                              tempRegIndex);
+    clsROPERAND_InitializeTempReg(Compiler,
+                                  &regTwoROperand,
+                                  clvQUALIFIER_NONE,
+                                  clmGenCodeDataType(T_UINT),
+                                  tempRegIndex);
 
 
     wordRegTwoIndex = wordStartTwoIOperand.tempRegIndex;
@@ -4922,10 +4929,11 @@ _GenCosCode(
     clsROPERAND_InitializeUsingIOperand(&reducedROperand, &reducedIOperand);
 
     /* get index */
-    clsROPERAND_InitializeTempReg(&regThreeROperand,
-                              clvQUALIFIER_NONE,
-                              clmGenCodeDataType(T_UINT),
-                              tempRegIndex);
+    clsROPERAND_InitializeTempReg(Compiler,
+                                  &regThreeROperand,
+                                  clvQUALIFIER_NONE,
+                                  clmGenCodeDataType(T_UINT),
+                                  tempRegIndex);
 
     wordRegThreeIndex = wordStartThreeIOperand.tempRegIndex;
     regThreeROperand.arrayIndex.mode = clvINDEX_REG;
@@ -5010,10 +5018,11 @@ _GenCosCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* shift the next word of the six segments */
-    clsROPERAND_InitializeTempReg(&regFourROperand,
-                              clvQUALIFIER_NONE,
-                              clmGenCodeDataType(T_UINT),
-                              tempRegIndex);
+    clsROPERAND_InitializeTempReg(Compiler,
+                                  &regFourROperand,
+                                  clvQUALIFIER_NONE,
+                                  clmGenCodeDataType(T_UINT),
+                                  tempRegIndex);
 
     wordRegFourIndex = wordStartFourIOperand.tempRegIndex;
     regFourROperand.arrayIndex.mode = clvINDEX_REG;
@@ -6515,7 +6524,7 @@ _GenSinCosCode(
                        tempRegIndex,
                        gcvNULL);
     for(i = 0; i<7; i++){
-        clsIOPERAND_Initialize(&intermIOperands[20+i], clmGenCodeDataType(T_UINT), tempRegIndex + (gctREG_INDEX)i);
+        clsIOPERAND_Initialize(Compiler, &intermIOperands[20+i], clmGenCodeDataType(T_UINT), tempRegIndex + (gctREG_INDEX)i);
     }
     for(i = 5; i>=1; i--){
         /* Not (MulHi)*/
@@ -6631,10 +6640,11 @@ _GenSinCosCode(
 
 
     /* get index */
-    clsROPERAND_InitializeTempReg(&regROperand,
-                              clvQUALIFIER_NONE,
-                              clmGenCodeDataType(T_UINT),
-                              tempRegIndex);
+    clsROPERAND_InitializeTempReg(Compiler,
+                                  &regROperand,
+                                  clvQUALIFIER_NONE,
+                                  clmGenCodeDataType(T_UINT),
+                                  tempRegIndex);
 
     wordRegIndex = wordStartIOperand.tempRegIndex;
     regROperand.arrayIndex.mode = clvINDEX_REG;
@@ -6720,10 +6730,11 @@ _GenSinCosCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* shift the next word of the six segments */
-    clsROPERAND_InitializeTempReg(&regTwoROperand,
-                              clvQUALIFIER_NONE,
-                              clmGenCodeDataType(T_UINT),
-                              tempRegIndex);
+    clsROPERAND_InitializeTempReg(Compiler,
+                                  &regTwoROperand,
+                                  clvQUALIFIER_NONE,
+                                  clmGenCodeDataType(T_UINT),
+                                  tempRegIndex);
 
 
     wordRegTwoIndex = wordStartTwoIOperand.tempRegIndex;
@@ -7003,10 +7014,11 @@ _GenSinCosCode(
     clsROPERAND_InitializeUsingIOperand(&reducedROperand, &reducedIOperand);
 
     /* get index */
-    clsROPERAND_InitializeTempReg(&regThreeROperand,
-                              clvQUALIFIER_NONE,
-                              clmGenCodeDataType(T_UINT),
-                              tempRegIndex);
+    clsROPERAND_InitializeTempReg(Compiler,
+                                  &regThreeROperand,
+                                  clvQUALIFIER_NONE,
+                                  clmGenCodeDataType(T_UINT),
+                                  tempRegIndex);
 
     wordRegThreeIndex = wordStartThreeIOperand.tempRegIndex;
     regThreeROperand.arrayIndex.mode = clvINDEX_REG;
@@ -7073,10 +7085,11 @@ _GenSinCosCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* shift the next word of the six segments */
-    clsROPERAND_InitializeTempReg(&regFourROperand,
-                              clvQUALIFIER_NONE,
-                              clmGenCodeDataType(T_UINT),
-                              tempRegIndex);
+    clsROPERAND_InitializeTempReg(Compiler,
+                                  &regFourROperand,
+                                  clvQUALIFIER_NONE,
+                                  clmGenCodeDataType(T_UINT),
+                                  tempRegIndex);
 
     wordRegFourIndex = wordStartFourIOperand.tempRegIndex;
     regFourROperand.arrayIndex.mode = clvINDEX_REG;
@@ -8294,7 +8307,7 @@ _GenTanCode(
                        tempRegIndex,
                        gcvNULL);
     for(i = 0; i<7; i++){
-        clsIOPERAND_Initialize(&intermIOperands[20+i], clmGenCodeDataType(T_UINT), tempRegIndex + (gctREG_INDEX)i);
+        clsIOPERAND_Initialize(Compiler, &intermIOperands[20+i], clmGenCodeDataType(T_UINT), tempRegIndex + (gctREG_INDEX)i);
     }
     for(i = 5; i>=1; i--){
         /* Not (MulHi)*/
@@ -8410,10 +8423,11 @@ _GenTanCode(
 
 
     /* get index */
-    clsROPERAND_InitializeTempReg(&regROperand,
-                              clvQUALIFIER_NONE,
-                              clmGenCodeDataType(T_UINT),
-                              tempRegIndex);
+    clsROPERAND_InitializeTempReg(Compiler,
+                                  &regROperand,
+                                  clvQUALIFIER_NONE,
+                                  clmGenCodeDataType(T_UINT),
+                                  tempRegIndex);
 
     wordRegIndex = wordStartIOperand.tempRegIndex;
     regROperand.arrayIndex.mode = clvINDEX_REG;
@@ -8499,10 +8513,11 @@ _GenTanCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* shift the next word of the six segments */
-    clsROPERAND_InitializeTempReg(&regTwoROperand,
-                              clvQUALIFIER_NONE,
-                              clmGenCodeDataType(T_UINT),
-                              tempRegIndex);
+    clsROPERAND_InitializeTempReg(Compiler,
+                                  &regTwoROperand,
+                                  clvQUALIFIER_NONE,
+                                  clmGenCodeDataType(T_UINT),
+                                  tempRegIndex);
 
 
     wordRegTwoIndex = wordStartTwoIOperand.tempRegIndex;
@@ -8790,10 +8805,11 @@ _GenTanCode(
     clsROPERAND_InitializeUsingIOperand(&reducedROperand, &reducedIOperand);
 
     /* get index */
-    clsROPERAND_InitializeTempReg(&regThreeROperand,
-                              clvQUALIFIER_NONE,
-                              clmGenCodeDataType(T_UINT),
-                              tempRegIndex);
+    clsROPERAND_InitializeTempReg(Compiler,
+                                  &regThreeROperand,
+                                  clvQUALIFIER_NONE,
+                                  clmGenCodeDataType(T_UINT),
+                                  tempRegIndex);
 
     wordRegThreeIndex = wordStartThreeIOperand.tempRegIndex;
     regThreeROperand.arrayIndex.mode = clvINDEX_REG;
@@ -8878,10 +8894,11 @@ _GenTanCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* shift the next word of the six segments */
-    clsROPERAND_InitializeTempReg(&regFourROperand,
-                              clvQUALIFIER_NONE,
-                              clmGenCodeDataType(T_UINT),
-                              tempRegIndex);
+    clsROPERAND_InitializeTempReg(Compiler,
+                                  &regFourROperand,
+                                  clvQUALIFIER_NONE,
+                                  clmGenCodeDataType(T_UINT),
+                                  tempRegIndex);
 
     wordRegFourIndex = wordStartFourIOperand.tempRegIndex;
     regFourROperand.arrayIndex.mode = clvINDEX_REG;
@@ -9302,6 +9319,7 @@ _GenTanCode(
                  &oneIntROperand);
 
         /*region = 1, 2, 5, 6, calculate reciprocal */
+        intermROperands[10].dataType.elementType = clvTYPE_FLOAT;
         status = clGenGenericCode1(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,
@@ -11722,6 +11740,7 @@ _GenAtanCode(
             if (gcmIS_ERROR(status)) return status;
 
             /* rcp for x */
+            OperandsParameters[0].rOperands[0].dataType.elementType = clvTYPE_FLOAT;
             status = clGenGenericCode1(Compiler,
                                     PolynaryExpr->exprBase.base.lineNo,
                                     PolynaryExpr->exprBase.base.stringNo,
@@ -11776,7 +11795,7 @@ _GenAtanCode(
 
             /* rcp for x */
             clsIOPERAND_New(Compiler, &switchIntermIOperand[0], clmGenCodeDataType(T_FLOAT));
-
+            OperandsParameters[0].rOperands[0].dataType.elementType = clvTYPE_FLOAT;
             status = clGenGenericCode1(Compiler,
                                     PolynaryExpr->exprBase.base.lineNo,
                                     PolynaryExpr->exprBase.base.stringNo,
@@ -13435,7 +13454,7 @@ _GenSinhCode(
         /* rcp e^x */
         clsIOPERAND_New(Compiler, &intermIOperands[19], clmGenCodeDataType(T_FLOAT));
         clsROPERAND_InitializeUsingIOperand(&intermROperands[11], &intermIOperands[11]);
-
+        intermROperands[11].dataType.elementType = clvTYPE_FLOAT;
         status = clGenGenericCode1(Compiler,
                                         PolynaryExpr->exprBase.base.lineNo,
                                         PolynaryExpr->exprBase.base.stringNo,
@@ -14043,7 +14062,7 @@ _GenCoshCode(
         /* rcp e^x */
         clsIOPERAND_New(Compiler, &intermIOperands[19], clmGenCodeDataType(T_FLOAT));
         clsROPERAND_InitializeUsingIOperand(&intermROperands[11], &intermIOperands[11]);
-
+        intermROperands[11].dataType.elementType = clvTYPE_FLOAT;
         status = clGenGenericCode1(Compiler,
                                         PolynaryExpr->exprBase.base.lineNo,
                                         PolynaryExpr->exprBase.base.stringNo,
@@ -14587,6 +14606,7 @@ _GenTanhCode(
                         &constantROperand);
 
         /*r2 = rcp(r0) */
+        intermROperands[0].dataType.elementType = clvTYPE_FLOAT;
         status = clGenGenericCode1(
                             Compiler,
                             PolynaryExpr->exprBase.base.lineNo,
@@ -16549,7 +16569,7 @@ _GenAtanhCode(
     /* inverse result */
     clsIOPERAND_New(Compiler, &intermIOperands[1], clmGenCodeDataType(T_FLOAT));
     clsROPERAND_InitializeUsingIOperand(&intermROperands[0], &intermIOperands[0]);
-
+    intermROperands[0].dataType.elementType = clvTYPE_FLOAT;
     status = clGenGenericCode1(
                             Compiler,
                             PolynaryExpr->exprBase.base.lineNo,
@@ -17765,6 +17785,7 @@ _GenTanPiCode(
                                         &intermROperands[1],
                                         &intermROperands[3]);
         /*Reciprocal r1 = 1/r2 */
+        intermROperands[2].dataType.elementType = clvTYPE_FLOAT;
         status = clGenGenericCode1(Compiler,
                 PolynaryExpr->exprBase.base.lineNo,
                 PolynaryExpr->exprBase.base.stringNo,
@@ -20289,7 +20310,11 @@ _GenPowCode(
                         &OperandsParameters[1].rOperands[0]);
 
 
-
+                intermROperands[1].dataType.elementType = clvTYPE_FLOAT;
+                intermROperands[4].dataType.elementType = clvTYPE_FLOAT;
+                intermIOperands[4].dataType.elementType = clvTYPE_FLOAT;
+                intermIOperands[5].dataType.elementType = clvTYPE_FLOAT;
+                intermROperands[5].dataType.elementType = clvTYPE_FLOAT;
                 /* r4 = floor(|y|) */
                 status = clGenGenericCode1(
                             Compiler,
@@ -20302,10 +20327,7 @@ _GenPowCode(
                 if (gcmIS_ERROR(status)) return status;
 
                 /*r5 = |y| - floor(|Y|) */
-                intermROperands[1].dataType.elementType = clvTYPE_FLOAT;
-                intermROperands[4].dataType.elementType = clvTYPE_FLOAT;
-                intermIOperands[5].dataType.elementType = clvTYPE_FLOAT;
-                intermROperands[5].dataType.elementType = clvTYPE_FLOAT;
+
                 status = clGenArithmeticExprCode(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,
@@ -21858,6 +21880,7 @@ _GenRootnCode(
 
 
     /* r7 = 1/r0, a quick estimation*/
+        intermROperands[0].dataType.elementType = clvTYPE_FLOAT;
         status = clGenGenericCode1(Compiler,
                 PolynaryExpr->exprBase.base.lineNo,
                 PolynaryExpr->exprBase.base.stringNo,
@@ -24507,6 +24530,7 @@ _GenNativeInverseCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
+    OperandsParameters[0].rOperands[0].dataType.elementType = clvTYPE_FLOAT;
     status = clGenGenericCode1(Compiler,
                     PolynaryExpr->exprBase.base.lineNo,
                     PolynaryExpr->exprBase.base.stringNo,
@@ -26178,7 +26202,11 @@ _GenModCode(
     clsIOPERAND_New(Compiler, &intermIOperands[2], clmGenCodeDataType(T_FLOAT));
     clsROPERAND_InitializeUsingIOperand(&intermROperands[1], &intermIOperands[1]);
 
+    /* The data type should be FLOAT. */
+    intermROperands[1].dataType.elementType = clvTYPE_FLOAT;
+
     /*r2 = 1/r1, float approx. of (1<<32)/y */
+    intermROperands[1].dataType.elementType = clvTYPE_FLOAT;
     status = clGenGenericCode1(Compiler,
                 LineNo,
                 StringNo,
@@ -27658,6 +27686,7 @@ _GenFModCode(
     clsROPERAND_InitializeUsingIOperand(&intermROperands[3], &intermIOperands[3]);
 
     /*r3 = 1/r2, float approx. of (1<<52)/Mantissa(y) */
+    intermROperands[2].dataType.elementType = clvTYPE_FLOAT;
     status = clGenGenericCode1(Compiler,
                 PolynaryExpr->exprBase.base.lineNo,
                 PolynaryExpr->exprBase.base.stringNo,
@@ -28768,6 +28797,7 @@ _GenRemainderCode(
     clsROPERAND_InitializeUsingIOperand(&intermROperands[3], &intermIOperands[3]);
 
     /*r3 = 1/r2, float approx. of (1<<52)/Mantissa(y) */
+    intermROperands[2].dataType.elementType = clvTYPE_FLOAT;
     status = clGenGenericCode1(Compiler,
                 PolynaryExpr->exprBase.base.lineNo,
                 PolynaryExpr->exprBase.base.stringNo,
@@ -30047,6 +30077,7 @@ _GenRemquoCode(
     clsROPERAND_InitializeUsingIOperand(&intermROperands[3], &intermIOperands[3]);
 
     /*r3 = 1/r2, float approx. of (1<<52)/Mantissa(y) */
+    intermROperands[2].dataType.elementType = clvTYPE_FLOAT;
     status = clGenGenericCode1(Compiler,
                 PolynaryExpr->exprBase.base.lineNo,
                 PolynaryExpr->exprBase.base.stringNo,
@@ -30068,7 +30099,6 @@ _GenRemquoCode(
                 &intermIOperands[4],
                 &intermROperands[3]);
     if (gcmIS_ERROR(status)) return status;
-    intermROperands[2].dataType.elementType = clvTYPE_FLOAT;
 
     clsIOPERAND_New(Compiler, &intermIOperands[5], clmGenCodeDataType(T_UINT));
     clsROPERAND_InitializeUsingIOperand(&intermROperands[5], &intermIOperands[5]);
@@ -33699,6 +33729,7 @@ _GenGammaCode(
             );
 
             /*Gamma(x) = Gamma(x + n)/((x+n-1)*...*x) */
+    intermROperands[2].dataType.elementType = clvTYPE_FLOAT;
     clGenGenericCode1(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,
@@ -34609,6 +34640,7 @@ _GenErfcCode(
                 &oneROperand,
                 &intermROperands[0]);
 
+    intermROperands[1].dataType.elementType = clvTYPE_FLOAT;
     status = clGenGenericCode1(Compiler,
                 PolynaryExpr->exprBase.base.lineNo,
                 PolynaryExpr->exprBase.base.stringNo,

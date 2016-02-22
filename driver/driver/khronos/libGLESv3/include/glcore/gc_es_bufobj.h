@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -131,6 +131,8 @@ typedef struct __GLbufferObjectMachineRec
     __GLbitmask bindingDirties[__GL_MAX_BUFFER_INDEX];
 
 } __GLbufferObjectMachine;
+
+extern GLboolean __glDeleteBufferObject(__GLcontext *gc, __GLbufferObject *bufObj);
 
 #endif /* __gc_gl_bufobj_h__ */
 

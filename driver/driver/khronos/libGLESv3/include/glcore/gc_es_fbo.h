@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -89,23 +89,17 @@ typedef struct __GLfboAttachPointRec
     GLint       level;
     GLint       face;
     GLint       layer;
+    GLint       slice; /* Same as face if cube map, and layer otherwise. */
+
     /* Below two just for GL_EXT_multisampled_render_to_texture */
     GLsizei     samples;
     GLsizei     samplesUsed;
-
-    /* chosenFace is arrayIndex for cubemap, 2d arrray.
-    ** for cubemap array, it's layer-face number.
-    */
-    GLint       chosenFace;
-    GLint       chosenDepth;
 
     GLboolean   layered;
     GLboolean   cube;   /* Is cube texture attached? */
     GLboolean   isExtMode;   /* Indicate extension func call*/
 
-
     GLuint      seqNumber;
-
 } __GLfboAttachPoint;
 
 /*
@@ -199,6 +193,7 @@ typedef struct __GLframebufferObjectRec
     GLint defaultWidth;
     GLint defaultHeight;
     GLint defaultSamples;
+    GLint defaultSamplesUsed;
     GLboolean defaultFixedSampleLoc;
     GLint defaultLayers;
 

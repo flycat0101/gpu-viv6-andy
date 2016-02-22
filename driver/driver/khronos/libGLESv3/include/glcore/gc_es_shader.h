@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -265,7 +265,10 @@ typedef struct __GLshaderProgramMachineRec
     /* Current bound program pipeline objects */
     __GLprogramPipelineObject  *boundPPO;
 
-    /* Active stage programs determined at draw time */
+    /* Active stage programs determined at draw time.
+    ** Attention: NOT to access them outside draw/dispatch APIs, since the program may be
+    **            deleted, while this field have no chance to be reset and left wild.
+    */
     __GLprogramObject          *activeProgObjs[__GLSL_STAGE_LAST];
 
     /* Dirty flag to indicate which sampler's mapped tex unit was changed. Used when validate samplers. */

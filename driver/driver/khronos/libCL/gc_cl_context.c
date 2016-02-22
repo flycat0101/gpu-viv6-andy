@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -36,6 +36,8 @@ clCreateContext(
     gctPOINTER      pointer = gcvNULL;
     gctINT          status;
     gctUINT         i;
+    gceCHIPMODEL  chipModel;
+    gctUINT32 chipRevision;
 
     gcmHEADER_ARG("Properties=0x%x NumDevices=%u Devices=0x%x",
                   Properties, NumDevices, Devices);
@@ -221,6 +223,12 @@ clCreateContext(
     gcmFOOTER_ARG("0x%x *ErrcodeRet=%d",
                   context, gcmOPT_VALUE(ErrcodeRet));
 
+    gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
+    if((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008))
+    {
+        gcoHAL_SetTimeOut(gcvNULL, 1200*gcdGPU_TIMEOUT);
+    }
+
     return context;
 
 OnError:
@@ -338,6 +346,8 @@ clReleaseContext(
 {
     gctINT          status;
     gctINT32        oldReference;
+    gceCHIPMODEL  chipModel;
+    gctUINT32 chipRevision;
 
     gcmHEADER_ARG("Context=0x%x", Context);
 
@@ -407,6 +417,12 @@ clReleaseContext(
 
         /* Free context. */
         gcoOS_Free(gcvNULL, Context);
+    }
+
+    gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
+    if((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008))
+    {
+        gcoHAL_SetTimeOut(gcvNULL, gcdGPU_TIMEOUT);
     }
 
     gcmFOOTER_ARG("%d", CL_SUCCESS);

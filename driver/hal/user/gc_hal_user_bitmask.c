@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -24,8 +24,8 @@
 typedef struct _gcsBITMASKFUNCS
 {
     gctBOOL (*test) (gcsBITMASK_PTR Bitmask, gctUINT32 Loc);
-    void    (*or) (gcsBITMASK_PTR Bitmask, gctUINT32 Loc);
-    void    (*or2)(gcsBITMASK_PTR BitmaskResult, gcsBITMASK_PTR Bitmask1, gcsBITMASK_PTR Bitmask2);
+    void    (*set) (gcsBITMASK_PTR Bitmask, gctUINT32 Loc);
+    void    (*or)(gcsBITMASK_PTR BitmaskResult, gcsBITMASK_PTR Bitmask1, gcsBITMASK_PTR Bitmask2);
     gctBOOL (*testAndClear)(gcsBITMASK_PTR Bitmask,  gctUINT32 Loc);
     gctBOOL (*isAllZero)(gcsBITMASK_PTR Bitmask);
     void    (*init)(gcsBITMASK_PTR Bitmask, gctBOOL AllOne);
@@ -43,13 +43,13 @@ static gctBOOL seMaskTest(gcsBITMASK_PTR Bitmask, gctUINT32 Loc)
     return ((Bitmask->me[0] & ((gcmBITMASK_ELT_TYPE) 1 << Loc)) ? gcvTRUE: gcvFALSE);
 }
 
-static void seMaskOR(gcsBITMASK_PTR Bitmask, gctUINT32 Loc)
+static void seMaskSet(gcsBITMASK_PTR Bitmask, gctUINT32 Loc)
 {
     gcmASSERT(Loc < Bitmask->size);
     Bitmask->me[0] |= (gcmBITMASK_ELT_TYPE) 1 << Loc;
 }
 
-static void seMaskOR2(gcsBITMASK_PTR BitmaskResult, gcsBITMASK_PTR Bitmask1, gcsBITMASK_PTR Bitmask2)
+static void seMaskOR(gcsBITMASK_PTR BitmaskResult, gcsBITMASK_PTR Bitmask1, gcsBITMASK_PTR Bitmask2)
 {
     BitmaskResult->me[0] = Bitmask1->me[0] | Bitmask2->me[0];
 }
@@ -99,8 +99,8 @@ static void seMaskSetValue(gcsBITMASK_PTR Bitmask, gctUINT32 Value)
 static gcsBITMASKFUNCS seMaskFuncs =
 {
     seMaskTest,
+    seMaskSet,
     seMaskOR,
-    seMaskOR2,
     seMaskTestAndClear,
     seMaskIsAllZero,
     seMaskInit,
@@ -115,14 +115,13 @@ static gctBOOL meMaskTest(gcsBITMASK_PTR Bitmask, gctUINT32 Loc)
     return ((Bitmask->me[Loc / gcmBITMASK_ELT_BITS] & ((gcmBITMASK_ELT_TYPE) 1 << (Loc % gcmBITMASK_ELT_BITS))) ? gcvTRUE: gcvFALSE);
 }
 
-
-static void  meMaskOR(gcsBITMASK_PTR Bitmask, gctUINT32 Loc)
+static void meMaskSet(gcsBITMASK_PTR Bitmask, gctUINT32 Loc)
 {
     gcmASSERT(Loc < Bitmask->size);
     Bitmask->me[Loc / gcmBITMASK_ELT_BITS] |= ((gcmBITMASK_ELT_TYPE) 1 << (Loc % gcmBITMASK_ELT_BITS));
 }
 
-static void meMaskOR2(gcsBITMASK_PTR BitmaskResult, gcsBITMASK_PTR Bitmask1, gcsBITMASK_PTR Bitmask2)
+static void meMaskOR(gcsBITMASK_PTR BitmaskResult, gcsBITMASK_PTR Bitmask1, gcsBITMASK_PTR Bitmask2)
 {
     gctUINT32 i;
     gctUINT32 minIndex = gcmMIN(Bitmask1->numOfElts, Bitmask2->numOfElts);
@@ -205,8 +204,8 @@ static void meMaskSetValue(gcsBITMASK_PTR Bitmask, gctUINT32 Value)
 static gcsBITMASKFUNCS meMaskFuncs =
 {
     meMaskTest,
+    meMaskSet,
     meMaskOR,
-    meMaskOR2,
     meMaskTestAndClear,
     meMaskIsAllZero,
     meMaskInit,
@@ -216,7 +215,7 @@ static gcsBITMASKFUNCS meMaskFuncs =
 };
 
 /*
-** Initilialize size Bitmask with all bit armed.
+** Initialize size Bitmask with all bit armed.
 */
 void
 gcsBITMASK_InitAllOne(
@@ -274,7 +273,7 @@ gcsBITMASK_InitAllZero(
 ** BitmaskResult can NOT be either of Bitmask1 or Bitmask2.
 */
 void
-gcsBITMASK_InitOR2(
+gcsBITMASK_InitOR(
     gcsBITMASK_PTR BitmaskResult,
     gcsBITMASK_PTR Bitmask1,
     gcsBITMASK_PTR Bitmask2
@@ -284,7 +283,7 @@ gcsBITMASK_InitOR2(
 
     gcsBITMASK_InitAllZero(BitmaskResult, size);
 
-    (*BitmaskResult->op->or2)(BitmaskResult, Bitmask1, Bitmask2);
+    (*BitmaskResult->op->or)(BitmaskResult, Bitmask1, Bitmask2);
 }
 
 /*
@@ -342,12 +341,12 @@ gcsBITMASK_IsAllZero(
 ** Arm Loc bit in Bitmask
 */
 void
-gcsBITMASK_OR(
+gcsBITMASK_Set(
     gcsBITMASK_PTR Bitmask,
     gctUINT32 Loc
     )
 {
-    (*Bitmask->op->or)(Bitmask, Loc);
+    (*Bitmask->op->set)(Bitmask, Loc);
 }
 
 /*
@@ -387,7 +386,7 @@ gcsBITMASK_MergeBitMaskArray(
     gctUINT32 i;
     for (i = 0; i < Count; i++)
     {
-        (*BitmaskResult->op->or2)(BitmaskResult, BitmaskResult, BitmaskArray[i]);
+        (*BitmaskResult->op->or)(BitmaskResult, BitmaskResult, BitmaskArray[i]);
     }
     return;
 }
@@ -396,12 +395,12 @@ gcsBITMASK_MergeBitMaskArray(
 ** Merge Bitmask into BitmaskResult
 */
 void
-gcsBITMASK_OR2(
+gcsBITMASK_OR(
     gcsBITMASK_PTR BitmaskResult,
     gcsBITMASK_PTR Bitmask
     )
 {
-    (*BitmaskResult->op->or2)(BitmaskResult, BitmaskResult, Bitmask);
+    (*BitmaskResult->op->or)(BitmaskResult, BitmaskResult, Bitmask);
 }
 
 #endif/* #if (gcdENABLE_3D || gcdENABLE_2D) */

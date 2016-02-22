@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -660,7 +660,7 @@ GL_API void GL_APIENTRY glReadPixels(
         rlvArgs.uArgs.v2.rectSize.y  = Height;
         rlvArgs.uArgs.v2.numSlices   = 1;
         rlvArgs.uArgs.v2.dump        = gcvTRUE;
-        gcmERR_BREAK(gcoSURF_CopyPixels_v2(&srcView, &dstView, &rlvArgs));
+        gcmERR_BREAK(gcoSURF_CopyPixels(&srcView, &dstView, &rlvArgs));
 
 #if gcdREAD_PIXELS_WORKAROUND
         _gl2gcFormat(Format, Type, &bytespp);

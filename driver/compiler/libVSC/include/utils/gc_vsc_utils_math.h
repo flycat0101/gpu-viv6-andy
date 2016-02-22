@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -58,9 +58,13 @@ BEGIN_EXTERN_C()
 #define CAN_EXACTLY_CVT_S32_2_S20(s32)        ((s32) > VSC_INT20_MIN && (s32) <= VSC_INT20_MAX)
 #define CAN_EXACTLY_CVT_U32_2_U16(u32)        ((u32) <= VSC_UINT16_MAX)
 #define CAN_EXACTLY_CVT_S32_2_S16(s32)        ((s32) > VSC_INT16_MIN && (s32) <= VSC_INT16_MAX)
+#define CAN_EXACTLY_CVT_S23E8_2_S10E5(fS23E8) vscCanCvtS23E8FloatToS10E5Float((fS23E8))
+
+gctBOOL vscCanCvtS23E8FloatToS10E5Float(gctUINT fS23E8);
 
 gctUINT vscCvtS23E8FloatToS11E8Float(gctUINT floatS23E8);
 gctUINT vscCvtS11E8FloatToS23E8Float(gctUINT floatS11E8);
+/*gctUINT vscCvtS23E8FloatToS10E5Float(gctUINT floatS11E8, gctBOOL rtz);*/
 
 END_EXTERN_C()
 

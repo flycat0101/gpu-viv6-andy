@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -666,7 +666,7 @@ gcoDECHARDWARE_YUVFormatPlanar(
 gceSTATUS
 gcoDECHARDWARE_CheckSurface(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface
+    IN gcoSURF Surface
     )
 {
     gctINT res = gcvTRUE;
@@ -723,7 +723,7 @@ gcoDECHARDWARE_QueryStateCmdLen(
     size = 2;
 #else
     gcs2D_MULTI_SOURCE_PTR src;
-    gcsSURF_INFO_PTR DstSurface = &State->dstSurface;
+    gcoSURF DstSurface = &State->dstSurface;
     gctUINT i, srcMask = 0;
 
     size = 4;
@@ -844,7 +844,7 @@ OnError:
 gceSTATUS
 gcoDECHARDWARE_SetSrcDECCompression(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gce2D_TILE_STATUS_CONFIG TileStatusConfig,
     IN gctUINT32 ReadId,
     IN gctBOOL FastClear,
@@ -1237,7 +1237,7 @@ OnError:
 gceSTATUS
 gcoDECHARDWARE_SetDstDECCompression(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gce2D_TILE_STATUS_CONFIG TileStatusConfig,
     IN gctUINT32 ReadId,
     IN gctUINT32 WriteId
@@ -1571,7 +1571,7 @@ OnError:
 gceSTATUS
 gcoDECHARDWARE_CheckSurface(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface
+    IN gcoSURF Surface
     )
 {
     return gcvSTATUS_NOT_SUPPORTED;
@@ -1600,7 +1600,7 @@ gcoDECHARDWARE_EnableDECCompression(
 gceSTATUS
 gcoDECHARDWARE_SetSrcDECCompression(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gce2D_TILE_STATUS_CONFIG TileStatusConfig,
     IN gctUINT32 ReadId,
     IN gctBOOL FastClear,
@@ -1613,7 +1613,7 @@ gcoDECHARDWARE_SetSrcDECCompression(
 gceSTATUS
 gcoDECHARDWARE_SetDstDECCompression(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gce2D_TILE_STATUS_CONFIG TileStatusConfig,
     IN gctUINT32 ReadId,
     IN gctUINT32 WriteId

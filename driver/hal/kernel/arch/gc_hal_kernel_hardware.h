@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -126,6 +126,32 @@ typedef struct _gcsHARDWARE_SIGNATURE
 }
 gcsHARDWARE_SIGNATURE;
 
+typedef struct _gcsMMU_TABLE_ARRAY_ENTRY
+{
+    gctUINT32                   low;
+    gctUINT32                   high;
+}
+gcsMMU_TABLE_ARRAY_ENTRY;
+
+typedef struct _gcsHARDWARE_PAGETABLE_ARRAY
+{
+    /* Number of entries in page table array. */
+    gctUINT                     num;
+
+    /* Size in bytes of array. */
+    gctSIZE_T                   size;
+
+    /* Physical address of array. */
+    gctPHYS_ADDR_T              address;
+
+    /* Memory descriptor. */
+    gctPHYS_ADDR                physical;
+
+    /* Logical address of array. */
+    gctPOINTER                  logical;
+}
+gcsHARDWARE_PAGETABLE_ARRAY;
+
 /* gckHARDWARE object. */
 struct _gckHARDWARE
 {
@@ -224,6 +250,12 @@ struct _gckHARDWARE
     gcsHARDWARE_SIGNATURE       signature;
 
     gctUINT32                   maxOutstandingReads;
+
+    gcsHARDWARE_PAGETABLE_ARRAY pagetableArray;
+
+    gceSECURE_MODE              secureMode;
+
+    gctUINT64                   contextID;
 };
 
 typedef struct _gcsFEDescriptor

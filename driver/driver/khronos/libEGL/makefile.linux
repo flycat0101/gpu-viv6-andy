@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -66,8 +66,11 @@ ifeq ($(EGL_API_X),1)
   INCLUDE += -I$(X11_ARM_DIR)/include
 endif
 
-ifeq ($(EGL_API_WL),1)
+
+ifeq ($(EGL_API_WL), 1)
+  INCLUDE += -I$(AQROOT)/driver/wl/
   INCLUDE += -I$(WAYLAND_DIR)/include
+  INCLUDE += -I$(WAYLAND_DIR)/include/wayland-viv
 endif
 
 CFLAGS  += $(INCLUDE)
@@ -132,7 +135,8 @@ endif
 LIBS := -L$(SDK_DIR)/drivers -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL
 
 ifeq ($(EGL_API_WL), 1)
-  LIBS += -lwayland-server -lwayland-client
+  LIBS += -L$(WAYLAND_DIR)/lib
+  LIBS += -lwayland-server -lwayland-client -lgc_wayland_protocol
 endif
 
 

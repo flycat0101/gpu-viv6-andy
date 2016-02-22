@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -413,7 +413,7 @@ glfCreateContext(
 
         gcmERR_BREAK(gcoHAL_Construct(gcvNULL, Os, &Hal));
 
-        gcmERR_BREAK(gco3D_Construct(Hal, &Engine));
+        gcmERR_BREAK(gco3D_Construct(Hal, gcvFALSE, &Engine));
 
         gcmERR_BREAK(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
 
@@ -663,6 +663,16 @@ glfCreateContext(
         /* Check whether IP has texture descriptor. */
         context->hasTxDescriptor = gcoHAL_IsFeatureAvailable(
             Hal, gcvFEATURE_TX_DESCRIPTOR
+            ) == gcvSTATUS_TRUE;
+
+        /* No SH alpha and PE alpha test, we need do ourself */
+        context->hashAlphaTest =
+            (gcoHAL_IsFeatureAvailable (Hal, gcvFEATURE_PE_NO_ALPHA_TEST) == gcvSTATUS_TRUE) &&
+            (gcoHAL_IsFeatureAvailable (Hal, gcvFEATURE_SH_SUPPORT_ALPHA_KILL) != gcvSTATUS_TRUE);
+
+        /* Check whether IP has yuv assembler. */
+        context->hasYuvAssembler10bit = gcoHAL_IsFeatureAvailable(
+            Hal, gcvFEATURE_TX_YUV_ASSEMBLER_10BIT
             ) == gcvSTATUS_TRUE;
 
         /* Get the target maximum size. */

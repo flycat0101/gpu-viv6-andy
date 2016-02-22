@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -883,9 +883,10 @@ GL_API void GL_APIENTRY glDeleteFramebuffersOES(
             /* Unbound from current */
             if (context->frameBuffer == (glsFRAME_BUFFER_PTR)wrapper->object)
             {
-                context->frameBuffer        = gcvNULL;
-                context->curFrameBufferID   = 0;
-                context->frameBufferChanged = gcvTRUE;
+                context->frameBuffer         = gcvNULL;
+                context->curFrameBufferID    = 0;
+                context->frameBufferChanged  = gcvTRUE;
+                context->stencilStates.dirty = gcvTRUE;
             }
 
             gcmVERIFY_OK(glfDeleteNamedObject(
@@ -1062,7 +1063,7 @@ GL_API void GL_APIENTRY glBindFramebufferOES(
                 /* Resolve color render target into texture. */
                 surfView.surf = context->frameBuffer->color.surface;
                 tgtView.surf  = context->frameBuffer->color.target;
-                gcmERR_BREAK(gcoSURF_ResolveRect_v2(&tgtView, &surfView, gcvNULL));
+                gcmERR_BREAK(gcoSURF_ResolveRect(&tgtView, &surfView, gcvNULL));
             }
 
             if(context->frameBuffer->depth.surface != gcvNULL)
@@ -1086,7 +1087,7 @@ GL_API void GL_APIENTRY glBindFramebufferOES(
                 /* Resolve depth render target into texture. */
                 surfView.surf = context->frameBuffer->depth.surface;
                 tgtView.surf  = context->frameBuffer->depth.target;
-                gcmERR_BREAK(gcoSURF_ResolveRect_v2(&tgtView, &surfView, gcvNULL));
+                gcmERR_BREAK(gcoSURF_ResolveRect(&tgtView, &surfView, gcvNULL));
             }
 
             /* Mark as resolved. */
@@ -1110,7 +1111,7 @@ GL_API void GL_APIENTRY glBindFramebufferOES(
 
                 surfView.surf = object->color.surface;
                 tgtView.surf  = object->color.target;
-                gcmERR_BREAK(gcoSURF_ResolveRect_v2(&surfView, &tgtView, gcvNULL));
+                gcmERR_BREAK(gcoSURF_ResolveRect(&surfView, &tgtView, gcvNULL));
             }
         }
 
@@ -1128,13 +1129,14 @@ GL_API void GL_APIENTRY glBindFramebufferOES(
 
                 surfView.surf = object->depth.surface;
                 tgtView.surf  = object->depth.target;
-                gcmERR_BREAK(gcoSURF_ResolveRect_v2(&surfView, &tgtView, gcvNULL));
+                gcmERR_BREAK(gcoSURF_ResolveRect(&surfView, &tgtView, gcvNULL));
             }
         }
 
-        context->frameBuffer        = object;
-        context->curFrameBufferID   = FrameBuffer;
-        context->frameBufferChanged = gcvTRUE;
+        context->frameBuffer         = object;
+        context->curFrameBufferID    = FrameBuffer;
+        context->frameBufferChanged  = gcvTRUE;
+        context->stencilStates.dirty = gcvTRUE;
     }
     glmLEAVE();
 }
@@ -1476,7 +1478,7 @@ GL_API void GL_APIENTRY glFramebufferTexture2DOES(
 #endif
 
                         /* Use resolve to upload texture. */
-                        status = gcoSURF_ResolveRect_v2(&imgView, &mipView, gcvNULL);
+                        status = gcoSURF_ResolveRect(&imgView, &mipView, gcvNULL);
 
                         if (gcmIS_ERROR(status))
                         {
@@ -1644,7 +1646,7 @@ GL_API void GL_APIENTRY glFramebufferTexture2DOES(
                     surfView.surf = context->frameBuffer->color.surface;
                     tgtView.surf  = context->frameBuffer->color.target;
                     /* Resolve color render target into texture. */
-                    gcmONERROR(gcoSURF_ResolveRect_v2(&tgtView, &surfView, gcvNULL));
+                    gcmONERROR(gcoSURF_ResolveRect(&tgtView, &surfView, gcvNULL));
 
                     context->frameBuffer->needResolve = gcvFALSE;
                 }
@@ -1677,7 +1679,7 @@ GL_API void GL_APIENTRY glFramebufferTexture2DOES(
             {
                 surfView.surf = context->frameBuffer->color.surface;
                 tgtView.surf  = context->frameBuffer->color.target;
-                gcmVERIFY_OK(gcoSURF_ResolveRect_v2(&surfView, &tgtView, gcvNULL));
+                gcmVERIFY_OK(gcoSURF_ResolveRect(&surfView, &tgtView, gcvNULL));
             }
             break;
 
@@ -1693,7 +1695,7 @@ GL_API void GL_APIENTRY glFramebufferTexture2DOES(
                     /* Resolve depth render target into texture. */
                     surfView.surf = context->frameBuffer->depth.surface;
                     tgtView.surf  = context->frameBuffer->depth.target;
-                    gcmONERROR(gcoSURF_ResolveRect_v2(&tgtView, &surfView, gcvNULL));
+                    gcmONERROR(gcoSURF_ResolveRect(&tgtView, &surfView, gcvNULL));
 
                     context->frameBuffer->needResolve = gcvFALSE;
                 }
@@ -1757,7 +1759,8 @@ GL_API void GL_APIENTRY glFramebufferTexture2DOES(
         default:
             glmERROR(GL_INVALID_ENUM);
         }
-        context->frameBufferChanged = gcvTRUE;
+        context->frameBufferChanged  = gcvTRUE;
+        context->stencilStates.dirty = gcvTRUE;
 
         if ((texture != gcvNULL) &&
             (texture->image.source != gcvNULL) &&
@@ -1927,7 +1930,7 @@ GL_API void GL_APIENTRY glFramebufferRenderbufferOES(
                 /* Resolve color render target into texture. */
                 surfView.surf = context->frameBuffer->color.surface;
                 tgtView.surf  = context->frameBuffer->color.target;
-                gcmONERROR(gcoSURF_ResolveRect_v2(&tgtView, &surfView, gcvNULL));
+                gcmONERROR(gcoSURF_ResolveRect(&tgtView, &surfView, gcvNULL));
 
                 gcmONERROR(
                     gcoSURF_SetOrientation(context->frameBuffer->color.surface,
@@ -1976,7 +1979,7 @@ GL_API void GL_APIENTRY glFramebufferRenderbufferOES(
 
                 surfView.surf = context->frameBuffer->color.surface;
                 tgtView.surf  = context->frameBuffer->color.target;
-                gcmONERROR(gcoSURF_ResolveRect_v2(&surfView, &tgtView, gcvNULL));
+                gcmONERROR(gcoSURF_ResolveRect(&surfView, &tgtView, gcvNULL));
 
                 gcmONERROR(
                         gcoSURF_SetOrientation(context->frameBuffer->color.surface,
@@ -2053,7 +2056,8 @@ GL_API void GL_APIENTRY glFramebufferRenderbufferOES(
         default:
             glmERROR(GL_INVALID_ENUM);
         }
-        context->frameBufferChanged = gcvTRUE;
+        context->frameBufferChanged  = gcvTRUE;
+        context->stencilStates.dirty = gcvTRUE;
 
 OnError:;
     }

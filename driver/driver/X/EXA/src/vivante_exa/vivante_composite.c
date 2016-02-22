@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -303,7 +303,6 @@ VivPrepareComposite(int op, PicturePtr pSrc, PicturePtr pMsk,
         TRACE_EXIT(FALSE);
     }
 
-
     /* Checkcomposite should check if the transform is supported , otherwise it shouldn't be here */
     if (pSrc->transform )
         pBlt->mRotation = VIVGetRotation(pSrc->transform);
@@ -462,7 +461,6 @@ CalOrgBoxInfoWithoutMask(VIV2DBLITINFOPTR pBlt, int srcX, int srcY, int maskX, i
     int src_x_t, src_y_t;
     int opWidth = width;
     int opHeight = height;
-
     srcwidth = opWidth;
     srcheight = opHeight;
 
@@ -501,6 +499,17 @@ CalOrgBoxInfoWithoutMask(VIV2DBLITINFOPTR pBlt, int srcX, int srcY, int maskX, i
     {
         src_x_t = srcY + pixman_fixed_to_int (((struct pixman_transform *)pBlt->mTransform)->matrix[0][2] + pixman_fixed_1 / 2 - pixman_fixed_e);
         src_y_t = -srcX + pixman_fixed_to_int (((struct pixman_transform *)pBlt->mTransform)->matrix[1][2] + pixman_fixed_1 / 2 - pixman_fixed_e) - width;
+        srcX = src_x_t;
+        srcY = src_y_t;
+        /* Fix me for the next lines */
+        pBlt->mSrcSurfInfo.alpha = 1;
+        pBlt->mDstSurfInfo.alpha = 1;
+    }
+
+    if ( pBlt->mRotation == gcvSURF_180_DEGREE )
+    {
+        src_x_t = pBlt->mSrcSurfInfo.mWidth - width - srcX;
+        src_y_t = pBlt->mSrcSurfInfo.mHeight - height - srcY;
         srcX = src_x_t;
         srcY = src_y_t;
         /* Fix me for the next lines */
@@ -575,7 +584,6 @@ ReCalBoxByStretchInfo(VIV2DBLITINFOPTR pBlt, VivBox *opBox) {
     float  xfactors = 0.0;
     float  yfactors = 0.0;
     Bool nstflag = TRUE;
-
 
     memcpy((void *)&(pBlt->mOSrcBox),(void *)srcbox,sizeof(VivBox));
     memcpy((void *)&(pBlt->mODstBox),(void *)dstbox,sizeof(VivBox));
@@ -686,7 +694,6 @@ ReCalBoxByStretchInfo(VIV2DBLITINFOPTR pBlt, VivBox *opBox) {
                 break;
         }
 
-
     }
 
 }
@@ -743,17 +750,19 @@ VivComposite(PixmapPtr pxDst, int srcX, int srcY, int maskX, int maskY,
     /* Currenlty if mask on, it will not fall into this path ,otherwise consider mask */
     /* IMX_EXA_NONCACHESURF_WIDTH * IMX_EXA_NONCACHESURF_HEIGHT is small, enable this */
     /* otherwise disable it, it is not meaningful when the size is big */
+
     if ( ( width * height ) < MAX_COMPOSITE_SUB_SIZE && (IMX_EXA_NONCACHESURF_SIZE > MAX_COMPOSITE_SUB_SIZE))
     {
 
         if (_last_hw_composite > 0)
-            VIV2DGPUBlitComplete(&pViv->mGrCtx,TRUE);
-            _last_hw_composite = 0;
+                VIV2DGPUBlitComplete(&pViv->mGrCtx,TRUE);
+        _last_hw_composite = 0;
 
         pBlt->mSwcmp = TRUE;
         VIVSWComposite(pxDst, srcX, srcY, maskX, maskY, dstX, dstY, width, height);
         return ;
     }
+
 
 
     psrc = (Viv2DPixmapPtr)pBlt->mSrcSurfInfo.mPriv;
@@ -803,7 +812,6 @@ VivComposite(PixmapPtr pxDst, int srcX, int srcY, int maskX, int maskY,
     }
 
     _last_hw_composite = 1;
-
     TRACE_EXIT();
 }
 

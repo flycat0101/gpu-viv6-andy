@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -29,6 +29,19 @@
 */
 #ifndef gcdPRINT_VERSION
 #   define gcdPRINT_VERSION                     0
+#endif
+
+/*
+USE_KERNEL_VIRTUAL_BUFFERS
+
+This define enables the use of VM for gckCommand and fence buffers.
+*/
+#ifndef USE_KERNEL_VIRTUAL_BUFFERS
+#if defined(UNDER_CE)
+#   define USE_KERNEL_VIRTUAL_BUFFERS           1
+#else
+#   define USE_KERNEL_VIRTUAL_BUFFERS           0
+#endif
 #endif
 
 /*
@@ -66,14 +79,16 @@
 #   define VIVANTE_PROFILER_PROBE               0
 #endif
 
+#ifndef VIVANTE_PROFILER_MULTI_GPU
+#   define VIVANTE_PROFILER_MULTI_GPU           0
+#endif
+
 #ifndef VIVANTE_PROFILER_ALL_COUNTER
 #   define VIVANTE_PROFILER_ALL_COUNTER         0
 #endif
 
 #ifndef VIVANTE_PROFILER_PM
-
 #   define VIVANTE_PROFILER_PM                  1
-
 #endif
 
 /*
@@ -787,15 +802,6 @@
 #endif
 
 /*
-    gcdENABLE_OUTER_CACHE_PATCH
-
-        Enable the outer cache patch.
-*/
-#ifndef gcdENABLE_OUTER_CACHE_PATCH
-#   define gcdENABLE_OUTER_CACHE_PATCH          0
-#endif
-
-/*
     gcdPROCESS_ADDRESS_SPACE
 
         When non-zero, every process which attaches to galcore has its own GPU
@@ -1220,6 +1226,40 @@
 #   define gcdENABLE_VG                         0
 #endif
 
+#ifndef gcdVG_ONLY
+#   define  gcdVG_ONLY  (!gcdENABLE_3D && !gcdENABLE_2D && gcdENABLE_VG)
+#endif
+
+#if defined(WIN32) && !defined(UNDER_CE) && (gcdENABLE_VG == 1)
+
+#ifdef gcdUSE_VX
+#undef gcdUSE_VX
+#endif
+
+#ifdef COMMAND_PROCESSOR_VERSION
+#undef  COMMAND_PROCESSOR_VERSION
+#endif
+
+#ifdef gcdENABLE_TRUST_APPLICATION
+#undef  gcdENABLE_TRUST_APPLICATION
+#endif
+
+#ifdef gcdENABLE_3D
+#undef  gcdENABLE_3D
+#endif
+
+#ifdef gcdENABLE_2D
+#undef  gcdENABLE_2D
+#endif
+
+#define gcdENABLE_3D 0
+#define gcdENABLE_2D 0
+#define gcdUSE_VX 0
+#define COMMAND_PROCESSOR_VERSION 2
+#define gcdENABLE_TRUST_APPLICATION 0
+
+#endif  /* Only for GC355 Cmodel build. */
+
 #ifndef gcdGC355_PROFILER
 #   define gcdGC355_PROFILER                    0
 #endif
@@ -1290,6 +1330,47 @@
 
 #ifndef gcdENABLE_APPCTXT_BLITDRAW
 #   define gcdENABLE_APPCTXT_BLITDRAW                     0
+#endif
+
+/*
+    gcdENABLE_TRUST_APPLICATION
+
+    When enabled, trust application is used to handle 'security' registers.
+
+    1) If HW doesn't have robust and security feature, this option is meaningless.
+    2) If HW have robust and security and this option is not enable,
+       security registers are handled by non secure driver. It is for
+       platform doesn't want/need to use trust zone.
+*/
+#ifndef gcdENABLE_TRUST_APPLICATION
+#if (defined(_WIN32) && !defined(UNDER_CE)) || (defined (LINUX) && !defined(EMULATOR))
+#   define gcdENABLE_TRUST_APPLICATION          1
+#else
+#   define gcdENABLE_TRUST_APPLICATION          0
+#endif
+#endif
+
+/* Disable gcdENABLE_TRUST_APPLICATION when oboslete gcdSECURITY enabled. */
+#if gcdSECURITY
+#undef gcdENABLE_TRUST_APPLICATION
+#define gcdENABLE_TRUST_APPLICATION             0
+#endif
+
+#ifndef gcdMMU_SECURE_AREA_SIZE
+#   define gcdMMU_SECURE_AREA_SIZE              128
+#endif
+
+/*
+VIV:gcdUSE_MMU_EXCEPTION
+
+    When enabled, enable and check exception interrupt raised by MMU.
+*/
+#ifndef gcdUSE_MMU_EXCEPTION
+#   define gcdUSE_MMU_EXCEPTION                 1
+#endif
+
+#ifndef gcdVX_OPTIMIZER
+#   define gcdVX_OPTIMIZER                      0
 #endif
 
 #endif /* __gc_hal_options_h_ */

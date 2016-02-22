@@ -1,0 +1,26 @@
+#include "cl_viv_vx_ext.h"
+
+__kernel void histogram
+(
+    __read_only image2d_t  	in_image,
+    vx_distribution 		in_dist
+)
+{
+    const int pX = get_global_id(0);
+    const int pY = get_global_id(1);
+	vxc_uchar16 zero = 0, v = viv_intrinsic_vx_read_imageuc(in_image, (int2)(pX, pY));
+	int4 v4;
+	uchar pixel;
+
+	_viv_asm(ADD, v4, v, zero);
+	pixel = convert_uchar(v4.x);
+
+	if(pixel >= in_dist.offset)
+	{
+		if(pixel < (in_dist.offset + in_dist.rang))
+		{
+			int i = (convert_uint(pixel) - in_dist.offset) * in_dist.window_r;
+			atomic_inc(in_dist.ptr + i);
+		}
+	}
+}

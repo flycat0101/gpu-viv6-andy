@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -66,17 +66,17 @@ enum
 
 #define __GL_SET_TEX_UNIT_BIT(gc, unit, bit)                                    \
     (gc)->texUnitAttrState[(unit)] |= (bit);                                    \
-    __glBitmaskOR(&((gc)->texUnitAttrDirtyMask), unit);                         \
+    __glBitmaskSet(&((gc)->texUnitAttrDirtyMask), unit);                         \
     (gc)->globalDirtyState[__GL_ALL_ATTRS] |= (__GL_ONE_32 << __GL_TEX_UNIT_ATTRS)
 
 #define __GL_SET_GLSL_SAMPLER_BIT(gc, samplerRegIdx)                            \
-    __glBitmaskOR(&((gc)->shaderProgram.samplerMapDirty), samplerRegIdx);       \
+    __glBitmaskSet(&((gc)->shaderProgram.samplerMapDirty), samplerRegIdx);       \
     (gc)->globalDirtyState[__GL_PROGRAM_ATTRS] |= (__GL_DIRTY_GLSL_SAMPLER);    \
     (gc)->globalDirtyState[__GL_ALL_ATTRS] |= (__GL_ONE_32 << __GL_PROGRAM_ATTRS)
 
 
 #define __GL_SET_IMG_UNIT_BIT(gc, unit)                                        \
-    __glBitmaskOR(&((gc)->imageUnitDirtyMask), unit);                          \
+    __glBitmaskSet(&((gc)->imageUnitDirtyMask), unit);                          \
     (gc)->globalDirtyState[__GL_ALL_ATTRS] |= (__GL_ONE_32 << __GL_IMG_UNIT_ATTRS)
 
 /*

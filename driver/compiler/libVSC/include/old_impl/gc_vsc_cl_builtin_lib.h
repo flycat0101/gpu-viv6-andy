@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -210,6 +210,132 @@ NL "    if (mullo < z) mulhi++;"
 NL "    if (mulhi != 0) mullo = 0xFFFFFFFFFFFFFFFFULL;"
 NL "    return mullo;"
 NL "}"
+NL
+NL "long2 _viv_madsat_long2(long2 x, long2 y, long2 z)"
+NL "{"
+NL "    long2 r;"
+NL "    r.x = _viv_madsat_long(x.x, y.x, z.x);"
+NL "    r.y = _viv_madsat_long(x.y, y.y, z.y);"
+NL "    return r;"
+NL "}"
+NL
+NL "ulong2 _viv_madsat_ulong2(ulong2 x, ulong2 y, ulong2 z)"
+NL "{"
+NL "    ulong2 r;"
+NL "    r.x = _viv_madsat_ulong(x.x, y.x, z.x);"
+NL "    r.y = _viv_madsat_ulong(x.y, y.y, z.y);"
+NL "    return r;"
+NL "}"
+NL
+NL "long3 _viv_madsat_long3(long3 x, long3 y, long3 z)"
+NL "{"
+NL "    long3 r;"
+NL "    r.s0 = _viv_madsat_long(x.s0, y.s0, z.s0);"
+NL "    r.s1 = _viv_madsat_long(x.s1, y.s1, z.s1);"
+NL "    r.s2 = _viv_madsat_long(x.s2, y.s2, z.s2);"
+NL "    return r;"
+NL "}"
+NL
+NL "ulong3 _viv_madsat_ulong3(ulong3 x, ulong3 y, ulong3 z)"
+NL "{"
+NL "    ulong3 r;"
+NL "    r.s0 = _viv_madsat_ulong(x.s0, y.s0, z.s0);"
+NL "    r.s1 = _viv_madsat_ulong(x.s1, y.s1, z.s1);"
+NL "    r.s2 = _viv_madsat_ulong(x.s2, y.s2, z.s2);"
+NL "    return r;"
+NL "}"
+NL
+NL "long4 _viv_madsat_long4(long4 x, long4 y, long4 z)"
+NL "{"
+NL "    long4 r;"
+NL "    r.s0 = _viv_madsat_long(x.s0, y.s0, z.s0);"
+NL "    r.s1 = _viv_madsat_long(x.s1, y.s1, z.s1);"
+NL "    r.s2 = _viv_madsat_long(x.s2, y.s2, z.s2);"
+NL "    r.s3 = _viv_madsat_long(x.s3, y.s3, z.s3);"
+NL "    return r;"
+NL "}"
+NL
+NL "ulong4 _viv_madsat_ulong4(ulong4 x, ulong4 y, ulong4 z)"
+NL "{"
+NL "    ulong4 r;"
+NL "    r.s0 = _viv_madsat_ulong(x.s0, y.s0, z.s0);"
+NL "    r.s1 = _viv_madsat_ulong(x.s1, y.s1, z.s1);"
+NL "    r.s2 = _viv_madsat_ulong(x.s2, y.s2, z.s2);"
+NL "    r.s3 = _viv_madsat_ulong(x.s3, y.s3, z.s3);"
+NL "    return r;"
+NL "}"
+NL
+NL "long8 _viv_madsat_long8(long8 x, long8 y, long8 z)"
+NL "{"
+NL "    long8 r;"
+NL "    r.s0 = _viv_madsat_long(x.s0, y.s0, z.s0);"
+NL "    r.s1 = _viv_madsat_long(x.s1, y.s1, z.s1);"
+NL "    r.s2 = _viv_madsat_long(x.s2, y.s2, z.s2);"
+NL "    r.s3 = _viv_madsat_long(x.s3, y.s3, z.s3);"
+NL "    r.s4 = _viv_madsat_long(x.s4, y.s4, z.s4);"
+NL "    r.s5 = _viv_madsat_long(x.s5, y.s5, z.s5);"
+NL "    r.s6 = _viv_madsat_long(x.s6, y.s6, z.s6);"
+NL "    r.s7 = _viv_madsat_long(x.s7, y.s7, z.s7);"
+NL "    return r;"
+NL "}"
+NL
+NL "ulong8 _viv_madsat_ulong8(ulong8 x, ulong8 y, ulong8 z)"
+NL "{"
+NL "    ulong8 r;"
+NL "    r.s0 = _viv_madsat_ulong(x.s0, y.s0, z.s0);"
+NL "    r.s1 = _viv_madsat_ulong(x.s1, y.s1, z.s1);"
+NL "    r.s2 = _viv_madsat_ulong(x.s2, y.s2, z.s2);"
+NL "    r.s3 = _viv_madsat_ulong(x.s3, y.s3, z.s3);"
+NL "    r.s4 = _viv_madsat_ulong(x.s4, y.s4, z.s4);"
+NL "    r.s5 = _viv_madsat_ulong(x.s5, y.s5, z.s5);"
+NL "    r.s6 = _viv_madsat_ulong(x.s6, y.s6, z.s6);"
+NL "    r.s7 = _viv_madsat_ulong(x.s7, y.s7, z.s7);"
+NL "    return r;"
+NL "}"
+NL
+NL "long16 _viv_madsat_long16(long16 x, long16 y, long16 z)"
+NL "{"
+NL "    long16 r;"
+NL "    r.s0 = _viv_madsat_long(x.s0, y.s0, z.s0);"
+NL "    r.s1 = _viv_madsat_long(x.s1, y.s1, z.s1);"
+NL "    r.s2 = _viv_madsat_long(x.s2, y.s2, z.s2);"
+NL "    r.s3 = _viv_madsat_long(x.s3, y.s3, z.s3);"
+NL "    r.s4 = _viv_madsat_long(x.s4, y.s4, z.s4);"
+NL "    r.s5 = _viv_madsat_long(x.s5, y.s5, z.s5);"
+NL "    r.s6 = _viv_madsat_long(x.s6, y.s6, z.s6);"
+NL "    r.s7 = _viv_madsat_long(x.s7, y.s7, z.s7);"
+NL "    r.s8 = _viv_madsat_long(x.s8, y.s8, z.s8);"
+NL "    r.s9 = _viv_madsat_long(x.s9, y.s9, z.s9);"
+NL "    r.sa = _viv_madsat_long(x.sa, y.sa, z.sa);"
+NL "    r.sb = _viv_madsat_long(x.sb, y.sb, z.sb);"
+NL "    r.sc = _viv_madsat_long(x.sc, y.sc, z.sc);"
+NL "    r.sd = _viv_madsat_long(x.sd, y.sd, z.sd);"
+NL "    r.se = _viv_madsat_long(x.se, y.se, z.se);"
+NL "    r.sf = _viv_madsat_long(x.sf, y.sf, z.sf);"
+NL "    return r;"
+NL "}"
+NL
+NL "ulong16 _viv_madsat_ulong16(ulong16 x, ulong16 y, ulong16 z)"
+NL "{"
+NL "    ulong16 r;"
+NL "    r.s0 = _viv_madsat_ulong(x.s0, y.s0, z.s0);"
+NL "    r.s1 = _viv_madsat_ulong(x.s1, y.s1, z.s1);"
+NL "    r.s2 = _viv_madsat_ulong(x.s2, y.s2, z.s2);"
+NL "    r.s3 = _viv_madsat_ulong(x.s3, y.s3, z.s3);"
+NL "    r.s4 = _viv_madsat_ulong(x.s4, y.s4, z.s4);"
+NL "    r.s5 = _viv_madsat_ulong(x.s5, y.s5, z.s5);"
+NL "    r.s6 = _viv_madsat_ulong(x.s6, y.s6, z.s6);"
+NL "    r.s7 = _viv_madsat_ulong(x.s7, y.s7, z.s7);"
+NL "    r.s8 = _viv_madsat_ulong(x.s8, y.s8, z.s8);"
+NL "    r.s9 = _viv_madsat_ulong(x.s9, y.s9, z.s9);"
+NL "    r.sa = _viv_madsat_ulong(x.sa, y.sa, z.sa);"
+NL "    r.sb = _viv_madsat_ulong(x.sb, y.sb, z.sb);"
+NL "    r.sc = _viv_madsat_ulong(x.sc, y.sc, z.sc);"
+NL "    r.sd = _viv_madsat_ulong(x.sd, y.sd, z.sd);"
+NL "    r.se = _viv_madsat_ulong(x.se, y.se, z.se);"
+NL "    r.sf = _viv_madsat_ulong(x.sf, y.sf, z.sf);"
+NL "    return r;"
+NL "}"
 NL;
 
 static gctSTRING gcCLLibLongNEXTAFTER_Funcs =
@@ -229,6 +355,361 @@ NL "    a += ((a < b) ? 1 : -1);"
 NL "    a = ((a < 0) ? (int) 0x80000000 - a : a);"
 NL "    if (((a & 0x7f800000) == 0) && (a & 0x7fffffff)) a &= ~0x7f800000;"
 NL "    return as_float(a);"
+NL "}"
+NL;
+
+/*****************************
+   image descriptor:  uint8
+   s0: base address of image data
+   s1: stride of a row of the image
+   s2: image size
+       [15:0]: width (U16)
+       [31:16]: height (U16)
+   s3: image properties
+       [2:0]: shift (for calculation of bpp)
+       [3:3]: multiply (for calculation of bpp)
+          0: ONE
+          1: THREE
+       [5:4]: addressing mode
+          0: NONE   // Currently aliases to BORDER0.
+          1: BORDER0    (0,0,0,0)
+          2: BORDER1    (0,0,0,1) or (0,0,0,1.0), depending on image format.
+       [9:6]: image format
+       [11:10]: tiling mode
+          0: LINEAR
+          1: TILED
+          2: SUPER_TILED
+       [12:12]: image type
+       [15:14]: component count (packed formats are treated as 1 component)
+                0: 4 components
+                1: 1 component
+                2: 2 components
+                3: 3 components
+       [18:16]: swizzle_r
+       [22:20]: swizzle_g
+       [26:24]: swizzle_b
+       [30:28]: swizzle_a
+   s4: size of an 2-D image in a 2-D image array or slice size of 2-D layer in a 3-D image
+   s5: depth of 3-D image or array size of 1-D/2-D array.
+   s6: image format
+       [0:15]: channel order
+       [16:31]: channel data type
+****************************/
+
+static gctSTRING gcCLLibImageQuery_Funcs_UseImgInst =
+NL "int _viv_get_image_width_image1d_t(uint8 image)"
+NL "{"
+NL "    return image.s2 & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_width_image2d_t(uint8 image)"
+NL "{"
+NL "    return image.s2 & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_width_image3d_t(uint8 image)"
+NL "{"
+NL "    return image.s2 & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_width_image1d_array_t(uint8 image)"
+NL "{"
+NL "    return image.s2 & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_width_image2d_array_t(uint8 image)"
+NL "{"
+NL "    return image.s2 & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_width_image1d_buffer_t(uint8 image)"
+NL "{"
+NL "    return image.s2 & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_height_image2d_t(uint8 image)"
+NL "{"
+NL "    return (image.s2 >> 16) & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_height_image2d_array_t(uint8 image)"
+NL "{"
+NL "    return (image.s2 >> 16) & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_height_image3d_t(uint8 image)"
+NL "{"
+NL "    return (image.s2 >> 16) & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_depth_image3d_t(uint8 image)"
+NL "{"
+NL "    return image.s5;"
+NL "}"
+NL
+NL "int2 _viv_get_image_dim_image2d_t(uint8 image)"
+NL "{"
+NL "    return (int2) (image.s2 & 0xFFFF, (image.s2 >> 16) & 0xFFFF);"
+NL "}"
+NL
+NL "int4 _viv_get_image_dim_image3d_t(uint8 image)"
+NL "{"
+NL "    return (int4) (image.s2 & 0xFFFF, (image.s2 >> 16) & 0xFFFF, image.s5, 0);"
+NL "}"
+NL
+NL "int2 _viv_get_image_dim_image2d_array_t(uint8 image)"
+NL "{"
+NL "    return (int2) (image.s2 & 0xFFFF, (image.s2 >> 16) & 0xFFFF);"
+NL "}"
+NL
+NL "int _viv_get_image_channel_order_image1d_t(uint8 image)"
+NL "{"
+NL "    return image.s6 & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_channel_order_image2d_t(uint8 image)"
+NL "{"
+NL "    return image.s6 & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_channel_order_image3d_t(uint8 image)"
+NL "{"
+NL "    return image.s6 & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_channel_order_image1d_array_t(uint8 image)"
+NL "{"
+NL "    return image.s6 & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_channel_order_image2d_array_t(uint8 image)"
+NL "{"
+NL "    return image.s6 & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_channel_order_image1d_buffer_t(uint8 image)"
+NL "{"
+NL "    return image.s6 & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_channel_data_type_image1d_t(uint8 image)"
+NL "{"
+NL "    return (image.s6 >> 16) & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_channel_data_type_image2d_t(uint8 image)"
+NL "{"
+NL "    return (image.s6 >> 16) & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_channel_data_type_image3d_t(uint8 image)"
+NL "{"
+NL "    return (image.s6 >> 16) & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_channel_data_type_image1d_array_t(uint8 image)"
+NL "{"
+NL "    return (image.s6 >> 16) & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_channel_data_type_image2d_array_t(uint8 image)"
+NL "{"
+NL "    return (image.s6 >> 16) & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_channel_data_type_image1d_buffer_t(uint8 image)"
+NL "{"
+NL "    return (image.s6 >> 16) & 0xFFFF;"
+NL "}"
+NL
+NL "int _viv_get_image_array_size_image1d_array_t(uint8 image)"
+NL "{"
+NL "    return image.s5;"
+NL "}"
+NL
+NL "int _viv_get_image_array_size_image2d_array_t(uint8 image)"
+NL "{"
+NL "    return image.s5;"
+NL "}"
+NL;
+
+/* Description of the image header:
+    struct _cl_image_header
+    {
+        int                  width;
+        int                  height;
+        int                  depth;
+        int                  channelDataType;
+        int                  channelOrder;
+        int                  samplerValue;
+        int                  rowPitch;
+        int                  slicePitch;
+        int                  textureNum;
+        int*                 physical;
+     };
+*/
+
+static gctSTRING gcCLLibImageQuery_Funcs =
+NL "int _viv_get_image_width_image1d_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return *imghdr;"
+NL "}"
+NL
+NL "int _viv_get_image_width_image2d_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return *imghdr;"
+NL "}"
+NL
+NL "int _viv_get_image_width_image3d_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return *imghdr;"
+NL "}"
+NL
+NL "int _viv_get_image_width_image1d_array_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return *imghdr;"
+NL "}"
+NL
+NL "int _viv_get_image_width_image2d_array_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return *imghdr;"
+NL "}"
+NL
+NL "int _viv_get_image_width_image1d_buffer_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return *imghdr;"
+NL "}"
+NL
+NL "int _viv_get_image_height_image2d_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return imghdr[1];"
+NL "}"
+NL
+NL "int _viv_get_image_height_image2d_array_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return imghdr[1];"
+NL "}"
+NL
+NL "int _viv_get_image_height_image3d_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return imghdr[1];"
+NL "}"
+NL
+NL "int _viv_get_image_depth_image3d_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return imghdr[2];"
+NL "}"
+NL
+NL "int2 _viv_get_image_dim_image2d_t(uint8 image)"
+NL "{"
+NL "    uint2 *imghdr = (uint2 *) image.s0;"
+NL "    return (int2)((*imghdr).x, (*imghdr).y);"
+NL "}"
+NL
+NL "int4 _viv_get_image_dim_image3d_t(uint8 image)"
+NL "{"
+NL "    uint4 *imghdr = (uint4 *) image.s0;"
+NL "    return (int4)((*imghdr).x, (*imghdr).y, (*imghdr).z, 0);"
+NL "}"
+NL
+NL "int2 _viv_get_image_dim_image2d_array_t(uint8 image)"
+NL "{"
+NL "    uint2 *imghdr = (uint2 *) image.s0;"
+NL "    return (int2)((*imghdr).x, (*imghdr).y);"
+NL "}"
+NL
+NL "int _viv_get_image_channel_order_image1d_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return imghdr[4];"
+NL "}"
+NL
+NL "int _viv_get_image_channel_order_image2d_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return imghdr[4];"
+NL "}"
+NL
+NL "int _viv_get_image_channel_order_image3d_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return imghdr[4];"
+NL "}"
+NL
+NL "int _viv_get_image_channel_order_image1d_array_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return imghdr[4];"
+NL "}"
+NL
+NL "int _viv_get_image_channel_order_image2d_array_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return imghdr[4];"
+NL "}"
+NL
+NL "int _viv_get_image_channel_order_image1d_buffer_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return imghdr[4];"
+NL "}"
+NL
+NL "int _viv_get_image_channel_data_type_image1d_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return imghdr[3];"
+NL "}"
+NL
+NL "int _viv_get_image_channel_data_type_image2d_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return imghdr[3];"
+NL "}"
+NL
+NL "int _viv_get_image_channel_data_type_image3d_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return imghdr[3];"
+NL "}"
+NL
+NL "int _viv_get_image_channel_data_type_image1d_array_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return imghdr[3];"
+NL "}"
+NL
+NL "int _viv_get_image_channel_data_type_image2d_array_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return imghdr[3];"
+NL "}"
+NL
+NL "int _viv_get_image_channel_data_type_image1d_buffer_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return imghdr[3];"
+NL "}"
+NL
+NL "int _viv_get_image_array_size_image1d_array_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return imghdr[8];"
+NL "}"
+NL
+NL "int _viv_get_image_array_size_image2d_array_t(uint8 image)"
+NL "{"
+NL "    uint *imghdr = (uint *) image.s0;"
+NL "    return imghdr[8];"
 NL "}"
 NL;
 

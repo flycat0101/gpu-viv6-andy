@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -732,7 +732,7 @@ readDepthStencilPixels(__GLcontext *gc,
         rlvArgs.uArgs.v2.rectSize.x  = w;
         rlvArgs.uArgs.v2.rectSize.y  = h;
         rlvArgs.uArgs.v2.numSlices   = 1;
-        gcmONERROR(gcoSURF_ResolveRect_v2(&srcView, &tmpView, &rlvArgs));
+        gcmONERROR(gcoSURF_ResolveRect(&srcView, &tmpView, &rlvArgs));
 
         gcmONERROR(gcoSURF_Flush(tmpView.surf));
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -26,10 +26,10 @@ typedef struct VIR_CPP_COPYPROPAGATION
     VSC_OPTN_CPPOptions     *options;
     VIR_Dumper              *dumper;
 
+    gctBOOL                 globalCPP;
+
     gctINT                  fwOptCount;
     gctINT                  bwOptCount;
-
-    gctBOOL                 largeCFG;
 
     VSC_PRIMARY_MEM_POOL    pmp;
 
@@ -45,6 +45,8 @@ typedef struct VIR_CPP_COPYPROPAGATION
 #define VSC_CPP_SetOptions(cpp, o)      ((cpp)->options = (o))
 #define VSC_CPP_GetDumper(cpp)          ((cpp)->dumper)
 #define VSC_CPP_SetDumper(cpp, d)       ((cpp)->dumper = (d))
+#define VSC_CPP_isGlobalCPP(cpp)        ((cpp)->globalCPP)
+#define VSC_CPP_SetGlobalCPP(cpp, g)    ((cpp)->globalCPP = (g))
 #define VSC_CPP_GetFWOptCount(cpp)      ((cpp)->fwOptCount)
 #define VSC_CPP_SetFWOptCount(cpp, s)   ((cpp)->fwOptCount = (s))
 #define VSC_CPP_GetBWOptCount(cpp)      ((cpp)->bwOptCount)
@@ -57,7 +59,8 @@ extern void VSC_CPP_Init(
     IN VIR_Shader                   *shader,
     VIR_DEF_USAGE_INFO              *du_info,
     IN VSC_OPTN_CPPOptions          *options,
-    IN VIR_Dumper                   *dumper
+    IN VIR_Dumper                   *dumper,
+    IN gctBOOL                      globaCPP
     );
 
 extern void VSC_CPP_Final(

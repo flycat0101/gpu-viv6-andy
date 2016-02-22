@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -405,136 +405,6 @@ Bool DisableAlphaBlending(GALINFOPTR galInfo) {
     TRACE_EXIT(TRUE);
 }
 
-static void SetTempSurfForRT(GALINFOPTR galInfo, VivBoxPtr opbox)
-{
-    GenericSurfacePtr srcsurf;
-    gceSTATUS status = gcvSTATUS_OK;
-    VIVGPUPtr gpuctx = (VIVGPUPtr) galInfo->mGpu;
-    VIV2DBLITINFOPTR pBlt = &(galInfo->mBlitInfo);
-    Bool retvsurf;
-    gctUINT32 physicaladdr;
-    gctPOINTER linearaddr;
-    gctUINT32 aligned_height;
-    gctUINT32 aligned_width;
-    gctUINT32 aligned_pitch;
-    gctUINT32 maxsize;
-    gcsRECT dstRect = {0, 0, 0, 0};
-
-    srcsurf = (GenericSurfacePtr)(pBlt->mSrcSurfInfo.mPriv->mVidMemInfo);
-    maxsize = V_MAX(pBlt->mDstSurfInfo.mWidth, pBlt->mDstSurfInfo.mHeight);
-
-    pBlt->mSrcTempSurfInfo.mPriv = (Viv2DPixmapPtr)malloc(sizeof(Viv2DPixmap));
-    pBlt->mSrcTempSurfInfo.mPriv->mVidMemInfo = (GenericSurfacePtr)malloc(sizeof(GenericSurface));
-
-    VSetSurfIndex(1);
-    switch ( pBlt->mSrcSurfInfo.mFormat.mBpp )
-    {
-            case 8:
-            case 16:
-                retvsurf = VGetSurfAddrBy16(galInfo, maxsize, (int *) (&physicaladdr), (int *) (&linearaddr),(int *)&aligned_width, (int *)&aligned_height, (int *)&aligned_pitch);
-                break;
-            case 24:
-            case 32:
-                retvsurf = VGetSurfAddrBy32(galInfo, maxsize, (int *) (&physicaladdr), (int *) (&linearaddr), (int *)&aligned_width, (int *)&aligned_height, (int *)&aligned_pitch);
-                break;
-            default:
-                return ;
-    }
-    if ( retvsurf == FALSE ) return ;
-
-    status = gco2D_SetGenericSource
-        (
-        gpuctx->mDriver->m2DEngine,
-        &srcsurf->mVideoNode.mPhysicalAddr,
-        1,
-        &srcsurf->mStride,
-        1,
-        srcsurf->mTiling,
-        pBlt->mSrcSurfInfo.mFormat.mVivFmt,
-        pBlt->mRotation,
-        srcsurf->mAlignedWidth,
-        srcsurf->mAlignedHeight
-        );
-
-    if ( status != gcvSTATUS_OK ) {
-            TRACE_ERROR("ERROR SETTING SOURCE SURFACE\n");
-            TRACE_EXIT();
-    }
-
-    status = gco2D_SetGenericTarget
-        (
-        gpuctx->mDriver->m2DEngine,
-        &physicaladdr,
-        1,
-        &aligned_pitch,
-        1,
-        srcsurf->mTiling,
-        pBlt->mSrcSurfInfo.mFormat.mVivFmt,
-        gcvSURF_0_DEGREE,
-        pBlt->mSrcSurfInfo.mHeight,
-        pBlt->mSrcSurfInfo.mWidth
-        );
-
-    if ( status != gcvSTATUS_OK ) {
-        TRACE_ERROR("ERROR SETTING TARGET SURFACE\n");
-        TRACE_EXIT();
-    }
-
-    dstRect.right = maxsize;
-    dstRect.bottom = maxsize;
-
-    status = gco2D_SetClipping(gpuctx->mDriver->m2DEngine, &dstRect);
-    if ( status != gcvSTATUS_OK ) {
-        TRACE_ERROR("ERROR SETTING Clipping\n");
-        TRACE_EXIT();
-    }
-
-    dstRect.right = pBlt->mSrcSurfInfo.mWidth;
-    dstRect.bottom = pBlt->mSrcSurfInfo.mHeight;
-
-    status = gco2D_SetSource(gpuctx->mDriver->m2DEngine, &dstRect);
-    if ( status != gcvSTATUS_OK ) {
-        TRACE_ERROR("ERROR SETTING Source\n");
-        TRACE_EXIT();
-    }
-
-    dstRect.right = pBlt->mSrcSurfInfo.mHeight;
-    dstRect.bottom = pBlt->mSrcSurfInfo.mWidth;
-
-    status = gco2D_Blit(gpuctx->mDriver->m2DEngine, 1, &dstRect, 0xCC, 0xAA, pBlt->mDstSurfInfo.mFormat.mVivFmt);
-
-    status = gco2D_SetGenericSource
-        (
-        gpuctx->mDriver->m2DEngine,
-        &physicaladdr,
-        1,
-        &aligned_pitch,
-        1,
-        srcsurf->mTiling,
-        pBlt->mSrcSurfInfo.mFormat.mVivFmt,
-        gcvSURF_0_DEGREE,
-        pBlt->mSrcSurfInfo.mHeight,
-        pBlt->mSrcSurfInfo.mWidth
-        );
-
-    if ( status != gcvSTATUS_OK ) {
-            TRACE_ERROR("ERROR SETTING SOURCE SURFACE\n");
-            TRACE_EXIT();
-    }
-}
-
-
-static void ReleaseTempSurfForRT(GALINFOPTR galInfo, VivBoxPtr opbox)
-{
-    VIV2DBLITINFOPTR pBlt = &(galInfo->mBlitInfo);
-
-    if ( pBlt->mSrcTempSurfInfo.mPriv )
-    {
-        free(pBlt->mSrcTempSurfInfo.mPriv->mVidMemInfo);
-        free(pBlt->mSrcTempSurfInfo.mPriv);
-    }
-}
-
 static gce2D_NATURE_ROTATION _convertToNR(gceSURF_ROTATION rt)
 {
 
@@ -567,28 +437,29 @@ static Bool composite_one_pass(GALINFOPTR galInfo, VivBoxPtr opbox) {
     VivBoxPtr dstbox = &galInfo->mBlitInfo.mDstBox;
     VivBoxPtr osrcbox = &galInfo->mBlitInfo.mOSrcBox;
     VivBoxPtr odstbox = &galInfo->mBlitInfo.mODstBox;
-    gceSURF_ROTATION rtx, rty;
+    gceSURF_ROTATION rtx, rty,trt;
+    GenericSurfacePtr srcsurf;
 
     gcsRECT mSrcClip = {srcbox->x1, srcbox->y1, srcbox->x2, srcbox->y2};
     gcsRECT mDstClip = {dstbox->x1, dstbox->y1, dstbox->x2, dstbox->y2};
 
     gcsRECT mOSrcClip = {osrcbox->x1, osrcbox->y1, osrcbox->x2, osrcbox->y2};
     gcsRECT mODstClip = {odstbox->x1, odstbox->y1, odstbox->x2, odstbox->y2};
-
+    srcsurf = (GenericSurfacePtr)(pBlt->mSrcSurfInfo.mPriv->mVidMemInfo);
     if ( pBlt->mIsNotStretched && (pBlt->mRotation == gcvSURF_90_DEGREE ||
         pBlt->mRotation == gcvSURF_180_DEGREE ||
         pBlt->mRotation == gcvSURF_270_DEGREE)  )
     {
-       SetTempSurfForRT(galInfo,  (VivBoxPtr)gcvNULL);
-       gco2D_NatureRotateTranslation(gcvTRUE, _convertToNR(pBlt->mRotation), pBlt->mSrcSurfInfo.mWidth, pBlt->mSrcSurfInfo.mHeight, pBlt->mDstSurfInfo.mWidth, pBlt->mDstSurfInfo.mHeight, &mSrcClip, &mDstClip, &rtx, &rty);
-    } else {
-       /*setting the source surface*/
-       if (!SetSourceSurface(galInfo)) {
-            TRACE_ERROR("ERROR SETTING SOURCE SURFACE\n");
-            TRACE_EXIT(FALSE);
-       }
+       gco2D_NatureRotateTranslation(gcvTRUE, _convertToNR(pBlt->mRotation),srcsurf->mAlignedWidth, srcsurf->mAlignedHeight, pBlt->mDstSurfInfo.mWidth, pBlt->mDstSurfInfo.mHeight, &mSrcClip, &mDstClip, &rtx, &rty);
+       trt = srcsurf->mRotation;
+       srcsurf->mRotation = rtx;
     }
 
+    /*setting the source surface*/
+    if (!SetSourceSurface(galInfo)) {
+            TRACE_ERROR("ERROR SETTING SOURCE SURFACE\n");
+            TRACE_EXIT(FALSE);
+    }
     /*Setting the dest surface*/
     if (!SetDestinationSurface(galInfo)) {
         TRACE_ERROR("ERROR SETTING DST SURFACE\n");
@@ -652,7 +523,9 @@ static Bool composite_one_pass(GALINFOPTR galInfo, VivBoxPtr opbox) {
     if ( pBlt->mIsNotStretched && (pBlt->mRotation == gcvSURF_90_DEGREE ||
         pBlt->mRotation == gcvSURF_180_DEGREE ||
         pBlt->mRotation == gcvSURF_270_DEGREE)  )
-        ReleaseTempSurfForRT(galInfo, (VivBoxPtr)gcvNULL);
+    {
+        srcsurf->mRotation = trt;
+    }
 
     TRACE_EXIT(TRUE);
 }

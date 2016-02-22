@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -37,20 +37,20 @@ typedef struct __GLbitmaskRec
     /* op table */
     struct __GLbitmaskFUNCS *op;
 
-}__GLbitmask,*GLbitmask_PTR;
+} __GLbitmask,*GLbitmask_PTR;
 
 typedef struct __GLbitmaskFUNCS
 {
     GLboolean (*test) (GLbitmask_PTR Bitmask, GLuint Loc);
-    GLvoid    (*or) (GLbitmask_PTR Bitmask, GLuint Loc);
-    GLvoid    (*or2)(GLbitmask_PTR BitmaskResult, GLbitmask_PTR Bitmask1, GLbitmask_PTR Bitmask2);
+    GLvoid    (*set) (GLbitmask_PTR Bitmask, GLuint Loc);
+    GLvoid    (*or)(GLbitmask_PTR BitmaskResult, GLbitmask_PTR Bitmask1, GLbitmask_PTR Bitmask2);
     GLboolean (*testAndClear)(GLbitmask_PTR Bitmask,  GLuint Loc);
     GLboolean (*isAllZero)(GLbitmask_PTR Bitmask);
     GLvoid    (*init)(GLbitmask_PTR Bitmask, GLboolean AllOne);
     GLvoid    (*clear)(GLbitmask_PTR Bitmask, GLuint Loc);
     GLvoid    (*setAll)(GLbitmask_PTR Bitmask, GLboolean AllOne);
     GLvoid    (*setValue)(GLbitmask_PTR Bitmask, GLuint Value);
-}GLbitmaskFUNCS;
+} GLbitmaskFUNCS;
 
 __GL_INLINE GLboolean seMaskTest(GLbitmask_PTR Bitmask, GLuint Loc)
 {
@@ -58,13 +58,13 @@ __GL_INLINE GLboolean seMaskTest(GLbitmask_PTR Bitmask, GLuint Loc)
     return ((Bitmask->me[0] & ((__GL_BITMASK_ELT_TYPE) 1 << Loc)) ? gcvTRUE: gcvFALSE);
 }
 
-__GL_INLINE GLvoid seMaskOR(GLbitmask_PTR Bitmask, GLuint Loc)
+__GL_INLINE GLvoid seMaskSet(GLbitmask_PTR Bitmask, GLuint Loc)
 {
     GL_ASSERT(Loc < Bitmask->size);
     Bitmask->me[0] |= (__GL_BITMASK_ELT_TYPE) 1 << Loc;
 }
 
-__GL_INLINE GLvoid seMaskOR2(GLbitmask_PTR BitmaskResult, GLbitmask_PTR Bitmask1, GLbitmask_PTR Bitmask2)
+__GL_INLINE GLvoid seMaskOR(GLbitmask_PTR BitmaskResult, GLbitmask_PTR Bitmask1, GLbitmask_PTR Bitmask2)
 {
     BitmaskResult->me[0] = Bitmask1->me[0] | Bitmask2->me[0];
 }
@@ -114,8 +114,8 @@ __GL_INLINE GLvoid seMaskSetValue(GLbitmask_PTR Bitmask, GLuint Value)
 static GLbitmaskFUNCS seMaskFuncs =
 {
     seMaskTest,
+    seMaskSet,
     seMaskOR,
-    seMaskOR2,
     seMaskTestAndClear,
     seMaskIsAllZero,
     seMaskInit,
@@ -131,13 +131,13 @@ __GL_INLINE GLboolean meMaskTest(GLbitmask_PTR Bitmask, GLuint Loc)
 }
 
 
-__GL_INLINE GLvoid  meMaskOR(GLbitmask_PTR Bitmask, GLuint Loc)
+__GL_INLINE GLvoid meMaskSet(GLbitmask_PTR Bitmask, GLuint Loc)
 {
     GL_ASSERT(Loc < Bitmask->size);
     Bitmask->me[Loc / __GL_BITMASK_ELT_BITS] |= ((__GL_BITMASK_ELT_TYPE) 1 << (Loc % __GL_BITMASK_ELT_BITS));
 }
 
-__GL_INLINE GLvoid meMaskOR2(GLbitmask_PTR BitmaskResult, GLbitmask_PTR Bitmask1, GLbitmask_PTR Bitmask2)
+__GL_INLINE GLvoid meMaskOR(GLbitmask_PTR BitmaskResult, GLbitmask_PTR Bitmask1, GLbitmask_PTR Bitmask2)
 {
     GLuint i;
     GLuint minIndex = __GL_MIN(Bitmask1->numOfElts, Bitmask2->numOfElts);
@@ -219,8 +219,8 @@ __GL_INLINE GLvoid meMaskSetValue(GLbitmask_PTR Bitmask, GLuint Value)
 static GLbitmaskFUNCS meMaskFuncs =
 {
     meMaskTest,
+    meMaskSet,
     meMaskOR,
-    meMaskOR2,
     meMaskTestAndClear,
     meMaskIsAllZero,
     meMaskInit,
@@ -286,7 +286,7 @@ __glBitmaskInitAllZero(
 ** BitmaskResult can NOT be either of Bitmask1 or Bitmask2.
 */
 __GL_INLINE GLvoid
-__glBitmaskInitOR2(
+__glBitmaskInitOR(
     GLbitmask_PTR BitmaskResult,
     GLbitmask_PTR Bitmask1,
     GLbitmask_PTR Bitmask2
@@ -296,7 +296,7 @@ __glBitmaskInitOR2(
 
     __glBitmaskInitAllZero(BitmaskResult, size);
 
-    (*BitmaskResult->op->or2)(BitmaskResult, Bitmask1, Bitmask2);
+    (*BitmaskResult->op->or)(BitmaskResult, Bitmask1, Bitmask2);
 }
 
 /*
@@ -338,12 +338,12 @@ __glBitmaskIsAllZero(
 ** Arm Loc bit in Bitmask
 */
 __GL_INLINE GLvoid
-__glBitmaskOR(
+__glBitmaskSet(
     GLbitmask_PTR Bitmask,
     GLuint Loc
     )
 {
-    (*Bitmask->op->or)(Bitmask, Loc);
+    (*Bitmask->op->set)(Bitmask, Loc);
 }
 
 /*
@@ -383,7 +383,7 @@ __glBitmaskMergeBitMaskArray(
     GLuint i;
     for (i = 0; i < Count; i++)
     {
-        (*BitmaskResult->op->or2)(BitmaskResult, BitmaskResult, BitmaskArray[i]);
+        (*BitmaskResult->op->or)(BitmaskResult, BitmaskResult, BitmaskArray[i]);
     }
     return;
 }
@@ -397,7 +397,7 @@ __glBitmaskOR2(
     GLbitmask_PTR Bitmask
     )
 {
-    (*BitmaskResult->op->or2)(BitmaskResult, BitmaskResult, Bitmask);
+    (*BitmaskResult->op->or)(BitmaskResult, BitmaskResult, Bitmask);
 }
 
 #endif /*#ifndef __gc_es_bitmask_h_*/

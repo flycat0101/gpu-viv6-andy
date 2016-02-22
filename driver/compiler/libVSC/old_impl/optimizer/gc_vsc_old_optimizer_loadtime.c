@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -629,13 +629,10 @@ _RemoveTargetFromLTCTempRegList(
 
     if (opcode != gcSL_CALL &&
         opcode != gcSL_JMP &&
-        gcOpt_IsTempFunctionArgument(Optimizer,
-                                     gcvNULL,
-                                     (gctUINT)inst->tempIndex,
-                                     0,
-                                     gcvNULL,
-                                     &function))
+        Optimizer->tempArray[inst->tempIndex].argument != gcvNULL)
     {
+        function = Optimizer->tempArray[inst->tempIndex].function;
+
         /* Remove all codes in LTC list that depends on this code. */
         if (Code->function != function && function->shaderFunction != gcvNULL)
         {
@@ -915,6 +912,8 @@ _addInstructionToLTCList(
         case gcSL_TEXLDPCFPROJ:
                 /* Skip texture sample instructions. */
         case gcSL_STORE:
+        case gcSL_STORE1:
+        case gcSL_STORE_L:
         case gcSL_IMAGE_SAMPLER:
         case gcSL_IMAGE_RD:
         case gcSL_IMAGE_WR:

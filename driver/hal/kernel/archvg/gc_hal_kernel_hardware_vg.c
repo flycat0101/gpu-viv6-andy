@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -56,6 +56,8 @@
 #include "gc_hal.h"
 #include "gc_hal_kernel.h"
 #include "gc_hal_kernel_hardware_command_vg.h"
+
+#include "gc_feature_database.h"
 
 #if gcdENABLE_VG
 
@@ -194,6 +196,7 @@ OnError:
 static gceSTATUS
 _IdentifyHardware(
     IN gckOS Os,
+    IN gckVGHARDWARE Hardware,
     OUT gceCHIPMODEL * ChipModel,
     OUT gctUINT32 * ChipRevision,
     OUT gctUINT32 * ChipFeatures,
@@ -245,6 +248,18 @@ _IdentifyHardware(
         /* Read chip minor feature register #2. */
         gcmkERR_BREAK(gckOS_ReadRegisterEx(
             Os, gcvCORE_VG, 0x00074, ChipMinorFeatures2
+            ));
+
+        gcmkERR_BREAK(gckOS_ReadRegisterEx(
+            Os, gcvCORE_VG, 0x000A8, &Hardware->productID
+            ));
+
+        gcmkERR_BREAK(gckOS_ReadRegisterEx(
+            Os, gcvCORE_VG, 0x000E8, &Hardware->ecoID
+            ));
+
+        gcmkERR_BREAK(gckOS_ReadRegisterEx(
+            Os, gcvCORE_VG, 0x00030, &Hardware->customerID
             ));
 
         gcmkTRACE(
@@ -316,6 +331,7 @@ gckVGHARDWARE_Construct(
     gctUINT32 chipFeatures;
     gctUINT32 chipMinorFeatures;
     gctUINT32 chipMinorFeatures2;
+    gcsFEATURE_DATABASE * database;
 
     gcmkHEADER_ARG("Os=0x%x Hardware=0x%x ", Os, Hardware);
 
@@ -335,15 +351,15 @@ gckVGHARDWARE_Construct(
                 "_ResetGPU failed: status=%d\n", status);
         }
 
-        /* Identify the hardware. */
-        gcmkERR_BREAK(_IdentifyHardware(Os,
-            &chipModel, &chipRevision,
-            &chipFeatures, &chipMinorFeatures, &chipMinorFeatures2
-            ));
-
         /* Allocate the gckVGHARDWARE object. */
         gcmkERR_BREAK(gckOS_Allocate(Os,
             gcmSIZEOF(struct _gckVGHARDWARE), (gctPOINTER *) &hardware
+            ));
+
+        /* Identify the hardware. */
+        gcmkERR_BREAK(_IdentifyHardware(Os, hardware,
+            &chipModel, &chipRevision,
+            &chipFeatures, &chipMinorFeatures, &chipMinorFeatures2
             ));
 
         /* Initialize the gckVGHARDWARE object. */
@@ -373,6 +389,25 @@ gckVGHARDWARE_Construct(
                                         &hardware->powerOffTimer));
 #endif
 
+        database = hardware->featureDatabase = gcQueryFeatureDB(
+            hardware->chipModel,
+            hardware->chipRevision,
+            hardware->productID,
+            hardware->ecoID,
+            hardware->customerID
+        );
+
+        if (database == gcvNULL)
+        {
+            gcmkPRINT("[galcore]: Feature database is not found,"
+                      "chipModel=0x%0x, chipRevision=0x%x, productID=0x%x, ecoID=0x%x",
+                      hardware->chipModel,
+                      hardware->chipRevision,
+                      hardware->productID,
+                      hardware->ecoID);
+            /* gcmkERR_BREAK(gcvSTATUS_NOT_FOUND); */
+        }
+
         /* Determine whether FE 2.0 is present. */
         hardware->fe20 = ((((gctUINT32) (hardware->chipFeatures)) >> (0 ?
  28:28) & ((gctUINT32) ((((1 ? 28:28) - (0 ? 28:28) + 1) == 32) ? ~0 : (~(~0 << ((1 ?
@@ -390,6 +425,10 @@ gckVGHARDWARE_Construct(
  18:18) & ((gctUINT32) ((((1 ? 18:18) - (0 ? 18:18) + 1) == 32) ? ~0 : (~(~0 << ((1 ?
  18:18) - (0 ? 18:18) + 1)))))) == (0x1  & ((gctUINT32) ((((1 ? 18:18) - (0 ?
  18:18) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:18) - (0 ? 18:18) + 1)))))));
+
+        /* Determine whether fc is present. */
+        hardware->fc = (((((gctUINT32) (hardware->chipFeatures)) >> (0 ? 0:0 )) & ((gctUINT32) ((((1 ? 0:0 ) - (0 ? 0:0 ) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 0:0 ) - (0 ? 0:0 ) + 1)))))) );
+
 
         /* Set default event mask. */
         hardware->eventMask = 0xFFFFFFFF;
@@ -628,6 +667,8 @@ gckVGHARDWARE_QueryChipIdentity(
     IN gckVGHARDWARE Hardware,
     OUT gceCHIPMODEL * ChipModel,
     OUT gctUINT32 * ChipRevision,
+    OUT gctUINT32 * ProductID,
+    OUT gctUINT32 * EcoID,
     OUT gctUINT32* ChipFeatures,
     OUT gctUINT32* ChipMinorFeatures,
     OUT gctUINT32* ChipMinorFeatures2
@@ -656,7 +697,7 @@ gckVGHARDWARE_QueryChipIdentity(
     {
         gctUINT32 features = Hardware->chipFeatures;
 
-        if ((((((gctUINT32) (features)) >> (0 ? 0:0)) & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 0:0) - (0 ? 0:0) + 1)))))) ))
+        if (Hardware->fc)
         {
             features = ((((gctUINT32) (features)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ? 0:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
@@ -701,6 +742,9 @@ gckVGHARDWARE_QueryChipIdentity(
     {
         *ChipMinorFeatures2 = Hardware->chipMinorFeatures2;
     }
+
+    *ProductID = Hardware->productID;
+    *EcoID = Hardware->ecoID;
 
     gcmkFOOTER_NO();
     /* Success. */
@@ -1485,7 +1529,7 @@ gckVGHARDWARE_SetFastClear(
     gctUINT32 debug;
     gceSTATUS status;
 
-    if (!(((((gctUINT32) (Hardware->chipFeatures)) >> (0 ? 0:0)) & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 0:0) - (0 ? 0:0) + 1)))))) ))
+    if (!Hardware->fc)
     {
         return gcvSTATUS_OK;
     }

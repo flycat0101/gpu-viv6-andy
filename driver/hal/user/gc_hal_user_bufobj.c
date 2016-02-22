@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1069,6 +1069,8 @@ gcoBUFOBJ_IndexBind (
     gceSTATUS status;
     gctUINT32 address;
     gctBOOL indexLocked;
+    gctUINT32 endAddress;
+    gctUINT32 bufSize;
 
     gcmHEADER_ARG("Index=0x%x Type=%d Offset=%u", Index, Type, Offset);
 
@@ -1080,7 +1082,10 @@ gcoBUFOBJ_IndexBind (
 
     /* Lock the bufobj buffer. */
     gcmONERROR(gcoHARDWARE_Lock(&Index->memory, &address, gcvNULL));
+    gcmSAFECASTSIZET(bufSize,Index->memory.size);
+
     indexLocked = gcvTRUE;
+    endAddress = address + bufSize  - 1;
 
     /* Add offset */
     address += Offset;
@@ -1088,7 +1093,7 @@ gcoBUFOBJ_IndexBind (
     gcoHARDWARE_SetHWSlot(gcvNULL, gcvENGINE_RENDER, gcvHWSLOT_INDEX, Index->memory.u.normal.node, 0);
 
     /* Program index */
-    gcmONERROR(gcoHARDWARE_BindIndex(gcvNULL, address, 0, Type, (Count * 3)));
+    gcmONERROR(gcoHARDWARE_BindIndex(gcvNULL, address, 0, endAddress, Type, (Count * 3)));
 
     /* Unlock the bufobj buffer. */
     if (indexLocked)

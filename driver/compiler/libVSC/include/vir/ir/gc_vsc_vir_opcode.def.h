@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -33,6 +33,8 @@
 #define EPFromS0            VIR_OPFLAG_ExpdPrecFromSrc0
 #define EPFromS12           VIR_OPFLAG_ExpdPrecFromSrc12
 #define EPFromS2            VIR_OPFLAG_ExpdPrecFromSrc2
+#define EPHP                VIR_OPFLAG_ExpdPrecHP
+#define EPMP                VIR_OPFLAG_ExpdPrecMP
 #define Use512BitUniform    VIR_OPFLAG_Use512Unifrom
 #define VXUse512BitUniform  (VXOnly|VIR_OPFLAG_Use512Unifrom)
 #define EVISModifier(SrcNo)  VIR_SrcNo2EVISModifier(SrcNo)
@@ -60,9 +62,9 @@
     /* @ conditional move: dst = cond_op(s0, s1) ? s2 : dst; */
     VIR_OPINFO(CMOV, 3, HasDest|Componentwise|Expr|EPFromS2, 1, AL),
     /* @ MOVAR, MOVAF, MOVAI, mov dynamic indexing value to a0 */
-    VIR_OPINFO(MOVA, 1, HasDest|Componentwise|EPFromS0, 1, LM),
+    VIR_OPINFO(MOVA, 1, HasDest|Componentwise|VIR_OPFLAG_ExpdPrecHP, 1, LM),
     /* @ swizzle vector components */
-    VIR_OPINFO(SWIZZLE, 3, HasDest|Expr|EPFromS0, 1, LM),
+    VIR_OPINFO(SWIZZLE, 3, HasDest|Expr|EPFromS0, 1, AL),
     /* @ shuffle vector components */
     VIR_OPINFO(SHUFFLE, 2, HasDest|Expr|EPFromS0, 1, NU),
     /* @ Shuffle components from register pair */
@@ -72,7 +74,7 @@
     /* compare each component
         dest = is_float(dest.type) ? ((cond_op(src0, src1) ? 1.0 : 0.0)
                                    : ((cond_op(src0, src1) ? 0xFFFFFFFF: 0) ;*/
-    VIR_OPINFO(CMP, 2, HasDest|Componentwise|Expr, 1, NM),
+    VIR_OPINFO(CMP, 2, HasDest|Componentwise|Expr|EPMP, 1, NM),
     /* machine instruction: Result = CMP(compFunc, source_0, source_1) ? source_2 : 0; */
     VIR_OPINFO(AQ_CMP, 3, HasDest|Componentwise|Expr|EPFromS2, 1, MC),
     /* machine instruction: Result = CMP(compFunc, source_0, source_1) ? 1.0 : 0.0; */
@@ -81,18 +83,18 @@
     VIR_OPINFO(PACK, 3, HasDest|Expr|EPFromHighest, 1, LM),
     /* move long/ulong data */
     VIR_OPINFO(MOV_LONG, 2, HasDest|Componentwise|EPFromHighest, 1, AL),
-    /* copy data */
+    /* copy data, COPY dest, source, byteSize */
     VIR_OPINFO(COPY, 2, HasDest|Componentwise|EPFromS0, 1, AL),
 
     /**
      ** type conversion
      **/
     /* convert source to dest type   */
-    VIR_OPINFO(CONV, 1, HasDest|Componentwise|Expr, 1, NM),
+    VIR_OPINFO(CONV, 1, HasDest|Componentwise|Expr|EPHP, 1, NM),
     /* convert source to dest type, only used in converter to match gcSL_CONV */
-    VIR_OPINFO(CONV0, 2, HasDest|Componentwise|Expr, 1, HM),
+    VIR_OPINFO(CONV0, 2, HasDest|Componentwise|Expr|EPHP, 1, HM),
     /* Machine instruction: convert source to dest type, source type is encoded in src1   */
-    VIR_OPINFO(AQ_CONV, 2, HasDest|Componentwise|Expr, 1, MC),
+    VIR_OPINFO(AQ_CONV, 2, HasDest|Componentwise|Expr|EPHP, 1, MC),
     /* Machine instruciton: convert source to dest type,
        Destination data type is determined by source_1.x[7:4].
        With dual-16 mode the Destination data type for I2I instructions
@@ -448,36 +450,61 @@
     VIR_OPINFO(STORE_S, 3, HasDest|MemWrite, 1, AL),
     VIR_OPINFO(ATOMADD_S, 3, HasDest|MemRead|MemWrite, 1, AL),
 
+    /* local memory load/store */
+    VIR_OPINFO(LOAD_L, 2, HasDest|MemRead|Expr, 1, AL),
+    VIR_OPINFO(STORE_L, 3, HasDest|MemWrite|Src2Componentwise|EPFromS2, 1, AL),
+
+    VIR_OPINFO(IMG_SAMPLER, 2, HasDest|MemRead|Expr, 1, HL),
+
     /* IMG_LOAD instructions.
-    ** The source0 holds the image address:
+    ** The source0 holds the vector 4 image descriptor:
     **      x: base address
     **      y: stride in bytes (should be set to 0 for 1D images).
-    **      z: slice in bytes (should be set to 0 for 1D/2D images).
+    **      z: [height(31:16), width(15:0)]
     **      w: image defines (see GCREG_SH_IMAGE offset).
-    ** The source1 holds the x/y/z coordinates (integer).
-    ** The source2 holds the relative offset for IMG_LOAD
+    ** The source1 holds the x/y coordinates (integer).
+    ** The source2 holds the relative offset (immediate value) for IMG_LOAD
+    **      src2.x[ 4: 0] S05 relative x offset
+    **      src2.x[ 9: 5] S05 relative y offset
+    ** The source3 is image sampler if presents (not undef)
+    */
+    VIR_OPINFO(IMG_LOAD, 4, HasDest|EPFromS0, 1, AL),
+
+    /* IMG_LOAD_3D instructions.
+    ** The source0 holds the vector 4 image descriptor:
+    **      x: base address (not used in 3d instruction)
+    **      y: stride in bytes (should be set to 0 for 1D images).
+    **      z: [height(31:16), width(15:0)]
+    **      w: image defines (see GCREG_SH_IMAGE offset).
+    ** The source1.xy holds the x/y coordinates (integer).
+    **     source1.z holds calculated base address of the addressing plane
+    **        z = src0.x + 3d_coord.z * slice
+    ** The source2 holds the relative offset (immediate value) for IMG_LOAD_3D
     **      src2.x[ 4: 0] S05 relative x offset
     **      src2.x[ 9: 5] S05 relative y offset
     **      src2.x[14:10] S05 relative z offset
+    ** The source3 is image sampler if presents (not undef)
     */
-    VIR_OPINFO(IMG_LOAD, 3, HasDest|EPFromS0, 1, AL),
+    VIR_OPINFO(IMG_LOAD_3D, 4, HasDest|MemRead|EPFromS0, 1, AL),
 
     /* IMG_STORE instructions.
-    ** The source0 holds the the image value:
-    **      src2.x[ 4: 0] S05 relative x offset
-    **      src2.x[ 9: 5] S05 relative y offset
-    **      src2.x[14:10] S05 relative z offset
-    ** The source1 holds the image address:
-    **      x: base address
-    **      y: stride in bytes (should be set to 0 for 1D images).
-    **      z: slice in bytes (should be set to 0 for 1D/2D images).
-    **      w: image defines (see GCREG_SH_IMAGE offset).
-    ** The source2 holds the x/y/z coordinates (integer).
-
+    ** The source0 holds the vector 4 image descriptor (same as IMG_LOAD):
+    ** The source1.xy holds the x/y coordinates (integer).
+    **     source1.z holds calculated base address of the addressing plane
+    **        z = src0.x + 3d_coord.z * slice
+    ** The source2 holds the color value
     */
     VIR_OPINFO(IMG_STORE, 3, HasDest|MemWrite|EPFromS0, 1, AL),
-    VIR_OPINFO(IMG_LOAD_3D, 3, HasDest|MemRead|EPFromS0, 1, AL),
+
+    /* IMG_STORE_3D instructions.
+    ** The source0 holds the vector 4 image descriptor (same as IMG_LOAD):
+    ** The source1.xy holds the x/y coordinates (integer).
+    **     source1.z holds calculated base address of the addressing plane
+    **        z = src0.x + 3d_coord.z * slice
+    ** The source2 holds the color value
+    */
     VIR_OPINFO(IMG_STORE_3D, 3, HasDest|MemWrite|EPFromS0, 1, AL),
+
     VIR_OPINFO(IMG_ADDR, 3, HasDest, 1, AL),
     VIR_OPINFO(IMG_ADDR_3D, 3, HasDest, 1, AL),
 
@@ -487,7 +514,7 @@
 
     /* register array access */
     /* indexed array load:  LDARR dest, src0, src1 ==> dest = src0[src1] */
-    VIR_OPINFO(LDARR, 2, HasDest|Expr, 1, LM),
+    VIR_OPINFO(LDARR, 2, HasDest|Expr|EPFromS0, 1, LM),
     /* indexed array store: STARR dest, src0, src1 ==> dest[src0] = src1 */
     VIR_OPINFO(STARR, 2, HasDest, 1, LM),
 
@@ -531,7 +558,7 @@
 
     /* Use integer texture coordinate P to lookup a single texel from sampler.
        The array layer comes from the last component of P for the array forms.*/
-    VIR_OPINFO(TEXLD_FETCH_MS, 4, HasDest|MemRead, 1, LM),
+    VIR_OPINFO(TEXLD_FETCH_MS, 4, HasDest|MemRead|EPFromS0, 1, LM),
 
     /* fragment shader only, get current quad lod,
        same group as dsx/dsy, need HW support */
@@ -553,7 +580,7 @@
     VIR_OPINFO(LODQ, 2, HasDest, 1, LM),
     VIR_OPINFO(LODQ_G, 2, HasDest, 1, LM),
 
-    VIR_OPINFO(GET_SAMPLER_IDX, 2, HasDest, 1, AL),
+    VIR_OPINFO(GET_SAMPLER_IDX, 2, HasDest|EPFromS0, 1, AL),
     VIR_OPINFO(GET_SAMPLER_LMM, 2, HasDest, 1, AL),
     VIR_OPINFO(GET_SAMPLER_LBS, 2, HasDest, 1, AL),
 
@@ -617,9 +644,61 @@
      *   i E [StartBin,EndBin],
      *   j E [SourceBin, SourceBin + EndBin ? StartBin]
      */
+
+    /* implicit cast for vx_inst parameter */
+    VIR_OPINFO(VX_ICASTP, 1, HasDest|EPFromS0|VXOnly, 1, NM),
+    /* implicit cast for vx_inst dest */
+    VIR_OPINFO(VX_ICASTD, 1, HasDest|EPFromS0|VXOnly, 1, NM),
+
+    /* VX_IMG_LOAD instructions.
+    ** The source0 holds the vector 4 image descriptor:
+    **      x: base address
+    **      y: stride in bytes (should be set to 0 for 1D images).
+    **      z: [height(31:16), width(15:0)]
+    **      w: image defines (see GCREG_SH_IMAGE offset).
+    ** The source1 holds the x/y coordinates (integer).
+    ** The source2 holds the relative offset (immediate value) for IMG_LOAD
+    **      src2.x[ 4: 0] S05 relative x offset
+    **      src2.x[ 9: 5] S05 relative y offset
+    ** The source3 holds EVIS_modifer
+    */
     VIR_OPINFO(VX_IMG_LOAD, 4, HasDest|EPFromS0|VXOnly|EVISModifier(4), 1, AL),
-    VIR_OPINFO(VX_IMG_STORE, 4, HasDest|MemWrite|EPFromS0|VXOnly|EVISModifier(4), 1, AL),
+
+    /* VX_IMG_LOAD_3D instructions.
+    ** The source0 holds the vector 4 image descriptor:
+    **      x: base address (not used in 3d instruction)
+    **      y: stride in bytes (should be set to 0 for 1D images).
+    **      z: [height(31:16), width(15:0)]
+    **      w: image defines (see GCREG_SH_IMAGE offset).
+    ** The source1.xy holds the x/y coordinates (integer).
+    **     source1.z holds calculated base address of the addressing plane
+    **        z = src0.x + 3d_coord.z * slice
+    ** The source2 holds the relative offset (immediate value) for IMG_LOAD_3D
+    **      src2.x[ 4: 0] S05 relative x offset
+    **      src2.x[ 9: 5] S05 relative y offset
+    **      src2.x[14:10] S05 relative z offset
+    ** The source3 holds EVIS_modifer
+    */
     VIR_OPINFO(VX_IMG_LOAD_3D, 4, HasDest|EPFromS0|VXOnly|EVISModifier(4), 1, AL),
+
+    /* IMG_STORE instructions.
+    ** The source0 holds the vector 4 image descriptor (same as IMG_LOAD):
+    ** The source1.xy holds the x/y coordinates (integer).
+    **     source1.z holds calculated base address of the addressing plane
+    **        z = src0.x + 3d_coord.z * slice
+    ** The source2 holds the color value
+    ** The source3 holds EVIS_modifer
+    */
+    VIR_OPINFO(VX_IMG_STORE, 4, HasDest|MemWrite|EPFromS0|VXOnly|EVISModifier(4), 1, AL),
+
+    /* VX_IMG_STORE_3D instructions.
+    ** The source0 holds the vector 4 image descriptor (same as IMG_LOAD):
+    ** The source1.xy holds the x/y coordinates (integer).
+    **     source1.z holds calculated base address of the addressing plane
+    **        z = src0.x + 3d_coord.z * slice
+    ** The source2 holds the color value
+    ** The source3 holds EVIS_modifer
+    */
     VIR_OPINFO(VX_IMG_STORE_3D, 4, HasDest|MemWrite|EPFromS0|VXOnly|EVISModifier(4), 1, AL),
 
     /* The AbsDiff instruction computes the absolute difference between two values.
@@ -641,7 +720,7 @@
      * values. Valid instruction formats are U8, S8, U16, and S16.
      *  dest[i] = src0[i] + (src1[j]^2 >> src2).
      */
-    VIR_OPINFO(VX_IACCSQ, 3, HasDest|Componentwise|Expr|VXOnly|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_IACCSQ, 4, HasDest|Componentwise|Expr|VXOnly|EVISModifier(4), 1, AL),
 
     /* The Lerp instruction does a linear interpolation between two values. It works
      * on 8- and 16-bit packed data, so it can compute 16x 8-bit values or 8x 16-bit
@@ -734,6 +813,35 @@
      * will produce up to sixteen output values. Valid instruction formats are U8, and
      * S8.*/
     VIR_OPINFO(VX_DP2X16, 4, HasDest|Expr|VXUse512BitUniform|EVISModifier(3), 1, AL),
+
+    /* The DP32x1 instruction performs a dot-product of two 32-component values. It
+     * will produce only one output value. Valid instruction formats are U8, S8, U16,
+     * S16, U32, S32, FP16, and FP32.
+     */
+    VIR_OPINFO(VX_DP32X1_B, 5, HasDest|Expr|VXUse512BitUniform|EVISModifier(4), 1, AL),
+
+    /* The DP16x2 instruction performs a dot-product of two 16-component values.
+     * It will produce up to two output values. Valid instruction formats are U8, S8,
+     * U16, S16, U32, S32, FP16, and FP32.
+     */
+    VIR_OPINFO(VX_DP16X2_B, 5, HasDest|Expr|VXUse512BitUniform|EVISModifier(4), 1, AL),
+
+    /* The DP8x4 instruction performs a dot-product of two 8-component values. It
+     * will produce up to four output values. Valid instruction formats are U8, S8,
+     * U16, S16, U32, S32, FP16, and FP32.
+     */
+    VIR_OPINFO(VX_DP8X4_B, 5, HasDest|Expr|VXUse512BitUniform|EVISModifier(4), 1, AL),
+
+    /* The DP4x8 instruction performs a dot-product of two 4-component values. It
+     * will produce up to eight output values. Valid instruction formats are U8, S8,
+     * U16, S16, and FP16.
+     */
+    VIR_OPINFO(VX_DP4X8_B, 5, HasDest|Expr|VXUse512BitUniform|EVISModifier(4), 1, AL),
+
+    /* The DP2x16 instruction performs a dot-product of two 2-component values. It
+     * will produce up to sixteen output values. Valid instruction formats are U8, and
+     * S8.*/
+    VIR_OPINFO(VX_DP2X16_B, 5, HasDest|Expr|VXUse512BitUniform|EVISModifier(4), 1, AL),
 
     /* The Clamp instruction clamps up to 16 values to a min and.or max value. In
      * boolean mode it will write a 0 in the result if the value is inside the specified
@@ -831,7 +939,7 @@
     VIR_OPINFO(STORE_ATTR, 3, HasDest|OnlyUseEnable|MemWrite, 0, LM), /* STORE_ATTR  RemapAddr, AttributeIndex, Value */
     VIR_OPINFO(LOAD_ATTR, 3, HasDest|MemRead, 1, LM), /* LOAD_ATTR  dest, Remap.xyzw, RemapIndex, AttributeIndex */
     VIR_OPINFO(ATTR_ST, 3, HasDest|MemWrite, 1, HM), /* ATTR_ST  Output, InvocationIndex, offset, value */
-    VIR_OPINFO(ATTR_LD, 3, HasDest|Src0Componentwise|MemRead, 1, HM), /* ATTR_LD  dest, Attribute, InvocationIndex, offset */
+    VIR_OPINFO(ATTR_LD, 3, HasDest|Src0Componentwise|MemRead|Expr, 1, HM), /* ATTR_LD  dest, Attribute, InvocationIndex, offset */
 
     VIR_OPINFO(SELECT_MAP, 4, HasDest, 1, LM), /* SELECT_MAP dest, RangeSourceComponent, src1, src2, samperSwizzle */
     VIR_OPINFO(EMIT, 0, NoDest, 0, AL),

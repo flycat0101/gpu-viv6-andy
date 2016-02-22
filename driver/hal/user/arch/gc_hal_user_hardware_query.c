@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -159,6 +159,16 @@ static struct _gcsSURF_FORMAT_INFO formatPalettized[] =
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvINVALID_TEXTURE_FORMAT, gcmINVALID_TEXTURE_FORMAT_ENTRY,
     },
+
+#if gcdVG_ONLY
+    {
+        gcmNameFormat(INDEX2), gcvFORMAT_CLASS_INDEX, gcvFORMAT_DATATYPE_INDEX, gcmNON_COMPRESSED_BPP_ENTRY(2),
+        1, 0, 0, gcvFALSE,
+        {{{ 0, 2 }, {0}, {0}, {0}, {0}, {0}}}, {{{ 0, 2 }, {0}, {0}, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_INDEX8, gcmINVALID_TEXTURE_FORMAT_ENTRY,
+    },
+#endif
 };
 
 /* Format value range: 200-299
@@ -889,6 +899,62 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
         gcvSURF_AYUV, 0x25 << 12, baseComponents_rgba, gcvTRUE
     },
 
+    {
+        gcmNameFormat(YUV420_10_ST), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 15, 8, 2, 240,
+        1, 0, 0, gcvFALSE,
+        {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
+        {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvINVALID_TEXTURE_FORMAT, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(YUV420_TILE_ST), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 12, 64, 64, 6144,
+        1, 0, 0, gcvFALSE,
+        {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
+        {{{ 0, 8 }, { 0, 8 }, { 0, 8 }, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvINVALID_TEXTURE_FORMAT, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(YUV420_TILE_10_ST), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 15, 64, 64, 7680,
+        1, 0, 0, gcvFALSE,
+        {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
+        {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvINVALID_TEXTURE_FORMAT, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+#if gcdVG_ONLY
+    /* Just for format query in new 355VG core, not actually rendering usage for 3D core. */
+    {
+        gcmNameFormat(AYUY2), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 32, 1, 1, 32,
+        1, 0, 0, gcvFALSE,
+        {{{ 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}, {0}}},
+        {{{ 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_AYUY2, 0x25 << 12, baseComponents_rgba, gcvTRUE
+    },
+
+    {
+        gcmNameFormat(ANV12), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 32, 1, 1, 32,
+        1, 0, 0, gcvFALSE,
+        {{{ 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}, {0}}},
+        {{{ 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_ANV12, 0x25 << 12, baseComponents_rgba, gcvTRUE
+    },
+
+    {
+        gcmNameFormat(ANV16), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 32, 1, 1, 32,
+        1, 0, 0, gcvFALSE,
+        {{{ 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}, {0}}},
+        {{{ 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_ANV16, 0x25 << 12, baseComponents_rgba, gcvTRUE
+    },
+#endif
 };
 
 /* Format value range: 600-699
@@ -1683,7 +1749,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
         gcvSURF_A32B32G32R32F_4_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
     },
 
-    {
+     {
         gcmNameFormat(A32L32F), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(64),
         1, 0, 0, gcvFALSE,
         {{{ 32, 32 }, { 0, 32 }, {0}, {0}, {0}, {0}}},
@@ -1854,7 +1920,7 @@ static struct _gcsSURF_FORMAT_INFO formatFP[] =
         gcvSURF_B10G11R11F_1_A8R8G8B8, 0x07, baseComponents_rgba, gcvTRUE
     },
 
-    {
+     {
         gcmNameFormat(A32F_1_R32F), gcvFORMAT_CLASS_LUMINANCE, gcvFORMAT_DATATYPE_FLOAT32, gcmNON_COMPRESSED_BPP_ENTRY(32),
         1, 1, 0, gcvFALSE,
         {{{ 0, 32 }, { 0, gcvCOMPONENT_NOTPRESENT },
@@ -3234,7 +3300,57 @@ gcoHARDWARE_InitializeFormatArrayTable(
     }
 
     /* YUV420 */
-    if (Hardware->features[gcvFEATURE_YUV420_TILER])
+    if (Hardware->features[gcvFEATURE_TEXTURE_YUV_ASSEMBLER])
+    {
+        info = gcmGET_SURF_FORMAT_INFO(gcvSURF_YV12);
+        info->closestTXFormat     = gcvSURF_YV12;
+        info->txFormat            = 0x13 << 12;
+        info->txSwizzle           = baseComponents_rgb1;
+
+        info = gcmGET_SURF_FORMAT_INFO(gcvSURF_I420);
+        info->closestTXFormat     = gcvSURF_I420;
+        info->txFormat            = 0x13 << 12;
+        info->txSwizzle           = baseComponents_rgb1;
+
+        info = gcmGET_SURF_FORMAT_INFO(gcvSURF_NV12);
+        info->closestTXFormat     = gcvSURF_NV12;
+        info->txFormat            = 0x13 << 12;
+        info->txSwizzle           = baseComponents_rgb1;
+
+        info = gcmGET_SURF_FORMAT_INFO(gcvSURF_NV21);
+        info->closestTXFormat     = gcvSURF_NV21;
+        info->txFormat            = 0x13 << 12;
+        info->txSwizzle           = baseComponents_rgb1;
+
+        info = gcmGET_SURF_FORMAT_INFO(gcvSURF_NV16);
+        info->closestTXFormat     = gcvSURF_NV16;
+        info->txFormat            = 0x13 << 12;
+        info->txSwizzle           = baseComponents_rgb1;
+
+        info = gcmGET_SURF_FORMAT_INFO(gcvSURF_NV61);
+        info->closestTXFormat     = gcvSURF_NV61;
+        info->txFormat            = 0x13 << 12;
+        info->txSwizzle           = baseComponents_rgb1;
+
+        if (Hardware->features[gcvFEATURE_TX_YUV_ASSEMBLER_10BIT])
+        {
+            info = gcmGET_SURF_FORMAT_INFO(gcvSURF_YUV420_TILE_ST);
+            info->closestTXFormat = gcvSURF_YUV420_TILE_ST;
+            info->txFormat        = 0x13 << 12;
+            info->txSwizzle       = baseComponents_rgb1;
+
+            info = gcmGET_SURF_FORMAT_INFO(gcvSURF_YUV420_10_ST);
+            info->closestTXFormat = gcvSURF_YUV420_10_ST;
+            info->txFormat        = 0x13 << 12;
+            info->txSwizzle       = baseComponents_rgb1;
+
+            info = gcmGET_SURF_FORMAT_INFO(gcvSURF_YUV420_TILE_10_ST);
+            info->closestTXFormat = gcvSURF_YUV420_TILE_10_ST;
+            info->txFormat        = 0x13 << 12;
+            info->txSwizzle       = baseComponents_rgb1;
+        }
+    }
+    else if (Hardware->features[gcvFEATURE_YUV420_TILER])
     {
         info = gcmGET_SURF_FORMAT_INFO(gcvSURF_YV12);
         info->closestTXFormat     = gcvSURF_YUY2;
@@ -3415,7 +3531,6 @@ gcoHARDWARE_InitializeFormatArrayTable(
         info->txSwizzle           = baseComponents_r00g;
 
         info = gcmGET_SURF_FORMAT_INFO(gcvSURF_A32F);
-
         if(Hardware->features[gcvFEATURE_32BPP_COMPONENT_TEXTURE_CHANNEL_SWIZZLE])
         {
             info->closestTXFormat     = gcvSURF_A32F;
@@ -3430,7 +3545,6 @@ gcoHARDWARE_InitializeFormatArrayTable(
 
         /*FIXME: below, the swizzle can't work for L32F, A32L32F, A32R32F. Need support in HW*/
         info = gcmGET_SURF_FORMAT_INFO(gcvSURF_L32F);
-
         if(Hardware->features[gcvFEATURE_32BPP_COMPONENT_TEXTURE_CHANNEL_SWIZZLE])
         {
             info->closestTXFormat = gcvSURF_L32F;
@@ -3477,7 +3591,6 @@ gcoHARDWARE_InitializeFormatArrayTable(
         info->closestRenderFormat =
         info->closestTXFormat     = gcvSURF_X32B32G32R32F_4_A8R8G8B8;
     }
-
 
     /* Integer formats. */
     if (Hardware->features[gcvFEATURE_HALTI2])
@@ -3875,6 +3988,13 @@ gcoHARDWARE_InitializeFormatArrayTable(
         info = gcmGET_SURF_FORMAT_INFO(gcvSURF_ETC1);
         info->closestTXFormat     = gcvSURF_ETC1;
         info->txFormat            = 0x1E;
+        info->txIntFilter         = gcvTRUE;
+    }
+    else if (Hardware->features[gcvFEATURE_TEX_ETC2])
+    {
+        info = gcmGET_SURF_FORMAT_INFO(gcvSURF_ETC1);
+        info->closestTXFormat     = gcvSURF_ETC1;
+        info->txFormat            = 0x00 << 12;
         info->txIntFilter         = gcvTRUE;
     }
 
@@ -4693,6 +4813,8 @@ gcoHARDWARE_QueryCommandBuffer(
             *ReservedUser += bytes;
             /* need reserve more space for sendHwfence*/
             *ReservedUser += bytes + 4 * gcmSIZEOF(gctUINT32);
+            /* need reserve more space for pauseOQ*/
+            *ReservedUser += (bytes * 2) + 4 * gcmSIZEOF(gctUINT32);
         }
         *ReservedUser += gcdRESERVED_HW_FENCE;
     }
@@ -4704,6 +4826,10 @@ gcoHARDWARE_QueryCommandBuffer(
         *Source = gcvCMDBUF_VIRTUAL;
 #else
         *Source = gcvCMDBUF_CONTIGUOUS;
+#endif
+
+#if defined(UNDER_CE) && USE_KERNEL_VIRTUAL_BUFFERS
+        *Source = gcvCMDBUF_VIRTUAL;
 #endif
 
 #if gcdSECURITY
@@ -4783,8 +4909,6 @@ gcoHARDWARE_AlignToTile(
     gctBOOL superTiled;
     gceSURF_FORMAT format;
     gcsSURF_FORMAT_INFO_PTR formatInfo;
-    gctBOOL oclFormat;
-    gctUINT index;
     gctBOOL superTileOnly = gcvFALSE;
     gceSURF_ALIGNMENT horizontalAlign = gcvSURF_FOUR;
 
@@ -4821,6 +4945,7 @@ gcoHARDWARE_AlignToTile(
 
     switch (Type)
     {
+#if gcdENABLE_3D
     case gcvSURF_RENDER_TARGET:
     case gcvSURF_DEPTH:
         if (Hint & gcvSURF_LINEAR)
@@ -4829,8 +4954,9 @@ gcoHARDWARE_AlignToTile(
             superTiled = gcvFALSE;
             tiling = gcvLINEAR;
 
-            xAlignment = 16;
-            yAlignment = 4 * Hardware->config->pixelPipes;
+            /* Fit resolve alignment. */
+            xAlignment = Hardware->resolveAlignmentX;
+            yAlignment = Hardware->resolveAlignmentY;
         }
         else if (Hint & gcvSURF_NO_TILE_STATUS)
         {
@@ -4855,28 +4981,39 @@ gcoHARDWARE_AlignToTile(
             xAlignment = superTiled ? 64 : 16;
             yAlignment = superTiled ? 64 : 4;
 
-            if (Hardware->features[gcvFEATURE_MULTI_PIXELPIPES] && !Hardware->features[gcvFEATURE_SINGLE_BUFFER])
+            if (Hardware->features[gcvFEATURE_MULTI_PIXELPIPES] &&
+                !Hardware->features[gcvFEATURE_SINGLE_BUFFER])
             {
-                /* Split buffer only if we have multiple pixel pipe, and PE_ENHANCEMENTS3 is not available. */
+                /*
+                 * Split buffer only if we have multiple pixel pipe, and
+                 * PE_ENHANCEMENTS3 is not available.
+                 */
                 tiling |= gcvTILING_SPLIT_BUFFER;
-                yAlignment *= Hardware->config->pixelPipes;
+                yAlignment *= Hardware->config->resolvePipes;
             }
         }
         else if ((Hint & gcvSURF_CREATE_AS_DISPLAYBUFFER) &&
-                 (gcoHAL_GetOption(gcvNULL, gcvOPTION_PREFER_TILED_DISPLAY_BUFFER) && !superTileOnly)
-                )
+                 (gcoHAL_GetOption(gcvNULL, gcvOPTION_PREFER_TILED_DISPLAY_BUFFER) &&
+                 !superTileOnly))
         {
-            /* special path for platform which perfer to have tiled display buffer */
+            /*
+             * special path for platform which perfer to have tiled display
+             * buffer
+             */
             tiling = gcvTILED;
             xAlignment = 16;
             yAlignment = 4;
             superTiled = gcvFALSE;
 
-            if (Hardware->features[gcvFEATURE_MULTI_PIXELPIPES] && !Hardware->features[gcvFEATURE_SINGLE_BUFFER])
+            if (Hardware->features[gcvFEATURE_MULTI_PIXELPIPES] &&
+                !Hardware->features[gcvFEATURE_SINGLE_BUFFER])
             {
-                /* Split buffer only if we have multiple pixel pipe, and PE_ENHANCEMENTS3 is not available. */
+                /*
+                 * Split buffer only if we have multiple pixel pipe, and
+                 * PE_ENHANCEMENTS3 is not available.
+                 */
                 tiling |= gcvTILING_SPLIT_BUFFER;
-                yAlignment *= Hardware->config->pixelPipes;
+                yAlignment *= Hardware->config->resolvePipes;
             }
         }
         else
@@ -4887,19 +5024,20 @@ gcoHARDWARE_AlignToTile(
             xAlignment = superTiled ? 64 : 16;
             yAlignment = superTiled ? 64 : 4;
 
-            if (Hardware->features[gcvFEATURE_MULTI_PIXELPIPES] && !Hardware->features[gcvFEATURE_SINGLE_BUFFER])
+            if (Hardware->features[gcvFEATURE_MULTI_PIXELPIPES]
+                && !Hardware->features[gcvFEATURE_SINGLE_BUFFER])
             {
-                /* Split buffer only if we have multiple pixel pipe, and PE_ENHANCEMENTS3 is not available. */
+                /*
+                 * Split buffer only if we have multiple pixel pipe, and
+                 * PE_ENHANCEMENTS3 is not available.
+                 */
                 tiling |= gcvTILING_SPLIT_BUFFER;
-                yAlignment *= Hardware->config->pixelPipes;
+                yAlignment *= Hardware->config->resolvePipes;
             }
         }
         break;
 
     case gcvSURF_TEXTURE:
-
-        oclFormat = ((Format & gcvSURF_FORMAT_OCL) != 0);
-
         switch (format)
         {
         case gcvSURF_ETC1:
@@ -4919,7 +5057,7 @@ gcoHARDWARE_AlignToTile(
         case gcvSURF_RGBA8_ETC2_EAC:
         case gcvSURF_SRGB8_ALPHA8_ETC2_EAC:
             /* Of course, hardware needs to support compressed super tiles. */
-            superTiled = oclFormat
+            superTiled = ((Format & gcvSURF_FORMAT_OCL) != 0)
                        ? gcvFALSE
                        : Hardware->features[gcvFEATURE_TEX_COMPRRESSION_SUPERTILED];
 
@@ -4956,11 +5094,15 @@ gcoHARDWARE_AlignToTile(
         case gcvSURF_ASTC10x10_SRGB:
         case gcvSURF_ASTC12x10_SRGB:
         case gcvSURF_ASTC12x12_SRGB:
-            superTiled = gcvFALSE;
-            index = format - gcvSURF_ASTC4x4;
-            xAlignment = formatASTC[index].blockWidth;
-            yAlignment = formatASTC[index].blockHeight;
-            tiling = gcvTILED;
+            {
+                gctUINT index;
+
+                superTiled = gcvFALSE;
+                index = format - gcvSURF_ASTC4x4;
+                xAlignment = formatASTC[index].blockWidth;
+                yAlignment = formatASTC[index].blockHeight;
+                tiling = gcvTILED;
+            }
             break;
 
         default:
@@ -4986,13 +5128,14 @@ gcoHARDWARE_AlignToTile(
             {
                 superTiled = gcvFALSE;
                 xAlignment = 16;
-                yAlignment = 4 * Hardware->config->pixelPipes;
+                yAlignment = 4;
                 tiling     = gcvLINEAR;
             }
             else
             {
-                xAlignment = superTiled ? 64 : Hardware->features[gcvFEATURE_TX_HOR_ALIGN_SEL]? 16 :
-                                                                         (Hardware->features[gcvFEATURE_128BTILE] ? 8 : 4);
+                xAlignment = superTiled ? 64
+                           : Hardware->features[gcvFEATURE_TX_HOR_ALIGN_SEL] ? 16
+                           : (Hardware->features[gcvFEATURE_128BTILE] ? 8 : 4);
                 yAlignment = superTiled ? 64 : 4;
                 tiling     = superTiled ? gcvSUPERTILED : gcvTILED;
             }
@@ -5000,19 +5143,40 @@ gcoHARDWARE_AlignToTile(
         }
 
         /* Need to be aligned for resolve. */
-        /* For CUBE/2DArray/3D texture, cannot aligned to multi pipe, otherwise HW texture unit cannot
-        ** calc the addr other than first slice.
-        */
-        if (!superTiled && (1 == Depth))
+        if (Hardware->features[gcvFEATURE_MULTI_PIXELPIPES] &&
+            !Hardware->features[gcvFEATURE_SINGLE_BUFFER])
         {
-            yAlignment *= Hardware->config->pixelPipes;
+            if (!superTiled && (1 == Depth))
+            {
+                yAlignment *= Hardware->config->resolvePipes;
+            }
         }
         break;
+#endif
 
     default:
-        superTiled = gcvFALSE;
-        xAlignment = 16;
-        yAlignment = 4 * Hardware->config->pixelPipes;
+        switch (Format)
+        {
+        case gcvSURF_YUV420_TILE_ST:
+        case gcvSURF_YUV420_TILE_10_ST:
+            superTiled = gcvFALSE;
+            /* Y is 64x64 pixel in one block. */
+            xAlignment = 64;
+            yAlignment = 64;
+            break;
+
+        default:
+            superTiled = gcvFALSE;
+            xAlignment = 16;
+            yAlignment = 4;
+        }
+
+        if (Hardware->features[gcvFEATURE_MULTI_PIXELPIPES] &&
+            !Hardware->features[gcvFEATURE_SINGLE_BUFFER])
+        {
+            yAlignment *= Hardware->config->resolvePipes;
+        }
+
         tiling     = gcvLINEAR;
     }
 
@@ -5064,6 +5228,15 @@ gcoHARDWARE_AlignToTile(
         horizontalAlign = gcvSURF_FOUR;
         break;
     }
+
+    gcmTRACE(
+        gcvLEVEL_INFO,
+        "%s: type=%x hint=%x format=%d => "
+        "tiling=%x superTiled=%d alignment=%d,%d",
+        __FUNCTION__,
+        Type, Hint, Format,
+        tiling, superTiled, xAlignment, yAlignment
+        );
 
     if (Width != gcvNULL)
     {
@@ -5211,7 +5384,7 @@ OnError:
 **          Pointer to a variable receiving the height in pixels per tile.
 */
 gceSTATUS gcoHARDWARE_GetSurfaceTileSize(
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     OUT gctINT32 * TileWidth,
     OUT gctINT32 * TileHeight
     )
@@ -5263,7 +5436,7 @@ gceSTATUS gcoHARDWARE_GetSurfaceTileSize(
 **
 **     gcoHARDWARE Hardware,
 *           Pointer to hardware object
-**     gcsSURF_INFO_PTR Surface,
+**     gcoSURF Surface,
 **
 **
 **  OUTPUT:
@@ -5283,7 +5456,7 @@ gceSTATUS gcoHARDWARE_GetSurfaceTileSize(
 */
 gceSTATUS gcoHARDWARE_GetSurfaceResolveAlignment(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     OUT gctUINT *originX,
     OUT gctUINT *originY,
     OUT gctUINT *sizeX,
@@ -5298,56 +5471,62 @@ gceSTATUS gcoHARDWARE_GetSurfaceResolveAlignment(
 
     gcmGETHARDWARE(Hardware);
 
-    gcmVERIFY_ARGUMENT(Surface != gcvNULL);
-
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
+    gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
 
     if (Surface->superTiled)
     {
-        x = 64;
+        x = y = 64;
     }
-    else if(Surface->format == gcvSURF_S8)
+    else if (Surface->tiling == gcvLINEAR)
     {
-        x = 32;
-    }
-    else if (Surface->node.pool == gcvPOOL_VIRTUAL)
-    {
-        if (Surface->bitsPerPixel == 16)
+        /* Requires 16,4 origin alignment for linear. */
+        x = 16;
+        y = 4;
+
+        if (Surface->bitsPerPixel == 8)
         {
+            /* Special resolve origin alignment for 8bpp. */
             x = 32;
         }
-        else
+    }
+    else
+    {
+        /* Requires 4,4 tile boundary. */
+        x = y = 4;
+
+        if (Surface->bitsPerPixel == 8)
         {
-            x = 16;
+            /* Special resolve origin alignment for 8bpp. */
+            x = 8;
         }
     }
-    else
+
+    if (Hardware->multiPipeResolve)
     {
-        x = 4;
+        /* More y-origin requirement if have to use multi-pipe resolve. */
+        y *= Hardware->config->resolvePipes;
     }
 
-    y = (Surface->superTiled ? 64 : 4) *
-                                (((Surface->tiling & gcvTILING_SPLIT_BUFFER) || (Hardware->multiPipeResolve)) ?
-                                                         Hardware->config->pixelPipes : 1);
+    /* Get resolve alignment. */
+    width  = Hardware->resolveAlignmentX;
+    height = Hardware->resolveAlignmentY;
 
-    if(Surface->format == gcvSURF_S8)
+    if (Surface->bitsPerPixel == 8)
     {
+        /* Special resolve size alignment for 8bpp. */
         width = 32;
     }
-    else
-    {
-        width = 16;
-    }
 
-    if (Hardware->features[gcvFEATURE_SINGLE_BUFFER])
-    {
-        height = (Surface->tiling & gcvTILING_SPLIT_BUFFER) ? 8 : 4;
-    }
-    else
-    {
-        height = (Hardware->config->pixelPipes > 1) ? 8 : 4;
-    }
+    gcmTRACE(
+        gcvLEVEL_INFO,
+        "%s: tiling=%d format=%d => "
+        "originAlignment=%d,%d sizeAlignment=%dx%d",
+        __FUNCTION__,
+        Surface->tiling, Surface->format,
+        x, y, width, height
+        );
 
     if (originX)
     {
@@ -5606,9 +5785,6 @@ OnError:
 **      gctUINT * MaxAnisoValue
 **          Pointer to a variable receiving the maximum parameter value of
 **          anisotropic filter.
-**
-**      gctUINT * TexldPerCycle
-**          Pointer to a variable receiving the number of texld per cycle.
 */
 gceSTATUS gcoHARDWARE_QueryTextureCaps(
     IN  gcoHARDWARE Hardware,
@@ -5619,8 +5795,7 @@ gceSTATUS gcoHARDWARE_QueryTextureCaps(
     OUT gctBOOL * NonPowerOfTwo,
     OUT gctUINT * VertexSamplers,
     OUT gctUINT * PixelSamplers,
-    OUT gctUINT * MaxAnisoValue,
-    OUT gctUINT * TexldPerCycle
+    OUT gctUINT * MaxAnisoValue
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -5695,11 +5870,6 @@ gceSTATUS gcoHARDWARE_QueryTextureCaps(
             /* Isotropic. */
             *MaxAnisoValue = 1;
         }
-    }
-
-    if (TexldPerCycle)
-    {
-        *TexldPerCycle = Hardware->config->texldPerCycle;
     }
 
 OnError:
@@ -5861,7 +6031,7 @@ gceSTATUS gcoHARDWARE_QueryStreamCaps(
     if (MaxAttributes != gcvNULL)
     {
         /* Return number of attributes per vertex for XAQ2. */
-        *MaxAttributes = Hardware->features[gcvFEATURE_32_ATTRIBUTES] ?
+        *MaxAttributes = Hardware->features[gcvFEATURE_PIPELINE_32_ATTRIBUTES] ?
                          32 : (Hardware->features[gcvFEATURE_HALTI0] ? 16 : 10);
     }
 
@@ -5885,7 +6055,7 @@ gceSTATUS gcoHARDWARE_QueryStreamCaps(
 
     if (MaxAttribOffset != gcvNULL)
     {
-        *MaxAttribOffset = Hardware->features[gcvFEATURE_32_ATTRIBUTES] ? 2047 : 255;
+        *MaxAttribOffset = Hardware->features[gcvFEATURE_NEW_GPIPE] ? 2047 : 255;
     }
 
 OnError:
@@ -6226,19 +6396,6 @@ gcoHARDWARE_QueryTileStatus(
         /* Assume 128B cache mode, every 128B->4bit */
         *Size = gcmALIGN (Bytes >> 8, alignment);
     }
-    else if (Hardware->features[gcvFEATURE_COMPRESSION_V4])
-    {
-        gctUINT alignment = Hardware->features[gcvFEATURE_BLT_ENGINE] ? 1 :
-                              (Hardware->resolveAlignmentX *
-                               Hardware->resolveAlignmentY * 4);
-
-        /* Every 8x8 pixels require 8bits tile status buffer */
-        gcmASSERT(((Width & 0x7) == 0) && ((Height & 0x7) == 0));
-        *Size = (Width >> 3) * (Height >> 3);
-
-        /* Align the tile status. */
-        *Size = gcmALIGN(*Size, alignment);
-    }
     else
     {
         gctUINT32 alignment = Hardware->resolveAlignmentX *
@@ -6255,12 +6412,6 @@ gcoHARDWARE_QueryTileStatus(
             *Size = is2BitPerTile ? (Bytes >> 8) : (Bytes >> 7);
         }
 
-        /* FIXME: remove this check, Hardware->resolveAlignmentY already consider the two pipe*/
-        if (Hardware->features[gcvFEATURE_SINGLE_BUFFER])
-        {
-            alignment *= Hardware->config->pixelPipes;
-        }
-
         /* Align the tile status. */
         *Size = gcmALIGN(*Size, alignment);
     }
@@ -6268,14 +6419,7 @@ gcoHARDWARE_QueryTileStatus(
     /* Set alignment. */
     if (Alignment != gcvNULL)
     {
-        if (Hardware->features[gcvFEATURE_COMPRESSION_V4])
-        {
-            *Alignment = 256;
-        }
-        else
-        {
-            *Alignment = 64;
-        }
+        *Alignment = 64;
     }
 
     if (Filler != gcvNULL)
@@ -6316,18 +6460,30 @@ gcoHARDWARE_QuerySamplerBase(
 
     if (Hardware->features[gcvFEATURE_TX_DESCRIPTOR])
     {
-        samplerCount[gcvPROGRAM_STAGE_VERTEX] = 16;
-        samplerCount[gcvPROGRAM_STAGE_TCS] = 16;
-        samplerCount[gcvPROGRAM_STAGE_TES] = 16;
-        samplerCount[gcvPROGRAM_STAGE_GEOMETRY] = 16;
+        gctUINT base = 0;
         samplerCount[gcvPROGRAM_STAGE_FRAGMENT] = 16;
+        samplerBase[gcvPROGRAM_STAGE_FRAGMENT] = base;
+        base += 16;
+        if (Hardware->features[gcvFEATURE_GEOMETRY_SHADER])
+        {
+            samplerCount[gcvPROGRAM_STAGE_GEOMETRY] = 16;
+            samplerBase[gcvPROGRAM_STAGE_GEOMETRY] = base;
+            base += 16;
+        }
+        if (Hardware->features[gcvFEATURE_TESSELLATION])
+        {
+            samplerCount[gcvPROGRAM_STAGE_TES] = 16;
+            samplerBase[gcvPROGRAM_STAGE_TES] = base;
+            base += 16;
+            samplerCount[gcvPROGRAM_STAGE_TCS] = 16;
+            samplerBase[gcvPROGRAM_STAGE_TCS] = base;
+            base += 16;
+        }
+        samplerCount[gcvPROGRAM_STAGE_VERTEX] = 16;
+        samplerBase[gcvPROGRAM_STAGE_VERTEX] = base;
 
-        samplerBase[gcvPROGRAM_STAGE_FRAGMENT] = 0;
-        samplerBase[gcvPROGRAM_STAGE_GEOMETRY] = 16;
-        samplerBase[gcvPROGRAM_STAGE_TES] = 32;
-        samplerBase[gcvPROGRAM_STAGE_TCS] = 48;
-        samplerBase[gcvPROGRAM_STAGE_VERTEX] = 64;
-        samplerBase[gcvPROGRAM_STAGE_COMPUTE] = samplerBase[gcvPROGRAM_STAGE_OPENCL] = 0;
+        samplerBase[gcvPROGRAM_STAGE_COMPUTE] =
+        samplerBase[gcvPROGRAM_STAGE_OPENCL] = 0;
     }
     else if (Hardware->features[gcvFEATURE_HALTI1])
     {
@@ -6658,11 +6814,16 @@ gcoHARDWARE_DrawOnOneCore(
 
     for (i = 0; i < gcvPROGRAM_STAGE_LAST; i++)
     {
-        if (hints && hints->useMemoryAccess[i] == gcvTRUE)
+        if (hints && (hints->memoryAccessFlags[i] & gceMA_FLAG_WRITE))
         {
             status = gcvSTATUS_TRUE;
             break;
         }
+    }
+
+    if (Hardware->QUERYStates->queryStatus[gcvQUERY_OCCLUSION] == gcvQUERY_Enabled)
+    {
+        status = gcvSTATUS_TRUE;
     }
 
 OnError:

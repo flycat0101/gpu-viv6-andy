@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1130,6 +1130,8 @@ decode[] =
     { "MOV_LONG", gcvTRUE, gcvFALSE },
     { "MADSAT", gcvTRUE, gcvFALSE },
     { "COPY", gcvTRUE, gcvFALSE },
+    { "LOAD_L", gcvTRUE, gcvFALSE },
+    { "STORE_L", gcvTRUE, gcvFALSE },
     { "IMAGE_ADDR_3D,",gcvTRUE, gcvFALSE },
     { "GET_SAMPLER_LMM",gcvTRUE, gcvFALSE },
     { "GET_SAMPLER_LBS",gcvTRUE, gcvFALSE },
@@ -1701,7 +1703,7 @@ gcDump_Shader(
             for (j = 0; j < argumentCount; ++j)
             {
                 static const char * const qualifier[] = {" I", " O", "IO" };
-                static const char * const precision[] = {"dp", "hp", "mp", "lp", "anyp" };
+                static const char * const precision[] = {"dp", "lp", "mp", "hp", "anyp" };
                 offset = 0;
 
                 gcmASSERT((arguments[j].qualifier <= gcvFUNCTION_INOUT));
@@ -2115,7 +2117,7 @@ gcDump_Shader(
                                    i,
                                    gcmOUTPUT_isCentroid(output) ? "centroid " : gcmOUTPUT_isSample(output) ? "sample " : "",
                                    gcmOUTPUT_isPerPatch(output) ? "patch " : gcmOUTPUT_isPerVertexArray(output) ? "PerVertexArray " : "",
-                                   (output->shaderMode == gcSHADER_SHADER_FLAT) ? "flat" : "smooth",
+                                   (output->shaderMode == gcSHADER_SHADER_FLAT) ? "flat " : "smooth ",
                                    GetPrecisionName_(output->precision),
                                    typeName, output->arraySize));
             }
@@ -2123,11 +2125,12 @@ gcDump_Shader(
             {
                 gcmVERIFY_OK(
                 gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,
-                                   "  output(%d) := %s%s%s %s ",
+                                   "  output(%d) := %s%s%s%s %s ",
                                    i,
                                    gcmOUTPUT_isCentroid(output) ? "centroid " : gcmOUTPUT_isSample(output) ? "sample " : "",
                                    gcmOUTPUT_isPerPatch(output) ? "patch " : gcmOUTPUT_isPerVertexArray(output) ? "PerVertexArray " : "",
-                                   (output->shaderMode == gcSHADER_SHADER_FLAT) ? "flat" : "smooth",
+                                   (output->shaderMode == gcSHADER_SHADER_FLAT) ? "flat " : "smooth ",
+                                   GetPrecisionName_(output->precision),
                                    typeName));
             }
 

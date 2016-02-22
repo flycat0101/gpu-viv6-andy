@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -24,11 +24,19 @@ VSC_ErrCode vscVIR_PutImmValueToUniform(VIR_Shader* pShader, VSC_HW_CONFIG* pHwC
 
 VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VIR_Shader* pShader, VSC_HW_CONFIG* pHwCfg);
 
+VSC_ErrCode vscVIR_CheckPosAndDepthConflict(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo);
+
+VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo, VSC_HW_CONFIG* pHwCfg);
+
 VSC_ErrCode vscVIR_AdjustPrecision(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo, VSC_HW_CONFIG* pHwCfg);
 
 VSC_ErrCode vscVIR_PatchDual16Shader(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo);
 
 VSC_ErrCode vscVIR_ConvertVirtualInstructions(VIR_Shader* pShader);
+
+VSC_ErrCode vscVIR_PrecisionUpdate(VIR_Shader* pShader, VSC_OPTN_PUOptions* puOptions, VIR_Dumper* dumper);
+
+VSC_ErrCode vscVIR_ConvertIntegerToFloat(IN OUT VIR_Shader* pShader, IN gctBOOL supportInteger, IN gctBOOL hasSignFloorCeil);
 END_EXTERN_C()
 
 #endif /* __gc_vsc_vir_misc_opts_h_ */

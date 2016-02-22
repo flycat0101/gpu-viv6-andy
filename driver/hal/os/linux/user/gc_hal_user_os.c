@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -46,6 +46,8 @@
 #include <elf.h>
 #include <cutils/properties.h>
 #endif
+
+#include "gc_hal_user_platform.h"
 
 #define _GC_OBJ_ZONE    gcvZONE_OS
 
@@ -127,6 +129,8 @@ struct _gcoOS
     gctBOOL                 oneRecording;
 #endif
 #endif
+
+    gcsPLATFORM             platform;
 };
 
 /******************************************************************************\
@@ -478,6 +482,9 @@ _ConstructOs(
 
         /* Get profiler start tick. */
         gcmPROFILE_INIT(freq, os->startTick);
+
+        /* Get platform callback functions. */
+        gcoPLATFORM_QueryOperations(&os->platform.ops);
     }
 
 #if VIVANTE_PROFILER
@@ -6878,7 +6885,8 @@ gcoOS_DestroySyncPoint(
     gceSTATUS status;
     gcsHAL_INTERFACE iface;
 
-    gcmHEADER_ARG("Os=0x%x SyncPoint=0x%x", Os, SyncPoint);
+    gcmHEADER_ARG("Os=0x%x SyncPoint=%u",
+                  Os, (gctUINT) (gctUINTPTR_T) SyncPoint);
 
     /* Call kernel API to dup signal to native fence fd. */
     iface.command                       = gcvHAL_SYNC_POINT;
@@ -6908,7 +6916,8 @@ gcoOS_CreateNativeFence(
     gceSTATUS status;
     gcsHAL_INTERFACE iface;
 
-    gcmHEADER_ARG("Os=0x%x SyncPoint=0x%x", Os, SyncPoint);
+    gcmHEADER_ARG("Os=0x%x SyncPoint=%d",
+                  Os, (gctUINT) (gctUINTPTR_T) SyncPoint);
 
     /* Call kernel API to dup signal to native fence fd. */
     iface.command                       = gcvHAL_CREATE_NATIVE_FENCE;
@@ -7021,9 +7030,31 @@ gcoOS_CPUPhysicalToGPUPhysical(
     OUT gctUINT32_PTR GPUPhysical
     )
 {
-    *GPUPhysical = CPUPhysical;
+    gctPHYS_ADDR_T cpuPhysical = CPUPhysical, gpuPhysical;
+
+    gcoOS os = gcPLS.os;
+    gcoPLATFORM platform;
+
+    gcmHEADER();
+    gcmVERIFY_ARGUMENT(os);
+
+    platform = &os->platform;
+
+    if (platform->ops->getGPUPhysical)
+    {
+        platform->ops->getGPUPhysical(platform, cpuPhysical, &gpuPhysical);
+
+        *GPUPhysical = (gctUINT32) gpuPhysical;
+    }
+    else
+    {
+        *GPUPhysical = CPUPhysical;
+    }
+
+    gcmFOOTER_NO();
     return gcvSTATUS_OK;
 }
+
 void
 gcoOS_RecordAllocation(void)
 {

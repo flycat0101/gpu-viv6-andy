@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -555,24 +555,16 @@ gcChipSetDepthTest(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-    if ((gc->state.enables.rasterizerDiscard) &&
-        (!chipCtx->chipFeature.hasHwTFB))
+    /* Restore depth state, if depth test enabled and depth buffer exist.
+    ** We can't rely on depthMode, which can be not NONE if stencil test need it.
+    */
+    if (gc->state.enables.depthTest && chipCtx->drawDepthView.surf)
     {
-        gcmONERROR(gcChipSetDepthCompareFunction(chipCtx, GL_NEVER));
+        gcmONERROR(gcChipSetDepthCompareFunction(chipCtx, gc->state.depth.testFunc));
     }
     else
     {
-        /* Restore depth state, if depth test enabled and depth buffer exist.
-        ** We can't rely on depthMode, which can be not NONE if stencil test need it.
-        */
-        if ((gc->state.enables.depthTest) && chipCtx->drawDepthView.surf)
-        {
-            gcmONERROR(gcChipSetDepthCompareFunction(chipCtx, gc->state.depth.testFunc));
-        }
-        else
-        {
-            gcmONERROR(gcChipSetDepthCompareFunction(chipCtx, GL_ALWAYS));
-        }
+        gcmONERROR(gcChipSetDepthCompareFunction(chipCtx, GL_ALWAYS));
     }
 
 OnError:

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1556,9 +1556,15 @@ gcoBUFFER_Commit(
                 gctUINT32 coreIndex;
 
                 iface.u.Commit.queue = 0;
-                iface.u.Commit.delta = gcmPTR_TO_UINT64(StateDeltas[i]);
-                iface.u.Commit.context = Contexts[i];
+                if (StateDeltas)
+                {
+                    iface.u.Commit.delta = gcmPTR_TO_UINT64(StateDeltas[i]);
+                }
 
+                if (Contexts)
+                {
+                    iface.u.Commit.context = Contexts[i];
+                }
                 if (commandBufferMirrors)
                 {
                     _DuplicateCommandBuffer(commandBufferMirrors[i - 1], commandBuffer);

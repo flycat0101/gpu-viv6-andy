@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1311,7 +1311,7 @@ gceSTATUS resolveDrawToTempBitmap(
             ));
 
         tmpView.surf = chipCtx->tempBitmap;
-        gcmERR_BREAK(gcoSURF_ResolveRect_v2(&srcView, &tmpView, &rlvArgs));
+        gcmERR_BREAK(gcoSURF_ResolveRect(&srcView, &tmpView, &rlvArgs));
 
         /* Make sure the operation is complete. */
         gcmERR_BREAK(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
@@ -1400,7 +1400,7 @@ gceSTATUS bindTextureAndTextureState(
                                                               0,
                                                               &texView.surf));
 
-                            gcmERR_BREAK(gcoSURF_ResolveRect_v2(&rtView, &texView, gcvNULL));
+                            gcmERR_BREAK(gcoSURF_ResolveRect(&rtView, &texView, gcvNULL));
 
                             gcmERR_BREAK(gcoTEXTURE_Flush(textureInfo->object));
 
@@ -1544,7 +1544,7 @@ gceSTATUS bindTextureAndTextureState(
                                                                    0,
                                                                    &texView.surf));
 
-                                 gcmERR_BREAK(gcoSURF_ResolveRect_v2(&rtView, &texView, gcvNULL));
+                                 gcmERR_BREAK(gcoSURF_ResolveRect(&rtView, &texView, gcvNULL));
 
                                  gcmERR_BREAK(gcoTEXTURE_Flush(textureInfo->object));
 
@@ -3106,7 +3106,7 @@ GLvoid residentTextureLevel(__GLclientPixelState *ps, glsCHIPCONTEXT_PTR chipCtx
                     goto ENDFLAG;
                 }
 
-                status = gcoSURF_ResolveRect_v2(&texView, &rtView, gcvNULL);
+                status = gcoSURF_ResolveRect(&texView, &rtView, gcvNULL);
                 if (gcmIS_ERROR(status)) {
                     goto ENDFLAG;
                 }
@@ -3556,7 +3556,7 @@ GLboolean __glChipGenerateMipMap(__GLcontext* gc, __GLtextureObject* texObj, GLi
             }
             else
             {
-                status = gcoSURF_Resample_v2(lod0, lod1);
+                status = gcoSURF_Resample(lod0, lod1);
             }
             if (gcmIS_ERROR(status))
             {

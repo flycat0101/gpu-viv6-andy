@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -73,8 +73,8 @@ static GLenum _UpdateDepthFunction(
 
     if(Context->depth)
     {
-        testFunction = ((Context->depth->info.format == gcvSURF_S8 ) ||
-                        (Context->depth->info.format == gcvSURF_X24S8))
+        testFunction = ((Context->depth->format == gcvSURF_S8 ) ||
+                        (Context->depth->format == gcvSURF_X24S8))
                         ? gcvCOMPARE_ALWAYS : testFunction;
     }
 
@@ -96,7 +96,7 @@ static GLenum _UpdateDepthEnable(
     GLenum result;
     gceDEPTH_MODE depthMode;
     gctBOOL isS8Depth = (Context->depth == gcvNULL) ? gcvFALSE :
-                        (Context->depth->info.format == gcvSURF_S8) ? gcvTRUE : gcvFALSE;
+                        (Context->depth->format == gcvSURF_S8) ? gcvTRUE : gcvFALSE;
 
     gcmHEADER_ARG("Context=0x%x", Context);
 
@@ -1133,21 +1133,23 @@ glfUpdateStencil(
     {
         do
         {
-            if (!Context->stencilStates.testEnabled)
+            gcoSURF depthStencil = gcvNULL;
+
+            if (Context->frameBuffer != gcvNULL)
             {
-                gcsSTENCIL_INFO faked = Context->stencilStates.hal;
+                depthStencil = glfGetFramebufferSurface(&Context->frameBuffer->depth);
+            }
+            else
+            {
+                depthStencil = Context->depth;
+            }
 
-                faked.mode           = gcvSTENCIL_SINGLE_SIDED;
-                faked.compareFront   = gcvCOMPARE_ALWAYS;
-                faked.compareBack    = gcvCOMPARE_ALWAYS;
-                faked.passFront      = gcvSTENCIL_KEEP;
-                faked.passBack       = gcvSTENCIL_KEEP;
-                faked.depthFailFront = gcvSTENCIL_KEEP;
-                faked.depthFailBack  = gcvSTENCIL_KEEP;
-
-                /* Fake for z compression with fast clear. */
-                gcmERR_BREAK(gco3D_SetStencilAll(Context->hw,
-                                                 &faked));
+            if (!Context->stencilStates.testEnabled
+            ||  (depthStencil == gcvNULL)
+            )
+            {
+                /* Disable stencil test. */
+                gco3D_SetStencilMode(Context->hw, gcvSTENCIL_NONE);
             }
             else
             {

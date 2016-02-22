@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -61,7 +61,6 @@ typedef struct _LINUX_MDL_MAP
     gctINT                  pid;
     gctPOINTER              vmaAddr;
     gctUINT32               count;
-    struct vm_area_struct * vma;
     struct _LINUX_MDL_MAP * next;
 }
 LINUX_MDL_MAP;
@@ -72,27 +71,11 @@ typedef struct _LINUX_MDL
 {
     char *                  addr;
 
-    union _pages
-    {
-        /* Pointer to a array of pages. */
-        struct page *       contiguousPages;
-        /* Pointer to a array of pointers to page. */
-        struct page **      nonContiguousPages;
-    }
-    u;
-
-#ifdef NO_DMA_COHERENT
-    gctPOINTER              kaddr;
-#endif /* NO_DMA_COHERENT */
-
     gctINT                  numPages;
-    gctINT                  pagedMem;
     gctBOOL                 contiguous;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
-    gctBOOL                 exact;
-#endif
     dma_addr_t              dmaHandle;
     PLINUX_MDL_MAP          maps;
+    struct mutex            mapsMutex;
     struct _LINUX_MDL *     prev;
     struct _LINUX_MDL *     next;
 

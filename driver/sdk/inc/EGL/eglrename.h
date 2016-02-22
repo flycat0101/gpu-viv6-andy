@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -84,5 +84,6 @@
 #define eglBindWaylandDisplayWL             gcmEGL(eglBindWaylandDisplayWL)
 #define eglUnbindWaylandDisplayWL           gcmEGL(eglUnbindWaylandDisplayWL)
 #define eglQueryWaylandBufferWL             gcmEGL(eglQueryWaylandBufferWL)
+#define eglCreateWaylandBufferFromImageWL   gcmEGL(eglCreateWaylandBufferFromImageWL)
 #endif /* _EGL_APPENDIX */
 #endif /* __eglrename_h_ */

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -201,7 +201,7 @@ sign						[+-]
 digit_sequence					{digit}+
 signed_integer_type				int|long|char|short
 builtin_data_type				{signed_integer_type}|float|uint|ulong|uchar|ushort|bool
-viv_packed_data_type				_viv_bool|_viv_char|_viv_uchar|_viv_short|_viv_ushort|_viv_half
+viv_packed_data_type				_viv_bool|_viv_char|_viv_uchar|_viv_short|_viv_ushort|_viv_half|_viv_gentype
 reserved_data_type				half|quad|double
 white_sp                                        [ \t]
 white_sp_nl                                     [ \t\n]

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -27,6 +27,7 @@
 
 
 #include <windows.h>
+#define EGL_EGLEXT_PROTOTYPES
 #define GL_GLEXT_PROTOTYPES
 #include <EGL\egl.h>
 #include <EGL\eglext.h>
@@ -289,7 +290,7 @@ BOOL InitOGLES()
 
     if (matchingConfigs < 1)  return FALSE;
 
-    glesSurface = eglCreateWindowSurface(glesDisplay, configs[0], (EGLNativeWindowType)hWnd, configAttribs);
+    glesSurface = eglCreateWindowSurface(glesDisplay, configs[0], (EGLNativeWindowType)hWnd, NULL);
     if(!glesSurface) return FALSE;
 
     glesContext=eglCreateContext(glesDisplay,configs[0],0,NULL);

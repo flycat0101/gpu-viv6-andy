@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1171,8 +1171,15 @@ eglCreateContext(
         case 3:
             gcmONERROR(gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL));
 
+            /* Halti5 HW with TS/GS supports ES3.2 */
+            if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI5) &&
+                gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_GEOMETRY_SHADER) &&
+                gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_TESSELLATION))
+            {
+                match = (minor >= 0 && minor <= 2) ? EGL_TRUE : EGL_FALSE;
+            }
             /* Halti2 HW support ES30 and ES31 */
-            if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI2) ||
+            else if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI2) ||
                 (chipModel == gcv900 && chipRevision == 0x5250))
             {
                 match = (minor >= 0 && minor <= 1) ? EGL_TRUE : EGL_FALSE;
@@ -1783,7 +1790,6 @@ veglMakeCurrent(
                                  current,
                                  current->context));
 
-
             /* Remove context. */
             gcmVERIFY(_ApiLoseCurrent(thread, current));
 
@@ -1818,40 +1824,39 @@ veglMakeCurrent(
 
                 if (sur->renderMode > 0)
                 {
-                    if (sur->prevRenderTarget && sur->renderTarget &&
-                        !gcoSURF_QueryFlags(sur->renderTarget,
-                                            gcvSURF_FLAG_CONTENT_UPDATED) &&
-                         gcoSURF_QueryFlags(sur->renderTarget,
-                                            gcvSURF_FLAG_CONTENT_PRESERVED))
+                    /* Track correct previous render target before release. */
+                    if (sur->renderTarget &&
+                        gcoSURF_QueryFlags(sur->renderTarget,
+                                           gcvSURF_FLAG_CONTENT_UPDATED))
                     {
-                        /* Copy previous to current. */
-                        if (sur->openVG)
+                        /*
+                         * Release current after render target is ever rendered.
+                         * Take current render target as reference.
+                         * Always need to track render target, even in DESTROYED
+                         * mode, because we should not drop pixels
+                         * when EGL current switches.
+                         */
+                        if (sur->prevRenderTarget != gcvNULL)
                         {
-                            gcoSURF_Copy(sur->renderTarget,
-                                         sur->prevRenderTarget);
+                            /* Dereference previous render target. */
+                            gcoSURF_Destroy(sur->prevRenderTarget);
                         }
-                        else
-                        {
-#if gcdENABLE_3D
-                            gcsSURF_VIEW prevRtView = {sur->prevRenderTarget, 0, 1};
-                            gcsSURF_VIEW rtView = {sur->renderTarget, 0, 1};
-                            gcoSURF_ResolveRect_v2(&prevRtView, &rtView, gcvNULL);
-#endif
-                        }
-                    }
 
-                    if (sur->renderTarget != gcvNULL)
-                    {
+                        /* The current render target becomes previous. */
+                        sur->prevRenderTarget = sur->renderTarget;
+
                         /* Dereference external window back buffer. */
-                        gcoSURF_Destroy(sur->renderTarget);
                         sur->renderTarget = gcvNULL;
                     }
-
-                    if (sur->prevRenderTarget != gcvNULL)
+                    else
                     {
-                        /* Dereference external window back buffer. */
-                        gcoSURF_Destroy(sur->prevRenderTarget);
-                        sur->prevRenderTarget = gcvNULL;
+                        /* Previous render target not change. */
+                        if (sur->renderTarget != gcvNULL)
+                        {
+                            /* Dereference external window back buffer. */
+                            gcoSURF_Destroy(sur->renderTarget);
+                            sur->renderTarget = gcvNULL;
+                        }
                     }
 
                     /* Sync drawable with renderTarget. */
@@ -2012,7 +2017,7 @@ veglMakeCurrent(
                  */
 
                 /* Sync the render target content to texture. */
-                if (gcmIS_ERROR(gcoSURF_ResolveRect_v2(&rtView, &texView, gcvNULL)))
+                if (gcmIS_ERROR(gcoSURF_ResolveRect(&rtView, &texView, gcvNULL)))
                 {
                     /* Resolve failed, set error enum. */
                     veglSetEGLerror(thread, EGL_BAD_SURFACE);
@@ -2057,44 +2062,43 @@ veglMakeCurrent(
 
                 if (sur->renderMode > 0)
                 {
-                    if (sur->prevRenderTarget && sur->renderTarget &&
-                        !gcoSURF_QueryFlags(sur->renderTarget,
-                                            gcvSURF_FLAG_CONTENT_UPDATED) &&
-                         gcoSURF_QueryFlags(sur->renderTarget,
-                                            gcvSURF_FLAG_CONTENT_PRESERVED))
+                    /* Track correct previous render target before release. */
+                    if (sur->renderTarget &&
+                        gcoSURF_QueryFlags(sur->renderTarget,
+                                           gcvSURF_FLAG_CONTENT_UPDATED))
                     {
-                        /* Copy previous to current. */
-                        if (sur->openVG)
+                        /*
+                         * Switch current after render target is ever rendered.
+                         * Take current render target as reference.
+                         * Always need to track render target, even in DESTROYED
+                         * mode, because we should not drop pixels
+                         * when EGL current switches.
+                         */
+                        if (sur->prevRenderTarget != gcvNULL)
                         {
-                            gcoSURF_Copy(sur->renderTarget,
-                                         sur->prevRenderTarget);
+                            /* Dereference previous render target. */
+                            gcoSURF_Destroy(sur->prevRenderTarget);
                         }
-                        else
-                        {
-#if gcdENABLE_3D
-                            gcsSURF_VIEW prevRtView = {sur->prevRenderTarget, 0, 1};
-                            gcsSURF_VIEW rtView = {sur->renderTarget, 0, 1};
-                            gcoSURF_ResolveRect_v2(&prevRtView, &rtView, gcvNULL);
-#endif
-                        }
-                    }
 
-                    if (sur->renderTarget != gcvNULL)
-                    {
+                        /* The current render target becomes previous. */
+                        sur->prevRenderTarget = sur->renderTarget;
+
                         /* Dereference external window back buffer. */
-                        gcoSURF_Destroy(sur->renderTarget);
                         sur->renderTarget = gcvNULL;
                     }
-
-                    if (sur->prevRenderTarget != gcvNULL)
+                    else
                     {
-                        /* Dereference external previous window back buffer. */
-                        gcoSURF_Destroy(sur->prevRenderTarget);
-                        sur->prevRenderTarget = gcvNULL;
+                        /* Previous render target not change. */
+                        if (sur->renderTarget != gcvNULL)
+                        {
+                            /* Dereference external window back buffer. */
+                            gcoSURF_Destroy(sur->renderTarget);
+                            sur->renderTarget = gcvNULL;
+                        }
                     }
 
                     /* Sync drawable with renderTarget. */
-                    sur->drawable.rtHandle = gcvNULL;
+                    sur->drawable.rtHandle     = gcvNULL;
                     sur->drawable.prevRtHandle = gcvNULL;
                 }
 
@@ -2270,16 +2274,50 @@ veglMakeCurrent(
                 gcmVERIFY_OK(gcoSURF_ReferenceSurface(draw->renderTarget));
             }
 
-            if (draw->prevRenderTarget)
+            if ((draw->prevRenderTarget == draw->renderTarget) &&
+                (draw->prevRenderTarget != gcvNULL))
             {
-                /* Destroy previous external render target. */
-                gcmVERIFY_OK(gcoSURF_Destroy(draw->prevRenderTarget));
+                /* Do not need to keep previous if it is the same. */
+                gcoSURF_Destroy(draw->prevRenderTarget);
+                draw->prevRenderTarget = gcvNULL;
+            }
+
+            /*
+             * In DESTROYED mode, we still need to recover buffer pixels from
+             * EGLSurface when it is switched out. Need copy the buffers right
+             * here in this case.
+             *
+             * In PRESERVED mode, set previous render target and client driver
+             * will preserve pixels there.
+             */
+            if ((draw->swapBehavior == EGL_BUFFER_DESTROYED) &&
+                (draw->renderTarget != gcvNULL) &&
+                (draw->prevRenderTarget != gcvNULL))
+            {
+#if gcdENABLE_VG
+                if (draw->openVG)
+                {
+                    gcoSURF_Copy(draw->renderTarget, draw->prevRenderTarget);
+                }
+                else
+#endif
+                {
+#if gcdENABLE_3D
+                    gcsSURF_VIEW srcView = {draw->prevRenderTarget, 0, 1};
+                    gcsSURF_VIEW trgView  = {draw->renderTarget,    0, 1};
+
+                    gcoSURF_ResolveRect(&srcView, &trgView, gcvNULL);
+#endif
+                }
+
+                /* Now drop previous render target. */
+                gcoSURF_Destroy(draw->prevRenderTarget);
                 draw->prevRenderTarget = gcvNULL;
             }
 
             /* Sync drawable with renderTarget. */
-            draw->drawable.rtHandle = draw->renderTarget;
-            draw->drawable.prevRtHandle = gcvNULL;
+            draw->drawable.rtHandle     = draw->renderTarget;
+            draw->drawable.prevRtHandle = draw->prevRenderTarget;
         }
         else if (draw->renderTarget == gcvNULL)
         {
@@ -2301,7 +2339,7 @@ veglMakeCurrent(
             gcsSURF_VIEW rtView = {draw->renderTarget, 0, 1};
 
             /* Resolve to renderTarget. */
-            status = gcoSURF_ResolveRect_v2(&mirrorView, &rtView, gcvNULL);
+            status = gcoSURF_ResolveRect(&mirrorView, &rtView, gcvNULL);
 
             if (gcmIS_ERROR(status))
             {
@@ -2663,7 +2701,7 @@ _SyncPixmap(
         pixmapView.surf = surface->pixmapSurface;
 
         /* Resolve from RT to pixmap (temp or wrapper). */
-        if (gcmIS_ERROR(gcoSURF_ResolveRect_v2(&rtView, &pixmapView, gcvNULL)))
+        if (gcmIS_ERROR(gcoSURF_ResolveRect(&rtView, &pixmapView, gcvNULL)))
         {
             /* Resolve failed? */
             break;
@@ -2730,7 +2768,7 @@ _SyncImage(
             gcoSURF_QueryOrientation(khrImage->surface,&dstOrient);
             gcoSURF_SetOrientation(khrImage->surface,srcOrient);
 
-            gcoSURF_ResolveRect_v2(&srcView, &surfView, gcvNULL);
+            gcoSURF_ResolveRect(&srcView, &surfView, gcvNULL);
 
             gcoSURF_SetOrientation(khrImage->surface,dstOrient);
 
@@ -2995,7 +3033,8 @@ _CreateImageFromVGParentImage(
         return EGL_BAD_ACCESS;
     }
 
-    status = (*dispatch->createImageParentImage)(Parent,
+    status = (*dispatch->createImageParentImage)(Context->context,
+                                                 Parent,
                                                  &images,
                                                  &count);
 

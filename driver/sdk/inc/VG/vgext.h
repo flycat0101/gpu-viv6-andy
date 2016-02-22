@@ -282,6 +282,35 @@ VG_API_CALL VGImage VG_API_ENTRY vgCreateImageConstVIV(
 #endif
 #endif
 
+#ifndef VG_VIV_image_resolve
+#define VG_VIV_image_resolve    1
+
+#define VG_VIV_UV_SWIZZLE_UV        0
+#define VG_VIV_UV_SWIZZLE_VU        1
+
+#define VG_VIV_YUV_STANDARD_601     0
+#define VG_VIV_YUV_STANDARD_709     1
+
+#ifdef VG_VGEXT_PROTOTYPES
+VG_API_CALL VGImage VG_API_ENTRY vgCreateImageDirectVIV(VGImageFormat Format, VGint Width, VGint Height, VGint *Count, void **Address) VG_API_EXIT;
+VG_API_CALL void VG_API_ENTRY vgInvalidateImageDirectVIV(VGImage Image) VG_API_EXIT;
+VG_API_CALL void VG_API_ENTRY vgResolveImageVIV(VGImage Src, VGImage Dst,
+                                                VGint Src_x, VGint Src_y,
+                                                VGint Width, VGint Height,
+                                                VGint Dst_x, VGint Dst_y,
+                                                VGint Src_uv, VGint Src_standard,
+                                                VGint Dst_uv, VGint Dst_standard, VGint Dst_alpha) VG_API_EXIT;
+#endif
+typedef VGImage (VG_API_ENTRYP PFNVGCREATEIMAGEDIRECTVIV)(VGImageFormat Format, VGint Width, VGint Height, VGint *Count, void **Address) VG_API_EXIT;
+typedef void (VG_API_ENTRYP PFNVGINVALIDATEIMAGEDIRECTVIV)(VGImage Image) VG_API_EXIT;
+typedef void (VG_API_ENTRYP PFNVGRESOLVEIMAGEPROC) (VGImage Src, VGImage Dst,
+                                                    VGint Src_x, VGint Src_y,
+                                                    VGint Width, VGint Height,
+                                                    VGint Dst_x, VGint Dst_y,
+                                                    VGint Src_uv, VGint Src_standard,
+                                                    VGint Dst_uv, VGint Dst_standard, VGint Dst_alpha);
+
+#endif
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

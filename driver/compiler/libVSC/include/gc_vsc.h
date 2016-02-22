@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -28,13 +28,8 @@
 #pragma warning(error : 4389 4189)
 /* warning C4820: 'NNN' : '4' bytes padding added after data member 'xxx' */
 /* warning C4668: 'LINUX' is not defined as a preprocessor macro, replacing with '0' for '#if/#elif' */
-/* warning C4255: 'GetTexLoadCycles' : no function prototype given: converting '()' to '(void)' */
-#pragma warning(disable : 4820 4668 4255)
+#pragma warning(disable : 4820 4668)
 #endif
-
-/* A temp control to make vir path implementation not break build for wince since we
-   will develop vir path on windows PC. It will be removed when vir path is ready */
-#define VSC_BUILD  ((LINUX) || (ANDROID) || (_WINDOWS) || (_WIN32) || (WIN32) || (__QNXNTO__) || defined(__APPLE__))
 
 /* HAL headers */
 #include "gc_hal.h"
@@ -54,8 +49,6 @@
 /*
  *  All new VIR related headers are put below
  */
-
-#if VSC_BUILD
 
 /* C-lib headers */
 #include <stdio.h>
@@ -98,7 +91,10 @@
 /* VIR pass manager */
 #include "vir/passmanager/gc_vsc_vir_pass_mnger.h"
 
-#endif
+/* Chip */
+#include "chip/gc_vsc_chip_uarch_caps.h"
+#include "chip/gc_vsc_chip_mc_codec.h"
+#include "chip/gc_vsc_chip_mc_dump.h"
 
 #endif /* __gc_vsc_h_ */
 

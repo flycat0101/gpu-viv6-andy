@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -5365,7 +5365,12 @@ gckOS_CreateKernelVirtualMapping(
     OUT gctSIZE_T * PageCount
     )
 {
-    return gcvSTATUS_NOT_SUPPORTED;
+    gcsPHYSICAL * physical = (gcsPHYSICAL *)Physical;
+
+    *PageCount = ADDRESS_AND_SIZE_TO_SPAN_PAGES(physical->logical, Bytes);
+    *Logical   = physical->logical;
+
+    return gcvSTATUS_OK;
 }
 
 gceSTATUS
@@ -5376,7 +5381,7 @@ gckOS_DestroyKernelVirtualMapping(
     IN gctPOINTER Logical
     )
 {
-    return gcvSTATUS_NOT_SUPPORTED;
+    return gcvSTATUS_OK;
 }
 
 gceSTATUS
@@ -5388,7 +5393,7 @@ gckOS_CreateUserVirtualMapping(
     OUT gctSIZE_T * PageCount
     )
 {
-    return gcvSTATUS_NOT_SUPPORTED;
+	return gckOS_LockPages(Os, Physical, Bytes, gcvFALSE, Logical, PageCount);
 }
 
 gceSTATUS
@@ -5399,7 +5404,7 @@ gckOS_DestroyUserVirtualMapping(
     IN gctPOINTER Logical
     )
 {
-    return gcvSTATUS_NOT_SUPPORTED;
+	return gckOS_UnlockPages(Os, Physical, Bytes, Logical);
 }
 
 void

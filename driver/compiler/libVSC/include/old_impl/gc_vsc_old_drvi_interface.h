@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -19,7 +19,7 @@
 #ifndef __gc_vsc_old_drvi_interface_h_
 #define __gc_vsc_old_drvi_interface_h_
 
-#define _SUPPORT_LONG_ULONG_DATA_TYPE  0
+#define _SUPPORT_LONG_ULONG_DATA_TYPE  1
 
 #include "gc_hal_engine.h"
 #include "old_impl/gc_vsc_old_gcsl.h"
@@ -432,6 +432,25 @@ typedef struct _gcSHADER_VID_NODES
     gctPOINTER  spillVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* SURF Node for spill memory. */
 }gcSHADER_VID_NODES;
 
+typedef enum _gceMEMORY_ACCESS_FLAG
+{
+    gceMA_FLAG_NONE                 = 0x0000,
+    gceMA_FLAG_LOAD                 = 0x0001,
+    gceMA_FLAG_STORE                = 0x0002,
+    gceMA_FLAG_IMG_READ             = 0x0004,
+    gceMA_FLAG_IMG_WRITE            = 0x0008,
+    gceMA_FLAG_ATOMIC               = 0x0010,
+
+    gceMA_FLAG_READ                 = gceMA_FLAG_LOAD       |
+                                      gceMA_FLAG_IMG_READ   |
+                                      gceMA_FLAG_ATOMIC,
+    gceMA_FLAG_WRITE                = gceMA_FLAG_STORE      |
+                                      gceMA_FLAG_IMG_WRITE  |
+                                      gceMA_FLAG_ATOMIC,
+    gceMA_FLAG_BARRIER              = 0x0020,
+}
+gceMEMORY_ACCESS_FLAG;
+
 struct _gcsHINT
 {
     /* fields for the program */
@@ -449,11 +468,8 @@ struct _gcsHINT
     gctUINT32   balanceMin;         /* Balance minimum. */
     gctUINT32   balanceMax;         /* Balance maximum. */
     gctBOOL     autoShift;          /* Auto-shift balancing. */
-    gctBOOL     useLoadStore[gcvPROGRAM_STAGE_LAST];        /* use Load/Store/Store1 */
-    gctBOOL     useImgReadWrite[gcvPROGRAM_STAGE_LAST];     /* use image read/write */
-    gctBOOL     useAtomicOp[gcvPROGRAM_STAGE_LAST];         /* use atomic operation */
-    gctBOOL     useMemoryAccess[gcvPROGRAM_STAGE_LAST];     /* use memory access operation */
-    gctBOOL     useBarrier[gcvPROGRAM_STAGE_LAST];          /* use workgroup barrier */
+
+    gceMEMORY_ACCESS_FLAG memoryAccessFlags[gcvPROGRAM_STAGE_LAST]; /* Memory access flag. */
 
     gcsPROGRAM_UNIFIED_STATUS unifiedStatus;
 
@@ -519,8 +535,12 @@ struct _gcsHINT
     gctBOOL     useFragCoord[4];
     gctBOOL     useFrontFacing;
     gctBOOL     usePointCoord[4];
+    gctBOOL     useDSX;
     gctBOOL     useDSY;
     gctBOOL     yInvertAware;
+
+    /* flag if PS uses any inputs defined as centroid. */
+    gctBOOL     hasCentroidInput;
 
     /* They're component index after packing */
     gctINT      pointCoordComponent;
@@ -589,6 +609,9 @@ struct _gcsHINT
 
     /* Sampler Base offset. */
     gctUINT32   samplerBaseOffset[gcvPROGRAM_STAGE_LAST];
+
+    gctINT      psOutCntl0to3;
+    gctINT      psOutCntl4to7;
 };
 
 #define gcsHINT_isCLShader(Hint)            ((Hint)->clShader)
@@ -641,19 +664,6 @@ extern const gcSHADER_TYPEINFO gcvShaderTypeInfo[];
 #define gcmType_ComponentByteSize       4
 
 #define gcmType_isMatrix(type) (gcmType_Rows(type) > 1)
-
-#if TEMP_SHADER_PATCH
-typedef struct _gcSHADER_TYPE_INFO
-{
-    gcSHADER_TYPE    type;        /* eg. gcSHADER_FLOAT_2X3 is the type */
-    gctCONST_STRING  name;        /* the name of the type: "gcSHADER_FLOAT_2X3" */
-    gcSHADER_TYPE    baseType;    /* its base type is gcSHADER_FLOAT_2 */
-    gctINT           components;  /* it has 2 components */
-    gctINT           rows;        /* and 3 rows */
-    gctINT           size;        /* the size in byte */
-} gcSHADER_TYPE_INFO;
-extern gcSHADER_TYPE_INFO shader_type_info[];
-#endif
 
 enum gceLTCDumpOption {
     gceLTC_DUMP_UNIFORM      = 0x0001,
@@ -763,6 +773,9 @@ typedef enum _gceSHADER_FLAGS
     /* This is a seperated program link */
     gcvSHADER_SEPERATED_PROGRAM         = 0x40000,
 
+    /* disable dual16 for this ps shader */
+    gcvSHADER_DISABLE_DUAL16            = 0x80000,
+
     /* set inline level 0 */
     gcvSHADER_SET_INLINE_LEVEL_0        = 0x100000,
 
@@ -780,8 +793,23 @@ typedef enum _gceSHADER_FLAGS
 
     /* resets inline level to default */
     gcvSHADER_RESET_INLINE_LEVEL        = 0x2000000,
+
+    /* Need add robustness check code */
+    gcvSHADER_NEED_ROBUSTNESS_CHECK     = 0x4000000,
+
+    /* Denormalize flag */
+    gcvSHADER_FLUSH_DENORM_TO_ZERO      = 0x8000000,
+
+    /* Has image in kernel source code of OCL kernel program */
+    gcSHADER_HAS_IMAGE_IN_KERNEL        = 0x10000000,
 }
 gceSHADER_FLAGS;
+
+typedef struct _gceSHADER_SUB_FLAGS
+{
+    gctUINT     dual16PrecisionRule;
+}
+gceSHADER_SUB_FLAGS;
 
 #if gcdUSE_WCLIP_PATCH
 gceSTATUS
@@ -885,6 +913,50 @@ typedef enum _gceOPTIMIZATION_VaryingPaking
     gcvOPTIMIZATION_VARYINGPACKING_NOSPLIT,
     gcvOPTIMIZATION_VARYINGPACKING_SPLIT
 } gceOPTIMIZATION_VaryingPaking;
+
+
+/* The highp in the shader appear because
+   1) APP defined as highp
+   2) promote from mediump per HW requirements
+   3) promote from mediump based on the following rules.
+      These rules can be disabled individually.
+      Driver will detect benchmark and shader and set
+      these rules accordingly.
+      VC_OPTION can override these rules.
+   */
+typedef enum _Dual16_PrecisionRule
+{
+    /*  No dual16 highp rules applied. */
+    Dual16_PrecisionRule_NONE                   = 0,
+
+    /*  promote the texld coordiante (from varying) to highp */
+    Dual16_PrecisionRule_TEXLD_COORD_HP         = 1 << 0,
+
+    /*  promote rcp src/dest to highp */
+    Dual16_PrecisionRule_RCP_HP                 = 1 << 1,
+
+    /*  promote frac src/dest to highp */
+    Dual16_PrecisionRule_FRAC_HP                = 1 << 2,
+
+    /*  immediate is always highp */
+    Dual16_PrecisionRule_IMMED_HP               = 1 << 3,
+
+    /*  immediate is always mediump */
+    Dual16_PrecisionRule_IMMED_MP               = 1 << 4,
+
+    /*  default rules */
+    Dual16_PrecisionRule_DEFAULT                = Dual16_PrecisionRule_TEXLD_COORD_HP |
+                                                  Dual16_PrecisionRule_RCP_HP         |
+                                                  Dual16_PrecisionRule_FRAC_HP,
+
+    /*  applied all rules */
+    Dual16_PrecisionRule_FULL                   = Dual16_PrecisionRule_TEXLD_COORD_HP |
+                                                  Dual16_PrecisionRule_RCP_HP         |
+                                                  Dual16_PrecisionRule_FRAC_HP        |
+                                                  Dual16_PrecisionRule_IMMED_HP,
+
+}
+Dual16_PrecisionRule;
 
 typedef struct _ShaderSourceList ShaderSourceList;
 struct _ShaderSourceList
@@ -1122,14 +1194,33 @@ typedef struct _gcOPTIMIZER_OPTION
     /* dual 16 mode
      *
      *    VC_OPTION=-DUAL16:[0-3]
-     *       0:  force dual16 off, no dual16 any more.
-     *       1:  auto-on mode for specific benchmarks
+     *       0:  force dual16 off.
+     *       1:  auto-on mode for specific benchmarks.
      *       2:  auto-on mode for all applications.
-     *       3:  force dual16 on for all applications no matter highp is specified or not.
+     *       3:  force dual16 on for all applications ignoring the heuristic.
      */
     gctUINT     dual16Mode;
     gctINT      _dual16Start;           /* shader id start to enable dual16 */
     gctINT      _dual16End;             /* shader id end to enalbe dual16 */
+
+    /* dual 16 highp rule
+    *
+    *    VC_OPTION=-HPDUAL16:[0-x]
+    *       0: no dual16 highp rules applied
+    *       1: Dual16_PrecisionRule_TEXLD_COORD_HP
+    *       2: Dual16_PrecisionRule_RCP_HP
+    *       4: Dual16_PrecisionRule_FRAC_HP
+    *       8: Dual16_PrecisionRule_IMMED_HP
+    *       default is Dual16_PrecisionRule_FULL
+    *           (which is Dual16_PrecisionRule_TEXLD_COORD_HP |
+    *                     Dual16_PrecisionRule_RCP_HP         |
+    *                     Dual16_PrecisionRule_FRAC_HP        |
+    *                     Dual16_PrecisionRule_IMMED_HP)
+    */
+    gctUINT     dual16PrecisionRule;
+
+    /* whether the user set dual16PrecisionRule */
+    gctBOOL     dual16PrecisionRuleFromEnv;
 
     /* force inline or not inline a function
      *
@@ -1193,6 +1284,20 @@ typedef struct _gcOPTIMIZER_OPTION
      */
     gctBOOL     oclUseNeg;
 
+    /*  USE img intrinsic query function for OCL
+     *
+     *   VC_OPTION=-OCLUSEIMG_INTRINSIC_QUERY:0|1
+     *
+     */
+    gctBOOL     oclUseImgIntrinsicQuery;
+
+    /*  Pass kernel struct arguments by value in OCL
+     *
+     *   VC_OPTION=-OCLPASS_KERNEL_STRUCT_ARG_BY_VALUE:0|1
+     *
+     */
+    gctBOOL     oclPassKernelStructArgByValue;
+
     /* Specify the log file name
      *
      *   VC_OPTION=-LOG:filename
@@ -1233,10 +1338,16 @@ typedef struct _gcOPTIMIZER_OPTION
        value in theOptimizerOption too */
 } gcOPTIMIZER_OPTION;
 
-#define DUAL16_FORCE_OFF    0
-#define DUAL16_AUTO_BENCH   1
-#define DUAL16_AUTO_ALL     2
-#define DUAL16_FORCE_ON     3
+/* DUAL16_FORCE_OFF:  turn off dual16
+   DUAL16_AUTO_BENCH: turn on dual16 for selected benchmarks
+   DUAL16_AUTO_ALL:   turn on dual16 for all
+   DUAL16_FORCE_ON:   we have heuristic to turn off dual16 if the single-t instructions are too many,
+                      this option will ignore the heuristic
+*/
+#define DUAL16_FORCE_OFF            0
+#define DUAL16_AUTO_BENCH           1
+#define DUAL16_AUTO_ALL             2
+#define DUAL16_FORCE_ON             3
 
 #define VC_OPTION_OCLFPCAPS_FASTRELAXEDMATH     (1 << 0 )
 #define VC_OPTION_OCLFPCAPS_FINITEMATHONLY      (1 << 1 )
@@ -1293,11 +1404,17 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_DualFP16Mode()       (gcmGetOptimizerOption()->dual16Mode)
 #define gcmOPT_DualFP16Start()      (gcmGetOptimizerOption()->_dual16Start)
 #define gcmOPT_DualFP16End()        (gcmGetOptimizerOption()->_dual16End)
+
+#define gcmOPT_DualFP16PrecisionRule()          (gcmGetOptimizerOption()->dual16PrecisionRule)
+#define gcmOPT_DualFP16PrecisionRuleFromEnv()   (gcmGetOptimizerOption()->dual16PrecisionRuleFromEnv)
+
 #define gcmOPT_ForceInline()        (gcmGetOptimizerOption()->forceInline)
 #define gcmOPT_UploadUBO()          (gcmGetOptimizerOption()->uploadUBO)
 #define gcmOPT_oclFpCaps()          (gcmGetOptimizerOption()->oclFpCaps)
 #define gcmOPT_oclHasLong()         (gcmGetOptimizerOption()->oclHasLong)
 #define gcmOPT_oclUseNeg()          (gcmGetOptimizerOption()->oclUseNeg)
+#define gcmOPT_oclUseImgIntrinsicQuery()   (gcmGetOptimizerOption()->oclUseImgIntrinsicQuery)
+#define gcmOPT_oclPassKernelStructArgByValue()   (gcmGetOptimizerOption()->oclPassKernelStructArgByValue)
 #define gcmOPT_UseVIRCodeGen()      (gcmGetOptimizerOption()->useVIRCodeGen)
 #define gcmOPT_VIRCGStart()         (gcmGetOptimizerOption()->_vircgStart)
 #define gcmOPT_VIRCGEnd()           (gcmGetOptimizerOption()->_vircgEnd)
@@ -1321,21 +1438,6 @@ extern gctBOOL gcSHADER_DumpFinalIR(gcSHADER Shader);
 extern gctBOOL VirSHADER_DoDual16(gctINT ShaderId);
 
 /* Setters */
-#define gcmOPT_SetPatchTexld(m,n) (gcmGetOptimizerOption()->patchEveryTEXLDs = (m),\
-                                   gcmGetOptimizerOption()->patchDummyTEXLDs = (n))
-#define gcmOPT_SetSplitVecMUL() (gcmGetOptimizerOption()->splitVec = gcvTRUE, \
-                                 gcmGetOptimizerOption()->splitVec4MUL = gcvTRUE)
-#define gcmOPT_SetSplitVecMULLO() (gcmGetOptimizerOption()->splitVec = gcvTRUE, \
-                                  gcmGetOptimizerOption()->splitVec4MULLO = gcvTRUE)
-#define gcmOPT_SetSplitVecDP3() (gcmGetOptimizerOption()->splitVec = gcvTRUE, \
-                                 gcmGetOptimizerOption()->splitVec4DP3 = gcvTRUE)
-#define gcmOPT_SetSplitVecDP4() (gcmGetOptimizerOption()->splitVec = gcvTRUE, \
-                                 gcmGetOptimizerOption()->splitVec4DP4 = gcvTRUE)
-#define gctOPT_hasFeature(FBit) ((gcmGetOptimizerOption()->featureBits & (FBit)) != 0)
-#define gctOPT_SetFeature(FBit) do { gcmGetOptimizerOption()->featureBits != (FBit); } while (0)
-
-#define gcmOPT_SetPackVarying(v)     (gcmGetOptimizerOption()->packVarying = v)
-
 /* feature bits */
 #define FB_LIVERANGE_FIX1         0x0001
 #define FB_INLINE_RENAMETEMP      0x0002
@@ -1346,6 +1448,32 @@ extern gctBOOL VirSHADER_DoDual16(gctINT ShaderId);
 #define FB_INSERT_MOV_INPUT       0x0040  /* insert MOV Rn, Rn for input to help HW team to debug */
 #define FB_ENABLE_FS_OUT_INIT     0x0080  /* enable Fragment shader output
                                              initialization if it is un-initialized */
+#define FB_ENABLE_CONST_BORDER    0x0100  /* enable const border value, driver need to set $ConstBorderValue uniform */
+#define FB_FORCE_LS_ACCESS        0x8000  /* triage use: enforce all load/store as local storage access,
+                                             remove this feature bit once local storage access is supported */
+
+#define gcmOPT_SetPatchTexld(m,n) (gcmGetOptimizerOption()->patchEveryTEXLDs = (m),\
+                                   gcmGetOptimizerOption()->patchDummyTEXLDs = (n))
+#define gcmOPT_SetSplitVecMUL() (gcmGetOptimizerOption()->splitVec = gcvTRUE, \
+                                 gcmGetOptimizerOption()->splitVec4MUL = gcvTRUE)
+#define gcmOPT_SetSplitVecMULLO() (gcmGetOptimizerOption()->splitVec = gcvTRUE, \
+                                  gcmGetOptimizerOption()->splitVec4MULLO = gcvTRUE)
+#define gcmOPT_SetSplitVecDP3() (gcmGetOptimizerOption()->splitVec = gcvTRUE, \
+                                 gcmGetOptimizerOption()->splitVec4DP3 = gcvTRUE)
+#define gcmOPT_SetSplitVecDP4() (gcmGetOptimizerOption()->splitVec = gcvTRUE, \
+                                 gcmGetOptimizerOption()->splitVec4DP4 = gcvTRUE)
+#define gcmOPT_getFeatureBits(FBit)   (gcmGetOptimizerOption()->featureBits)
+#define gcmOPT_hasFeature(FBit)   ((gcmGetOptimizerOption()->featureBits & (FBit)) != 0)
+#define gcmOPT_SetFeature(FBit)   do { gcmGetOptimizerOption()->featureBits |= (FBit); } while (0)
+#define gcmOPT_ResetFeature(FBit) do { gcmGetOptimizerOption()->featureBits &= ~(FBit); } while (0)
+
+extern void gcOPT_SetFeature(gctUINT FBit);
+extern void gcOPT_ResetFeature(gctUINT FBit);
+
+#define gcmOPT_SetPackVarying(v)      (gcmGetOptimizerOption()->packVarying = v)
+
+#define gcmOPT_SetDual16PrecisionRule(v)     (gcmGetOptimizerOption()->dual16PrecisionRule = v)
+
 /* temporarily change PredefinedDummySamplerId from 7 to 8 */
 #define PredefinedDummySamplerId       8
 
@@ -1525,6 +1653,7 @@ extern gceSTATUS gcInitGLSLCaps(
 #define GetGLMaxCombinedShaderOutputResources() (gcGetGLSLCaps()->maxCombinedShaderOutputResource)
 #define GetGLMaxComputeWorkGroupCount(Index)  (gcGetGLSLCaps()->maxWorkGroupCount[(Index)])
 #define GetGLMaxComputeWorkGroupSize(Index)   (gcGetGLSLCaps()->maxWorkGroupSize[(Index)])
+#define GetGLMaxSharedMemorySize()            (gcGetGLSLCaps()->maxShareMemorySize)
 #define GetGLMaxComputeUniformComponents()    (gcGetGLSLCaps()->maxCmptUniformVectors * 4)
 #define GetGLMaxComputeTextureImageUnits()    (gcGetGLSLCaps()->maxCmptTextureImageUnits)
 #define GetGLMaxComputeAtomicCounters()       (gcGetGLSLCaps()->maxCmptAtomicCounters)
@@ -2614,6 +2743,18 @@ gcSHADER_CreateConstantUniform(
     OUT gcUNIFORM *              Uniform
     );
 
+/* add uniform with compile-time initializer */
+gceSTATUS
+gcSHADER_AddUniformWithInitializer(
+    IN gcSHADER                  Shader,
+    IN gctCONST_STRING           Name,
+    IN gcSHADER_TYPE             Type,
+    IN gctUINT32                 Length,
+    IN gcSHADER_PRECISION        Precision,
+    IN gcsValue *                Value,
+    OUT gcUNIFORM *              Uniform
+    );
+
 gcSL_FORMAT
 gcGetFormatFromType(
     IN gcSHADER_TYPE Type
@@ -3692,6 +3833,11 @@ gcSHADER_IsHaltiCompiler(
 
 gctBOOL
 gcSHADER_IsES31Compiler(
+    IN gcSHADER Shader
+    );
+
+gctBOOL
+gcSHADER_IsES32Compiler(
     IN gcSHADER Shader
     );
 
@@ -5362,7 +5508,7 @@ gcSHADER_ConvertSamplerAssignForParameter(
 gceSTATUS
 gcSHADER_AnalyzeFunctions(
     IN gcSHADER Shader,
-    IN gctBOOL InFE
+    IN gctBOOL NeedToCheckRecursive
     );
 
 /*******************************************************************************
@@ -6810,6 +6956,7 @@ gcLinkProgram(
     IN gctINT               ShaderCount,
     IN gcSHADER *           ShaderArray,
     IN gceSHADER_FLAGS      Flags,
+    IN gceSHADER_SUB_FLAGS  *SubFlags,
     OUT gctUINT32 *         StateBufferSize,
     OUT gctPOINTER *        StateBuffer,
     OUT gcsHINT_PTR *       Hints
@@ -7103,7 +7250,8 @@ gcFinalizeRecompilation(void);
 /* dynamic patch shader */
 gceSTATUS gcSHADER_DynamicPatch(
     IN OUT gcSHADER         Shader,
-    IN gcPatchDirective  *  PatchDirective
+    IN gcPatchDirective  *  PatchDirective,
+    IN gctUINT              isScalar
     );
 
 /*******************************************************************************

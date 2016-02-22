@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -80,6 +80,8 @@ typedef struct _gcoCL_DEVICE_INFO
     gctUINT64           execCapability;         /* cl_device_exec_capabilities */
     gctBOOL             atomicSupport;
     gctSIZE_T           imageMaxBufferSize;
+
+    gctBOOL             computeOnlyGpu;         /* without graphih, only compute core GPU flag */
 } gcoCL_DEVICE_INFO;
 
 typedef gcoCL_DEVICE_INFO *  gcoCL_DEVICE_INFO_PTR;

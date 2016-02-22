@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,19 +13,6 @@
 
 #include "gc_vsc.h"
 #include "vir/codegen/gc_vsc_vir_ep_gen.h"
-#include "chip/gc_vsc_chip_mc_codec.h"
-
-/* Temporarily, use old MC dump function */
-extern void
-gcDumpMCStates(
-    IN gctUINT32 Address,
-    IN gctUINT32 * States,
-    IN gctBOOL OutputFormat,
-    IN gctBOOL OutputHexStates,
-    IN gctBOOL OutputDual16Modifiers,
-    IN gctSIZE_T BufSize,
-    OUT gctSTRING Buffer
-    );
 
 /* Defined in drvi_link.c */
 extern void _ConvertVirPerVtxPxlAndPerPrimIoList(
@@ -116,6 +103,10 @@ static gctUINT _GenerateShaderVersionAndType(VIR_Shader* pShader)
     case _SHADER_ES31_VERSION:
         shMajorVer = 3;
         shMinorVer = 1;
+        break;
+    case _SHADER_ES32_VERSION:
+        shMajorVer = 3;
+        shMinorVer = 2;
         break;
     case _SHADER_ES11_VERSION:
     case _cldCL1Dot1:
@@ -926,13 +917,13 @@ OnError:
     return errCode;
 }
 
-static gctBOOL _IsUniformAllocatedOnTargetHwLocation(VIR_Uniform*                         pVirUniform,
+static gctBOOL _IsUniformAllocatedOnTargetHwLocation(gctINT                               uniformPhysicalAddr,
                                                      SHADER_CONSTANT_HW_LOCATION_MAPPING* pTargetHwLocation)
 {
-    if (pVirUniform->physical != -1 &&
+    if (uniformPhysicalAddr != -1 &&
         pTargetHwLocation->hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER)
     {
-        return (pTargetHwLocation->hwLoc.hwRegNo == (gctUINT)pVirUniform->physical);
+        return (pTargetHwLocation->hwLoc.hwRegNo == (gctUINT)uniformPhysicalAddr);
     }
 
     /* Do not support mapping to mem */
@@ -941,12 +932,12 @@ static gctBOOL _IsUniformAllocatedOnTargetHwLocation(VIR_Uniform*               
     return gcvFALSE;
 }
 
-static void _SetUniformTargetHwLocation(VIR_Uniform*                         pVirUniform,
+static void _SetUniformTargetHwLocation(gctINT                               uniformPhysicalAddr,
                                         SHADER_CONSTANT_HW_LOCATION_MAPPING* pTargetHwLocation)
 {
-    if (pVirUniform->physical != -1)
+    if (uniformPhysicalAddr != -1)
     {
-        pTargetHwLocation->hwLoc.hwRegNo = pVirUniform->physical;
+        pTargetHwLocation->hwLoc.hwRegNo = uniformPhysicalAddr;
         pTargetHwLocation->hwAccessMode = SHADER_HW_ACCESS_MODE_REGISTER;
 
         return;
@@ -989,13 +980,15 @@ static VSC_ErrCode _CollectConstantMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelpe
     VIR_Symbol*                   pVirUniformSym;
     VIR_Uniform*                  pVirUniform;
     VIR_Type*                     pVirUniformType;
-    gctUINT                       virUniformIdx, ctcSlot;
+    gctUINT                       virUniformIdx, ctcSlot, subUniformIdx;
     gctUINT                       channel, hwChannel;
     gctUINT                       thisUniformRegCount;
     VIR_Const*                    pThisVirCTCVal;
     SHADER_CONSTANT_MAPPING*      pCnstMapping = &pOutSEP->constantMapping;
     SHADER_COMPILE_TIME_CONSTANT* pThisCTC;
     gctUINT                       thisChannelValue;
+    gctINT                        thisSubUniformPhysicalAddr;
+    gctUINT*                      pThisSubUniformConstValue;
 
     for (virUniformIdx = 0; virUniformIdx < VIR_IdList_Count(pVirUniformLsts); virUniformIdx ++)
     {
@@ -1025,7 +1018,7 @@ static VSC_ErrCode _CollectConstantMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelpe
         if (pVirUniform && pVirUniform->physical == -1 &&
              /* Only affiliated with LTC */
             (isSymUniformUsedInLTC(pVirUniformSym) ||
-             /* We use same uniform to dedicate ubo and ubo address, but it is possible that ubo is used but ubo address is not used */
+             /* We use same uniform to indicate ubo and ubo address, but it is possible that ubo is used but ubo address is not used */
              VIR_Symbol_GetUniformKind(pVirUniformSym) == VIR_UNIFORM_UNIFORM_BLOCK_ADDRESS))
         {
             continue;
@@ -1045,50 +1038,57 @@ static VSC_ErrCode _CollectConstantMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelpe
             /* Collect CTC */
             if (isSymUniformCompiletimeInitialized(pVirUniformSym))
             {
-                gcmASSERT(thisUniformRegCount == 1);
+                /* Maxium is 512-bits uniform (4 HW constants) */
+                gcmASSERT(thisUniformRegCount <= 4);
 
                 pThisVirCTCVal = (VIR_Const*)VIR_GetSymFromId(&pShader->constTable, pVirUniform->u.initializer);
 
-                pThisCTC = gcvNULL;
-
-                /* Check whether there is already a CTC allocated on same HW location */
-                for (ctcSlot = 0; ctcSlot < pCnstMapping->countOfCompileTimeConstant; ctcSlot ++)
+                for (subUniformIdx = 0; subUniformIdx < thisUniformRegCount; subUniformIdx ++)
                 {
-                    if (_IsUniformAllocatedOnTargetHwLocation(pVirUniform,
-                                             &pCnstMapping->pCompileTimeConstant[ctcSlot].hwConstantLocation))
+                    pThisCTC = gcvNULL;
+
+                    thisSubUniformPhysicalAddr = pVirUniform->physical + subUniformIdx;
+                    pThisSubUniformConstValue = &pThisVirCTCVal->value.vecVal.u32Value[CHANNEL_NUM * subUniformIdx];
+
+                    /* Check whether there is already a CTC allocated on same HW location */
+                    for (ctcSlot = 0; ctcSlot < pCnstMapping->countOfCompileTimeConstant; ctcSlot ++)
                     {
-                        pThisCTC = &pCnstMapping->pCompileTimeConstant[ctcSlot];
-                        break;
-                    }
-                }
-
-                /* Enlarge CTC set to make room for current CTC */
-                if (pThisCTC == gcvNULL)
-                {
-                    pThisCTC = _EnlargeCTCRoom(pCnstMapping, 1);
-                    vscInitializeCTC(pThisCTC);
-                    _SetUniformTargetHwLocation(pVirUniform, &pThisCTC->hwConstantLocation);
-                }
-
-                /* Copy CTC now */
-                for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
-                {
-                    if (channel >= (gctUINT)(VIR_GetTypeComponents(pThisVirCTCVal->type)))
-                    {
-                        break;
+                        if (_IsUniformAllocatedOnTargetHwLocation(thisSubUniformPhysicalAddr,
+                                                 &pCnstMapping->pCompileTimeConstant[ctcSlot].hwConstantLocation))
+                        {
+                            pThisCTC = &pCnstMapping->pCompileTimeConstant[ctcSlot];
+                            break;
+                        }
                     }
 
-                    hwChannel = (((pVirUniform->swizzle) >> ((channel) * 2)) & 0x3);
-                    thisChannelValue = *(gctUINT*)&pThisVirCTCVal->value.vecVal.u32Value[channel];
-
-                    if (pThisCTC->hwConstantLocation.validHWChannelMask & (1 << hwChannel))
+                    /* Enlarge CTC set to make room for current CTC */
+                    if (pThisCTC == gcvNULL)
                     {
-                        gcmASSERT(thisChannelValue == pThisCTC->constantValue[hwChannel]);
+                        pThisCTC = _EnlargeCTCRoom(pCnstMapping, 1);
+                        vscInitializeCTC(pThisCTC);
+                        _SetUniformTargetHwLocation(thisSubUniformPhysicalAddr, &pThisCTC->hwConstantLocation);
                     }
-                    else
+
+                    /* Copy CTC now */
+                    for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
                     {
-                        pThisCTC->hwConstantLocation.validHWChannelMask |= (1 << hwChannel);
-                        pThisCTC->constantValue[hwChannel] = thisChannelValue;
+                        if (channel >= (gctUINT)(VIR_GetTypeComponents(pThisVirCTCVal->type)))
+                        {
+                            break;
+                        }
+
+                        hwChannel = (((pVirUniform->swizzle) >> ((channel) * 2)) & 0x3);
+                        thisChannelValue = *(gctUINT*)&pThisSubUniformConstValue[channel];
+
+                        if (pThisCTC->hwConstantLocation.validHWChannelMask & (1 << hwChannel))
+                        {
+                            gcmASSERT(thisChannelValue == pThisCTC->constantValue[hwChannel]);
+                        }
+                        else
+                        {
+                            pThisCTC->hwConstantLocation.validHWChannelMask |= (1 << hwChannel);
+                            pThisCTC->constantValue[hwChannel] = thisChannelValue;
+                        }
                     }
                 }
             }
@@ -1304,6 +1304,11 @@ static void _CollectExeHints(VSC_SEP_GEN_HELPER* pSepGenHelper, SHADER_EXECUTABL
                                        &pOutSEP->exeHints.nativeHints.prvStates.gs.outputPrim);
     }
 
+    if (pShader->shaderKind == VIR_SHADER_COMPUTE || pShader->shaderKind == VIR_SHADER_CL)
+    {
+        pOutSEP->exeHints.nativeHints.prvStates.gps.shareMemSizePerThreadGrpInByte = VIR_Shader_GetLocalMemorySize(pShader);
+    }
+
     /* 2. Derived hints */
 
     if (VIR_Shader_isPackUnifiedSampler(pShader))
@@ -1319,11 +1324,7 @@ static void _CollectExeHints(VSC_SEP_GEN_HELPER* pSepGenHelper, SHADER_EXECUTABL
     pOutSEP->exeHints.derivedHints.globalStates.unifiedConstRegAllocStrategy = UNIFIED_RF_ALLOC_STRATEGY_FLOAT_ADDR_OFFSET;
     pOutSEP->exeHints.derivedHints.globalStates.unifiedSamplerRegAllocStrategy = samplerAllocStrategy;
     pOutSEP->exeHints.derivedHints.globalStates.bGprSpilled = pShader->hasRegisterSpill;
-    pOutSEP->exeHints.derivedHints.globalStates.bLoadStore = pShader->hasLoadStore;
-    pOutSEP->exeHints.derivedHints.globalStates.bImgReadWrite = pShader->hasImgReadWrite;
-    pOutSEP->exeHints.derivedHints.globalStates.bAtomicOp = pShader->hasAtomicOp;
-    pOutSEP->exeHints.derivedHints.globalStates.bMemAccess = pShader->hasMemoryAccess;
-    pOutSEP->exeHints.derivedHints.globalStates.bBarrierOp = pShader->hasBarrier;
+    pOutSEP->exeHints.derivedHints.globalStates.memoryAccessHint = (SHADER_EDH_MEM_ACCESS_HINT)pShader->memoryAccessFlag;
     pOutSEP->exeHints.derivedHints.globalStates.hwStartRegNoForUSCAddrs = pShader->remapRegStart;
     pOutSEP->exeHints.derivedHints.globalStates.hwStartRegChannelForUSCAddrs = pShader->remapChannelStart;
     pOutSEP->exeHints.derivedHints.globalStates.bIoUSCAddrsPackedToOneReg = (pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL) ?
@@ -1339,6 +1340,7 @@ static void _CollectExeHints(VSC_SEP_GEN_HELPER* pSepGenHelper, SHADER_EXECUTABL
     if (pShader->shaderKind == VIR_SHADER_FRAGMENT)
     {
         pOutSEP->exeHints.derivedHints.prvStates.ps.bPxlDiscard = pShader->psHasDiscard;
+        pOutSEP->exeHints.derivedHints.prvStates.ps.bDerivRTx = pShader->hasDsx;
         pOutSEP->exeHints.derivedHints.prvStates.ps.bDerivRTy = pShader->hasDsy;
         pOutSEP->exeHints.derivedHints.prvStates.ps.hwRegNoForSampleMaskId = pShader->sampleMaskIdRegStart;
         pOutSEP->exeHints.derivedHints.prvStates.ps.hwRegChannelForSampleMaskId = pShader->sampleMaskIdChannelStart;
@@ -1495,544 +1497,6 @@ static VSC_ErrCode _CollectStaticPatches(VSC_SEP_GEN_HELPER* pSepGenHelper, SHAD
 
 OnError:
     return errCode;
-}
-
-void _PrintMachineCode(VSC_MC_RAW_INST* pMcCode, gctUINT countOfMCInst, gctBOOL bExecuteOnDual16, VSC_DUMPER* pDumper)
-{
-    gctUINT  instIdx;
-    gctCHAR  buffer[256];
-
-    if (pMcCode && countOfMCInst > 0)
-    {
-        vscDumper_PrintStrSafe(pDumper, "[code]");
-        vscDumper_DumpBuffer(pDumper);
-
-        for (instIdx = 0; instIdx < countOfMCInst; instIdx ++)
-        {
-            gcDumpMCStates(instIdx,
-                           (gctUINT32*)(pMcCode + instIdx),
-                           gcvTRUE,
-                           gcvTRUE,
-                           bExecuteOnDual16,
-                           sizeof(buffer),
-                           buffer
-                           );
-
-            vscDumper_PrintStrSafe(pDumper, "%s", buffer);
-            vscDumper_DumpBuffer(pDumper);
-        }
-    }
-}
-
-void _PrintIoMappingPerExeObj(SHADER_IO_MAPPING_PER_EXE_OBJ* pIoMappingPerExeObj, gctBOOL bInput,
-                              gctBOOL bPerPrim, VIR_Shader* pShader, VSC_DUMPER* pDumper)
-{
-    gctINT          ioIndex, ui, channel, i;
-    gctUINT         hwLoc, hwLocT1;
-    gctUINT         usageIndex;
-    SHADER_IO_USAGE thisUsage;
-    gctUINT         writeMask, writeMaskT1 = 0;
-    gctBOOL         bHpRegOnDual16;
-    gctUINT         usageIndexMask[SHADER_IO_USAGE_TOTAL_COUNT];
-
-    gctCONST_STRING strUsageName[] =
-    {
-        "position",
-        "blendweight",
-        "blendindices",
-        "normal",
-        "psize",
-        "texcoord",
-        "tagent",
-        "binormal",
-        "tessfactor",
-        "positiont",
-        "color",
-        "fog",
-        "depth",
-        "sample",
-        "vertexid",
-        "primitiveid",
-        "instanceid",
-        "inputcoverage",
-        "isfrontface",
-        "sampleindex",
-        "outputcontrolpointid",
-        "forkinstanceid",
-        "joininstanceid",
-        "domain",
-        "threadid",
-        "threadgroupid",
-        "threadidingroup",
-        "threadidingroupflattened",
-        "clipdistance",
-        "culldistance",
-        "rendertargetarrayindex",
-        "viewportarrayindex",
-        "depthgreaterequal",
-        "depthlessequal",
-        "insidetessfactor",
-        "samplemask",
-        "pointcoord",
-        "fogcoord",
-        "helperpixel",
-        "sampledepth",
-        "samplepos",
-        "inputvtxcpcount",
-        "instancingid"
-        "",
-        "?*&%#"
-    };
-
-    gctCONST_STRING strWriteMask[] =
-    {
-        ".", ".x", ".y", ".xy",
-        ".z", ".xz", ".yz", ".xyz",
-        ".w", ".xw", ".yw", ".xyw",
-        ".zw", ".xzw", ".yzw", ".xyzw"
-    };
-
-#define IO_DUMP_ALIGNEMENT  11
-
-    for (ioIndex = 0; ioIndex < MAX_SHADER_IO_NUM; ioIndex ++)
-    {
-        if (!(pIoMappingPerExeObj->ioIndexMask & (1LL << ioIndex)))
-        {
-            continue;
-        }
-
-        for (ui = 0; ui < SHADER_IO_USAGE_TOTAL_COUNT; ui ++)
-        {
-            if (pIoMappingPerExeObj->usage2IO[ui].ioIndexMask & (1LL << ioIndex))
-            {
-                memset(usageIndexMask, 0, sizeof(gctUINT)*SHADER_IO_USAGE_TOTAL_COUNT);
-                thisUsage = (SHADER_IO_USAGE)ui;
-
-                for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
-                {
-                    if (pIoMappingPerExeObj->pIoRegMapping[ioIndex].ioChannelMapping[channel].ioUsage == thisUsage &&
-                        pIoMappingPerExeObj->pIoRegMapping[ioIndex].ioChannelMapping[channel].flag.bActiveWithinShader)
-                    {
-                        usageIndex = pIoMappingPerExeObj->pIoRegMapping[ioIndex].ioChannelMapping[channel].usageIndex;
-                        if (usageIndexMask[thisUsage] & (1 << usageIndex))
-                        {
-                            continue;
-                        }
-
-                        bHpRegOnDual16 = gcvFALSE;
-                        hwLoc = pIoMappingPerExeObj->pIoRegMapping[ioIndex].ioChannelMapping[channel].hwLoc.cmnHwLoc.u.hwRegNo;
-                        hwLocT1 = pIoMappingPerExeObj->pIoRegMapping[ioIndex].ioChannelMapping[channel].hwLoc.t1HwLoc.hwRegNo;
-                        usageIndexMask[thisUsage] |= (1 << usageIndex);
-                        writeMask = (1 << channel);
-                        if (pIoMappingPerExeObj->pIoRegMapping[ioIndex].ioChannelMapping[channel].flag.bHighPrecisionOnDual16)
-                        {
-                            bHpRegOnDual16 = gcvTRUE;
-
-                            if (hwLoc == hwLocT1)
-                            {
-                                writeMaskT1 = (1 << pIoMappingPerExeObj->pIoRegMapping[ioIndex].
-                                                    ioChannelMapping[channel].hwLoc.t1HwLoc.hwRegChannel);
-                            }
-                            else
-                            {
-                                writeMaskT1 = writeMask;
-                            }
-                        }
-
-                        for (i = channel + 1; i < CHANNEL_NUM; i ++)
-                        {
-                            if (pIoMappingPerExeObj->pIoRegMapping[ioIndex].ioChannelMapping[i].flag.bActiveWithinShader)
-                            {
-                                if ((pIoMappingPerExeObj->pIoRegMapping[ioIndex].ioChannelMapping[i].ioUsage == thisUsage) &&
-                                    (usageIndex == pIoMappingPerExeObj->pIoRegMapping[ioIndex].ioChannelMapping[i].usageIndex))
-                                {
-                                    writeMask |= (1 << i);
-
-                                    if (bHpRegOnDual16)
-                                    {
-                                        gcmASSERT(pIoMappingPerExeObj->pIoRegMapping[ioIndex].ioChannelMapping[i].flag.bHighPrecisionOnDual16);
-
-                                        if (hwLoc == hwLocT1)
-                                        {
-                                            writeMaskT1 |= (1 << pIoMappingPerExeObj->pIoRegMapping[ioIndex].
-                                                                 ioChannelMapping[i].hwLoc.t1HwLoc.hwRegChannel);
-                                        }
-                                        else
-                                        {
-                                            writeMaskT1 = writeMask;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        if (thisUsage == SHADER_IO_USAGE_ISFRONTFACE)
-                        {
-                            gcmASSERT(bInput);
-
-                            vscDumper_PrintStrSafe(pDumper, "i%d%s", ioIndex, strWriteMask[writeMask]);
-
-                            for (i = pDumper->curOffset; i < IO_DUMP_ALIGNEMENT; i ++)
-                            {
-                                vscDumper_PrintStrSafe(pDumper, " ");
-                            }
-
-                            vscDumper_PrintStrSafe(pDumper, "------>    vface\n");
-                        }
-                        else
-                        {
-                            /* pi --- per-prim input
-                               po --- per-prim output */
-                            vscDumper_PrintStrSafe(pDumper,
-                                                   bInput ? (bPerPrim ? "pi%d%s" : "i%d%s") : (bPerPrim ? "po%d%s" : "o%d%s"),
-                                                   ioIndex, strWriteMask[writeMask]);
-
-                            for (i = pDumper->curOffset; i < IO_DUMP_ALIGNEMENT; i ++)
-                            {
-                                vscDumper_PrintStrSafe(pDumper, " ");
-                            }
-
-                            if (hwLoc == SPECIAL_HW_IO_REG_NO)
-                            {
-                                vscDumper_PrintStrSafe(pDumper, "------>    specialHwReg");
-                            }
-                            else
-                            {
-                                /* pci --- per-prim channel index
-                                   vci --- per-vertex channel index */
-                                if (bHpRegOnDual16)
-                                {
-                                    vscDumper_PrintStrSafe(pDumper, "------>    r%d%s/r%d%s",
-                                                           hwLoc, strWriteMask[writeMask],
-                                                           hwLocT1, strWriteMask[writeMaskT1]);
-                                }
-                                else
-                                {
-                                    vscDumper_PrintStrSafe(pDumper,
-                                                           pIoMappingPerExeObj->pIoRegMapping[ioIndex].regIoMode == SHADER_IO_MODE_ACTIVE ?
-                                                           (bPerPrim ? "------>    pci%d" : "------>    vci%d") : "------>    r%d%s",
-                                                           hwLoc, strWriteMask[writeMask]);
-                                }
-                            }
-
-                            if (thisUsage != SHADER_IO_USAGE_GENERAL)
-                            {
-                                if (usageIndex == 0)
-                                {
-                                    vscDumper_PrintStrSafe(pDumper, " (%s", strUsageName[thisUsage]);
-                                }
-                                else
-                                {
-                                    vscDumper_PrintStrSafe(pDumper, " (%s%d", strUsageName[thisUsage], usageIndex);
-                                }
-
-                                if (pIoMappingPerExeObj->soIoIndexMask & (1LL << ioIndex))
-                                {
-                                    vscDumper_PrintStrSafe(pDumper, ", streamout)\n");
-                                }
-                                else
-                                {
-                                    vscDumper_PrintStrSafe(pDumper, ")\n");
-                                }
-                            }
-                            else
-                            {
-                                if (pIoMappingPerExeObj->soIoIndexMask & (1LL << ioIndex))
-                                {
-                                    vscDumper_PrintStrSafe(pDumper, " (streamout)\n");
-                                }
-                                else
-                                {
-                                    vscDumper_PrintStrSafe(pDumper, "\n");
-                                }
-                            }
-                        }
-
-                        vscDumper_DumpBuffer(pDumper);
-                    }
-                }
-            }
-        }
-    }
-}
-
-void _PrintIoMapping(SHADER_IO_MAPPING* pIoMapping, gctBOOL bInput, VIR_Shader* pShader, VSC_DUMPER* pDumper)
-{
-    _PrintIoMappingPerExeObj(&pIoMapping->ioVtxPxl, bInput, gcvFALSE, pShader, pDumper);
-    _PrintIoMappingPerExeObj(&pIoMapping->ioPrim, bInput, gcvTRUE, pShader, pDumper);
-}
-
-void _PrintConstantMapping(SHADER_CONSTANT_MAPPING* pConstantMapping, VIR_Shader* pShader, VSC_DUMPER* pDumper)
-{
-    gctUINT ctcIdx, i;
-
-    /* Print CTC */
-    for (ctcIdx = 0; ctcIdx < pConstantMapping->countOfCompileTimeConstant; ctcIdx ++)
-    {
-        SHADER_COMPILE_TIME_CONSTANT* pCTC = &pConstantMapping->pCompileTimeConstant[ctcIdx];
-
-        gcmASSERT(pCTC->hwConstantLocation.hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
-
-        vscDumper_PrintStrSafe(pDumper, "c%d = {", pCTC->hwConstantLocation.hwLoc.hwRegNo);
-
-        for (i = 0; i < CHANNEL_NUM; i ++)
-        {
-            vscDumper_PrintStrSafe(pDumper, "%f(0x%08x)", *(float*)&pCTC->constantValue[i], pCTC->constantValue[i]);
-
-            if (i < CHANNEL_NUM - 1)
-            {
-                vscDumper_PrintStrSafe(pDumper, ",");
-            }
-        }
-
-        vscDumper_PrintStrSafe(pDumper, "}\n");
-        vscDumper_DumpBuffer(pDumper);
-    }
-}
-
-void _PrintMappingTables(SHADER_EXECUTABLE_PROFILE* pSEP, VIR_Shader* pShader, VSC_DUMPER* pDumper)
-{
-    vscDumper_PrintStrSafe(pDumper, "[mapping tables]");
-    vscDumper_DumpBuffer(pDumper);
-
-    /* TODO:
-            If pShader is not NULL, we need dump vir-symbol->#->hw resource, not only #->hw resource.
-    */
-
-    /* Print inputs */
-    _PrintIoMapping(&pSEP->inputMapping, gcvTRUE, pShader, pDumper);
-
-    /* Print outputs */
-    _PrintIoMapping(&pSEP->outputMapping, gcvFALSE, pShader, pDumper);
-
-    /* Print constant mapping */
-    _PrintConstantMapping(&pSEP->constantMapping, pShader, pDumper);
-}
-
-void _PrintSEPMisc(SHADER_EXECUTABLE_PROFILE* pSEP, VSC_DUMPER* pDumper)
-{
-    gctCHAR*   strClientType[] = {"UNKNOWN", "dx", "gl", "gles", "cl"};
-    gctCHAR*   strShaderType[] = {"UNKNOWN", "vs", "ps", "gs", "hs", "ds", "gps"};
-
-    /* Print shader type */
-    vscDumper_PrintStrSafe(pDumper, "%s_%s_%d_%d\n",
-                                    strClientType[DECODE_SHADER_CLIENT(pSEP->shVersionType)],
-                                    strShaderType[DECODE_SHADER_TYPE(pSEP->shVersionType)],
-                                    DECODE_SHADER_MAJOR_VER(pSEP->shVersionType),
-                                    DECODE_SHADER_MINOR_VER(pSEP->shVersionType));
-
-    /* Print chip version */
-    vscDumper_PrintStrSafe(pDumper, "chip = 0x%x\n", pSEP->chipModel);
-    vscDumper_PrintStrSafe(pDumper, "chipRevision = 0x%x\n", pSEP->chipRevision);
-
-    /* Print total inst count */
-    vscDumper_PrintStrSafe(pDumper, "instCount = %d\n", pSEP->countOfMCInst);
-
-    /* Print end pc */
-    vscDumper_PrintStrSafe(pDumper, "endPC = %d\n", pSEP->endPCOfMainRoutine);
-
-    /* Print GPR count */
-    vscDumper_PrintStrSafe(pDumper, "tempRegCount = %d\n", pSEP->gprCount);
-
-    /* Flush now */
-    vscDumper_DumpBuffer(pDumper);
-}
-
-void _PrintExeHints(SHADER_EXECUTABLE_PROFILE* pSEP, VSC_DUMPER* pDumper)
-{
-    SHADER_EXECUTABLE_HINTS* pExeHints = &pSEP->exeHints;
-
-    gctCONST_STRING strOnOff[] =
-    {
-        "off",
-        "on"
-    };
-
-    gctCONST_STRING strYesNo[] =
-    {
-        "no",
-        "yes"
-    };
-
-    gctCONST_STRING strURFAllocStrategy[] =
-    {
-        "unified",
-        "fixed",
-        "float"
-    };
-
-    gctCONST_STRING strGsInputPrimName[] =
-    {
-        "point",
-        "line",
-        "triangle"
-        "line_adj",
-        "triangle_adj",
-        "patch_1",
-        "patch_2",
-        "patch_3",
-        "patch_4",
-        "patch_5",
-        "patch_6",
-        "patch_7",
-        "patch_8",
-        "patch_9",
-        "patch_10",
-        "patch_11",
-        "patch_12",
-        "patch_13",
-        "patch_14",
-        "patch_15",
-        "patch_16",
-        "patch_17",
-        "patch_18",
-        "patch_19",
-        "patch_20",
-        "patch_21",
-        "patch_22",
-        "patch_23",
-        "patch_24",
-        "patch_25",
-        "patch_26",
-        "patch_27",
-        "patch_28",
-        "patch_29",
-        "patch_30",
-        "patch_31",
-        "patch_32",
-    };
-
-    gctCONST_STRING strGsOutputPrimName[] =
-    {
-        "pointlist",
-        "linestrip",
-        "triaglestrip"
-    };
-
-    gctCONST_STRING strTessDomainTypeName[] =
-    {
-        "isoline",
-        "triangle",
-        "quad"
-    };
-
-    gctCONST_STRING strTessPartitionTypeName[] =
-    {
-        "integer",
-        "pow2",
-        "fractional_odd",
-        "fractional_even"
-    };
-
-    gctCONST_STRING strTessOutputPrimName[] =
-    {
-        "point",
-        "line",
-        "triangle_cw",
-        "triangle_ccw"
-    };
-
-    vscDumper_PrintStrSafe(pDumper, "[exe-hints]");
-    vscDumper_DumpBuffer(pDumper);
-
-    vscDumper_PrintStrSafe(pDumper, "executeOnDual16: %s\n", strOnOff[pExeHints->derivedHints.globalStates.bExecuteOnDual16]);
-    vscDumper_PrintStrSafe(pDumper, "allocCrByUnifiedMode: %s\n", strURFAllocStrategy[pExeHints->derivedHints.globalStates.unifiedConstRegAllocStrategy]);
-    vscDumper_PrintStrSafe(pDumper, "allocSrByUnifiedMode: %s\n", strURFAllocStrategy[pExeHints->derivedHints.globalStates.unifiedSamplerRegAllocStrategy]);
-    vscDumper_PrintStrSafe(pDumper, "gprSpilled: %s\n", strYesNo[pExeHints->derivedHints.globalStates.bGprSpilled]);
-
-    if (DECODE_SHADER_TYPE(pSEP->shVersionType) == SHADER_TYPE_HULL ||
-        DECODE_SHADER_TYPE(pSEP->shVersionType) == SHADER_TYPE_DOMAIN)
-    {
-        vscDumper_PrintStrSafe(pDumper, "inputCtrlPointCount: %d\n", pExeHints->nativeHints.prvStates.ts.inputCtrlPointCount);
-
-        if (DECODE_SHADER_TYPE(pSEP->shVersionType) == SHADER_TYPE_HULL)
-        {
-            vscDumper_PrintStrSafe(pDumper, "outputCtrlPointCount: %d\n", pExeHints->nativeHints.prvStates.ts.outputCtrlPointCount);
-        }
-
-        if ((DECODE_SHADER_CLIENT(pSEP->shVersionType) == SHADER_CLIENT_DX && DECODE_SHADER_TYPE(pSEP->shVersionType) == SHADER_TYPE_HULL) ||
-            (DECODE_SHADER_CLIENT(pSEP->shVersionType) != SHADER_CLIENT_DX && DECODE_SHADER_TYPE(pSEP->shVersionType) == SHADER_TYPE_DOMAIN))
-        {
-            vscDumper_PrintStrSafe(pDumper, "tessDomainType: %s\n", strTessDomainTypeName[pExeHints->nativeHints.prvStates.ts.tessDomainType]);
-            vscDumper_PrintStrSafe(pDumper, "tessPartitionType: %s\n", strTessPartitionTypeName[pExeHints->nativeHints.prvStates.ts.tessPartitionType]);
-            vscDumper_PrintStrSafe(pDumper, "tessOutputPrim: %s\n", strTessOutputPrimName[pExeHints->nativeHints.prvStates.ts.tessOutputPrim]);
-            vscDumper_PrintStrSafe(pDumper, "maxTessFactor: %d\n", pExeHints->nativeHints.prvStates.ts.maxTessFactor);
-        }
-    }
-    else if (DECODE_SHADER_TYPE(pSEP->shVersionType) == SHADER_TYPE_GEOMETRY)
-    {
-        vscDumper_PrintStrSafe(pDumper, "inputPrim: %s\n", strGsInputPrimName[pExeHints->nativeHints.prvStates.gs.inputPrim]);
-        vscDumper_PrintStrSafe(pDumper, "outputPrim: %s\n", strGsOutputPrimName[pExeHints->nativeHints.prvStates.gs.outputPrim]);
-        vscDumper_PrintStrSafe(pDumper, "maxOutputVtxCount: %d\n", pExeHints->nativeHints.prvStates.gs.maxOutputVtxCount);
-        vscDumper_PrintStrSafe(pDumper, "instanceCount: %d\n", pExeHints->nativeHints.prvStates.gs.instanceCount);
-    }
-    else if (DECODE_SHADER_TYPE(pSEP->shVersionType) == SHADER_TYPE_PIXEL)
-    {
-        vscDumper_PrintStrSafe(pDumper, "executeOnSampleFreq: %s\n", strOnOff[pExeHints->derivedHints.prvStates.ps.bExecuteOnSampleFreq]);
-        vscDumper_PrintStrSafe(pDumper, "earlyPixelTestInRa: %s\n", strYesNo[pExeHints->nativeHints.prvStates.ps.bEarlyPixelTestInRa]);
-    }
-
-    /* Flush now */
-    vscDumper_DumpBuffer(pDumper);
-}
-
-void vscPrintSEP(SHADER_EXECUTABLE_PROFILE* pSEP, void* pVirShader)
-{
-    VSC_DUMPER  sepDumper;
-    gctUINT     dumpBufferSize = 1024;
-    gctCHAR*    pDumpBuffer;
-    VIR_Shader* pShader = (VIR_Shader*)pVirShader;
-    gctCHAR*    strShaderType[] = {"UNKNOWN", "VS", "PS", "GS", "HS", "DS", "GPS"};
-
-    if (gcoOS_Allocate(gcvNULL, 1024, (gctPOINTER*)&pDumpBuffer) != gcvSTATUS_OK)
-    {
-        return;
-    }
-
-    vscDumper_Initialize(&sepDumper,
-                         gcvNULL,
-                         gcvNULL,
-                         pDumpBuffer,
-                         dumpBufferSize);
-
-    if (pShader)
-    {
-        vscDumper_PrintStrSafe(&sepDumper,
-                               "\n************ [ Generated Shader Executable Profile <%s> (id:%u)] ************",
-                               strShaderType[DECODE_SHADER_TYPE(pSEP->shVersionType)],
-                               VIR_Shader_GetId(pShader));
-    }
-    else
-    {
-        vscDumper_PrintStrSafe(&sepDumper,
-                               "\n************ [ Generated Shader Executable Profile <%s>] ************",
-                               strShaderType[DECODE_SHADER_TYPE(pSEP->shVersionType)]);
-    }
-
-    vscDumper_DumpBuffer(&sepDumper);
-
-    /* Print SEP version */
-    vscDumper_PrintStrSafe(&sepDumper, "SEP_%d_%d\n", DECODE_SEP_MAJOR_VER(pSEP->profileVersion),
-                                                      DECODE_SEP_MINOR_VER(pSEP->profileVersion));
-    vscDumper_DumpBuffer(&sepDumper);
-
-    /* Print misc info */
-    _PrintSEPMisc(pSEP, &sepDumper);
-
-    /* Print executable hints */
-    _PrintExeHints(pSEP, &sepDumper);
-
-    /* Print mapping tables */
-    _PrintMappingTables(pSEP, pShader, &sepDumper);
-
-    /* Print code */
-    _PrintMachineCode((VSC_MC_RAW_INST*)pSEP->pMachineCode,
-                      pSEP->countOfMCInst,
-                      pSEP->exeHints.derivedHints.globalStates.bExecuteOnDual16,
-                      &sepDumper);
-
-    /* Release dumper buffer */
-    gcoOS_Free(gcvNULL, pDumpBuffer);
 }
 
 VSC_ErrCode

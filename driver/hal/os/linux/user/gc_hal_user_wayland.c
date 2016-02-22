@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -299,6 +299,10 @@ struct termios  tty;
 gctINT ignore;
 gctINT hookSEGV = 0;
 
+static  struct wl_list WLEGLWindowList = {0};
+static  struct wl_list WLEGLBufferList = {0};
+static  pthread_mutex_t registerMutex = PTHREAD_MUTEX_INITIALIZER;
+
 static gctBOOL inline
 _IsCompositorDisplay(struct _FBDisplay *Display)
 {
@@ -306,9 +310,88 @@ _IsCompositorDisplay(struct _FBDisplay *Display)
 }
 
 static gctBOOL inline
+_IsWaylandLocalDisplay(gcsWL_LOCAL_DISPLAY* Display)
+{
+    return ((Display->wl_signature == WL_LOCAL_DISPLAY_SIGNATURE) ? gcvTRUE : gcvFALSE);
+}
+
+static gctBOOL inline
 _IsCompositorWindow(struct _FBWindow *Window)
 {
     return ((Window->wl_signature == WL_COMPOSITOR_SIGNATURE) ? gcvTRUE : gcvFALSE);
+}
+
+static gctBOOL inline
+_IsClientWindow(struct wl_egl_window *Window)
+{
+    return ((Window->wl_signature == WL_CLIENT_SIGNATURE) ? gcvTRUE : gcvFALSE);
+}
+
+static gctBOOL inline
+_IsClientEGLBuffer(gcsWL_EGL_BUFFER *egl_buffer)
+{
+    return ((egl_buffer->wl_signature == WL_CLIENT_SIGNATURE) ? gcvTRUE : gcvFALSE);
+}
+
+static gctBOOL inline
+_isValidWindow(struct wl_egl_window *window)
+{
+    struct wl_egl_window* win;
+
+    wl_list_for_each(win, &WLEGLWindowList, link)
+    {
+        if(win == window && _IsClientWindow(window))
+            return gcvTRUE;
+    }
+    return gcvFALSE;
+}
+
+static gctBOOL inline
+_isValidEGLBuffer(gcsWL_EGL_BUFFER *buffer)
+{
+    gcsWL_EGL_BUFFER* egl_buffer;
+    wl_list_for_each(egl_buffer, &WLEGLBufferList, link)
+    {
+        if(egl_buffer == buffer && _IsClientEGLBuffer(buffer))
+            return gcvTRUE;
+    }
+    return gcvFALSE;
+}
+
+static void registerWindow(struct wl_egl_window *window)
+{
+    int i;
+    struct wl_egl_window* wl_window = window;
+    pthread_mutex_lock(&registerMutex);
+    if(WLEGLWindowList.next == gcvNULL)
+    {
+        wl_list_init(&WLEGLWindowList);
+        wl_list_init(&WLEGLBufferList);
+    }
+    wl_list_insert(&WLEGLWindowList, &wl_window->link);
+    for(i = 0; i < wl_window->info->bufferCount; i++)
+    {
+        wl_list_insert(&WLEGLBufferList, &wl_window->backbuffers[i]->link);
+    }
+    pthread_mutex_unlock(&registerMutex);
+}
+
+static void unRegisterWindow(struct wl_egl_window *window)
+{
+    int i;
+    struct wl_egl_window* wl_window = window;
+    if(WLEGLWindowList.next == gcvNULL)
+    {
+        gcmPRINT("The WLEGLWindowList was not initialized \n");
+        return;
+    }
+    pthread_mutex_lock(&registerMutex);
+    wl_list_remove(&wl_window->link);
+    for(i = 0; i < wl_window->info->bufferCount; i++)
+    {
+        wl_list_remove(&wl_window->backbuffers[i]->link);
+    }
+    pthread_mutex_unlock(&registerMutex);
 }
 
 static struct _FBDisplay *displayStack = gcvNULL;
@@ -351,7 +434,23 @@ gcoOS_GetDisplay(
     IN gctPOINTER Context
     )
 {
-    return gcoOS_GetDisplayByIndex(0, Display, Context);
+
+    gctINT index = 0;
+    char* fbenv = getenv("FB_FRAMEBUFFER_0");
+    if(fbenv != gcvNULL)
+    {
+        gctINT count = strlen(fbenv);
+        if(count > 1)
+        {
+            index = atoi(&fbenv[count-1]);
+            if(index < 0)
+            {
+                return  gcvSTATUS_INVALID_ARGUMENT;
+            }
+        }
+    }
+
+    return gcoOS_GetDisplayByIndex(index, Display, Context);
 }
 
 gceSTATUS
@@ -419,6 +518,10 @@ gcoOS_GetDisplayByIndex(
             if (display->multiBuffer < 1)
             {
                 display->multiBuffer = 1;
+            }
+            else if(display->multiBuffer > 3)
+            {
+                display->multiBuffer = 3;
             }
         }
 
@@ -873,27 +976,71 @@ static void wayland_release_pending_resource(void *data, struct wl_callback *cal
 
 static const struct wl_callback_listener release_buffer_listener = { wayland_release_pending_resource};
 
+ gctBOOL
+isRenderFinished(struct wl_egl_window *window)
+{
+    gctUINT i;
+    if(window->display == gcvNULL)
+    {
+        return gcvTRUE;
+    }
+    for (i=0; i< window->info->bufferCount ; i++)
+    {
+        if (window->backbuffers[i]->frame_callback != gcvNULL)
+        {
+            wl_display_dispatch_queue(window->display->wl_display, window->display->wl_swap_queue);
+            return gcvFALSE;
+        }
+    }
+
+   return gcvTRUE;
+}
+
+void wait_for_the_frame_finish(struct wl_egl_window *window)
+{
+    gctINT32 counter = 0;
+    if(window->reference != gcvNULL)
+    {
+        do
+        {
+            gcoOS_AtomIncrement(gcvNULL, window->reference, gcvNULL);
+            gcoOS_AtomDecrement(gcvNULL, window->reference, &counter);
+            /* Sleep for a while */
+            gcoOS_Delay(gcvNULL, 10);
+        }
+
+        while(counter > 1 || isRenderFinished(window) != gcvTRUE);
+    }
+}
+
 static void
 gcoWL_DestroryBO(struct wl_egl_window *window)
 {
      gctUINT i;
 
+    wait_for_the_frame_finish(window);
     if (window != gcvNULL)
     {
         for (i=0; i< window->info->bufferCount ; i++)
         {
             if (window->backbuffers[i]->info.surface != gcvNULL)
             {
-                gcoSURF_Unlock(
-                    window->backbuffers[i]->info.surface,
-                    gcvNULL
-                    );
 
-                gcoSURF_Destroy(
-                    window->backbuffers[i]->info.surface
-                    );
+               if(window->display)
+               {
+                   struct wl_callback *callback;
+                   callback = wl_display_sync(window->display->wl_display);
+                   wl_callback_add_listener(callback, &release_buffer_listener,
+                       window->backbuffers[i]->info.surface);
+                   wl_proxy_set_queue((struct wl_proxy *) callback, window->display->wl_swap_queue);
+                   window->backbuffers[i]->info.surface = gcvNULL;
+               }
+               else
+               {
+                   gcoSURF_Unlock(window->backbuffers[i]->info.surface, gcvNULL);
+                   gcoSURF_Destroy(window->backbuffers[i]->info.surface);
+               }
 
-                gcmTRACE(gcvLEVEL_VERBOSE, "Surface %d (%p) destroyed", i, window->backbuffers[i]->info.surface);
             }
         }
     }
@@ -934,8 +1081,6 @@ gcoWL_CreateBO(struct wl_egl_window* window, int dx, int dy, int width, int heig
             ));
 
         window->info->bpp = renderTargetInfo[0]->bitsPerPixel;
-        /* Query current hardware type. */
-        gcmONERROR(gcoHAL_GetHardwareType(gcvNULL, &currentType));
 
         gcmONERROR(
             gcoTEXTURE_GetClosestFormat(gcvNULL,
@@ -1024,6 +1169,102 @@ OnError:
     gcoWL_DestroryBO(window);
     gcoOS_FreeMemory(gcvNULL, window);
     window = gcvNULL;
+    return gcvSTATUS_INVALID_ARGUMENT;
+}
+
+
+static gceSTATUS
+gcoWL_ResizeBO(struct wl_egl_window* window)
+{
+     gceSTATUS status = gcvSTATUS_OK;
+     gctUINT i;
+
+    gcmASSERT(window);
+    do
+    {
+        gceSURF_TYPE surfaceType = gcvSURF_BITMAP;
+        gceSURF_FORMAT resolveFormat = window->info->format;
+        gceHARDWARE_TYPE currentType = gcvHARDWARE_INVALID;
+        struct wl_callback *callback;
+        i = window->info->current;
+
+        callback = wl_display_sync(window->display->wl_display);
+        wl_callback_add_listener(callback, &release_buffer_listener,
+                window->backbuffers[i]->info.surface);
+        wl_proxy_set_queue((struct wl_proxy *) callback, window->display->wl_swap_queue);
+        window->backbuffers[i]->info.surface = gcvNULL;
+
+        /* Get hardware type. */
+        gcmONERROR(gcoHAL_GetHardwareType(gcvNULL, &currentType));
+        gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
+
+        if (window->noResolve)
+        {
+            surfaceType = gcvSURF_TEXTURE;
+        }
+
+        /* Query current hardware type. */
+        gcmONERROR(gcoHAL_GetHardwareType(gcvNULL, &currentType));
+
+        gcmONERROR(
+            gcoSURF_Construct(
+                      gcvNULL,
+                      window->info->width,
+                      window->info->height,
+                      1,
+                      surfaceType,
+                      resolveFormat,
+                      gcvPOOL_DEFAULT,
+                      &window->backbuffers[i]->info.surface
+                      ));
+
+        if(surfaceType != gcvSURF_BITMAP)
+        {
+            gcmONERROR(
+                    gcoSURF_SetFlags(
+                    window->backbuffers[i]->info.surface,
+                    gcvSURF_FLAG_CONTENT_YINVERTED,
+                    gcvTRUE));
+        }
+
+        gcmONERROR(
+                gcoSURF_Lock(
+                    window->backbuffers[i]->info.surface,
+                    gcvNULL,
+                    gcvNULL
+                    ));
+
+        gcmONERROR(
+                gcoSURF_GetAlignedSize(
+                    window->backbuffers[i]->info.surface,
+                    gcvNULL,
+                    gcvNULL,
+                    &window->backbuffers[i]->info.stride
+                    ));
+
+        gcmONERROR(
+               gcoSURF_QueryVidMemNode(
+                    window->backbuffers[i]->info.surface,
+                    (gctUINT32 *)&window->backbuffers[i]->info.node,
+                    &window->backbuffers[i]->info.pool,
+                    &window->backbuffers[i]->info.bytes
+                    ));
+
+        gcmONERROR(
+                gcoHAL_NameVideoMemory((gctUINT32)window->backbuffers[i]->info.node,
+                                       (gctUINT32 *)&window->backbuffers[i]->info.node));
+
+        window->backbuffers[i]->info.width = window->info->width;
+        window->backbuffers[i]->info.height = window->info->height;
+        window->backbuffers[i]->info.invalidate = gcvTRUE;
+        window->backbuffers[i]->frame_callback = gcvNULL;
+
+        /* Restore hardware type. */
+        gcoHAL_SetHardwareType(gcvNULL, currentType);
+    }
+    while (gcvFALSE);
+    return status;
+OnError:
     return gcvSTATUS_INVALID_ARGUMENT;
 }
 
@@ -1158,7 +1399,12 @@ static void
 wl_buffer_release(void *data, struct wl_buffer *buffer)
 {
     gcsWL_EGL_BUFFER* egl_buffer = data;
-    egl_buffer->info.locked = gcvFALSE;
+    pthread_mutex_lock(&registerMutex);
+    if (_isValidEGLBuffer(egl_buffer))
+    {
+        egl_buffer->info.locked = gcvFALSE;
+    }
+    pthread_mutex_unlock(&registerMutex);
 }
 
 static struct wl_buffer_listener wl_buffer_listener = {
@@ -1169,8 +1415,13 @@ static void
 gcoWL_FrameCallback(void *data, struct wl_callback *callback, uint32_t time)
 {
     gcsWL_EGL_BUFFER* egl_buffer = data;
-    egl_buffer->frame_callback = NULL;
-    wl_callback_destroy(callback);
+    pthread_mutex_lock(&registerMutex);
+    if (_isValidEGLBuffer(egl_buffer))
+    {
+        egl_buffer->frame_callback = NULL;
+        wl_callback_destroy(callback);
+    }
+    pthread_mutex_unlock(&registerMutex);
 }
 
 static const struct wl_callback_listener gcsWL_FRAME_LISTENER = {
@@ -1285,10 +1536,21 @@ gcoOS_SetDisplayVirtualEx(
         /* Client */
         struct wl_egl_window* wl_window = (struct wl_egl_window*) Window;
         gcsWL_EGL_BUFFER* egl_buffer = (gcsWL_EGL_BUFFER*)Context;
-        struct wl_buffer* wl_buffer = egl_buffer->wl_buffer;
-        gcsWL_EGL_DISPLAY* display = wl_window->display;
+
+        struct wl_buffer* wl_buffer = gcvNULL;
+        gcsWL_EGL_DISPLAY* display = gcvNULL;
+
         int ret = 0;
         int i   = 0;
+
+        if(_isValidWindow(Window) == gcvFALSE)
+        {
+            return gcvSTATUS_FALSE;
+        }
+        wl_buffer = egl_buffer->wl_buffer;
+        display = wl_window->display;
+        wl_display_dispatch_queue_pending(display->wl_display, display->wl_queue);
+
         /* wait for frame callback */
         for(i = 0; i < wl_window->info->bufferCount; i++)
         {
@@ -1299,8 +1561,15 @@ gcoOS_SetDisplayVirtualEx(
         }
         if(ret < 0)
         {
+            gcoOS_AtomDecrement(gcvNULL, wl_window->reference, gcvNULL);
             return gcvSTATUS_FALSE;
         }
+
+        if(wl_window->reference == gcvNULL)
+        {
+             return status;
+         }
+
         if(display->swapInterval > 0)
         {
             gctINT swapInterval = display->swapInterval;
@@ -1333,6 +1602,10 @@ gcoOS_SetDisplayVirtualEx(
             wl_proxy_set_queue((struct wl_proxy *) egl_buffer->frame_callback, display->wl_swap_queue);
         }
         wl_display_flush(display->wl_display);
+        if(wl_window->reference != gcvNULL )
+        {
+            gcoOS_AtomDecrement(gcvNULL, wl_window->reference, gcvNULL);
+        }
         return status;
     }
 
@@ -1576,6 +1849,11 @@ gcoOS_CreateWindow(
         gcoOS_ZeroMemory( wl_window->info, sizeof(struct _gcsWL_EGL_WINDOW_INFO));
 
         wl_window->info->bufferCount =  WL_EGL_NUM_BACKBUFFERS;
+
+        gcoOS_AtomConstruct(gcvNULL, &wl_window->reference);
+        wl_window->wl_signature = WL_CLIENT_SIGNATURE;
+        pthread_mutex_init(&(wl_window->window_mutex), gcvNULL);
+
         p = getenv("GPU_VIV_WL_MULTI_BUFFER");
         if (p != gcvNULL)
         {
@@ -1592,7 +1870,9 @@ gcoOS_CreateWindow(
             gcoOS_AllocateMemory(gcvNULL, sizeof(struct _gcsWL_EGL_BUFFER),
                     (gctPOINTER) &wl_window->backbuffers[i]);
             gcoOS_ZeroMemory( wl_window->backbuffers[i], sizeof(struct _gcsWL_EGL_BUFFER));
+            wl_window->backbuffers[i]->wl_signature = WL_CLIENT_SIGNATURE;
         }
+        registerWindow(wl_window);
         status = gcoWL_CreateBO((struct wl_egl_window*)(*Window), 0, 0, Width, Height);
         return status;
     }
@@ -1751,23 +2031,10 @@ gcoOS_ResizeWindow(
         /* Nothing to do if window size if same. */
         if(window->info->width != Width || window->info->height != Height)
         {
-            int i = 0;
-            /*Make sure the surface was not used in work thread*/
-            gcoHAL_Commit(gcvNULL, gcvTRUE);
-            for (i = 0; i < window->info->bufferCount ; i++)
-            {
-                /*In case the wl_egl_window_resize was called twice without drawing*/
-                if (window->backbuffers[i]->info.pendingSurface != gcvNULL)
-                {
-                    struct wl_callback *callback;
-                    callback = wl_display_sync(window->display->wl_display);
-                    wl_callback_add_listener(callback, &release_buffer_listener,
-                    window->backbuffers[i]->info.pendingSurface);
-                    wl_proxy_set_queue((struct wl_proxy *) callback, window->display->wl_swap_queue);
-                }
-                window->backbuffers[i]->info.pendingSurface = window->backbuffers[i]->info.surface;
-            }
-            gcoWL_CreateBO(window, 0, 0, Width, Height);
+
+            wait_for_the_frame_finish(window);
+            window->info->width = Width;
+            window->info->height = Height;
         }
     }
     gcmFOOTER();
@@ -1910,6 +2177,8 @@ gcoOS_DestroyWindow(
         struct wl_egl_window* window = (struct wl_egl_window*)Window;
         gctUINT i;
         gcoWL_DestroryBO(window);
+        unRegisterWindow(window);
+        pthread_mutex_lock(&(window->window_mutex));
         for(i=0; i< window->info->bufferCount; i++)
         {
             if (window->backbuffers[i]->wl_buffer != gcvNULL)
@@ -1917,23 +2186,20 @@ gcoOS_DestroyWindow(
                 wl_buffer_destroy(window->backbuffers[i]->wl_buffer);
                 window->backbuffers[i]->wl_buffer = gcvNULL;
             }
-            if (window->backbuffers[i]->frame_callback != gcvNULL)
-            {
-                wl_callback_destroy(window->backbuffers[i]->frame_callback);
-                window->backbuffers[i]->frame_callback = gcvNULL;
-            }
+
+
 
             gcoOS_FreeMemory(gcvNULL, window->backbuffers[i]);
             window->backbuffers[i] = gcvNULL;
         }
+
+        pthread_mutex_unlock(&(window->window_mutex));
+        pthread_mutex_destroy(&(window->window_mutex));
         gcoOS_FreeMemory(gcvNULL, window->backbuffers);
         gcoOS_FreeMemory(gcvNULL, window->info);
         window->info = gcvNULL;
         window->backbuffers = gcvNULL;
-
-        /*Make sure to free the deferred list, which will be called in server after wl_buffer_destroy*/
-        gcoHAL_Commit(gcvNULL, gcvTRUE);
-
+        window->wl_signature = 0;
     }
     return gcvSTATUS_OK;
 }
@@ -2749,9 +3015,9 @@ gcoWL_ImportBuffer(struct wl_client *client,
                           &surface));
 
     /* Save surface info. */
-    surface->info.node.u.normal.node = (gctUINT32) node;
-    surface->info.node.pool          = (gcePOOL) pool;
-    surface->info.node.size          = (gctSIZE_T) bytes;
+    surface->node.u.normal.node = (gctUINT32) node;
+    surface->node.pool          = (gcePOOL) pool;
+    surface->node.size          = (gctSIZE_T) bytes;
 /*
     gcmONERROR(
         gcoSURF_SetOrientation(surface,
@@ -2759,7 +3025,7 @@ gcoWL_ImportBuffer(struct wl_client *client,
 */
 
     gcmONERROR(gcoHAL_ImportVideoMemory(
-        (gctUINT32)node, (gctUINT32 *)&surface->info.node.u.normal.node));
+        (gctUINT32)node, (gctUINT32 *)&surface->node.u.normal.node));
 
     /* Lock once as it's done in gcoSURF_Construct with vidmem. */
     gcmONERROR(
@@ -2810,7 +3076,7 @@ OnError:
 }
 
 struct wl_viv_interface gcsWL_VIV_IMPLEMENTATION = {
-    gcoWL_ImportBuffer
+    (void *) gcoWL_ImportBuffer
 };
 
 static void
@@ -2835,22 +3101,28 @@ gcoOS_InitLocalDisplayInfo(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gctPOINTER Context = *localDisplay;
+    gcsWL_LOCAL_DISPLAY* wl_localDisplay = (gcsWL_LOCAL_DISPLAY*)Context;
 
-    if (_IsCompositorDisplay((struct _FBDisplay*)Display) == gcvTRUE)
+    if ((_IsCompositorDisplay((struct _FBDisplay*)Display) == gcvTRUE)
+         || (Context && _IsWaylandLocalDisplay(wl_localDisplay)))
     {
         struct wl_display *display = gcvNULL;
-        if(Context != gcvNULL)
+        if(wl_localDisplay != gcvNULL && Context && _IsWaylandLocalDisplay(wl_localDisplay))
         {
-            display = (struct wl_display*) Context;
+            display = (struct wl_display*) wl_localDisplay->localInfo;
         }
-        else if ((((struct _FBDisplay*) Display)->wl_display) != gcvNULL)
+        else /*Deprecated path */
         {
             display = ((struct _FBDisplay*) Display)->wl_display;
         }
         if(display != NULL)
         {
-            *localDisplay = wl_global_create(((struct _FBDisplay*) Display)->wl_display,
-                            &wl_viv_interface, 1, gcvNULL, gcoWL_BindWLViv);
+            *localDisplay = wl_global_create(display,
+                             &wl_viv_interface, 1, gcvNULL, gcoWL_BindWLViv);
+        }
+        else
+        {
+            *localDisplay = gcvNULL;
         }
     }
     else
@@ -2913,6 +3185,13 @@ gcoOS_DeinitLocalDisplayInfo(
 {
     gceSTATUS status = gcvSTATUS_OK;
 
+
+    if(localDisplay && (*localDisplay == gcvNULL))
+    {
+        /*The localDisplay was not initialized in FB app */
+        return status;
+    }
+
     if (_IsCompositorDisplay((struct _FBDisplay*)Display) == gcvTRUE)
     {
         if ((((struct _FBDisplay*) Display)->wl_display) != gcvNULL)
@@ -2923,10 +3202,24 @@ gcoOS_DeinitLocalDisplayInfo(
     else
     {
         gcsWL_EGL_DISPLAY *egl_display = *localDisplay;
+        struct wl_egl_window* wl_window;
         if (egl_display->file >= 0)
         {
             close(egl_display->file);
             egl_display->file = -1;
+        }
+        if(WLEGLWindowList.next != gcvNULL)
+        {
+            pthread_mutex_lock(&registerMutex);
+            wl_list_for_each(wl_window, &WLEGLWindowList, link)
+            {
+                if(_IsClientWindow(wl_window))
+                {
+                    if(wl_window->display == egl_display)
+                         wl_window->display = gcvNULL;
+                }
+            }
+            pthread_mutex_unlock(&registerMutex);
         }
         gcoWL_ReleaseDisplay(*localDisplay);
     }
@@ -2987,29 +3280,25 @@ gcoWL_CreateWLBuffer(
     IN gctPOINTER  localDisplay
     )
 {
+    unsigned int i =0;
     struct wl_egl_window* wl_window = (struct wl_egl_window*) Window;
-    struct wl_buffer* wl_buffer = wl_window->backbuffers[wl_window->info->current]->wl_buffer;
-    gcsWL_EGL_DISPLAY* display = ((gcsWL_EGL_DISPLAY*) localDisplay);
+    i = wl_window->info->current;
 
-    int i = wl_window->info->current;
-    if (wl_window->backbuffers[i]->info.pendingSurface != gcvNULL)
-    {
-        struct wl_callback *callback;
-        callback = wl_display_sync(wl_window->display->wl_display);
-        wl_callback_add_listener(callback, &release_buffer_listener,
-            wl_window->backbuffers[i]->info.pendingSurface);
-        wl_proxy_set_queue((struct wl_proxy *) callback, display->wl_swap_queue);
-        wl_window->backbuffers[i]->info.pendingSurface = NULL;
-    }
+    gcsWL_EGL_DISPLAY* display = ((gcsWL_EGL_DISPLAY*) localDisplay);
+    pthread_mutex_lock(&(wl_window->window_mutex));
+    struct wl_buffer* wl_buffer = wl_window->backbuffers[i]->wl_buffer;
 
     if(wl_buffer)
     {
         wl_buffer_destroy(wl_buffer);
     }
-    gcoWL_CreateGhostBuffer(display, &(*wl_window->backbuffers[i]));
+
+    gcoWL_CreateGhostBuffer(display, wl_window->backbuffers[i]);
     wl_buffer = wl_window->backbuffers[i]->wl_buffer;
     wl_proxy_set_queue((struct wl_proxy *) wl_buffer, display->wl_queue);
     wl_buffer_add_listener(wl_buffer, &wl_buffer_listener, wl_window->backbuffers[i]);
+    wl_window->backbuffers[i]->info.invalidate = gcvFALSE;
+    pthread_mutex_unlock(&(wl_window->window_mutex));
 }
 
 gceSTATUS
@@ -3039,10 +3328,15 @@ gcoOS_GetDisplayBackbufferEx(
         if (ret < 0)
             return gcvSTATUS_INVALID_ARGUMENT;
 
+        if( wl_window->backbuffers[wl_window->info->current]->info.width != wl_window->info->width
+            || wl_window->backbuffers[wl_window->info->current]->info.height != wl_window->info->height)
+        {
+            gcoWL_ResizeBO(wl_window);
+        }
+
         if (wl_window->backbuffers[wl_window->info->current]->info.invalidate == gcvTRUE)
         {
-            gcoWL_CreateWLBuffer(Window, localDisplay);
-            wl_window->backbuffers[wl_window->info->current]->info.invalidate = gcvFALSE;
+           gcoWL_CreateWLBuffer(Window, localDisplay);
         }
 
         *context = wl_window->backbuffers[wl_window->info->current];
@@ -3050,6 +3344,11 @@ gcoOS_GetDisplayBackbufferEx(
         *Offset  = 0;
         *X       = 0;
         *Y       = 0;
+
+        if(wl_window->reference != gcvNULL )
+        {
+            gcoOS_AtomIncrement(gcvNULL, wl_window->reference, gcvNULL);
+        }
     }
     else
     {
@@ -3087,6 +3386,12 @@ gcoOS_SynchronousFlip(
                 syncFlip = gcvTRUE;
             }
         }
+    }
+    else
+    {
+        struct _FBDisplay* display = (struct _FBDisplay*)Display;
+        if(display->multiBuffer <= 3 && display->multiBuffer > 1)
+            syncFlip = gcvTRUE;
     }
     return syncFlip;
 }

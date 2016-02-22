@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -348,6 +348,27 @@ EGLBoolean
 veglSyncToPixmap(
     IN NativePixmapType Pixmap,
     IN VEGLPixmapInfo PixInfo
+    );
+
+/*
+ * Update buffer age.
+ */
+EGLBoolean
+veglUpdateBufferAge(
+    IN VEGLDisplay Display,
+    IN VEGLSurface Surface,
+    IN struct eglBackBuffer * BackBuffer
+    );
+
+/*
+ * Query buffer age.
+ */
+EGLBoolean
+veglQueryBufferAge(
+    IN VEGLDisplay Display,
+    IN VEGLSurface Surface,
+    IN struct eglBackBuffer * BackBuffer,
+    OUT EGLint *BufferAge
     );
 
 #ifdef __cplusplus

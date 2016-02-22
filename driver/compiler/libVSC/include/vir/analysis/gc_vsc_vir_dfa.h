@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -47,21 +47,24 @@ typedef enum _VIR_DFA_TYPE
 {
     VIR_DFA_TYPE_REACH_DEF = 0, /* Forward */
     VIR_DFA_TYPE_LIVE_VAR, /* Backward */
+    VIR_DFA_TYPE_HELPER, /* Any direction, not for real flow */
     VIR_DFA_TYPE_COUNT
 }VIR_DFA_TYPE;
 
 typedef struct _VIR_DFA_COMMON_FLAGS
 {
     gctUINT                      bValid            : 1;  /* Means DFA info has been built */
-    gctUINT                      bFlowUpdated      : 1;  /* See comments for VIR_BASE_DFA */
+    gctUINT                      bFlowInvalidated  : 1;  /* See comments for VIR_BASE_DFA */
     gctUINT                      reserved          : 30;
 }VIR_DFA_COMMON_FLAGS;
 
 /* A base DFA structure from which all other different types of DFA will derive.
 
-   NOTE after bFlowUpdated in common flag is set, flowsize and all related flow (func-flow
-   and block-flow) of this base DFA is not be VALID anymore because when partially updating,
-   we don't do iterative analysis again!!! */
+   NOTE after bFlowInvalidated in common flag is set, flowsize and all related flows (func-
+   flow and block-flow) of this DFA is not VALID anymore because for some partially updating,
+   we may not update them easily!!! So if bFlowInvalidated has been set, and you still want
+   to access flowsize and all related flows (func-flow and block-flow) of this DFA, you must
+   redo such global DFA again */
 typedef struct _VIR_BASE_DFA
 {
     VIR_DFA_TYPE                 dfaType;
@@ -136,10 +139,8 @@ typedef void (*PFN_TS_BLOCK_FLOW_LOCAL_GENKILL_RESOLVER)(VIR_BASE_TS_DFA* pBaseT
 typedef void (*PFN_TS_BLOCK_FLOW_INIT_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow);
 typedef gctBOOL (*PFN_TS_BLOCK_FLOW_ITERATE_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow);
 typedef gctBOOL (*PFN_TS_BLOCK_FLOW_COMBINE_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow); /* n-to-1 */
-#if SUPPORT_IPA_DFA
 typedef gctBOOL (*PFN_TS_BLOCK_FLOW_COMBINE_FROM_CALLEE_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pCallerTsBlockFlow); /* 1-to-1 */
 typedef gctBOOL (*PFN_TS_FUNC_FLOW_COMBINE_FROM_CALLERS_RESOLVER)(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_FUNC_FLOW* pCalleeTsFuncFlow); /* n-to-1 */
-#endif
 
 /* Resolvers for iterative ts-DFA */
 typedef struct _VIR_TS_DFA_RESOLVERS
@@ -148,10 +149,8 @@ typedef struct _VIR_TS_DFA_RESOLVERS
     PFN_TS_BLOCK_FLOW_INIT_RESOLVER                ts_initBlockFlow_resolver;
     PFN_TS_BLOCK_FLOW_ITERATE_RESOLVER             ts_iterateBlockFlow_resolver;
     PFN_TS_BLOCK_FLOW_COMBINE_RESOLVER             ts_combineBlockFlow_resolver;
-#if SUPPORT_IPA_DFA
     PFN_TS_BLOCK_FLOW_COMBINE_FROM_CALLEE_RESOLVER ts_combineBlockFlowFromCallee_resolver;
     PFN_TS_FUNC_FLOW_COMBINE_FROM_CALLERS_RESOLVER ts_combineFuncFlowFromCallers_resolver;
-#endif
 }VIR_TS_DFA_RESOLVERS;
 
 /* ts-DFA base, all concrete ts-DFA must be derived from this structure. The general iterative ts-DFA
@@ -174,10 +173,11 @@ void vscVIR_InitializeBaseTsDFA(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_CALL_GRAPH* pCg
                                 gctINT flowSize, VSC_MM* pMM, VIR_TS_DFA_RESOLVERS* pTsDfaResolvers);
 void vscVIR_UpdateBaseTsDFAFlowSize(VIR_BASE_TS_DFA* pBaseTsDFA, gctINT newFlowSize);
 void vscVIR_FinalizeBaseTsDFA(VIR_BASE_TS_DFA* pBaseTsDFA);
+void vscVIR_UpdateTsFlow(VSC_BIT_VECTOR* pTsFlow, VSC_BIT_VECTOR* pDeltaTsFlow, gctBOOL bClearFlow);
 
 /* General iterative ts-DFA routines */
-VSC_ErrCode vscVIR_DoForwardIterativeTsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_TS_DFA* pTsDFA);
-VSC_ErrCode vscVIR_DoBackwardIterativeTsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_TS_DFA* pTsDFA);
+VSC_ErrCode vscVIR_DoForwardIterativeTsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_TS_DFA* pTsDFA, gctBOOL bIPA);
+VSC_ErrCode vscVIR_DoBackwardIterativeTsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_TS_DFA* pTsDFA, gctBOOL bIPA);
 
 /*
  *  Generic multi-states (MS) DFA interface (general version with state-vector)
@@ -232,10 +232,8 @@ typedef void (*PFN_MS_BLOCK_FLOW_LOCAL_GENKILL_RESOLVER)(VIR_BASE_MS_DFA* pBaseM
 typedef void (*PFN_MS_BLOCK_FLOW_INIT_RESOLVER)(VIR_BASE_MS_DFA* pBaseMsDFA, VIR_MS_BLOCK_FLOW* pMsBlockFlow);
 typedef gctBOOL (*PFN_MS_BLOCK_FLOW_ITERATE_RESOLVER)(VIR_BASE_MS_DFA* pBaseMsDFA, VIR_MS_BLOCK_FLOW* pMsBlockFlow);
 typedef gctBOOL (*PFN_MS_BLOCK_FLOW_COMBINE_RESOLVER)(VIR_BASE_MS_DFA* pBaseMsDFA, VIR_MS_BLOCK_FLOW* pMsBlockFlow); /* n-to-1 */
-#if SUPPORT_IPA_DFA
 typedef gctBOOL (*PFN_MS_BLOCK_FLOW_COMBINE_FROM_CALLEE_RESOLVER)(VIR_BASE_MS_DFA* pBaseMsDFA, VIR_MS_BLOCK_FLOW* pCallerMsBlockFlow); /* 1-to-1 */
 typedef gctBOOL (*PFN_MS_FUNC_FLOW_COMBINE_FROM_CALLERS_RESOLVER)(VIR_BASE_MS_DFA* pBaseMsDFA, VIR_MS_FUNC_FLOW* pCalleeMsFuncFlow); /* n-to-1 */
-#endif
 
 /* Resolvers for iterative ms-DFA */
 typedef struct _VIR_MS_DFA_RESOLVERS
@@ -244,10 +242,8 @@ typedef struct _VIR_MS_DFA_RESOLVERS
     PFN_MS_BLOCK_FLOW_INIT_RESOLVER                ms_initBlockFlow_resolver;
     PFN_MS_BLOCK_FLOW_ITERATE_RESOLVER             ms_iterateBlockFlow_resolver;
     PFN_MS_BLOCK_FLOW_COMBINE_RESOLVER             ms_combineBlockFlow_resolver;
-#if SUPPORT_IPA_DFA
     PFN_MS_BLOCK_FLOW_COMBINE_FROM_CALLEE_RESOLVER ms_combineBlockFlowFromCallee_resolver;
     PFN_MS_FUNC_FLOW_COMBINE_FROM_CALLERS_RESOLVER ms_combineFuncFlowFromCallers_resolver;
-#endif
 }VIR_MS_DFA_RESOLVERS;
 
 /* ms-DFA base, all concrete ms-DFA must be derived from this structure. The general iterative ms-DFA
@@ -275,8 +271,8 @@ void vscVIR_UpdateBaseMsDFAFlowSize(VIR_BASE_MS_DFA* pBaseMsDFA, gctINT newFlowS
 void vscVIR_FinalizeBaseMsDFA(VIR_BASE_MS_DFA* pBaseMsDFA);
 
 /* General iterative ms-DFA routines */
-VSC_ErrCode vscVIR_DoForwardIterativeMsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_MS_DFA* pMsDFA);
-VSC_ErrCode vscVIR_DoBackwardIterativeMsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_MS_DFA* pMsDFA);
+VSC_ErrCode vscVIR_DoForwardIterativeMsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_MS_DFA* pMsDFA, gctBOOL bIPA);
+VSC_ErrCode vscVIR_DoBackwardIterativeMsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_MS_DFA* pMsDFA, gctBOOL bIPA);
 
 /*
  *  DU analysis
@@ -288,6 +284,8 @@ VSC_ErrCode vscVIR_DoBackwardIterativeMsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_MS_DFA
 #define VIR_INVALID_DEF_INDEX         INVALID_BT_ENTRY_ID
 #define VIR_INVALID_USAGE_INDEX       INVALID_BT_ENTRY_ID
 #define VIR_INVALID_WEB_INDEX         INVALID_BT_ENTRY_ID
+
+#define VIR_INVALID_REG_NO            VIR_INVALID_ID
 
 #define VIR_ANY_DEF_INST              (VIR_Instruction*)(-1) /* For def-key search only */
 #define VIR_UNDEF_INST                (VIR_Instruction*)(-2) /* For undefined usage */
@@ -316,16 +314,34 @@ VSC_ErrCode vscVIR_DoBackwardIterativeMsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_MS_DFA
 #define VIR_HALF_CHANNEL_MASK_HIGH    0x2 /* T1 */
 #define VIR_HALF_CHANNEL_MASK_FULL    (VIR_HALF_CHANNEL_MASK_LOW | VIR_HALF_CHANNEL_MASK_HIGH)
 
-typedef struct _VIR_DEF_FLAGS
+typedef struct VIR_NATIVE_DEF_FLAGS
 {
     gctUINT                      bIsInput             : 1; /* Attributes/inputs/varying inputs */
     gctUINT                      bIsOutput            : 1; /* Output/varyings output */
-    gctUINT                      bNoUsageCrossRoutine : 1; /* Means all usages are in same routine as this def */
     gctUINT                      bIsPerVtxCp          : 1; /* Per vertex/control-point */
     gctUINT                      bIsPerPrim           : 1; /* Per prim */
     gctUINT                      bHwSpecialInput      : 1; /* A hw special input */
-    gctUINT                      bDynIndexed          : 1; /* Mean there is dynamic indexing access */
-    gctUINT                      reserved             : 25;
+
+    gctUINT                      reserved             : 27;
+}VIR_NATIVE_DEF_FLAGS;
+
+typedef struct VIR_DEDUCED_DEF_FLAGS
+{
+    gctUINT                      bNoUsageCrossRoutine : 1; /* Means all usages are in same routine as this def */
+    gctUINT                      bDynIndexed          : 1; /* This def will be dynamically indexed access by indexing reg */
+    gctUINT                      bIndexingReg         : 1; /* This def is for indexing reg Ro of Rb[Ro.single_channel] */
+
+    gctUINT                      reserved             : 29;
+
+}VIR_DEDUCED_DEF_FLAGS;
+
+typedef struct _VIR_DEF_FLAGS
+{
+    /* These must be specified by shader itself */
+    VIR_NATIVE_DEF_FLAGS         nativeDefFlags;
+
+    /* These can be deduced by analysis */
+    VIR_DEDUCED_DEF_FLAGS        deducedDefFlags;
 }VIR_DEF_FLAGS;
 
 typedef struct _VIR_DEF_KEY
@@ -427,6 +443,14 @@ typedef struct _VIR_USAGE_KEY
     /* For output (pUsageInst must be set to VIR_OUTPUT_USAGE_INST or EMIT), use
        output regNo as operand, so we can make a diff with different output usages */
     VIR_Operand*                 pOperand;
+
+    /* Because we use operand to differiate usages of same inst, for the case of
+       Rb[Ro.single_channel] where Ro share same operand with host operand, to
+       differiate Ro usage with usage of host operand, bIsIndexingRegUsage must be
+       TRUE if this usage is for Ro. So we can regard bIsIndexingRegUsage as part
+       of pOperand!! */
+    gctBOOL                      bIsIndexingRegUsage;
+
 }VIR_USAGE_KEY;
 
 typedef struct _VIR_USAGE
@@ -471,8 +495,9 @@ typedef enum _VIR_WEB_TYPE
 
 /* TODO!!!: We need provide several levels of web info, from fine to coarse,
             CHANNEL_WEB, REG_WEB, RANGE_WEB!!! The best result of RA should
-            be on CHANNEL_WEB with auxiliary of other two webs. Current web
-            is just similar as RANGE_WEB. It is too conservative! */
+            be on CHANNEL_WEB with auxiliary of other two webs. Currently,
+            only indexing-reg web is using CHANNEL_WEB, other webs are all
+            just similar as RANGE_WEB. It is too conservative!!!! */
 typedef struct _VIR_WEB
 {
     VIR_WEB_TYPE                 webType;
@@ -517,18 +542,20 @@ typedef struct _VIR_DEF_USAGE_INFO
 #define GET_WEB_BY_IDX(pWebTable, webIdx)          (VIR_WEB*)BT_GET_ENTRY_DATA(pWebTable, (webIdx))
 
 /* Utilities for d-u related analysis */
+
 gctBOOL vscVIR_QueryRealWriteVirRegInfo(VIR_Shader* pShader,
                                         VIR_Instruction* pInst,
                                         VIR_Enable *pDefEnableMask,
                                         gctUINT8 *pHalfChannelMask,
                                         gctUINT* pFirstRegNo,
                                         gctUINT* pRegNoRange,
-                                        VIR_DEF_FLAGS* pDefFlags,
+                                        VIR_NATIVE_DEF_FLAGS* pNativeDefFlags,
                                         gctBOOL* pIsIndexing);
 
 #define MAKE_DEAD_DEF_IN_SEPERATED_WEB     0
 
 /* Build routines */
+
 VSC_ErrCode vscVIR_BuildDefUsageInfo(VIR_CALL_GRAPH*     pCg,
                                      VIR_DEF_USAGE_INFO* pDuInfo,
                                      gctBOOL             bBuildWeb /* Web-table will also be
@@ -543,15 +570,15 @@ VSC_ErrCode vscVIR_BuildWebs(VIR_CALL_GRAPH*     pCg,
 VSC_ErrCode vscVIR_DestroyDefUsageInfo(VIR_DEF_USAGE_INFO* pDuInfo); /* All du info including web will be destroyed */
 VSC_ErrCode vscVIR_DestoryWebs(VIR_DEF_USAGE_INFO* pDuInfo); /* Only web table will be destroyed */
 
-/* Update routines */
+/* Partially update routines */
+
 void vscVIR_AddNewDef(VIR_DEF_USAGE_INFO* pDuInfo,
                       VIR_Instruction* pDefInst,
                       gctUINT firstDefRegNo,
                       gctUINT defRegNoRange,
                       VIR_Enable defEnableMask,
                       gctUINT8 halfChannelMask,
-                      gctBOOL bIsInputDef,
-                      gctBOOL bIsOutputDef,
+                      VIR_NATIVE_DEF_FLAGS* pNativeDefFlags, /* If NULL, default native-def-flags will be used */
                       gctUINT* pRetDefIdxArray  /* VIR_CHANNEL_NUM*defRegNoRange sized array to
                                                    return def index for each enabled channel that
                                                    is new added into def-table */
@@ -572,6 +599,7 @@ void vscVIR_AddNewUsageToDef(VIR_DEF_USAGE_INFO* pDuInfo,
                              VIR_Instruction* pDefInst,
                              VIR_Instruction* pUsageInst,
                              VIR_Operand* pOperand,
+                             gctBOOL bIsIndexingRegUsage,
                              gctUINT firstUsageRegNo,
                              gctUINT usageRegNoRange,
                              VIR_Enable defEnableMask,
@@ -582,6 +610,7 @@ void vscVIR_DeleteUsage(VIR_DEF_USAGE_INFO* pDuInfo,
                         VIR_Instruction* pDefInst, /* Can be set as VIR_ANY_DEF_INST */
                         VIR_Instruction* pUsageInst,
                         VIR_Operand* pOperand,
+                        gctBOOL bIsIndexingRegUsage,
                         gctUINT firstUsageRegNo,
                         gctUINT usageRegNoRange,
                         VIR_Enable defEnableMask,
@@ -603,6 +632,7 @@ VIR_DEF* vscVIR_GetDef(VIR_DEF_USAGE_INFO*        pDuInfo,
 VIR_USAGE* vscVIR_GetUsage(VIR_DEF_USAGE_INFO*    pDuInfo,
                            VIR_Instruction*       pUsageInst,
                            VIR_Operand*           pUsageOperand,
+                           gctBOOL                bIsIndexingRegUsage,
                            VIR_WEB**              ppWeb);
 
 typedef struct _VIR_GENERAL_DU_ITERATOR
@@ -635,9 +665,18 @@ void vscVIR_InitGeneralUdIterator(VIR_GENERAL_UD_ITERATOR*  pIter,
                                   VIR_DEF_USAGE_INFO*       pDuInfo,
                                   VIR_Instruction*          pUsageInst,
                                   VIR_Operand*              pUsageOperand,
+                                  gctBOOL                   bIsIndexingRegUsage,
                                   gctBOOL                   bSameBBOnly);
 VIR_DEF* vscVIR_GeneralUdIterator_First(VIR_GENERAL_UD_ITERATOR* pIter);
 VIR_DEF* vscVIR_GeneralUdIterator_Next(VIR_GENERAL_UD_ITERATOR* pIter);
+
+/* That a def has homonymy defs means there is at least another def that has same defRegNo
+   and defChannel as ones in requested def */
+gctBOOL vscVIR_HasHomonymyDefs(VIR_DEF_USAGE_INFO*          pDuInfo,
+                               VIR_Instruction*             pDefInst,
+                               gctUINT                      defRegNo,
+                               gctUINT8                     defChannel,
+                               gctBOOL                      bSameBBOnly);
 
 VIR_DEF* vscVIR_GetNextHomonymyDef(VIR_DEF_USAGE_INFO*      pDuInfo,
                                    VIR_Instruction*         pDefInst,
@@ -668,26 +707,50 @@ void vscVIR_InitHomonymyDefIterator(VIR_HOMONYMY_DEF_ITERATOR* pIter,
 VIR_DEF* vscVIR_HomonymyDefIterator_First(VIR_HOMONYMY_DEF_ITERATOR* pIter);
 VIR_DEF* vscVIR_HomonymyDefIterator_Next(VIR_HOMONYMY_DEF_ITERATOR* pIter);
 
+/* Given an expected unique def (or usage inst/usage operand), check wether it is
+   really the unique one that usage (or def) has, if yes, return TRUE, otherwise,
+   return FALSE. */
 gctBOOL vscVIR_IsUniqueUsageInstOfDefInst(VIR_DEF_USAGE_INFO* pDuInfo,
                                           VIR_Instruction*    pDefInst,
                                           VIR_Instruction*    pExpectedUniqueUsageInst, /* Expected unique usage inst */
-                                          VIR_Instruction**   ppFirstOtherUsageInst);   /* If not unique, it returns first other usage inst when searching */
+                                          VIR_Operand*        pExpectedUniqueUsageOperand, /* If not NULL, means usage-operand also needs to be unique */
+                                          gctBOOL             bIsIdxingRegForExpectedUniqueUsage,/* Valid only when pExpectedUniqueUsageOperand is not NULL */
+                                          VIR_Instruction**   ppFirstOtherUsageInst, /* If not unique, it returns first other usage inst when searching */
+                                          VIR_Operand**       ppFirstOtherUsageOperand, /* Valid only when pExpectedUniqueUsageOperand is not NULL */
+                                          gctBOOL*            pIsIdxingRegForFirstOtherUsage);   /* Valid only when pExpectedUniqueUsageOperand is not NULL */
 gctBOOL vscVIR_IsUniqueDefInstOfUsageInst(VIR_DEF_USAGE_INFO* pDuInfo,
                                           VIR_Instruction*    pUsageInst,
                                           VIR_Operand*        pUsageOperand,
+                                          gctBOOL             bIsIndexingRegUsage,
                                           VIR_Instruction*    pExpectedUniqueDefInst, /* Expected unique def inst */
-                                          VIR_Instruction**   ppFirstOtherDefInst);     /* If not unique, it returns first other def inst when searching */
+                                          VIR_Instruction**   ppFirstOtherDefInst);              /* If not unique, it returns first other def inst when searching */
 
+/* Check whether a def (or usage) has unique usage (or def), if yes, just return this
+   unique one. */
+gctBOOL vscVIR_DoesDefInstHaveUniqueUsageInst(VIR_DEF_USAGE_INFO* pDuInfo,
+                                              VIR_Instruction*    pDefInst,
+                                              gctBOOL             bUniqueOperand, /* If TRUE, operand of usage must be also unique even if usage-inst is unique */
+                                              VIR_Instruction**   ppUniqueUsageInst, /* If unique, it returns this unique usage inst */
+                                              VIR_Operand**       ppUniqueUsageOperand, /* Valid only when bUniqueOperand is TRUE */
+                                              gctBOOL*            pIsIdxingRegForUniqueUsage);   /* Valid only when bUniqueOperand is TRUE */
+gctBOOL vscVIR_DoesUsageInstHaveUniqueDefInst(VIR_DEF_USAGE_INFO* pDuInfo,
+                                              VIR_Instruction*    pUsageInst,
+                                              VIR_Operand*        pUsageOperand,
+                                              gctBOOL             bIsIndexingRegUsage,
+                                              VIR_Instruction**   ppUniqueDefInst);              /* If unique, it returns this unique def inst */
+
+/* Check an usage (or def) is the unique one for each of defs in its UD chain (or each of
+   usages in its DU chain) */
 gctBOOL vscVIR_IsUniqueUsageInstOfDefsInItsUDChain(VIR_DEF_USAGE_INFO* pDuInfo,
                                                    VIR_Instruction*    pUsageInst,
                                                    VIR_Operand*        pUsageOperand,
+                                                   gctBOOL             bIsIndexingRegUsage,
                                                    VIR_Instruction**   ppFirstMultiUsageDefInst,
                                                    VIR_Instruction**   ppFirstOtherUsageInst);
 gctBOOL vscVIR_IsUniqueDefInstOfUsagesInItsDUChain(VIR_DEF_USAGE_INFO* pDuInfo,
                                                    VIR_Instruction*    pDefInst,
                                                    VIR_Instruction**   ppFirstOtherDefInst,
                                                    VIR_Instruction**   ppFirstMultiDefUsageInst);
-
 
 /*
  *  LV analysis

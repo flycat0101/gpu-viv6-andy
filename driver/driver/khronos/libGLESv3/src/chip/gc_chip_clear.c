@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -109,6 +109,7 @@ gcChipClearRenderTarget(
     gcsSURF_CLEAR_ARGS  clearArg;
     __GLrasterState     *pRasterState = &gc->state.raster;
     gceSTATUS           status = gcvSTATUS_OK;
+    gctBOOL             tsEnabled = gcvFALSE;
 
     gcmHEADER_ARG("gc=0x%x",gc);
 
@@ -138,7 +139,6 @@ gcChipClearRenderTarget(
             }
 
             clearArg.flags = gcvCLEAR_COLOR;
-            clearArg.flags |= gcvCLEAR_WITH_GPU_ONLY;
             clearArg.flags |= chipCtx->drawLayered ? gcvCLEAR_MULTI_SLICES : 0;
 
             if (bFullClear)
@@ -150,7 +150,16 @@ gcChipClearRenderTarget(
                 clearArg.clearRect = &clearRect;
             }
 
-            gcmONERROR(gcoSURF_Clear_v2(&chipCtx->drawRtViews[i], &clearArg));
+            tsEnabled = gcoSURF_IsTileStatusEnabled(chipCtx->drawRtViews[i].surf);
+
+            gcmONERROR(gcoSURF_Clear(&chipCtx->drawRtViews[i], &clearArg));
+
+            /* TS from disable to enable */
+            if (!tsEnabled &&
+                gcoSURF_IsTileStatusEnabled(chipCtx->drawRtViews[i].surf))
+            {
+                chipCtx->chipDirty.uBuffer.sBuffer.rtSurfDirty = gcvTRUE;
+            }
         }
     }
 
@@ -222,12 +231,9 @@ gcChipClearDepthAndStencil(
             clearArg.clearRect = &clearRect;
         }
 
-        /* Hardware clear by default */
-        clearArg.flags |= gcvCLEAR_WITH_GPU_ONLY;
-
         clearArg.flags |= chipCtx->drawLayered ? gcvCLEAR_MULTI_SLICES : 0;
 
-        gcmONERROR(gcoSURF_Clear_v2(dsView, &clearArg));
+        gcmONERROR(gcoSURF_Clear(dsView, &clearArg));
     }
 
 OnError:
@@ -351,48 +357,49 @@ __glChipClearBegin(
         *mask &= ~GL_STENCIL_BUFFER_BIT;
     }
 
-#if __GL_CHIP_STENCIL_TEST_OPT
-    if (*mask & GL_STENCIL_BUFFER_BIT)
+    if (chipCtx->needStencilOpt && (*mask & GL_STENCIL_BUFFER_BIT))
     {
-        gcsRECT rect;
-        GLint width  = (GLint)chipCtx->drawRTWidth;
-        GLint height = (GLint)chipCtx->drawRTHeight;
         __GLchipStencilOpt *stencilOpt = gcChipPatchStencilOptGetInfo(gc, GL_FALSE);
-        GL_ASSERT(stencilOpt);
 
-        if (gc->state.enables.scissorTest)
+        if (stencilOpt)
         {
-            __GLscissor *pScissor = &(gc->state.scissor);
+            gcsRECT rect;
+            GLint width  = (GLint)chipCtx->drawRTWidth;
+            GLint height = (GLint)chipCtx->drawRTHeight;
 
-            /* ClearRect is the Intersection of scissor and RT size */
-            rect.left    = __GL_MIN(__GL_MAX(0, pScissor->scissorX), width  - 1);
-            rect.top     = __GL_MIN(__GL_MAX(0, pScissor->scissorY), height - 1);
-            rect.right   = __GL_MIN(__GL_MAX(0, pScissor->scissorX + pScissor->scissorWidth  - 1), width  - 1);
-            rect.bottom  = __GL_MIN(__GL_MAX(0, pScissor->scissorY + pScissor->scissorHeight - 1), height - 1);
-
-            if (chipCtx->drawYInverted)
+            if (gc->state.enables.scissorTest)
             {
-                gctINT32 temp = rect.top;
-                rect.top = height - rect.bottom - 1 ;
-                rect.bottom = height - temp - 1;
-            }
-        }
-        else
-        {
-            rect.left    = 0;
-            rect.top  = 0;
-            rect.right   = width  - 1;
-            rect.bottom     = height - 1;
-        }
+                __GLscissor *pScissor = &(gc->state.scissor);
 
-        gcChipPatchStencilOptWrite(gc,
-                                     stencilOpt,
-                                     &rect,
-                                     gc->state.stencil.clear,
-                                     (GLuint)gc->state.stencil.front.writeMask,
-                                     GL_FALSE);
+                /* ClearRect is the Intersection of scissor and RT size */
+                rect.left    = __GL_MIN(__GL_MAX(0, pScissor->scissorX), width  - 1);
+                rect.top     = __GL_MIN(__GL_MAX(0, pScissor->scissorY), height - 1);
+                rect.right   = __GL_MIN(__GL_MAX(0, pScissor->scissorX + pScissor->scissorWidth  - 1), width  - 1);
+                rect.bottom  = __GL_MIN(__GL_MAX(0, pScissor->scissorY + pScissor->scissorHeight - 1), height - 1);
+
+                if (chipCtx->drawYInverted)
+                {
+                    gctINT32 temp = rect.top;
+                    rect.top = height - rect.bottom - 1 ;
+                    rect.bottom = height - temp - 1;
+                }
+            }
+            else
+            {
+                rect.left   = 0;
+                rect.top    = 0;
+                rect.right  = width  - 1;
+                rect.bottom = height - 1;
+            }
+
+            gcChipPatchStencilOptWrite(gc,
+                                       stencilOpt,
+                                       &rect,
+                                       gc->state.stencil.clear,
+                                       (GLuint)gc->state.stencil.front.writeMask,
+                                       GL_FALSE);
+        }
     }
-#endif
 
     return *mask ? GL_TRUE : GL_FALSE;
 }
@@ -478,12 +485,11 @@ __glChipClearEnd(
         /* Commit command buffer. */
         gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
     }
+
     if (g_dbgDumpImagePerDraw == 3)
     {
         gcmONERROR(gcChipUtilsDumpRT(gc, 1));
     }
-
-
 #endif
 
 OnError:
@@ -643,12 +649,9 @@ __glChipClearBuffer(
             clearArg.clearRect = &clearRect;
         }
 
-        /* Hardware clear by default */
-        clearArg.flags |= gcvCLEAR_WITH_GPU_ONLY;
-
         clearArg.flags |= chipCtx->drawLayered ? gcvCLEAR_MULTI_SLICES : 0;
 
-        gcmONERROR(gcoSURF_Clear_v2(surfView, &clearArg));
+        gcmONERROR(gcoSURF_Clear(surfView, &clearArg));
     }
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
@@ -712,12 +715,9 @@ __glChipClearBufferfi(
             clearArg.clearRect = &clearRect;
         }
 
-        /* Hardware clear by default */
-        clearArg.flags |= gcvCLEAR_WITH_GPU_ONLY;
-
         clearArg.flags |= chipCtx->drawLayered ? gcvCLEAR_MULTI_SLICES : 0;
 
-        gcmONERROR(gcoSURF_Clear_v2(dsView, &clearArg));
+        gcmONERROR(gcoSURF_Clear(dsView, &clearArg));
     }
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);

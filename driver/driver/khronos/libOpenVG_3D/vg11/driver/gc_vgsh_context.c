@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -182,7 +182,7 @@ void flush(_VGContext *context)
         clearArgs.depthMask = gcvTRUE;
         clearArgs.clearRect = gcvNULL;
         clearArgs.flags = gcvCLEAR_DEPTH;
-        gcmVERIFY_OK(gcoSURF_Clear_v2(&dView, &clearArgs));
+        gcmVERIFY_OK(gcoSURF_Clear(&dView, &clearArgs));
 
         context->postionZ = POSITION_Z_BIAS;
         context->hardware.zValue            = POSITION_Z_BIAS;
@@ -216,7 +216,7 @@ void finish(_VGContext *context)
         clearArgs.depthMask = gcvTRUE;
         clearArgs.clearRect = gcvNULL;
         clearArgs.flags = gcvCLEAR_DEPTH;
-        gcmVERIFY_OK(gcoSURF_Clear_v2(&dView, &clearArgs));
+        gcmVERIFY_OK(gcoSURF_Clear(&dView, &clearArgs));
 
         context->postionZ = POSITION_Z_BIAS;
         context->hardware.zValue            = POSITION_Z_BIAS;

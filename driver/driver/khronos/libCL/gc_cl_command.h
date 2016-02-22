@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -45,6 +45,17 @@ struct _cl_commit_request
     clsCommitRequest_PTR        previous;
 };
 
+typedef struct clsPrivateBuffer   clsPrivateBuffer;
+typedef clsPrivateBuffer *          clsPrivateBuffer_PTR;
+
+struct clsPrivateBuffer
+{
+    clsMemAllocInfo_PTR         buffer;
+    clsKernel_PTR               kernel;
+    gcUNIFORM                   uniform;
+    clsPrivateBuffer_PTR        next;
+};
+
 typedef struct _cl_command_queue
 {
     clsIcdDispatch_PTR          dispatch;
@@ -73,6 +84,8 @@ typedef struct _cl_command_queue
     gctPOINTER                  workerThread;
     gctSIGNAL                   workerStartSignal;
     gctSIGNAL                   workerStopSignal;
+
+    clsPrivateBuffer_PTR        privateBufList;
 }
 clsCommandQueue;
 

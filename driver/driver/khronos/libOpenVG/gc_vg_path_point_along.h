@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -35,6 +35,16 @@ gctBOOL vgfComputePointAlongPath(
     OUT gctFLOAT_PTR PathBottom
     );
 
+#if gcdMOVG
+gctBOOL vgfComputeCtrlBounds(
+    IN vgsCONTEXT_PTR Context,
+    IN vgsPATH_PTR Path,
+    OUT gctFLOAT_PTR PathLeft,
+    OUT gctFLOAT_PTR PathTop,
+    OUT gctFLOAT_PTR PathRight,
+    OUT gctFLOAT_PTR PathBottom
+    );
+#endif
 #ifdef __cplusplus
 }
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,13 +13,1500 @@
 
 #include <gc_vx_common.h>
 
+gceSTATUS
+gcfVX_AdjustLocalWorkSize(
+    vx_kernel_shader    Kernel,
+    gctUINT             WorkDim,
+    size_t              GlobalWorkOffset[3],
+    size_t              GlobalWorkSize[3],
+    size_t              LocalWorkSize[3]
+    )
+{
+
+    if (LocalWorkSize[0] == 0 &&
+        (WorkDim < 2 || LocalWorkSize[1] == 0) &&
+        (WorkDim < 3 || LocalWorkSize[2] == 0))
+    {
+        gctSIZE_T           preferredWorkGroupSize;
+        gctSIZE_T           workGroupSize = 1;
+        gctUINT             i;
+
+        /* Find the largest workgroup size which has a common multiple with
+         * preferred workgroup size but still less than max work group size
+         */
+        for (i = 0; i < WorkDim; i++)
+        {
+            preferredWorkGroupSize = 16;//Kernel->preferredWorkGroupSizeMultiple;
+            while (preferredWorkGroupSize % 2 == 0)
+            {
+                if ((GlobalWorkSize[i] % preferredWorkGroupSize == 0) &&
+                    (workGroupSize * preferredWorkGroupSize <= Kernel->maxWorkGroupSize))
+                {
+                    LocalWorkSize[i] = preferredWorkGroupSize;
+                    workGroupSize *= LocalWorkSize[i];
+                    break;
+                }
+                preferredWorkGroupSize /= 2;
+            }
+        }
+
+        if (workGroupSize == 1)
+        {
+
+            /* No common multiple found
+             * Try adjusting wrt global work size
+             */
+            for (i=0; i<WorkDim; i++)
+            {
+                if (workGroupSize * GlobalWorkSize[i] <= Kernel->maxWorkGroupSize)
+                {
+                    LocalWorkSize[i] = GlobalWorkSize[i];
+                    workGroupSize *= LocalWorkSize[i];
+                }
+            }
+        }
+
+        if (workGroupSize == 1)
+        {
+            for (i=0; i<WorkDim; i++)
+            {
+                if (((GlobalWorkSize[i] % 381) == 0) && (workGroupSize * 381 <= Kernel->maxWorkGroupSize))
+                {
+                    LocalWorkSize[i] = 381;
+                    workGroupSize *= LocalWorkSize[i];
+                }
+            }
+        }
+    }
+
+    return gcvSTATUS_OK;
+}
+
+
+/* Return how many uniform entries will be reported to app */
+static gctUINT
+gcfVX_GetUniformArrayInfo(
+    gcUNIFORM uniform,
+    gctUINT *maxNameLen,    /* max possible name len of this entry, exclude bottom-level "[0]" */
+    gctBOOL *isArray,
+    gctUINT *arraySize
+)
+{
+    gctINT j;
+    gctUINT32 length;
+    gctUINT entries = 1;
+
+    gcUNIFORM_GetName(uniform, &length, gcvNULL);
+
+    /* Multiple entries will be reported for array of arrays.
+    ** If a uniform is an array, or array of array, its name length should be added
+    ** with several dim of array indices, like "name[x]...[x][0]".
+    */
+    for (j = 0; j < uniform->arrayLengthCount - 1; ++j)
+    {
+        gctUINT decimalLen = 1;
+        gctINT arrayLen = uniform->arrayLengthList[j];
+
+        gcmASSERT(arrayLen > 0);
+        entries *= arrayLen;
+
+        arrayLen--;    /* Get max arrayIndex */
+        while (arrayLen >= 10)
+        {
+            ++decimalLen;
+            arrayLen /= 10;
+        }
+
+        length += (decimalLen + 2);
+    }
+
+    if (maxNameLen)
+    {
+        *maxNameLen = length;
+    }
+
+    if (isArray)
+    {
+        *isArray = uniform->arrayLengthCount > 0 ? gcvTRUE : gcvFALSE;
+    }
+
+    if (arraySize)
+    {
+        *arraySize = uniform->arrayLengthCount > 0
+                   ? (uniform->arrayLengthList[uniform->arrayLengthCount - 1] > 0 ?
+                      uniform->arrayLengthList[uniform->arrayLengthCount - 1] : 0)
+                   : 1;
+    }
+
+    return entries;
+}
+
+gceSTATUS
+gcfVX_LoadKernelArgLocalMemValues(
+    vx_kernel_shader    Kernel,
+    gctUINT             NumArgs,
+    vx_argument         Args,
+    gctUINT             WorkDim,
+    size_t              GlobalWorkOffset[3],
+    size_t              GlobalWorkSize[3],
+    size_t              LocalWorkSize[3]
+    )
+{
+    gcSHADER_TYPE       type;
+    gctUINT             length;
+    vx_argument         argument;
+    gctINT              totalNumGroups;
+    gctINT              totalSize = 0;
+    gctINT              totalAlignSize = 0;
+    gctINT              totalArgSize = 0;
+    gctINT              totalArgAlignSize = 0;
+    gctUINT             i;
+    vx_mem_alloc_info   memAllocInfo;
+    gctINT *            data;
+    gctUINT             allocatedSize;
+    gctPHYS_ADDR        physical;
+    gctPOINTER          logical;
+    gcsSURF_NODE_PTR    node;
+    gceSTATUS           status;
+
+    /* Add up sizes for all local kernel args. */
+    for (i = 0; i < NumArgs; i++)
+    {
+        argument = &Args[i];
+
+        if (argument->uniform == gcvNULL) continue;
+
+        if (isUniformInactive(argument->uniform)) continue;
+
+        if (isUniformKernelArgLocal(argument->uniform))
+        {
+            memAllocInfo = (vx_mem_alloc_info) argument->data;
+
+            if (!argument->isMemAlloc)
+            {
+                status = gcvSTATUS_INVALID_DATA;
+                goto OnError;
+            }
+
+            if (memAllocInfo->allocatedSize <= 0)
+            {
+                status = gcvSTATUS_INVALID_DATA;
+                goto OnError;
+            }
+
+            totalSize += gcmALIGN(memAllocInfo->allocatedSize, 4);
+            totalAlignSize = gcmALIGN(totalSize, memAllocInfo->allocatedSize);
+            totalSize = totalAlignSize;
+        }
+    }
+
+    if (totalSize > 0)
+    {
+        totalNumGroups = (gctINT)(GlobalWorkSize[0] / (LocalWorkSize[0] ? LocalWorkSize[0] : 1)
+                       * (WorkDim > 1 ? (GlobalWorkSize[1] / (LocalWorkSize[1] ? LocalWorkSize[1] : 1)) : 1)
+                       * (WorkDim > 2 ? (GlobalWorkSize[2] / (LocalWorkSize[2] ? LocalWorkSize[2] : 1)) : 1));
+
+        allocatedSize = totalSize * totalNumGroups;
+
+        /* Allocate the physical buffer */
+        gcmONERROR(gcoVX_AllocateMemoryEx(&allocatedSize, &physical, &logical,  &node));
+
+        /* Set up relative address for all local kernel args. */
+        for (i = 0; i < NumArgs; i++)
+        {
+            argument = &Args[i];
+
+            if (argument->uniform == gcvNULL) continue;
+
+            gcmONERROR(gcUNIFORM_GetType(argument->uniform, &type, &length));
+
+            if (isUniformInactive(argument->uniform)) continue;
+
+            if (isUniformKernelArgLocal(argument->uniform))
+            {
+                memAllocInfo = (vx_mem_alloc_info) argument->data;
+
+                if (!argument->isMemAlloc)
+                {
+                    status = gcvSTATUS_INVALID_DATA;
+                    goto OnError;
+                }
+
+                if (memAllocInfo->allocatedSize <= 0)
+                {
+                    status = gcvSTATUS_INVALID_DATA;
+                    goto OnError;
+                }
+
+                totalArgAlignSize = gcmALIGN(totalArgSize, memAllocInfo->allocatedSize);
+                memAllocInfo->physical = (gctPHYS_ADDR)((gctUINTPTR_T)physical + totalArgAlignSize);
+                totalArgSize += gcmALIGN(memAllocInfo->allocatedSize, 4);
+
+                data = (gctINT *) &memAllocInfo->physical;
+                gcmONERROR(gcUNIFORM_SetValue(argument->uniform, length, data));
+            }
+            else if (isUniformKernelArgLocalMemSize(argument->uniform))
+            {
+                memAllocInfo = (vx_mem_alloc_info) argument->data;
+
+                if (!argument->isMemAlloc)
+                {
+                    status = gcvSTATUS_INVALID_DATA;
+                    goto OnError;
+                }
+
+                memAllocInfo->allocatedSize = allocatedSize;
+                memAllocInfo->node          = node;
+
+                data = (gctINT *) &totalSize;
+                gcmONERROR(gcUNIFORM_SetValue(argument->uniform, length, data));
+            }
+        }
+    }
+
+    status = gcvSTATUS_OK;
+
+OnError:
+    return status;
+}
+
+static gceSTATUS
+gcfVX_LoadKernelArgValues(
+    vx_kernel_shader    Kernel,
+    gcSHADER            Shader,
+    vx_argument         Arg,
+    vx_border_mode_t*   BorderMode,
+    gctUINT             WorkDim,
+    size_t              GlobalWorkOffset[3],
+    size_t              GlobalWorkSize[3],
+    size_t              LocalWorkSize[3]
+    )
+{
+    gcSHADER_TYPE       type;
+    gctUINT             length;
+    gcSL_FORMAT         format;
+    gctBOOL             isPointer;
+    gceUNIFORM_FLAGS    flags;
+    gceSTATUS           status;
+
+    if (Arg->uniform == gcvNULL)
+    {
+        return gcvSTATUS_OK;
+    }
+
+    gcmONERROR(gcUNIFORM_GetType(Arg->uniform, &type, &length));
+
+    gcmONERROR(gcUNIFORM_GetFormat(Arg->uniform, &format, &isPointer));
+
+    gcmONERROR(gcUNIFORM_GetFlags(Arg->uniform, &flags));
+
+    if (isUniformKernelArg(Arg->uniform) ||
+        isUniformKernelArgConstant(Arg->uniform))
+    {
+        if (isPointer)
+        {
+            if ((type == gcSHADER_IMAGE_2D) && (Arg->data != gcvNULL))
+            {
+                vx_image image = *(vx_image*) Arg->data;
+
+                gcoVX_Kernel_Context context = {{0}};
+                gcsVX_IMAGE_INFO     info = {0};
+
+#if gcdVX_OPTIMIZER
+                context.borders = BorderMode->mode;
+#else
+                context.params.borders = BorderMode->mode;
+#endif
+
+                gcmONERROR(gcfVX_GetImageInfo(context, (vx_image)image, &info, 0));
+
+                gcmONERROR(gcoVX_BindImage(GetUniformPhysical(Arg->uniform), &info));
+            }
+            else
+            {
+                gcmONERROR(gcUNIFORM_SetValue(Arg->uniform,
+                                        length,
+                                        (gctINT*)Arg->data));
+            }
+        }
+        else
+        {
+            gctUINT arraySize;
+            gctUINT32 physicalAddress, numCols, numRows;
+            gctUINT8_PTR pData = (gctUINT8_PTR)Arg->data;
+            switch (type)
+            {
+            case gcSHADER_FLOAT_X1:
+            case gcSHADER_FLOAT_X2:
+            case gcSHADER_FLOAT_X3:
+            case gcSHADER_FLOAT_X4:
+            case gcSHADER_FLOAT_2X2:
+            case gcSHADER_FLOAT_3X3:
+            case gcSHADER_FLOAT_4X4:
+                gcmONERROR(gcUNIFORM_SetValueF(Arg->uniform,
+                                               length,
+                                               Arg->data));
+                break;
+
+            case gcSHADER_BOOLEAN_X1:
+            case gcSHADER_BOOLEAN_X2:
+            case gcSHADER_BOOLEAN_X3:
+            case gcSHADER_BOOLEAN_X4:
+            case gcSHADER_INTEGER_X1:
+            case gcSHADER_INTEGER_X2:
+            case gcSHADER_INTEGER_X3:
+            case gcSHADER_INTEGER_X4:
+            case gcSHADER_UINT_X1:
+            case gcSHADER_UINT_X2:
+            case gcSHADER_UINT_X3:
+            case gcSHADER_UINT_X4:
+
+                switch (format)
+                {
+                case gcSL_INT8:
+                case gcSL_UINT8:
+                case gcSL_INT16:
+                case gcSL_UINT16:
+                    {
+                        /* Unpack argument data into 4B chunks */
+                        gctUINT32 *data= gcvNULL;
+                        gctUINT32 signMask, signExt;
+                        gctPOINTER pointer= gcvNULL;
+                        gctSIZE_T i, elemSize, numElem, bytes;
+
+                        elemSize =  ((format == gcSL_INT8)   ? 1 :
+                                     (format == gcSL_UINT8)  ? 1 :
+                                     (format == gcSL_INT16)  ? 2 :
+                                     (format == gcSL_UINT16) ? 2 : 0);
+
+                        signMask =  ((format == gcSL_INT8)   ? 0x80 :
+                                     (format == gcSL_INT16)  ? 0x8000 : 0);
+
+                        signExt =   ((format == gcSL_INT8)   ? 0xFFFFFF00 :
+                                     (format == gcSL_INT16)  ? 0xFFFF0000 : 0);
+
+                        numElem = Arg->size / elemSize;
+                        bytes = numElem * 4;
+
+                        gcmONERROR(gcoOS_Allocate(gcvNULL, bytes, &pointer));
+                        gcoOS_ZeroMemory(pointer, bytes);
+                        data = (gctUINT32 *) pointer;
+                        for (i=0; i<numElem; i++) {
+                            pointer = (gctPOINTER)(((gctUINTPTR_T)Arg->data)+(i*elemSize));
+                            gcoOS_MemCopy(&data[i], pointer, elemSize);
+                            if (data[i]&signMask) {
+                                data[i] |= signExt;
+                            }
+                        }
+                        pointer = data;
+                        status = gcUNIFORM_SetValue(Arg->uniform, length, pointer);
+                        gcoOS_Free(gcvNULL, data);
+                        if (gcmIS_ERROR(status)) goto OnError;
+
+                    }
+                    break;
+
+                default:
+                    gcmONERROR(gcUNIFORM_SetValue(Arg->uniform, length, Arg->data));
+                    break;
+                }
+                break;
+
+            case gcSHADER_INT64_X1:
+            case gcSHADER_INT64_X2:
+            case gcSHADER_INT64_X3:
+            case gcSHADER_INT64_X4:
+            case gcSHADER_UINT64_X1:
+            case gcSHADER_UINT64_X2:
+            case gcSHADER_UINT64_X3:
+            case gcSHADER_UINT64_X4:
+                gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(Kernel->states.hints->vsConstBase,
+                                                                   Kernel->states.hints->psConstBase,
+                                                                   Kernel->states.hints->tcsConstBase,
+                                                                   Kernel->states.hints->tesConstBase,
+                                                                   Kernel->states.hints->gsConstBase,
+                                                                   Arg->uniform,
+                                                                   &physicalAddress));
+
+                gcTYPE_GetTypeInfo(GetUniformType(Arg->uniform), &numCols, &numRows, gcvNULL);
+
+                arraySize = Arg->uniform->arraySize;
+
+                gcmONERROR(gcoSHADER_ProgramUniformEx(gcvNULL, physicalAddress,
+                                                        numCols, numRows, arraySize, gcvTRUE,
+                                                        sizeof(gctINT64),
+                                                        4*sizeof(gctINT64),
+                                                        pData, gcvUNIFORMCVT_NONE, GetUniformShaderKind(Arg->uniform)));
+                break;
+
+            case gcSHADER_IMAGE_2D:
+            case gcSHADER_IMAGE_3D:
+                {
+                vx_image image = *(vx_image*) Arg->data;
+
+                gcoVX_Kernel_Context context = {{0}};
+                gcsVX_IMAGE_INFO     info = {0};
+
+#if gcdVX_OPTIMIZER
+                context.borders = VX_BORDER_MODE_UNDEFINED;
+#else
+                context.params.borders = BorderMode->mode;
+#endif
+
+                gcmONERROR(gcfVX_GetImageInfo(context, (vx_image)image, &info, 1));
+
+                gcmONERROR(gcoVX_BindImage(0, &info));
+
+                }
+                break;
+
+            case gcSHADER_SAMPLER:
+                {
+                gcmASSERT(length == 1);
+                gcmONERROR(gcUNIFORM_SetValue(Arg->uniform,
+                                              length,
+                                              Arg->data));
+                }
+                break;
+
+            default:
+                break;
+            }
+        }
+    }
+    else if (isUniformWorkDim(Arg->uniform))
+    {
+        gcoOS_MemCopy(Arg->data, &WorkDim, gcmSIZEOF(WorkDim));
+
+        gcmONERROR(gcUNIFORM_SetValue(Arg->uniform,
+                                      length,
+                                      Arg->data));
+    }
+    else if (isUniformGlobalSize(Arg->uniform))
+    {
+        /* TODO - For 64-bit GPU. */
+        /*gcoOS_MemCopy(Arg->data, GlobalWorkSize, gcmSIZEOF(size_t) * 3);*/
+        gctUINT32 globalWorkSize[3];
+
+        globalWorkSize[0] = (gctUINT32)GlobalWorkSize[0];
+        globalWorkSize[1] = (gctUINT32)GlobalWorkSize[1];
+        globalWorkSize[2] = (gctUINT32)GlobalWorkSize[2];
+        gcoOS_MemCopy(Arg->data, globalWorkSize, gcmSIZEOF(gctUINT32) * 3);
+
+        gcmONERROR(gcUNIFORM_SetValue(Arg->uniform,
+                                      length,
+                                      Arg->data));
+    }
+    else if (isUniformLocalSize(Arg->uniform))
+    {
+        /* TODO - For 64-bit GPU. */
+        /*gcoOS_MemCopy(Arg->data, LocalWorkSize, gcmSIZEOF(size_t) * 3);*/
+        gctUINT32 localWorkSize[3];
+
+        localWorkSize[0] = (gctUINT32)(LocalWorkSize[0]);
+        localWorkSize[1] = (gctUINT32)(LocalWorkSize[1]);
+        localWorkSize[2] = (gctUINT32)(LocalWorkSize[2]);
+        gcoOS_MemCopy(Arg->data, localWorkSize, gcmSIZEOF(gctUINT32) * 3);
+
+        gcmONERROR(gcUNIFORM_SetValue(Arg->uniform,
+                                      length,
+                                      Arg->data));
+    }
+    else if (isUniformNumGroups(Arg->uniform))
+    {
+        /* TODO - For 64-bit GPU. */
+        /*size_t numGroups[3];*/
+        gctUINT32 numGroups[3];
+
+        numGroups[0] = (gctUINT32)(GlobalWorkSize[0] / (LocalWorkSize[0] ? LocalWorkSize[0] : 1));
+        numGroups[1] = (gctUINT32)(WorkDim > 1 ? (GlobalWorkSize[1] / (LocalWorkSize[1] ? LocalWorkSize[1] : 1)) : 0);
+        numGroups[2] = (gctUINT32)(WorkDim > 2 ? (GlobalWorkSize[2] / (LocalWorkSize[2] ? LocalWorkSize[2] : 1)) : 0);
+
+        gcoOS_MemCopy(Arg->data, numGroups, gcmSIZEOF(numGroups));
+
+        gcmONERROR(gcUNIFORM_SetValue(Arg->uniform,
+                                      length,
+                                      Arg->data));
+
+    }
+    else if (isUniformGlobalOffset(Arg->uniform))
+    {
+        /* TODO - For 64-bit GPU. */
+        /*gcoOS_MemCopy(Arg->data, GlobalWorkOffset, gcmSIZEOF(size_t) * 3);*/
+        gctUINT32 glocalWorkOffset[3];
+
+        glocalWorkOffset[0] = (gctUINT32)(GlobalWorkOffset[0]);
+        glocalWorkOffset[1] = (gctUINT32)(GlobalWorkOffset[1]);
+        glocalWorkOffset[2] = (gctUINT32)(GlobalWorkOffset[2]);
+        gcoOS_MemCopy(Arg->data, glocalWorkOffset, gcmSIZEOF(gctUINT32) * 3);
+
+        gcmONERROR(gcUNIFORM_SetValue(Arg->uniform,
+                                      length,
+                                      Arg->data));
+    }
+    else if (isUniformLocalAddressSpace(Arg->uniform) ||
+             isUniformPrivateAddressSpace(Arg->uniform))
+    {
+        vx_mem_alloc_info memAllocInfo = (vx_mem_alloc_info) Arg->data;
+
+        /* Size may be zero if declared but never used */
+        if (memAllocInfo->allocatedSize > 0)
+        {
+            gctINT * data;
+
+            gctINT totalNumGroups = (gctINT)(GlobalWorkSize[0] / (LocalWorkSize[0] ? LocalWorkSize[0] : 1)
+                                  * (WorkDim > 1 ? (GlobalWorkSize[1] / (LocalWorkSize[1] ? LocalWorkSize[1] : 1)) : 1)
+                                  * (WorkDim > 2 ? (GlobalWorkSize[2] / (LocalWorkSize[2] ? LocalWorkSize[2] : 1)) : 1));
+
+            gctINT totalNumItems  = (gctINT)(GlobalWorkSize[0]
+                                  * (WorkDim > 1 ? GlobalWorkSize[1] : 1)
+                                  * (WorkDim > 2 ? GlobalWorkSize[2] : 1));
+
+            if (!Arg->isMemAlloc)
+            {
+                status = gcvSTATUS_INVALID_DATA;
+                goto OnError;
+            }
+
+            memAllocInfo->allocatedSize *= isUniformPrivateAddressSpace(Arg->uniform) ? totalNumItems : totalNumGroups;
+
+            /* Allocate the physical buffer */
+            gcmONERROR(gcoVX_AllocateMemoryEx(&memAllocInfo->allocatedSize,
+                                            &memAllocInfo->physical,
+                                            &memAllocInfo->logical,
+                                            &memAllocInfo->node));
+
+            data = (gctINT *) &memAllocInfo->physical;
+            gcmONERROR(gcUNIFORM_SetValue(Arg->uniform, length, data));
+        }
+    }
+    else if (isUniformConstantAddressSpace(Arg->uniform) && (GetUniformPhysical(Arg->uniform) != -1))
+    {
+        vx_mem_alloc_info memAllocInfo = (vx_mem_alloc_info) Arg->data;
+        gctINT * data;
+
+        if (!Arg->isMemAlloc)
+        {
+            status = gcvSTATUS_INVALID_DATA;
+            goto OnError;
+        }
+
+        if (memAllocInfo->allocatedSize <= 0)
+        {
+            status = gcvSTATUS_INVALID_DATA;
+            goto OnError;
+        }
+        /* Allocate the physical buffer */
+        gcmONERROR(gcoVX_AllocateMemoryEx(&memAllocInfo->allocatedSize,
+                                        &memAllocInfo->physical,
+                                        &memAllocInfo->logical,
+                                        &memAllocInfo->node));
+
+        data = (gctINT *) &memAllocInfo->physical;
+        gcmONERROR(gcUNIFORM_SetValue(Arg->uniform, length, data));
+
+        /* Copy the constant data to the buffer */
+        gcoOS_MemCopy(memAllocInfo->logical, Kernel->constantMemBuffer, Kernel->constantMemSize);
+
+    }
+    else if (isUniformKernelArgSampler(Arg->uniform))
+    {
+        gcmASSERT(length == 1);
+        gcmONERROR(gcUNIFORM_SetValue(Arg->uniform,
+                                              length,
+                                              Arg->data));
+
+    }
+    else if (isUniformKernelArgLocal(Arg->uniform) ||
+                isUniformKernelArgLocalMemSize(Arg->uniform))
+    {
+        /* Special case, handled separately, do nothing now */
+    }
+    else if (isUniformKernelArgPrivate(Arg->uniform))
+    {
+        vx_mem_alloc_info memAllocInfo = (vx_mem_alloc_info) Arg->data;
+        gctINT * data;
+        gctINT i;
+        gctPOINTER pointer;
+
+        gctINT totalNumItems  = (gctINT)(GlobalWorkSize[0]
+                              * (WorkDim > 1 ? GlobalWorkSize[1] : 1)
+                              * (WorkDim > 2 ? GlobalWorkSize[2] : 1));
+
+        if (!Arg->isMemAlloc)
+        {
+            status = gcvSTATUS_INVALID_DATA;
+            goto OnError;
+        }
+
+        if (memAllocInfo->allocatedSize <= 0)
+        {
+            status = gcvSTATUS_INVALID_DATA;
+            goto OnError;
+        }
+
+        memAllocInfo->allocatedSize *= totalNumItems;
+
+        /* Allocate the physical buffer */
+        gcmONERROR(gcoVX_AllocateMemoryEx(&memAllocInfo->allocatedSize,
+                                        &memAllocInfo->physical,
+                                        &memAllocInfo->logical,
+                                        &memAllocInfo->node));
+
+        data = (gctINT *) &memAllocInfo->physical;
+        gcmONERROR(gcUNIFORM_SetValue(Arg->uniform, length, data));
+
+        /* Copy the private data to the buffer */
+        for (i = 0; i < totalNumItems; i++)
+        {
+            pointer = (gctPOINTER)((gctUINTPTR_T)memAllocInfo->logical + i*Arg->size);
+            gcoOS_MemCopy(pointer, memAllocInfo->data, Arg->size);
+        }
+    }
+    else if (isUniformKernelArgPatch(Arg->uniform))
+    {
+        switch (type)
+        {
+        case gcSHADER_FLOAT_X1:
+        case gcSHADER_FLOAT_X2:
+        case gcSHADER_FLOAT_X3:
+        case gcSHADER_FLOAT_X4:
+        case gcSHADER_FLOAT_2X2:
+        case gcSHADER_FLOAT_3X3:
+        case gcSHADER_FLOAT_4X4:
+            gcmONERROR(gcUNIFORM_SetValueF(Arg->uniform,
+                                           length,
+                                           Arg->data));
+            break;
+
+        case gcSHADER_BOOLEAN_X1:
+        case gcSHADER_BOOLEAN_X2:
+        case gcSHADER_BOOLEAN_X3:
+        case gcSHADER_BOOLEAN_X4:
+        case gcSHADER_INTEGER_X1:
+        case gcSHADER_INTEGER_X2:
+        case gcSHADER_INTEGER_X3:
+        case gcSHADER_INTEGER_X4:
+        case gcSHADER_UINT_X1:
+        case gcSHADER_UINT_X2:
+        case gcSHADER_UINT_X3:
+        case gcSHADER_UINT_X4:
+
+            switch (format)
+            {
+            case gcSL_INT8:
+            case gcSL_UINT8:
+            case gcSL_INT16:
+            case gcSL_UINT16:
+                {
+                    /* Unpack argument data into 4B chunks */
+                    gctUINT32 *data= gcvNULL;
+                    gctUINT32 signMask, signExt;
+                    gctPOINTER pointer= gcvNULL;
+                    gctSIZE_T i, elemSize, numElem, bytes;
+
+                    elemSize =  ((format == gcSL_INT8)   ? 1 :
+                                 (format == gcSL_UINT8)  ? 1 :
+                                 (format == gcSL_INT16)  ? 2 :
+                                 (format == gcSL_UINT16) ? 2 : 0);
+
+                    signMask =  ((format == gcSL_INT8)   ? 0x80 :
+                                 (format == gcSL_INT16)  ? 0x8000 : 0);
+
+                    signExt =   ((format == gcSL_INT8)   ? 0xFFFFFF00 :
+                                 (format == gcSL_INT16)  ? 0xFFFF0000 : 0);
+
+                    numElem = Arg->size / elemSize;
+                    bytes = numElem * 4;
+
+                    gcmONERROR(gcoOS_Allocate(gcvNULL, bytes, &pointer));
+                    gcoOS_ZeroMemory(pointer, bytes);
+                    data = (gctUINT32 *) pointer;
+                    for (i=0; i<numElem; i++) {
+                        pointer = (gctPOINTER)(((gctUINTPTR_T)Arg->data)+(i*elemSize));
+                        gcoOS_MemCopy(&data[i], pointer, elemSize);
+                        if (data[i]&signMask) {
+                            data[i] |= signExt;
+                        }
+                    }
+                    pointer = data;
+                    status = gcUNIFORM_SetValue(Arg->uniform, length, pointer);
+                    gcoOS_Free(gcvNULL, data);
+                    if (gcmIS_ERROR(status)) goto OnError;
+
+                }
+                break;
+
+            default:
+                gcmONERROR(gcUNIFORM_SetValue(Arg->uniform, length, Arg->data));
+                break;
+            }
+            break;
+
+        default:
+            break;
+        }
+    }
+    else if (gcoOS_StrCmp(Arg->uniform->name, "$ConstBorderValue") == gcvSTATUS_OK)
+    {
+        gctUINT32   data[4] = {0};
+        gctUINT32   data32 = (gctUINT32)BorderMode->constant_value;
+
+        gctUINT8  data8 = data32 & 0xFF;
+        gctUINT16 data16 = data32 & 0xFFFF;
+        gctFLOAT  dataf  = (gctFLOAT)(data32);
+
+        data[0] = data8 | (data8 << 8) | (data8 << 16) | (data8 << 24);
+
+        data[1] = data16 | (data16 << 16);
+
+        data[2] = data32;
+
+        data[3] = *(gctUINT32*)(&dataf);
+
+        gcmONERROR(gcUNIFORM_SetValue(Arg->uniform, length, (gctINT*)data));
+    }
+    else
+    {
+        gcsUNIFORM_BLOCK uniformBlock = gcvNULL;
+        gcUNIFORM bUniform = gcvNULL;
+        gctINT16   blockIndex = GetUniformBlockID(Arg->uniform);
+        gctUINT32 physicalAddress = 0;
+        gctUINT      entries, arraySize;
+        gctUINT32    numCols = 0, numRows = 0;
+        if ((blockIndex >= 0) && (GetUniformPhysical(Arg->uniform) != -1))
+        {
+            gcmONERROR(gcSHADER_GetUniformBlock(Shader, blockIndex, &uniformBlock));
+            gcmONERROR(gcSHADER_GetUniform(Shader, GetUBIndex(uniformBlock), &bUniform));
+            if(isUniformConstantAddressSpace(bUniform))
+            {
+                gctUINT8_PTR pData = (gctUINT8_PTR)(Kernel->constantMemBuffer) + GetUniformOffset(Arg->uniform);
+
+                gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(Kernel->states.hints->vsConstBase,
+                                                                   Kernel->states.hints->psConstBase,
+                                                                   Kernel->states.hints->tcsConstBase,
+                                                                   Kernel->states.hints->tesConstBase,
+                                                                   Kernel->states.hints->gsConstBase,
+                                                                   Arg->uniform,
+                                                                   &physicalAddress));
+
+                gcTYPE_GetTypeInfo(GetUniformType(Arg->uniform), &numCols, &numRows, gcvNULL);
+
+                entries = gcfVX_GetUniformArrayInfo(Arg->uniform, gcvNULL, gcvNULL, &arraySize);
+                arraySize *= entries;   /* Expand array size for array of arrays to one dimension */
+
+                gcmONERROR(gcoSHADER_ProgramUniformEx(gcvNULL, physicalAddress,
+                                                        numCols, numRows, arraySize, gcvFALSE,
+                                                        (gctSIZE_T)GetUniformMatrixStride(Arg->uniform),
+                                                        (gctSIZE_T)GetUniformArrayStride(Arg->uniform),
+                                                        pData, gcvUNIFORMCVT_NONE, GetUniformShaderKind(Arg->uniform)));
+            }
+        }
+        else
+        {
+            gctUINT arraySize;
+            gctUINT32 physicalAddress, numCols, numRows;
+            gctUINT8_PTR pData = (gctUINT8_PTR)Arg->data;
+            switch (type)
+            {
+            case gcSHADER_FLOAT_X1:
+            case gcSHADER_FLOAT_X2:
+            case gcSHADER_FLOAT_X3:
+            case gcSHADER_FLOAT_X4:
+            case gcSHADER_FLOAT_2X2:
+            case gcSHADER_FLOAT_3X3:
+            case gcSHADER_FLOAT_4X4:
+                gcmONERROR(gcUNIFORM_SetValueF(Arg->uniform,
+                                               length,
+                                               (gctFLOAT*)Arg->data));
+                break;
+
+            case gcSHADER_BOOLEAN_X1:
+            case gcSHADER_BOOLEAN_X2:
+            case gcSHADER_BOOLEAN_X3:
+            case gcSHADER_BOOLEAN_X4:
+            case gcSHADER_INTEGER_X1:
+            case gcSHADER_INTEGER_X2:
+            case gcSHADER_INTEGER_X3:
+            case gcSHADER_INTEGER_X4:
+            case gcSHADER_UINT_X1:
+            case gcSHADER_UINT_X2:
+            case gcSHADER_UINT_X3:
+            case gcSHADER_UINT_X4:
+            case gcSHADER_UINT_X16:
+
+                switch (format)
+                {
+                case gcSL_INT8:
+                case gcSL_UINT8:
+                case gcSL_INT16:
+                case gcSL_UINT16:
+                    {
+                        /* Unpack argument data into 4B chunks */
+                        gctUINT32 *data= gcvNULL;
+                        gctUINT32 signMask, signExt;
+                        gctPOINTER pointer= gcvNULL;
+                        gctSIZE_T i, elemSize, numElem, bytes;
+
+                        elemSize =  ((format == gcSL_INT8)   ? 1 :
+                                     (format == gcSL_UINT8)  ? 1 :
+                                     (format == gcSL_INT16)  ? 2 :
+                                     (format == gcSL_UINT16) ? 2 : 0);
+
+                        signMask =  ((format == gcSL_INT8)   ? 0x80 :
+                                     (format == gcSL_INT16)  ? 0x8000 : 0);
+
+                        signExt =   ((format == gcSL_INT8)   ? 0xFFFFFF00 :
+                                     (format == gcSL_INT16)  ? 0xFFFF0000 : 0);
+
+                        numElem = Arg->size / elemSize;
+                        bytes = numElem * 4;
+
+                        gcmONERROR(gcoOS_Allocate(gcvNULL, bytes, &pointer));
+                        gcoOS_ZeroMemory(pointer, bytes);
+                        data = (gctUINT32 *) pointer;
+                        for (i=0; i<numElem; i++) {
+                            pointer = (gctPOINTER)(((gctUINTPTR_T)Arg->data)+(i*elemSize));
+                            gcoOS_MemCopy(&data[i], pointer, elemSize);
+                            if (data[i]&signMask) {
+                                data[i] |= signExt;
+                            }
+                        }
+                        pointer = data;
+                        status = gcUNIFORM_SetValue(Arg->uniform, length, pointer);
+                        gcoOS_Free(gcvNULL, data);
+                        if (gcmIS_ERROR(status)) goto OnError;
+
+                    }
+                    break;
+
+                default:
+                    gcmONERROR(gcUNIFORM_SetValue(Arg->uniform, length, (gctINT*)Arg->data));
+                    break;
+                }
+                break;
+
+            case gcSHADER_INT64_X1:
+            case gcSHADER_INT64_X2:
+            case gcSHADER_INT64_X3:
+            case gcSHADER_INT64_X4:
+            case gcSHADER_UINT64_X1:
+            case gcSHADER_UINT64_X2:
+            case gcSHADER_UINT64_X3:
+            case gcSHADER_UINT64_X4:
+                gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(Kernel->states.hints->vsConstBase,
+                                                                   Kernel->states.hints->psConstBase,
+                                                                   Kernel->states.hints->tcsConstBase,
+                                                                   Kernel->states.hints->tesConstBase,
+                                                                   Kernel->states.hints->gsConstBase,
+                                                                   Arg->uniform,
+                                                                   &physicalAddress));
+
+                gcTYPE_GetTypeInfo(GetUniformType(Arg->uniform), &numCols, &numRows, gcvNULL);
+
+                arraySize = Arg->uniform->arraySize;
+
+                gcmONERROR(gcoSHADER_ProgramUniformEx(gcvNULL, physicalAddress,
+                                                        numCols, numRows, arraySize, gcvTRUE,
+                                                        sizeof(gctINT64),
+                                                        4*sizeof(gctINT64),
+                                                        pData, gcvUNIFORMCVT_NONE, GetUniformShaderKind(Arg->uniform)));
+                break;
+
+
+            default:
+                status = gcvSTATUS_INVALID_DATA;
+                goto OnError;
+            }
+        }
+    }
+
+    status = gcvSTATUS_OK;
+
+OnError:
+    return status;
+}
+
+vx_argument
+clfGetKernelArg(
+    vx_kernel_shader    Kernel,
+    gctUINT             Index,
+    gctBOOL *           isLocal,
+    gctBOOL *           isPrivate,
+    gctBOOL *           isSampler
+    )
+{
+    vx_argument         arg;
+    gctUINT             i, argIndex = 0;
+
+    for (i = 0; i < Kernel->numArgs; i++)
+    {
+        arg = &Kernel->args[i];
+        if (arg->uniform == gcvNULL) continue;
+        if (! hasUniformKernelArgKind(arg->uniform)) continue;
+        if (argIndex == Index)
+        {
+            if (isLocal) *isLocal = isUniformKernelArgLocal(arg->uniform);
+            if (isPrivate) *isPrivate = isUniformKernelArgPrivate(arg->uniform);
+            if (isSampler) *isSampler = isUniformKernelArgSampler(arg->uniform);
+            return arg;
+        }
+        argIndex++;
+    }
+    return gcvNULL;
+}
+
+gceSTATUS
+gcfVX_SetKernelArg(
+    vx_kernel_shader    Kernel,
+    vx_uint32           ArgIndex,
+    size_t              ArgSize,
+    const void *        ArgValue
+    )
+{
+    vx_argument     argument;
+    gceSTATUS       status;
+    gctBOOL         isLocal, isPrivate, isSampler;
+    gctBOOL         acquired = gcvFALSE;
+
+    if (Kernel == gcvNULL)
+    {
+        status = gcvSTATUS_INVALID_ARGUMENT;
+        goto OnError;
+    }
+
+    if (ArgIndex > Kernel->numArgs)
+    {
+        status = gcvSTATUS_INVALID_ARGUMENT;
+        goto OnError;
+    }
+
+ //   gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL, Kernel->argMutex, gcvINFINITE));
+ //   acquired = gcvTRUE;
+
+    argument = clfGetKernelArg(Kernel, ArgIndex, &isLocal, &isPrivate, &isSampler);
+
+    if (argument == gcvNULL)
+    {
+        status = gcvSTATUS_INVALID_ARGUMENT;
+        goto OnError;
+    }
+
+    if (isLocal)
+    {
+        if (ArgSize == 0)
+        {
+            status = gcvSTATUS_INVALID_ARGUMENT;
+            goto OnError;
+        }
+
+        if (argument->isMemAlloc != gcvTRUE)
+        {
+            status = gcvSTATUS_INVALID_ARGUMENT;
+            goto OnError;
+        }
+
+        ((vx_mem_alloc_info)argument->data)->allocatedSize = (gctINT)ArgSize;
+        argument->size = ArgSize;
+        Kernel->localMemSize += ArgSize;
+    }
+    else if (isPrivate)
+    {
+        vx_mem_alloc_info memAllocInfo;
+        gctPOINTER pointer;
+
+        if (ArgSize == 0)
+        {
+            status = gcvSTATUS_INVALID_ARGUMENT;
+            goto OnError;
+        }
+
+        if (argument->isMemAlloc != gcvTRUE)
+        {
+            status = gcvSTATUS_INVALID_ARGUMENT;
+            goto OnError;
+        }
+
+        memAllocInfo = (vx_mem_alloc_info) argument->data;
+        memAllocInfo->allocatedSize = (gctINT)ArgSize;
+        argument->size = ArgSize;
+
+        status = gcoOS_Allocate(gcvNULL, ArgSize, &pointer);
+        if (gcmIS_ERROR(status))
+        {
+            status = gcvSTATUS_OUT_OF_MEMORY;
+            goto OnError;
+        }
+        memAllocInfo->data = pointer;
+
+        gcoOS_MemCopy(memAllocInfo->data, ArgValue, ArgSize);
+    }
+    else if (isSampler)
+    {
+    }
+    else
+    {
+        if(ArgSize != argument->size)
+        {
+            status = gcvSTATUS_INVALID_ARGUMENT;
+            goto OnError;
+        }
+
+        gcoOS_MemCopy(argument->data, ArgValue, ArgSize);
+    }
+
+    argument->set = gcvTRUE;
+
+
+    status = gcvSTATUS_OK;
+
+OnError:
+    if (acquired)
+    {
+       // gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, Kernel->argMutex));
+    }
+
+    return status;
+}
+
+gceSTATUS
+gcfVX_AllocateKernelArgs(
+    vx_kernel_shader   Kernel
+    )
+{
+    gceSTATUS       status = gcvSTATUS_OK;
+    gctPOINTER      pointer;
+    gctSIZE_T       bytes;
+    vx_argument     argument;
+    gctUINT         i, uniformCount;
+    gcSHADER        shader = (gcSHADER)Kernel->states.binary;
+    gcUNIFORM       uniform;
+
+        /* Get the number of uniforms. */
+    gcmONERROR(gcSHADER_GetUniformCount(
+                        shader,
+                        &uniformCount));
+
+
+    if (uniformCount == 0)
+    {
+        Kernel->args = gcvNULL;
+        status = gcvSTATUS_INVALID_ARGUMENT;
+        goto OnError;
+    }
+
+    Kernel->numArgs = 0;
+
+    for (i = 0; i < uniformCount; i++)
+    {
+        gcmONERROR(gcSHADER_GetUniform(
+                        shader,
+                        i, &uniform));
+
+        if (!uniform || ( uniform && isUniformCompiletimeInitialized(uniform)))
+            continue;
+
+        Kernel->numArgs++;
+    }
+
+    /* Allocate the array of arguments. */
+    bytes = Kernel->numArgs * gcmSIZEOF(vx_argument_s);
+    gcmONERROR(gcoOS_Allocate(gcvNULL, bytes, &pointer));
+    gcoOS_ZeroMemory(pointer, bytes);
+
+    Kernel->args = argument = pointer;
+    for (i = 0; i < uniformCount; i++)
+    {
+        gcUNIFORM uniform;
+        gcSHADER_TYPE type;
+        gcSL_FORMAT format;
+        gctBOOL isPointer;
+        gctUINT length;
+        gctSIZE_T bytes;
+
+        gcmONERROR(gcSHADER_GetUniform(
+                        shader,
+                        i, &uniform));
+
+        if (!uniform || ( uniform && isUniformCompiletimeInitialized(uniform))) continue;
+
+        gcmONERROR(gcUNIFORM_GetType(uniform, &type, &length));
+        gcmONERROR(gcUNIFORM_GetFormat(uniform, &format, &isPointer));
+
+        if (isUniformLocalAddressSpace(uniform) ||
+            isUniformPrivateAddressSpace(uniform) ||
+            isUniformConstantAddressSpace(uniform) ||
+            isUniformKernelArgPrivate(uniform) ||
+            isUniformKernelArgLocal(uniform) ||
+            isUniformKernelArgLocalMemSize(uniform) ||
+            isUniformPrintfAddress(uniform))
+        {
+            vx_mem_alloc_info memAllocInfo;
+            gctPOINTER pointer;
+
+            bytes = sizeof(vx_mem_alloc_info_s);
+
+            /* Allocate the memory allocation info. */
+            gcmONERROR(gcoOS_Allocate(gcvNULL, bytes, &pointer));
+            gcoOS_ZeroMemory(pointer, bytes);
+            memAllocInfo = (vx_mem_alloc_info)pointer;
+
+            /* Get the required memory size.
+             * For local/private kernel arguments it will be set by the application.
+             */
+            if (isUniformLocalAddressSpace(uniform))
+            {
+                gcmONERROR(gcSHADER_GetLocalMemorySize(shader, &memAllocInfo->allocatedSize));
+                Kernel->localMemSize += memAllocInfo->allocatedSize;
+            }
+            else if (isUniformPrivateAddressSpace(uniform))
+            {
+                gcmONERROR(gcSHADER_GetPrivateMemorySize(shader, &memAllocInfo->allocatedSize));
+                Kernel->privateMemSize += memAllocInfo->allocatedSize;
+            }
+            else if (isUniformConstantAddressSpace(uniform))
+            {
+                gcmONERROR(gcSHADER_GetConstantMemorySize(shader, &memAllocInfo->allocatedSize, &Kernel->constantMemBuffer ));
+                Kernel->constantMemSize += memAllocInfo->allocatedSize;
+            }
+
+            argument->data       = memAllocInfo;
+            argument->uniform    = uniform;
+            argument->size       = bytes;
+            argument->set        = gcvFALSE;
+            argument->isMemAlloc = gcvTRUE;
+            argument->isPointer  = gcvFALSE;
+        }
+        else
+        {
+            if (isPointer)
+            {
+                bytes = gcmSIZEOF(gctPOINTER);
+            }
+            else
+            {
+                switch (type)
+                {
+                case gcSHADER_FLOAT_X1:
+                case gcSHADER_BOOLEAN_X1:
+                case gcSHADER_INTEGER_X1:
+                case gcSHADER_UINT_X1:
+                    bytes = 1 * gcmSIZEOF(vx_float32) * length;
+                    break;
+
+                case gcSHADER_FLOAT_X2:
+                case gcSHADER_BOOLEAN_X2:
+                case gcSHADER_INTEGER_X2:
+                case gcSHADER_UINT_X2:
+                    bytes = 2 * gcmSIZEOF(vx_float32) * length;
+                    break;
+
+                case gcSHADER_FLOAT_X3:
+                case gcSHADER_BOOLEAN_X3:
+                case gcSHADER_INTEGER_X3:
+                case gcSHADER_UINT_X3:
+                    bytes = 3 * gcmSIZEOF(vx_float32) * length;
+                    break;
+
+                case gcSHADER_FLOAT_X4:
+                case gcSHADER_BOOLEAN_X4:
+                case gcSHADER_INTEGER_X4:
+                case gcSHADER_UINT_X4:
+                    bytes = 4 * gcmSIZEOF(vx_float32) * length;
+                    break;
+
+                case gcSHADER_UINT_X16:
+                    bytes = 16 * gcmSIZEOF(vx_float32) * length;
+                    break;
+
+                case gcSHADER_INT64_X1:
+                case gcSHADER_UINT64_X1:
+                    bytes = 1 * gcmSIZEOF(vx_int64) * length;
+                    break;
+                case gcSHADER_INT64_X2:
+                case gcSHADER_UINT64_X2:
+                    bytes = 2 * gcmSIZEOF(vx_int64) * length;
+                    break;
+                case gcSHADER_INT64_X3:
+                case gcSHADER_UINT64_X3:
+                    bytes = 3 * gcmSIZEOF(vx_int64) * length;
+                    break;
+                case gcSHADER_INT64_X4:
+                case gcSHADER_UINT64_X4:
+                    bytes = 4 * gcmSIZEOF(vx_int64) * length;
+                    break;
+
+                case gcSHADER_FLOAT_2X2:
+                    bytes = 2 * 2 * gcmSIZEOF(vx_float32) * length;
+                    break;
+
+                case gcSHADER_FLOAT_3X3:
+                    bytes = 3 * 3 * gcmSIZEOF(vx_float32) * length;
+                    break;
+
+                case gcSHADER_FLOAT_4X4:
+                    bytes = 4 * 4 * gcmSIZEOF(vx_float32) * length;
+                    break;
+
+                case gcSHADER_IMAGE_2D:
+                case gcSHADER_IMAGE_3D:
+                case gcSHADER_SAMPLER:
+                case gcSHADER_IMAGE_1D:
+                case gcSHADER_IMAGE_1D_ARRAY:
+                case gcSHADER_IMAGE_1D_BUFFER:
+                case gcSHADER_IMAGE_2D_ARRAY:
+                    bytes = 1 * gcmSIZEOF(vx_uint32) * length;
+                    break;
+
+                case gcSHADER_SAMPLER_2D:
+                case gcSHADER_SAMPLER_3D:
+                    bytes = 1 * gcmSIZEOF(vx_float32) * length;
+                    break;
+
+                default:
+                    gcmASSERT("Unknown shader type");
+                    bytes = 0;
+                    status = gcvSTATUS_INVALID_ARGUMENT;
+                    goto OnError;
+                }
+
+                switch (format)
+                {
+                case gcSL_INT8:
+                case gcSL_UINT8:
+                    bytes /= 4;
+                    break;
+
+                case gcSL_INT16:
+                case gcSL_UINT16:
+                    bytes /= 2;
+                    break;
+
+                default:
+                    break;
+                }
+            }
+
+            /* Allocate the data array. */
+            gcmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data));
+
+            gcoOS_ZeroMemory(argument->data, bytes);
+
+            argument->uniform    = uniform;
+            argument->size       = bytes;
+            argument->set        = gcvFALSE;
+            argument->isMemAlloc = gcvFALSE;
+            argument->isPointer  = isPointer;
+        }
+
+        argument++;
+    }
+
+OnError:
+    return status;
+}
+
+gceSTATUS
+gcfVX_ExecuteKernel(
+    vx_kernel_shader    Kernel,
+    gctUINT             NumArgs,
+    vx_argument         Args,
+    vx_border_mode_t*   BorderMode,
+    gctUINT             WorkDim,
+    size_t              GlobalWorkOffset[3],
+    size_t              GlobalWorkScale[3],
+    size_t              GlobalWorkSize[3],
+    size_t              LocalWorkSize[3]
+)
+{
+    gctUINT i;
+    gceSTATUS status;
+    /* Load kernel states. */
+    gcmONERROR(gcoVX_LoadKernelShader(Kernel->states.stateBufferSize,
+                                Kernel->states.stateBuffer,
+                                Kernel->states.hints));
+
+    /* Adjust local work sizes if not specified by the application. */
+    gcmONERROR(gcfVX_AdjustLocalWorkSize(Kernel,
+                                      WorkDim,
+                                      GlobalWorkOffset,
+                                      GlobalWorkSize,
+                                      LocalWorkSize));
+
+    /* Load argument values. */
+    for (i = 0; i < NumArgs; i++)
+    {
+        if (Args[i].uniform && !isUniformInactive(Args[i].uniform))
+        {
+            gcmONERROR(gcfVX_LoadKernelArgValues(Kernel,
+                                                (gcSHADER) Kernel->states.binary,
+                                                &Args[i],
+                                                BorderMode,
+                                                WorkDim,
+                                                GlobalWorkOffset,
+                                                GlobalWorkSize,
+                                                LocalWorkSize));
+        }
+    }
+
+    /* Set up local memory for kernel arguments. */
+    gcmONERROR(gcfVX_LoadKernelArgLocalMemValues(Kernel,
+                                              NumArgs,
+                                              Args,
+                                              WorkDim,
+                                              GlobalWorkOffset,
+                                              GlobalWorkSize,
+                                              LocalWorkSize));
+
+
+    gcmONERROR(gcoVX_InvokeKernelShader((gcSHADER) Kernel->states.binary,
+                                  WorkDim,
+                                  GlobalWorkOffset,
+                                  GlobalWorkScale,
+                                  GlobalWorkSize,
+                                  LocalWorkSize,
+                                  Kernel->states.hints->valueOrder));
+
+    gcmONERROR(gcoVX_Flush(gcvFALSE));
+
+    status = gcvSTATUS_OK;
+
+OnError:
+    return status;
+}
+
+gceSTATUS
+gcfVX_CreateKernelShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], gctBOOL constBorder, vx_kernel_shader *kernelShader)
+{
+    gcSHADER        pgmBinary, kernelBinary;
+    gctUINT         binarySize;
+    gctUINT         i;
+    gctUINT         count, propertySize = 0;
+    gctINT          propertyType = 0;
+    gctSIZE_T       propertyValues[3] = {0};
+    gceSHADER_FLAGS flags;
+    gctPOINTER      pointer;
+    gceSTATUS       status;
+    gctPOINTER      buffer      = gcvNULL;
+    gctUINT         bufferSize  = 0;
+    gcsHINT_PTR     hints       = gcvNULL;
+
+    gcKERNEL_FUNCTION   kernelFunction;
+    vx_kernel_shader    kernel;
+
+    /* Allocate kernel. */
+    gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(vx_kernel_shader_s), (gctPOINTER*)&kernel));
+    gcoOS_ZeroMemory(kernel, sizeof(vx_kernel_shader_s));
+
+    /* Save program binary into buffer */
+    pgmBinary = (gcSHADER) program->binary;
+    gcmONERROR(gcSHADER_SaveEx(pgmBinary, gcvNULL, &binarySize));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, binarySize, &pointer));
+    gcmONERROR(gcSHADER_SaveEx(pgmBinary, pointer, &binarySize));
+
+    /* Construct kernel binary. */
+    gcmONERROR(gcSHADER_Construct(gcvNULL, gcSHADER_TYPE_CL, &kernelBinary));
+
+    /* Load kernel binary from program binary */
+    gcmONERROR(gcSHADER_LoadEx(kernelBinary, pointer, binarySize));
+
+    gcoOS_Free(gcvNULL, pointer);
+
+    /* Load kernel binary uniforms with the given kernel name */
+    gcmONERROR(gcSHADER_LoadKernel(kernelBinary, name));
+
+    /* Set the required work group size. */
+    gcmONERROR(gcSHADER_GetKernelFunctionByName(kernelBinary, name, &kernelFunction));
+    gcKERNEL_FUNCTION_GetPropertyCount(kernelFunction, &count);
+
+    for (i = 0; i < count; i++)
+    {
+        gcKERNEL_FUNCTION_GetProperty(kernelFunction, i, &propertySize, &propertyType, (gctINT *)propertyValues);
+
+        if (propertyType == gcvPROPERTY_REQD_WORK_GRP_SIZE)
+        {
+            gcoOS_MemCopy(kernel->compileWorkGroupSize,
+                propertyValues,
+                gcmSIZEOF(gctINT) * propertySize);
+        }
+    }
+
+    /* Assume all dead code is removed by optimizer. */
+    flags = gcvSHADER_RESOURCE_USAGE /*| gcvSHADER_DEAD_CODE*/ | gcvSHADER_OPTIMIZER;
+
+    gcSetCLCompiler(gcCompileKernel);
+
+    if (constBorder)
+    {
+        gcOPT_SetFeature(FB_ENABLE_CONST_BORDER);
+    }
+
+    gcmONERROR(gcLinkKernel(kernelBinary,
+                          flags | gcvSHADER_REMOVE_UNUSED_UNIFORMS,
+                          &bufferSize,
+                          &buffer,
+                          &hints));
+
+    if (constBorder)
+    {
+        gcOPT_ResetFeature(FB_ENABLE_CONST_BORDER);
+    }
+
+    kernel->states.binary          = (gctUINT8_PTR) kernelBinary;
+    kernel->states.stateBuffer     = buffer;
+    kernel->states.stateBufferSize = bufferSize;
+    kernel->states.hints           = hints;
+
+
+    gcmVERIFY_OK(gcSHADER_GetAttributeCount(kernelBinary, &kernel->attributeCount));
+
+    /* Allocate kernel arguments. */
+    gcmONERROR(gcfVX_AllocateKernelArgs(kernel));
+
+    *kernelShader = kernel;
+
+    status =  gcvSTATUS_OK;
+
+OnError:
+    return status;
+}
+
+VX_PRIVATE_API vx_string _getShaderName(vx_string orignal, vx_string name)
+{
+	vx_char* pointer = strrchr(orignal, '.');
+
+	if(pointer)
+	{
+		gctSTRING suffix = strchr(pointer, ':');
+		pointer = pointer + 1;
+		if(suffix)
+			gcoOS_StrCopySafe(name, suffix - pointer + 1, pointer);
+		else
+			gcoOS_StrCopySafe(name, strlen(pointer) + 1, pointer);
+	}
+	else
+		gcoOS_StrCopySafe(name, strlen(orignal)+1, orignal);
+
+	return name;
+}
+
 VX_INTERNAL_API vx_status vxoKernel_Initialize(
-        vx_context context, vx_kernel kernel,
-        vx_char name[VX_MAX_KERNEL_NAME], vx_enum kernelEnum,
-        vx_program program, vx_kernel_f function,
-        vx_param_description_s *parameters, vx_uint32 paramCount,
-        vx_kernel_input_validate_f inputValidateFunction, vx_kernel_output_validate_f outputValidateFunction,
-        vx_kernel_initialize_f initializeFunction,  vx_kernel_deinitialize_f deinitializeFunction)
+    vx_context context,
+    vx_kernel kernel,
+    vx_char name[VX_MAX_KERNEL_NAME],
+    vx_enum kernelEnum,
+    vx_program program,
+    vx_kernel_f function,
+    vx_param_description_s *parameters,
+    vx_uint32 paramCount,
+    vx_kernel_input_validate_f inputValidateFunction,
+    vx_kernel_output_validate_f outputValidateFunction,
+    vx_kernel_initialize_f initializeFunction,
+    vx_kernel_deinitialize_f deinitializeFunction
+#if gcdVX_OPTIMIZER
+    , vx_kernel_optimization_attribute_s optAttributes
+#endif
+    )
 {
     vx_uint32 i;
 
@@ -35,6 +1522,7 @@ VX_INTERNAL_API vx_status vxoKernel_Initialize(
     vxoReference_Increment(&kernel->base, VX_REF_INTERNAL);
 
     vxStrCopySafe(kernel->name, VX_MAX_KERNEL_NAME, name);
+
     kernel->enumeration             = kernelEnum;
 
     kernel->program                 = program;
@@ -50,6 +1538,31 @@ VX_INTERNAL_API vx_status vxoKernel_Initialize(
 
     kernel->attributes.borderMode.mode              = VX_BORDER_MODE_UNDEFINED;
     kernel->attributes.borderMode.constant_value    = 0;
+
+#if gcdVX_OPTIMIZER
+    kernel->attributes.optAttributes                = optAttributes;
+#endif
+
+    if (kernel->program != VX_NULL)
+    {
+		vx_char shader_name[128] = {0};
+         gceSTATUS status0 = gcfVX_CreateKernelShader(
+                                kernel->program,
+                                _getShaderName(kernel->name, shader_name),
+                                gcvFALSE,
+                                &kernel->kernelShader[0]);
+
+         gceSTATUS status1 = gcfVX_CreateKernelShader(
+                                kernel->program,
+                                shader_name,
+                                gcvTRUE,
+                                &kernel->kernelShader[1]);
+
+         if (gcmIS_ERROR(status0) || gcmIS_ERROR(status1))
+         {
+             return VX_FAILURE;
+         }
+    }
 
     if (parameters != VX_NULL)
     {
@@ -673,25 +2186,429 @@ VX_PUBLIC_API vx_status vxSetKernelAttribute(vx_kernel kernel, vx_enum attribute
 
 VX_PRIVATE_API vx_status vxoProgramKernel_Function(vx_node node, vx_reference parameters[], vx_uint32 paramCount)
 {
-    /* TODO */
+    vx_uint32           i;
+    gceSTATUS           status;
+    gctUINT             shaderID, argIndex = 0;
+    vx_kernel_shader    kernelShader;
+
+    shaderID = ((node->kernelAttributes.borderMode.mode == VX_BORDER_MODE_CONSTANT) ? 1 : 0);
+
+    kernelShader = node->kernel->kernelShader[shaderID];
+
+    for (i = 0; i < paramCount; i++)
+    {
+        switch(node->kernel->signature.dataTypeTable[i])
+        {
+        case VX_TYPE_SCALAR:
+        {
+            gctBOOL isPointer;
+            vx_scalar scalar = (vx_scalar)parameters[i];
+            vx_argument argument = clfGetKernelArg(kernelShader, argIndex, gcvNULL, gcvNULL, gcvNULL);
+
+            if (scalar)
+            {
+                gcmONERROR(gcUNIFORM_GetFormat(argument->uniform, gcvNULL, &isPointer));
+
+                if (!isPointer)
+                {
+                    gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),/*vxDataType_GetSize((vx_type_e)scalar->dataType),*/
+                                scalar->value));
+                }
+                else
+                {
+                    gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &scalar->physical));
+                }
+
+                argIndex++;
+            }
+            else
+            {
+                argIndex++;
+            }
+            break;
+        }
+        case VX_TYPE_LUT:
+        case VX_TYPE_ARRAY:
+        {
+            vx_array array = (vx_array)parameters[i];
+
+            if (array)
+            {
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &array->capacity));
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &array->memory.physicals[0]));
+                argIndex ++;
+            }
+            else
+            {
+                argIndex += 2;
+            }
+            break;
+        }
+        case VX_TYPE_CONVOLUTION:
+        {
+            vx_convolution conv = (vx_convolution)parameters[i];
+            if (conv)
+            {
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &conv->matrix.columns));
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &conv->matrix.rows));
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &conv->matrix.memory.physicals[0]));
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &conv->scale));
+                argIndex ++;
+            }
+            else
+            {
+                argIndex += 4;
+            }
+            break;
+        }
+        case VX_TYPE_MATRIX:
+        {
+            vx_matrix matrix = (vx_matrix)parameters[i];
+
+            if (matrix)
+            {
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &matrix->columns));
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &matrix->rows));
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &matrix->memory.physicals[0]));
+                argIndex ++;
+            }
+            else
+            {
+                argIndex += 3;
+            }
+            break;
+        }
+        case VX_TYPE_THRESHOLD:
+        {
+            vx_threshold threshold = (vx_threshold)parameters[i];
+            if (threshold)
+            {
+                gctUINT32  value = FV(threshold->value + 1);
+                gctUINT32  lower = (gctINT32)FV(threshold->lower);
+                gctUINT32  upper = (gctINT32)FV(threshold->upper);
+
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &threshold->type));
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &value));
+
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &lower));
+
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &upper));
+
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &threshold->trueValue));
+
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &threshold->falseValue));
+
+                argIndex ++;
+            }
+            else
+            {
+                argIndex += 6;
+            }
+
+            break;
+        }
+        case VX_TYPE_DISTRIBUTION:
+        {
+            vx_distribution distribution = (vx_distribution)parameters[i];
+
+            if (distribution)
+            {
+                gctUINT32  rang = distribution->memory.dims[0][VX_DIM_X] * distribution->windowX;
+                gctFLOAT   window = 1.0f/distribution->windowX;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &distribution->memory.dims[0][VX_DIM_X]));
+
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &rang));
+
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &distribution->offsetX));
+
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &window));
+
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &distribution->memory.physicals[0]));
+
+                argIndex ++;
+            }
+            else
+            {
+                argIndex += 5;
+            }
+
+            break;
+        }
+		case VX_TYPE_REMAP:
+		{
+            vx_remap remap = (vx_remap)parameters[i];
+
+            if (remap)
+            {
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &remap->destWidth));
+
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &remap->destHeight));
+
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                kernelShader,
+                                argIndex,
+                                sizeof(gctUINT32),
+                                &remap->memory.physicals[0]));
+
+                argIndex ++;
+            }
+            else
+            {
+                argIndex += 3;
+            }
+
+            break;
+
+        }
+        case VX_TYPE_IMAGE:
+        {
+            gcmONERROR(gcfVX_SetKernelArg(
+                        kernelShader,
+                        argIndex,
+                        sizeof(vx_reference),
+                        &parameters[i]));
+
+            argIndex ++;
+
+            break;
+        }
+        case VX_TYPE_PYRAMID:
+        {
+            gctINT32* shaderArg;
+            gctUINT32 j = 0;
+            vx_pyramid pyramid = (vx_pyramid)parameters[i];
+
+            if (pyramid)
+            {
+                vx_mem_alloc_info  memAllocInfo = &pyramid->memAllocInfo;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                    kernelShader,
+                                    argIndex,
+                                    sizeof(gctUINT32),
+                                    &pyramid->scale));
+
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                    kernelShader,
+                                    argIndex,
+                                    sizeof(gctUINT32),
+                                    &pyramid->width));
+
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                    kernelShader,
+                                    argIndex,
+                                    sizeof(gctUINT32),
+                                    &pyramid->height));
+
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                    kernelShader,
+                                    argIndex,
+                                    sizeof(gctUINT32),
+                                    &pyramid->format));
+
+                argIndex ++;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                    kernelShader,
+                                    argIndex,
+                                    sizeof(gctUINT32),
+                                    &pyramid->levelCount));
+
+                argIndex ++;
+
+
+                if (!memAllocInfo->node)
+                {
+                    memAllocInfo->allocatedSize = sizeof(gctINT32)*pyramid->levelCount;
+                    gcmONERROR(gcoVX_AllocateMemoryEx(&memAllocInfo->allocatedSize,
+                                                &memAllocInfo->physical,
+                                                &memAllocInfo->logical,
+                                                &memAllocInfo->node));
+                }
+
+                shaderArg = (gctINT32*)memAllocInfo->logical;
+
+                for (j = 0; j < pyramid->levelCount; j++)
+                {
+                    shaderArg[j] = (gctINT32)pyramid->levels[j];
+                }
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                                    kernelShader,
+                                    argIndex,
+                                    sizeof(gctUINT32),
+                                    &memAllocInfo->physical));
+
+                argIndex ++;
+
+            }
+            else
+            {
+                argIndex += 6;
+            }
+
+            break;
+        }
+        default:
+            goto OnError;
+        }
+    }
+
+    gcmONERROR(gcfVX_ExecuteKernel(kernelShader,
+                        kernelShader->numArgs,
+                        kernelShader->args,
+                        &node->kernelAttributes.borderMode,
+                        node->kernelAttributes.shaderParameter.workDim,
+                        node->kernelAttributes.shaderParameter.globalWorkOffset,
+                        node->kernelAttributes.shaderParameter.globalWorkScale,
+                        node->kernelAttributes.shaderParameter.globalWorkSize,
+                        node->kernelAttributes.shaderParameter.localWorkSize));
 
     return VX_SUCCESS;
+
+OnError:
+    return VX_FAILURE;
 }
 
-VX_PRIVATE_API vx_status vxoProgramKernel_InputValidator(vx_node node, vx_uint32 index)
-{
-    /* TODO */
-
-    return VX_SUCCESS;
-}
-
-VX_PRIVATE_API vx_status vxoProgramKernel_OutputValidator(vx_node node, vx_uint32 index, vx_meta_format meta)
-{
-    /* TODO */
-
-    return VX_SUCCESS;
-}
-
+/*unused code*/
 VX_PRIVATE_API vx_status vxoProgramKernel_Initialize(vx_node node, vx_reference parameters[], vx_uint32 paramCount)
 {
     /* TODO */
@@ -707,13 +2624,14 @@ VX_PRIVATE_API vx_status vxoProgramKernel_Deinitialize(vx_node node, vx_referenc
 }
 
 VX_PUBLIC_API vx_kernel vxAddKernelInProgram(
-        vx_program program, vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration)
+        vx_program program, vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration, vx_uint32 num_params, vx_kernel_input_validate_f input,
+        vx_kernel_output_validate_f output, vx_kernel_initialize_f initialize, vx_kernel_deinitialize_f deinitialize)
 {
     vx_context  context;
     vx_uint32   targetIndex;
     vx_char     targetName[VX_MAX_TARGET_NAME] = VX_DEFAULT_TARGET_NAME;
 
-    if (!vxoReference_IsValidAndSpecific(&program->base, VX_TYPE_PROGRAM)) return VX_NULL;
+    if (!vxoReference_IsValidAndSpecific(&program->base, (vx_type_e)VX_TYPE_PROGRAM)) return VX_NULL;
 
     context = program->base.context;
 
@@ -728,9 +2646,10 @@ VX_PUBLIC_API vx_kernel vxAddKernelInProgram(
             vxmASSERT(target->funcs.addkernel);
 
             return target->funcs.addkernel(target, name, enumeration,
-                                            program, vxoProgramKernel_Function, 0,
-                                            vxoProgramKernel_InputValidator, vxoProgramKernel_OutputValidator,
-                                            vxoProgramKernel_Initialize, vxoProgramKernel_Deinitialize);
+                                            program, vxoProgramKernel_Function, num_params,
+                                            input, output,
+                                            (initialize != VX_NULL)?initialize:vxoProgramKernel_Initialize,
+											(deinitialize != VX_NULL)?deinitialize:vxoProgramKernel_Deinitialize);
         }
     }
 
@@ -738,4 +2657,100 @@ VX_PUBLIC_API vx_kernel vxAddKernelInProgram(
 
 ErrorExit:
     return (vx_kernel)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
+}
+
+VX_PUBLIC_API vx_status vxSetNodeUniform(vx_node node, const vx_char * name, vx_size count, void * value)
+{
+    vx_argument         arg;
+    gctUINT             i;
+    vx_kernel_shader    kernelShader;
+    gctUINT             shaderID;
+    gceSTATUS           status;
+    gctUINT             length;
+    vx_status           vStatus = VX_FAILURE;
+
+    shaderID = ((node->kernelAttributes.borderMode.mode == VX_BORDER_MODE_CONSTANT) ? 1 : 0);
+    kernelShader = node->kernel->kernelShader[shaderID];
+
+    for (i = 0; i < kernelShader->numArgs; i++)
+    {
+        arg = &kernelShader->args[i];
+
+        if (arg->uniform == gcvNULL) continue;
+
+        if ((gcoOS_StrCmp(arg->uniform->name, name) == gcvSTATUS_OK))
+        {
+            gcmONERROR(gcUNIFORM_GetType(arg->uniform, gcvNULL, &length));
+
+            if (length != count) break;
+
+            gcoOS_MemCopy(arg->data, value, arg->size);
+
+            vStatus = VX_SUCCESS;
+            break;
+        }
+    }
+
+OnError:
+    return vStatus;
+}
+
+gceSTATUS
+gcfVX_FreeKernelArgs(
+    gctUINT         NumArgs,
+    vx_argument     Args,
+    gctBOOL         FreeAllocData
+    )
+{
+    gctUINT         i;
+
+    if (Args == gcvNULL || NumArgs == 0)
+    {
+        return gcvSTATUS_OK;
+    }
+
+    for (i = 0; i < NumArgs; i++)
+    {
+        if (Args[i].isMemAlloc)
+        {
+            vx_mem_alloc_info memAllocInfo = (vx_mem_alloc_info) Args[i].data;
+            gcoVX_FreeMemoryEx(memAllocInfo->physical,
+                             memAllocInfo->logical,
+                             memAllocInfo->allocatedSize,
+                             memAllocInfo->node);
+            if (FreeAllocData && memAllocInfo->data) gcmOS_SAFE_FREE(gcvNULL, memAllocInfo->data);
+        }
+
+        if (Args[i].data)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, Args[i].data);
+        }
+    }
+    gcmOS_SAFE_FREE(gcvNULL, Args);
+
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS gcfVX_FreeKernelShader(vx_kernel_shader kernel)
+{
+    if (kernel)
+    {
+        gcfVX_FreeKernelArgs(kernel->numArgs, kernel->args, gcvTRUE);
+
+        if (kernel->states.stateBuffer) gcoOS_Free(gcvNULL, kernel->states.stateBuffer);
+        if (kernel->states.hints) gcHINTS_Destroy(kernel->states.hints);
+        if (kernel->states.hints) gcoOS_Free(gcvNULL, kernel->states.hints);
+        if (kernel->states.binary) gcSHADER_Destroy((gcSHADER)kernel->states.binary);
+        if (kernel->name) gcoOS_Free(gcvNULL, kernel->name);
+    }
+
+    return gcvSTATUS_OK;
+}
+
+VX_INTERNAL_CALLBACK_API void vxoKernel_Destructor(vx_reference ref)
+{
+    vx_kernel vKernel = (vx_kernel)ref;
+
+    gcfVX_FreeKernelShader(vKernel->kernelShader[0]);
+    gcfVX_FreeKernelShader(vKernel->kernelShader[1]);
 }

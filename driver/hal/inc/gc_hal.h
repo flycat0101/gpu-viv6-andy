@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -22,10 +22,6 @@
 #include "gc_hal_driver.h"
 #if gcdENABLE_3D
 #include "gc_hal_statistics.h"
-#endif
-
-#if gcdSECURITY
-#include "gc_hal_security_interface.h"
 #endif
 
 #ifdef __cplusplus
@@ -486,6 +482,7 @@ gceSTATUS
 gckOS_PhysicalToPhysicalAddress(
     IN gckOS Os,
     IN gctPOINTER Physical,
+    IN gctUINT32 Offset,
     OUT gctPHYS_ADDR_T * PhysicalAddress
     );
 
@@ -1030,40 +1027,6 @@ gceSTATUS
 gckOS_GetThreadID(
     OUT gctUINT32_PTR ThreadID
     );
-
-#if gcdSECURITY
-gceSTATUS
-gckOS_OpenSecurityChannel(
-    IN gckOS Os,
-    IN gceCORE Core,
-    OUT gctUINT32 *Channel
-    );
-
-gceSTATUS
-gckOS_CloseSecurityChannel(
-    IN gctUINT32 Channel
-    );
-
-gceSTATUS
-gckOS_CallSecurityService(
-    IN gctUINT32 Channel,
-    IN gcsTA_INTERFACE * Interface
-    );
-
-gceSTATUS
-gckOS_InitSecurityChannel(
-    OUT gctUINT32 Channel
-    );
-
-gceSTATUS
-gckOS_AllocatePageArray(
-    IN gckOS Os,
-    IN gctPHYS_ADDR Physical,
-    IN gctSIZE_T PageCount,
-    OUT gctPOINTER * PageArrayLogical,
-    OUT gctPHYS_ADDR * PageArrayPhysical
-    );
-#endif
 
 /******************************************************************************\
 ********************************** Signal Object *********************************
@@ -1757,6 +1720,7 @@ gceSTATUS
 gckKERNEL_Construct(
     IN gckOS Os,
     IN gceCORE Core,
+    IN gctUINT ChipID,
     IN gctPOINTER Context,
     IN gckDEVICE Device,
     IN gckDB SharedDB,
@@ -2525,7 +2489,8 @@ gckEVENT_Unlock(
 gceSTATUS
 gckEVENT_CommitDone(
     IN gckEVENT Event,
-    IN gceKERNEL_WHERE FromWhere
+    IN gceKERNEL_WHERE FromWhere,
+    IN gckCONTEXT Context
     );
 
 /* Schedule a FreeVirtualCommandBuffer event. */
@@ -2719,6 +2684,7 @@ gckMMU_AllocatePagesEx(
     IN gckMMU Mmu,
     IN gctSIZE_T PageCount,
     IN gceSURF_TYPE Type,
+    IN gctBOOL Secure,
     OUT gctPOINTER * PageTable,
     OUT gctUINT32 * Address
     );
@@ -2727,6 +2693,7 @@ gckMMU_AllocatePagesEx(
 gceSTATUS
 gckMMU_FreePages(
     IN gckMMU Mmu,
+    IN gctBOOL Secure,
     IN gctUINT32 Address,
     IN gctPOINTER PageTable,
     IN gctSIZE_T PageCount

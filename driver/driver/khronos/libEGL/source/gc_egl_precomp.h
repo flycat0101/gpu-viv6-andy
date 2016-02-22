@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -14,8 +14,16 @@
 #ifndef __gc_egl_precomp_h_
 #define __gc_egl_precomp_h_
 
-#if !defined(__EGL_EXPORTS)
-#    define __EGL_EXPORTS
+#ifndef EGL_EGLEXT_PROTOTYPES
+#  define EGL_EGLEXT_PROTOTYPES 1
+#endif
+
+#ifndef EGLAPI
+#if defined(_WIN32) && !defined(__SCITECH_SNAP__)
+#    define EGLAPI    __declspec(dllexport)
+#  else
+#    define EGLAPI
+#  endif
 #endif
 
 #include <EGL/egl.h>

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -21,15 +21,8 @@
 
 #include "gc_glsl_common.h"
 
-/* Language version :  'H' 'L' stand for halti */
-#define sldDefaultLanguageType  gcmCC('E', 'S', '\0', '\0')
-#define sldDefaultLanguageVersion  gcmCC('\0', '\0', '\1', '\1')
-#define sldHaltiLanguageVersion    gcmCC('\0', '\0', '\0', '\3')
-#define sldES_31_LanguageVersion    gcmCC('\0', '\0', '\1', '\3')
-
 #define slmIsLanguageVersion3_1(Compiler) \
-    (sloCOMPILER_GetLanguageVersion(Compiler) >= sldES_31_LanguageVersion)
-
+    (sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_ES31_VERSION)
 
 #if gcmIS_DEBUG(gcdDEBUG_ASSERT)
 
@@ -168,6 +161,12 @@ typedef enum _sleSHADER_TYPE
 }
 sleSHADER_TYPE;
 
+gceSTATUS
+sloCOMPILER_LoadBuiltIns(
+    IN sloCOMPILER Compiler,
+    IN gctBOOL LoadPrecisionOnly
+    );
+
 gctUINT32 *
 sloCOMPILER_GetVersion(
     IN sloCOMPILER Compiler,
@@ -178,7 +177,6 @@ gceAPI
 sloCOMPILER_GetClientApiVersion(
     IN sloCOMPILER Compiler
 );
-
 
 gceSTATUS
 sloCOMPILER_SetLanguageVersion(
@@ -459,18 +457,21 @@ typedef enum _sleEXTENSION
     slvEXTENSION_EXT_TEXTURE_BUFFER                         = 0x00800000,
     slvEXTENSION_EXT_PRIMITIVE_BOUNDING_BOX                 = 0x01000000,
 
+    slvEXTENSION_ES_32                                      = 0x02000000,
+
     slvEXTENSION_ES_30_AND_ABOVE                            = slvEXTENSION_HALTI |
-                                                               slvEXTENSION_ES_31,
+                                                              slvEXTENSION_ES_31 |
+                                                              slvEXTENSION_ES_32,
 
     slvEXTENSION_ALL                                        = slvEXTENSION_STANDARD_DERIVATIVES |
-                                                               slvEXTENSION_TEXTURE_3D |
-                                                               slvEXTENSION_TEXTURE_ARRAY |
-                                                               slvEXTENSION_FRAG_DEPTH |
-                                                               slvEXTENSION_EGL_IMAGE_EXTERNAL |
-                                                               slvEXTENSION_SHADOW_SAMPLER |
-                                                               slvEXTENSION_BLEND_EQUATION_ADVANCED |
-                                                               slvEXTENSION_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY |
-                                                               slvEXTENSION_IMAGE_ATOMIC
+                                                              slvEXTENSION_TEXTURE_3D |
+                                                              slvEXTENSION_TEXTURE_ARRAY |
+                                                              slvEXTENSION_FRAG_DEPTH |
+                                                              slvEXTENSION_EGL_IMAGE_EXTERNAL |
+                                                              slvEXTENSION_SHADOW_SAMPLER |
+                                                              slvEXTENSION_BLEND_EQUATION_ADVANCED |
+                                                              slvEXTENSION_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY |
+                                                              slvEXTENSION_IMAGE_ATOMIC
 }
 sleEXTENSION;
 

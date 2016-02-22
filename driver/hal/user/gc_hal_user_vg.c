@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -331,6 +331,8 @@ _GetTessellationBuffer(
 
         /* Set the result pointer. */
         (* TessellationBuffer) = buffer;
+
+
 
 #if gcdGC355_MEM_PRINT
     Vg->tsCurMemSize += gcoOS_EndRecordAllocation();
@@ -1261,7 +1263,7 @@ gcoVG_SetTarget(
 
     if (Target != gcvNULL)
     {
-        Target->info.orientation = orientation;
+        Target->orientation = orientation;
     }
 
     do
@@ -1287,7 +1289,7 @@ gcoVG_SetTarget(
         {
             /* Call hardware layer to set the target. */
             gcmERR_BREAK(gcoVGHARDWARE_SetVgTarget(
-                Vg->hw, &Target->info
+                Vg->hw, Target
                 ));
 
             /* Set target. */
@@ -1297,8 +1299,8 @@ gcoVG_SetTarget(
             }
             gcoSURF_ReferenceSurface(Target);
             Vg->target       = Target;
-            Vg->targetWidth  = Target->info.requestW;
-            Vg->targetHeight = Target->info.requestH;
+            Vg->targetWidth  = Target->requestW;
+            Vg->targetHeight = Target->requestH;
         }
     }
     while (gcvFALSE);
@@ -1546,9 +1548,9 @@ gcoVG_SetMask(
         gcmVERIFY_OBJECT(Mask, gcvOBJ_SURF);
 #if gcdGC355_PROFILER
         /* Test if surface format is supported. */
-        if (!gcoVG_IsMaskSupported(Vg, Vg->TreeDepth, Vg->saveLayerTreeDepth, Vg->varTreeDepth, Mask->info.format))
+        if (!gcoVG_IsMaskSupported(Vg, Vg->TreeDepth, Vg->saveLayerTreeDepth, Vg->varTreeDepth, Mask->format))
 #else
-        if (!gcoVG_IsMaskSupported(Mask->info.format))
+        if (!gcoVG_IsMaskSupported(Mask->format))
 #endif
         {
             /* Format not supported. */
@@ -1566,7 +1568,7 @@ gcoVG_SetMask(
 
         /* Program hardware. */
         gcmERR_BREAK(gcoVGHARDWARE_SetVgMask(
-            Vg->hw, &Mask->info
+            Vg->hw, Mask
             ));
 
         /* Success. */
@@ -1775,7 +1777,7 @@ gcoVG_SetScissor(
         /* Zero the entire surface. */
         gcoOS_ZeroMemory(
             bits,
-            Vg->scissor->info.stride * Vg->targetHeight
+            Vg->scissor->stride * Vg->targetHeight
             );
 
         /* Loop while there are rectangles to process. */
@@ -1801,7 +1803,7 @@ gcoVG_SetScissor(
                 gctUINT8 rightMask = 0xFF >> (((right - 1) & 7) ^ 7);
 
                 /* Start at top line of region. */
-                gctUINT32 offset = top * Vg->scissor->info.stride;
+                gctUINT32 offset = top * Vg->scissor->stride;
 
                 /* See if left and right bytes overlap. */
                 if (leftByte == rightByte)
@@ -1812,7 +1814,7 @@ gcoVG_SetScissor(
                         bits[offset + leftByte] |= leftMask & rightMask;
 
                         /* Next line. */
-                        offset += Vg->scissor->info.stride;
+                        offset += Vg->scissor->stride;
                     }
                 }
 
@@ -1838,7 +1840,7 @@ gcoVG_SetScissor(
                         bits[offset + rightByte] |= rightMask;
 
                         /* Next line. */
-                        offset += Vg->scissor->info.stride;
+                        offset += Vg->scissor->stride;
                     }
                 }
             }
@@ -1852,7 +1854,7 @@ gcoVG_SetScissor(
         gcmERR_GOTO(gcoVGHARDWARE_SetScissor(
             Vg->hw,
             Vg->scissorAddress,
-            Vg->scissor->info.stride
+            Vg->scissor->stride
             ));
 
         /* Unlock the scissor surface. */
@@ -2211,7 +2213,7 @@ gcoVG_SetColorRamp(
     /* Set solid paint. */
     status = gcoVGHARDWARE_SetPaintImage(
         Vg->hw,
-        &ColorRamp->info,
+        ColorRamp,
         ColorRampSpreadMode,
         gcvFILTER_LINEAR,
         Vg->tileFillColor
@@ -2250,14 +2252,14 @@ gcoVG_SetPattern(
     vghalENTERSUBAPI(gcoVG_SetPattern);
 #endif
     /* Set solid paint. */
-    Pattern->info.requestW = width;
-    Pattern->info.requestH = height;
-    Pattern->info.requestD = 1;
-    Pattern->info.allocedW = width;
-    Pattern->info.allocedH = height;
+    Pattern->requestW = width;
+    Pattern->requestH = height;
+    Pattern->requestD = 1;
+    Pattern->allocedW = width;
+    Pattern->allocedH = height;
     status = gcoVGHARDWARE_SetPaintImage(
         Vg->hw,
-        &Pattern->info,
+        Pattern,
         TileMode,
         Filter,
         Vg->tileFillColor
@@ -2627,7 +2629,7 @@ gcoVG_DrawImage(
     gcoVG_ProfilerSetStates(Vg, TreeDepth, saveLayerTreeDepth, varTreeDepth);
     vghalENTERSUBAPI(gcoVG_DrawImage);
 #endif
-    Source->info.orientation = orientation;
+    Source->orientation = orientation;
 
     do
     {
@@ -2647,7 +2649,7 @@ gcoVG_DrawImage(
         /* Draw the image. */
         gcmERR_BREAK(gcoVGHARDWARE_DrawImage(
             Vg->hw,
-            &Source->info,
+            Source,
             &srcRect,
             &trgRect,
             gcvFILTER_POINT,
@@ -2767,7 +2769,7 @@ gcoVG_TesselateImage(
         status = gcoVGHARDWARE_TesselateImage(
             Vg->hw,
             SoftwareTesselation,
-            &Image->info,
+            Image,
             Rectangle,
             Filter,
             Mask,
@@ -2797,7 +2799,7 @@ gcoVG_TesselateImage(
                 gcmERR_BREAK(gcoVGHARDWARE_TesselateImage(
                     Vg->hw,
                     gcvTRUE,
-                    &Image->info,
+                    Image,
                     Rectangle,
                     Filter,
                     Mask,
@@ -2824,7 +2826,7 @@ gcoVG_TesselateImage(
             gcmERR_BREAK(gcoVGHARDWARE_TesselateImage(
                 Vg->hw,
                 gcvTRUE,
-                &Image->info,
+                Image,
                 Rectangle,
                 Filter,
                 Mask,
@@ -2879,7 +2881,7 @@ gcoVG_DrawSurfaceToImage(
     /* Draw the image. */
     status = gcoVGHARDWARE_DrawSurfaceToImage(
         Vg->hw,
-        &Image->info,
+        Image,
         SrcRectangle,
         DstRectangle,
         Filter,
@@ -2927,8 +2929,8 @@ gcoVG_Blit(
     /* Send to the hardware. */
     status = gcoVGHARDWARE_VgBlit(
         Vg->hw,
-        &Source->info,
-        &Target->info,
+        Source,
+        Target,
         SrcRect,
         TrgRect,
         Filter,
@@ -2978,8 +2980,8 @@ gcoVG_ColorMatrix(
     /* Execute color matrix. */
     status = gcoVGHARDWARE_ColorMatrix(
         Vg->hw,
-        &Source->info,
-        &Target->info,
+        Source,
+        Target,
         Matrix,
         ColorChannels,
         FilterLinear,
@@ -3040,7 +3042,7 @@ gcoVG_SeparableConvolve(
     /* Execute color matrix. */
     status = gcoVGHARDWARE_SeparableConvolve(
         Vg->hw,
-        &Source->info, &Target->info,
+        Source, Target,
         KernelWidth, KernelHeight,
         ShiftX, ShiftY,
         KernelX, KernelY,
@@ -3101,7 +3103,7 @@ gcoVG_GaussianBlur(
     /* Execute color matrix. */
     status = gcoVGHARDWARE_GaussianBlur(
         Vg->hw,
-        &Source->info, &Target->info,
+        Source, Target,
         StdDeviationX, StdDeviationY,
         TilingMode, FillColor,
         ColorChannels,
@@ -3268,5 +3270,121 @@ gcoVG_EnableDither(
     gcmFOOTER();
     return status;
 }
+
+#if gcdVG_ONLY
+/******************************************************************************/
+/** @ingroup gcoVG
+**
+**  @brief   Set Color Key Values.
+**
+**  @param[in]  Vg      Pointer to the gcoVG object.
+**  @param[in]  Values  gcvTRUE to enable dither or gcvFALSE to disable
+**                      dither.  dither is by default disabled.
+*/
+gceSTATUS
+gcoVG_SetColorKey(
+    IN gcoVG    Vg,
+#if gcdGC355_PROFILER
+    IN gcsPROFILERFUNCNODE *DList,
+    IN gctUINT TreeDepth,
+    IN gctUINT saveLayerTreeDepth,
+    IN gctUINT varTreeDepth,
+#endif
+    IN gctUINT32 *Values,
+    IN gctBOOL  *Enables
+)
+{
+    gceSTATUS status;
+    gcmHEADER_ARG("Vg=0x%x Values=0x%x Enables=%p",
+                  Vg, Values, Enables
+                  );
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Vg, gcvOBJ_VG);
+
+#if gcdGC355_PROFILER
+    gcoVG_ProfilerSetStates(Vg, DList, TreeDepth, saveLayerTreeDepth, varTreeDepth);
+    vghalENTERSUBAPI(gcoVG_EnableDither);
+#endif
+    /* Call gcoVGHARDWARE to enable scissoring. */
+    status = gcoVGHARDWARE_SetColorKey(Vg->hw, Values, Enables);
+#if gcdGC355_PROFILER
+    vghalLEAVESUBAPI(gcoVG_EnableDither);
+#endif
+
+    gcmFOOTER();
+    return status;
+}
+
+/* Index Color States. */
+gceSTATUS
+gcoVG_SetColorIndexTable(
+    IN gcoVG        Vg,
+#if gcdGC355_PROFILER
+    IN gcsPROFILERFUNCNODE *DList,
+    IN gctUINT TreeDepth,
+    IN gctUINT saveLayerTreeDepth,
+    IN gctUINT varTreeDepth,
+#endif
+    IN gctUINT32*    Values,
+    IN gctINT32      Count
+)
+{
+    gceSTATUS status;
+    gcmHEADER_ARG("Vg=0x%x Values=0x%x Count = %d",
+                  Vg, Values, Count
+                  );
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Vg, gcvOBJ_VG);
+
+#if gcdGC355_PROFILER
+    gcoVG_ProfilerSetStates(Vg, DList, TreeDepth, saveLayerTreeDepth, varTreeDepth);
+    vghalENTERSUBAPI(gcoVG_EnableDither);
+#endif
+    /* Call gcoVGHARDWARE to enable scissoring. */
+    status = gcoVGHARDWARE_SetColorIndexTable(Vg->hw, Values, Count);
+#if gcdGC355_PROFILER
+    vghalLEAVESUBAPI(gcoVG_EnableDither);
+#endif
+
+    gcmFOOTER();
+    return status;
+}
+
+/* VG RS feature support: YUV format conversion. */
+gceSTATUS
+gcoVG_Resolve(
+    IN gcoVG        Vg,
+    IN gcoSURF      Source,
+    IN gcoSURF      Target,
+    IN gctINT       SX,
+    IN gctINT       SY,
+    IN gctINT       DX,
+    IN gctINT       DY,
+    IN gctINT       Width,
+    IN gctINT       Height,
+    IN gctINT       Src_uv,
+    IN gctINT       Src_standard,
+    IN gctINT       Dst_uv,
+    IN gctINT       Dst_standard,
+    IN gctINT       Dst_alpha)
+{
+    gceSTATUS status;
+    gcmHEADER_ARG("Vg=%p Source=%p Target=%p SX=%d SY=%d DX=%d Width =%d Height=%d",
+                  Vg, Source, Target, SX, SY, DX, DY, Width, Height
+                  );
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Vg, gcvOBJ_VG);
+
+    status = gcoVGHARDWARE_ResolveRect(
+        Vg->hw,
+        Source, Target,
+        SX, SY, DX, DY, Width, Height,
+        Src_uv, Src_standard,
+        Dst_uv, Dst_standard, Dst_alpha);
+
+    gcmFOOTER();
+    return status;
+}
+#endif  /* gcdVG_ONLY */
 
 #endif /* gcdENABLE_VG */

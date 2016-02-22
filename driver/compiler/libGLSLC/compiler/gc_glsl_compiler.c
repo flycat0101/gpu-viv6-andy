@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -18,8 +18,8 @@
 #include "gc_glsl_ast_walk.h"
 #include "gc_glsl_emit_code.h"
 
-static gctUINT32 _slCompilerVersion[2] = { sldDefaultLanguageType,
-                                           sldDefaultLanguageVersion };
+static gctUINT32 _slCompilerVersion[2] = { _SHADER_GL_LANGUAGE_TYPE,
+                                           _SHADER_ES11_VERSION };
 
 /* sloCOMPILER object. */
 struct _sloCOMPILER
@@ -68,10 +68,8 @@ struct _sloCOMPILER
         gctBOOL                 debug;
         gctBOOL                 optimize;
         gctBOOL                 outputInvariant;
-        gctUINT32               inputLocationSettings;
         gctUINT32               outputLocationSettings;
         gctUINT32               uniformLocationMaxLength;
-        gctUINT32*              uniformLocationSettings;
         slsSLINK_LIST           layoutOffset;
         gctINT                  currentIterationCount;
         struct {
@@ -128,7 +126,7 @@ sloCOMPILER_Construct(
     do
     {
         gctPOINTER pointer = gcvNULL;
-        gctINT     sz;
+
         /* Allocate memory for sloCOMPILER object */
         status = gcoOS_Allocate(
                                 gcvNULL,
@@ -150,7 +148,7 @@ sloCOMPILER_Construct(
         compiler->object.type               = slvOBJ_COMPILER;
         compiler->hal                       = Hal;
         gcoHAL_GetPatchID(gcvNULL, &compiler->patchId);
-        compiler->langVersion               = sldDefaultLanguageVersion;
+        compiler->langVersion               = _SHADER_ES11_VERSION;
         compiler->shaderType                = (sleSHADER_TYPE)_convertShaderType(ShaderType);
         compiler->binary                    = gcvNULL;
         compiler->log                       = gcvNULL;
@@ -261,17 +259,6 @@ sloCOMPILER_Construct(
         compiler->context.outDefaultLayout.verticesNumber = -1;
 
         compiler->context.uniformLocationMaxLength = GetGLMaxUniformLocations();
-        /* make sure it is multiple of 4 bytes  */
-        sz = ((compiler->context.uniformLocationMaxLength + (sizeof(gctINT) * 8 - 1)) / (sizeof(gctINT) * 8)) * sizeof(gctINT);
-        status = sloCOMPILER_Allocate(compiler,
-                                      sz,
-                                      &pointer);
-
-        if (gcmIS_ERROR(status)) break;
-        gcoOS_ZeroMemory(pointer, sz);
-
-        compiler->context.uniformLocationSettings = pointer;
-
         compiler->context.currentIterationCount = 1;
 
         /* Create IR root */
@@ -370,9 +357,6 @@ sloCOMPILER_Destroy(
     {
         gcmVERIFY_OK(slsNAME_SPACE_Destory(Compiler, Compiler->context.unnamedSpace));
     }
-
-    /* Destroy allcated uniformLocationSettings*/
-    gcmVERIFY_OK(sloCOMPILER_Free(Compiler, Compiler->context.uniformLocationSettings));
 
     /* Destroy vec constant list */
     for(i = 0; i < sldMAX_VECTOR_COMPONENT; i++)
@@ -582,6 +566,44 @@ sloCOMPILER_LoadingBuiltIns(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
 
     Compiler->context.loadingBuiltIns = LoadingBuiltIns;
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_LoadBuiltIns(
+    IN sloCOMPILER Compiler,
+    IN gctBOOL LoadPrecisionOnly
+    )
+{
+    gceSTATUS           status;
+    sleSHADER_TYPE      shaderType;
+    slsNAME_SPACE *     currentSpace = Compiler->context.currentSpace;
+
+    gcmHEADER_ARG("Compiler=0x%x", Compiler);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    Compiler->context.currentSpace = Compiler->context.builtinSpace;
+
+    gcmVERIFY_OK(sloCOMPILER_LoadingBuiltIns(Compiler, gcvTRUE));
+
+    /* Load all kind of built-ins */
+    gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
+
+    status = slLoadBuiltIns(Compiler, shaderType, LoadPrecisionOnly);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER();
+        return status;
+    }
+
+    gcmVERIFY_OK(sloCOMPILER_LoadingBuiltIns(Compiler, gcvFALSE));
+
+    Compiler->context.currentSpace = currentSpace;
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -904,20 +926,17 @@ sloCOMPILER_Compile(
 
     do
     {
-        /* Load the built-ins */
-        status = sloCOMPILER_LoadBuiltIns(Compiler);
-
+        /* Set the global scope as current */
+        status = sloCOMPILER_LoadBuiltIns(Compiler, gcvTRUE);
         if (gcmIS_ERROR(status)) break;
-
 
         /* Set the global scope as current */
         Compiler->context.currentSpace = Compiler->context.globalSpace;
 
         /* Parse the source string */
-        status = sloCOMPILER_Parse(
-                                    Compiler,
-                                    StringCount,
-                                    Strings);
+        status = sloCOMPILER_Parse(Compiler,
+                                   StringCount,
+                                   Strings);
 
         if (gcmIS_ERROR(status)) break;
 
@@ -1546,14 +1565,18 @@ sloCOMPILER_ExtensionEnabled(
     IN sleEXTENSION Extension
     )
 {
+    gctBOOL result;
     gcmHEADER_ARG("Compiler=0x%x Extension=%d",
                   Compiler, Extension);
 
     /* Verify the arguments. */
     slmASSERT_OBJECT(Compiler, slvOBJ_COMPILER);
 
-    gcmFOOTER_ARG("<return>=%d", Compiler->context.extensions & Extension);
-    return (Compiler->context.extensions & Extension);
+    result = (Extension == slvEXTENSION_NONE) || (Compiler->context.extensions & Extension);
+
+    gcmFOOTER_ARG("<return>=%d", result);
+
+    return result;
 }
 
 /* Enable extension */
@@ -3438,7 +3461,7 @@ gceSTATUS
 sloCOMPILER_SetOutputInvariant(
     IN sloCOMPILER Compiler,
     IN gctBOOL Invariant
-)
+    )
 {
    gcmHEADER_ARG("Compiler=0x%x Flag=%d",
                  Compiler, Invariant);
@@ -3452,29 +3475,36 @@ gceSTATUS
 sloCOMPILER_SetLanguageVersion(
     IN sloCOMPILER Compiler,
     IN gctUINT32 LangVersion
-)
+    )
 {
    gcmHEADER_ARG("Compiler=0x%x LangVersion=%u",
                  Compiler, LangVersion);
 
    switch (LangVersion)
    {
-   case 300:
-      Compiler->langVersion = sldHaltiLanguageVersion;
-      Compiler->context.extensions &= ~(slvEXTENSION_NON_HALTI | slvEXTENSION_ES_31);
-      Compiler->context.extensions |= slvEXTENSION_HALTI;
-      Compiler->clientApiVersion = gcvAPI_OPENGL_ES30;
+   case 320:
+      Compiler->langVersion = _SHADER_ES32_VERSION;
+      Compiler->context.extensions &= ~slvEXTENSION_NON_HALTI;
+      Compiler->context.extensions |= (slvEXTENSION_HALTI | slvEXTENSION_ES_31 | slvEXTENSION_ES_32);
+      Compiler->clientApiVersion = gcvAPI_OPENGL_ES32;
       break;
 
    case 310:
-      Compiler->langVersion = sldES_31_LanguageVersion;
+      Compiler->langVersion = _SHADER_ES31_VERSION;
       Compiler->context.extensions &= ~slvEXTENSION_NON_HALTI;
       Compiler->context.extensions |= (slvEXTENSION_HALTI | slvEXTENSION_ES_31);
       Compiler->clientApiVersion = gcvAPI_OPENGL_ES31;
       break;
 
+   case 300:
+      Compiler->langVersion = _SHADER_HALTI_VERSION;
+      Compiler->context.extensions &= ~(slvEXTENSION_NON_HALTI | slvEXTENSION_ES_31);
+      Compiler->context.extensions |= slvEXTENSION_HALTI;
+      Compiler->clientApiVersion = gcvAPI_OPENGL_ES30;
+      break;
+
    case 100:
-      Compiler->langVersion = sldDefaultLanguageVersion;
+      Compiler->langVersion = _SHADER_ES11_VERSION;
       Compiler->context.extensions &= ~slvEXTENSION_ES_30_AND_ABOVE;
       Compiler->context.extensions |= slvEXTENSION_NON_HALTI;
       Compiler->clientApiVersion = gcvAPI_OPENGL_ES20;
@@ -3482,7 +3512,7 @@ sloCOMPILER_SetLanguageVersion(
 
    default:
       gcmASSERT(0);
-      Compiler->langVersion = sldDefaultLanguageVersion;
+      Compiler->langVersion = _SHADER_ES11_VERSION;
       Compiler->context.extensions &= ~slvEXTENSION_HALTI;
       Compiler->context.extensions |= slvEXTENSION_NON_HALTI;
       gcmFOOTER_NO();
@@ -3496,30 +3526,31 @@ sloCOMPILER_SetLanguageVersion(
 gctUINT32
 sloCOMPILER_GetLanguageVersion(
     IN sloCOMPILER Compiler
-)
+    )
 {
-  return Compiler ? Compiler->langVersion : sldDefaultLanguageVersion;
+    return Compiler ? Compiler->langVersion : _SHADER_ES11_VERSION;
 }
 
 gctUINT32 *
 sloCOMPILER_GetVersion(
     IN sloCOMPILER Compiler,
     IN sleSHADER_TYPE ShaderType
-)
+    )
 {
-  gctUINT32 version = sldDefaultLanguageVersion;
-  if(Compiler) {
-     version = Compiler->langVersion;
-  }
-  _slCompilerVersion[0] = sldDefaultLanguageType | (ShaderType << 16);
-  _slCompilerVersion[1] = version;
-  return _slCompilerVersion;
+    gctUINT32 version = _SHADER_ES11_VERSION;
+    if (Compiler)
+    {
+        version = Compiler->langVersion;
+    }
+    _slCompilerVersion[0] = _SHADER_GL_LANGUAGE_TYPE | (ShaderType << 16);
+    _slCompilerVersion[1] = version;
+    return _slCompilerVersion;
 }
 
 gceAPI
 sloCOMPILER_GetClientApiVersion(
     IN sloCOMPILER Compiler
-)
+    )
 {
     return Compiler->clientApiVersion;
 }
@@ -3527,25 +3558,25 @@ sloCOMPILER_GetClientApiVersion(
 gctBOOL
 sloCOMPILER_IsHaltiVersion(
     IN sloCOMPILER Compiler
-)
+    )
 {
-   return sloCOMPILER_GetLanguageVersion(Compiler) >= sldHaltiLanguageVersion;
+    return sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_HALTI_VERSION;
 }
 
 gctBOOL
 sloCOMPILER_IsES30Version(
     IN sloCOMPILER Compiler
-)
+    )
 {
-   return sloCOMPILER_GetLanguageVersion(Compiler) == sldHaltiLanguageVersion;
+    return sloCOMPILER_GetLanguageVersion(Compiler) == _SHADER_HALTI_VERSION;
 }
 
 gctBOOL
 sloCOMPILER_IsES31VersionOrAbove(
     IN sloCOMPILER Compiler
-)
+    )
 {
-   return sloCOMPILER_GetLanguageVersion(Compiler) >= sldES_31_LanguageVersion;
+    return sloCOMPILER_GetLanguageVersion(Compiler) >= _SHADER_ES31_VERSION;
 }
 
 gctLABEL
@@ -3624,8 +3655,8 @@ sloCOMPILER_PackUniformsWithSharedOrStd140(
 
         if (!uniformBlock) continue;
 
-        if (GetUBMemoryLayout(uniformBlock) == gcvINTERFACE_BLOCK_SHARED ||
-            GetUBMemoryLayout(uniformBlock) == gcvINTERFACE_BLOCK_STD140)
+        if (GetUBMemoryLayout(uniformBlock) & gcvINTERFACE_BLOCK_SHARED ||
+            GetUBMemoryLayout(uniformBlock) & gcvINTERFACE_BLOCK_STD140)
         {
             gcSHADER_GetUniform(shader, GetUBIndex(uniformBlock), &ubUniform);
 
@@ -3648,8 +3679,8 @@ sloCOMPILER_PackUniformsWithSharedOrStd140(
 
         if (!uniformBlock) continue;
 
-        if (GetUBMemoryLayout(uniformBlock) == gcvINTERFACE_BLOCK_SHARED ||
-            GetUBMemoryLayout(uniformBlock) == gcvINTERFACE_BLOCK_STD140)
+        if (GetUBMemoryLayout(uniformBlock) & gcvINTERFACE_BLOCK_SHARED ||
+            GetUBMemoryLayout(uniformBlock) & gcvINTERFACE_BLOCK_STD140)
         {
             /* Set active flag. */
             ResetUniformFlag(uniform, gcvUNIFORM_FLAG_IS_INACTIVE);
@@ -3802,9 +3833,9 @@ sloCOMPILER_PackSSBOWithSharedOrStd140OrStd430(
 
         if (!ssbo) continue;
 
-        if (GetSBMemoryLayout(ssbo) == gcvINTERFACE_BLOCK_SHARED ||
-            GetSBMemoryLayout(ssbo) == gcvINTERFACE_BLOCK_STD140 ||
-            GetSBMemoryLayout(ssbo) == gcvINTERFACE_BLOCK_STD430)
+        if (GetSBMemoryLayout(ssbo) & gcvINTERFACE_BLOCK_SHARED ||
+            GetSBMemoryLayout(ssbo) & gcvINTERFACE_BLOCK_STD140 ||
+            GetSBMemoryLayout(ssbo) & gcvINTERFACE_BLOCK_STD430)
         {
             gcSHADER_GetUniform(shader, GetSBIndex(ssbo), &ssboUniform);
 
@@ -4255,7 +4286,7 @@ sloCOMPILER_UpdateDefaultLayout(
 
     default:
         gcmASSERT(0);
-        status = gcvSTATUS_INVALID_DATA;
+        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
         break;
     }
 
@@ -4265,208 +4296,88 @@ sloCOMPILER_UpdateDefaultLayout(
 
 gceSTATUS
 sloCOMPILER_SetInputLocationInUse(
-IN sloCOMPILER Compiler,
-IN gctINT Location,
-IN gctSIZE_T Length,
-OUT gctBOOL *InUseAlready
-)
+    IN sloCOMPILER Compiler,
+    IN gctINT Location,
+    IN gctSIZE_T Length
+    )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gctSIZE_T i;
-    gctUINT mask;
-    gctBOOL inUseAlready = gcvFALSE;
 
     gcmHEADER_ARG("Compiler=0x%x, Location=0x%x Length=%lu",
                   Compiler, Location, Length);
 
-    if((Location + Length - 1) >= 32)
+    if ((Location + Length - 1) >= 32)
     {
-        gcmVERIFY_OK(sloCOMPILER_Report(
-                                        Compiler,
-                                        0,
-                                        0,
-                                        slvREPORT_ERROR,
-                                        "location exceeds maximum"));
-
         status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
-        gcmFOOTER();
         return status;
     }
-    gcmASSERT(InUseAlready);
 
-    mask = 1 << Location;
-    if((Location + Length - 1) < 32) {
-       for(i = 0; i < Length; i++) {
-          if(Compiler->context.inputLocationSettings & mask) {
-             inUseAlready = gcvTRUE;
-             break;
-          }
-          Compiler->context.inputLocationSettings |= mask;
-          mask <<= 1;
-       }
-    }
-    else {
-       status = gcvSTATUS_INVALID_DATA;
-    }
-    *InUseAlready = inUseAlready;
     gcmFOOTER();
     return status;
 }
 
 gceSTATUS
 sloCOMPILER_SetOutputLocationInUse(
-IN sloCOMPILER Compiler,
-IN gctINT Location,
-IN gctSIZE_T Length,
-OUT gctBOOL *InUseAlready
-)
+    IN sloCOMPILER Compiler,
+    IN gctINT Location,
+    IN gctSIZE_T Length
+    )
 {
     gceSTATUS status = gcvSTATUS_OK;
     gctSIZE_T i;
     gctUINT mask;
-    gctBOOL inUseAlready = gcvFALSE;
 
     gcmHEADER_ARG("Compiler=0x%x, Location=0x%x Length=%lu",
                   Compiler, Location, Length);
 
-    gcmASSERT((Location + Length - 1) < 32);
-    gcmASSERT(InUseAlready);
-
     mask = 1 << Location;
-    if((Location + Length - 1) < 32) {
-       for(i = 0; i < Length; i++) {
-          if(Compiler->context.outputLocationSettings & mask) {
-             inUseAlready = gcvTRUE;
-             break;
-          }
-          Compiler->context.outputLocationSettings |= mask;
-          mask <<= 1;
-       }
+    if ((Location + Length - 1) < 32)
+    {
+        for (i = 0; i < Length; i++)
+        {
+            if (Compiler->context.outputLocationSettings & mask)
+            {
+                break;
+            }
+            Compiler->context.outputLocationSettings |= mask;
+            mask <<= 1;
+        }
     }
-    else {
-       status = gcvSTATUS_INVALID_DATA;
+    else
+    {
+        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
     }
-    *InUseAlready = inUseAlready;
+
     gcmFOOTER();
     return status;
 }
 
 gceSTATUS
 sloCOMPILER_SetUniformLocationInUse(
-IN sloCOMPILER Compiler,
-IN gctINT Location,
-IN gctSIZE_T Length,
-IN gctBOOL IsPostDecidedArray,
-OUT gctBOOL *InUseAlready
-)
+    IN sloCOMPILER Compiler,
+    IN gctINT Location,
+    IN gctSIZE_T Length
+    )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gctSIZE_T i;
-    gctUINT head_uint, tail_uint, head_mask, tail_mask;
-    gctBOOL inUseAlready = gcvFALSE;
 
     gcmHEADER_ARG("Compiler=0x%x, Location=0x%x Length=%lu",
                   Compiler, Location, Length);
 
-    if((Location + Length - 1) >= Compiler->context.uniformLocationMaxLength)
+    if ((Location + Length - 1) >= Compiler->context.uniformLocationMaxLength)
     {
-        status = gcvSTATUS_INVALID_DATA;
+        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
         return status;
     }
-    gcmASSERT(InUseAlready);
 
-    /* For arrays defined with brackets following identifier, this function
-       will be called twice. The first time in slParseFullySpecifiedType,
-       Length is 1 and only the bit at Location is set. The second time in
-       slParseArrayVariableDecl/slParseArrayListVariableDecl, to avoid the
-       already set bit of Location, increase Location and decrease Length here.
-    */
-    if(IsPostDecidedArray)
-    {
-        Location++;
-        Length--;
-    }
-
-    head_uint = Location / 32;
-    tail_uint = (Location + (gctINT)Length - 1) / 32;
-    if(head_uint < tail_uint)
-    {
-        head_mask = 1 << (Location % 32);
-        for(i = Location % 32; i < 32; i++)
-        {
-            if(Compiler->context.uniformLocationSettings[head_uint] & head_mask)
-            {
-                inUseAlready = gcvTRUE;
-                break;
-            }
-            Compiler->context.uniformLocationSettings[head_uint] |= head_mask;
-            head_mask <<= 1;
-        }
-        tail_mask = 1;
-        for(i = 0; i < (Location + Length - 1) % 32; i++)
-        {
-            if(Compiler->context.uniformLocationSettings[tail_uint] & tail_mask)
-            {
-                inUseAlready = gcvTRUE;
-                break;
-            }
-            Compiler->context.uniformLocationSettings[tail_uint] |= tail_mask;
-            tail_mask <<= 1;
-        }
-        for(i = head_uint + 1; i < tail_uint; i++)
-        {
-            if(Compiler->context.uniformLocationSettings[i] != 0)
-            {
-                inUseAlready = gcvTRUE;
-                break;
-            }
-            Compiler->context.uniformLocationSettings[i] = gcvMAXUINT32;
-        }
-    }
-    else
-    {
-        head_mask = 1 << (Location % 32);
-        for(i = 0; i < Length; i++)
-        {
-            if(Compiler->context.uniformLocationSettings[head_uint] & head_mask)
-            {
-                inUseAlready = gcvTRUE;
-                break;
-            }
-            Compiler->context.uniformLocationSettings[head_uint] |= head_mask;
-            head_mask <<= 1;
-        }
-    }
-    *InUseAlready = inUseAlready;
     gcmFOOTER();
     return status;
 }
 
 gceSTATUS
-sloCOMPILER_SetUnspecifiedInputLocationExist(
-IN sloCOMPILER Compiler
-)
-{
-    gctBOOL isOK;
-    gcmHEADER_ARG("Compiler=0x%x", Compiler);
-
-    isOK = !slsCOMPILER_HasUnspecifiedLocation(Compiler->context.compilerFlags) &&
-           Compiler->context.inputLocationSettings == 0;
-    if(isOK) {
-       slsCOMPILER_SetUnspecifiedLocation(Compiler->context.compilerFlags);
-       gcmFOOTER_NO();
-       return gcvSTATUS_OK;
-    }
-    else {
-       gcmFOOTER_NO();
-       return gcvSTATUS_INVALID_DATA;
-    }
-}
-
-gceSTATUS
 sloCOMPILER_SetUnspecifiedOutputLocationExist(
-IN sloCOMPILER Compiler
-)
+    IN sloCOMPILER Compiler
+    )
 {
     gctBOOL isOK;
     gcmHEADER_ARG("Compiler=0x%x", Compiler);

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -413,6 +413,16 @@ _Prepare(
      */
     gctBOOL identical = gcvTRUE;
 
+    if ((HwDisplay->flags & HWC_GEOMETRY_CHANGED) ||
+        (Display->layerCount != Display->identityCount))
+    {
+        Display->geometryChanged = gcvTRUE;
+    }
+    else
+    {
+        Display->geometryChanged = gcvFALSE;
+    }
+
     if (!Display->hasG2D ||
         (HwDisplay->flags & HWC_GEOMETRY_CHANGED) ||
         (Display->layerCount != Display->identityCount))
@@ -425,7 +435,6 @@ _Prepare(
         {
             hwc_layer_1_t * hwLayer = &HwDisplay->hwLayers[i];
             hwcLayer * layer = &Display->layers[i];
-            hwcLayerIdentity   current;
             hwcLayerIdentity * identity = &Display->identities[i];
 
             if ((identity->type       != layer->compositionType) ||

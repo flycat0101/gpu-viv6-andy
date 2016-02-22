@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -51,7 +51,7 @@ struct _gcoVGHARDWARE
 
     /* Temporary buffer parameters. */
     gctUINT                     tempBufferSize;
-    struct _gcsSURF_INFO        tempBuffer;
+    struct _gcoSURF             tempBuffer;
 
     /* Filter blit. */
     gceFILTER_TYPE              loadedFilterType;
@@ -148,8 +148,8 @@ struct _gcoVGHARDWARE
     gcsRECT                     sourceRect;
 
     /* Surface information. */
-    struct _gcsSURF_INFO        sourceSurface;
-    struct _gcsSURF_INFO        targetSurface;
+    struct _gcoSURF             sourceSurface;
+    struct _gcoSURF             targetSurface;
 
     /***************************************************************************
     ** VG states.
@@ -168,7 +168,7 @@ struct _gcoVGHARDWARE
         gctUINT32                   tsMode;
 
         /* Target surface. */
-        gcsSURF_INFO_PTR            target;
+        gcoSURF                     target;
         gctINT                      targetWidth;
         gctINT                      targetHeight;
         gctBOOL                     targetPremultiplied;

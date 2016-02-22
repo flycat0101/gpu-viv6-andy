@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -77,13 +77,13 @@
 #   include <gui/Surface.h>
 #   include <gui/SurfaceComposerClient.h>
 
-#elif ANDROID_SDK_VERSION <= 22
+#elif ANDROID_SDK_VERSION <= 23
 #   include <gui/ISurfaceComposer.h>
 #   include <gui/Surface.h>
 #   include <gui/SurfaceComposerClient.h>
 
 #else
-#   error "Not ready for ANDROID_SDK_VERSION > 22"
+#   error "Not ready for ANDROID_SDK_VERSION > 23"
 #endif
 
 #include <EGL/egl.h>

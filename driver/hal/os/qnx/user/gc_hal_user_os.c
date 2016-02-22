@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -897,7 +897,7 @@ _TLSDestructor(
     if (tls->engineVG != gcvNULL)
     {
 #if gcdGC355_PROFILER
-        gcmVERIFY_OK(gcoVG_Destroy(tls->engineVG , 0, 0, 0));
+        gcmVERIFY_OK(gcoVG_Destroy(tls->engineVG, 0, 0, 0));
 #else
         gcmVERIFY_OK(gcoVG_Destroy(tls->engineVG));
 #endif
@@ -933,7 +933,7 @@ _TLSDestructor(
                                          &reference));
 
         /* Check if there are still more references. */
-        if (reference ==  1)
+        if (reference == 1)
         {
             /* If all threads exit, destruct PLS */
             _PLSDestructor();

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -17,6 +17,9 @@
 ** Misc
 */
 #define VX_IMPLEMENTATION_NAME          "Vivante"
+
+gceSTATUS gcLoadKernelCompiler(void);
+gceSTATUS gcUnloadKernelCompiler(void);
 
 VX_INTERNAL_API vx_bool vxIsValidImportType(vx_enum type)
 {
@@ -158,7 +161,7 @@ static vx_object_destructor_record_s vxDestructorRecords[] = {
     {VX_TYPE_GRAPH,         &vxoGraph_Destructor},
     {VX_TYPE_NODE,          &vxoNode_Destructor},
     {VX_TYPE_TARGET,        VX_NULL},
-    {VX_TYPE_KERNEL,        VX_NULL},
+    {VX_TYPE_KERNEL,        &vxoKernel_Destructor},
     {VX_TYPE_PARAMETER,     &vxoParameter_Destructor},
     {VX_TYPE_ERROR,         VX_NULL},
     {VX_TYPE_META_FORMAT,   VX_NULL},
@@ -170,7 +173,7 @@ static vx_object_destructor_record_s vxDestructorRecords[] = {
     {VX_TYPE_IMAGE,         &vxoImage_Destructor},
     {VX_TYPE_LUT,           &vxoArray_Destructor},
     {VX_TYPE_MATRIX,        &vxoMatrix_Destructor},
-    {VX_TYPE_SCALAR,        VX_NULL},
+    {VX_TYPE_SCALAR,        &vxoScalar_Destructor},
     {VX_TYPE_PYRAMID,       &vxoPyramid_Destructor},
     {VX_TYPE_REMAP,         &vxoRemap_Destructor},
     {VX_TYPE_THRESHOLD,     VX_NULL},
@@ -302,6 +305,9 @@ VX_PRIVATE_API vx_context vxoContext_Create()
 
     if (vxSingletonContext == VX_NULL)
     {
+        gctSTRING  oldEnv = gcvNULL;
+        gctCHAR    newEnv[128] = {0};
+
         vxEnableAllTraceTargets(vx_false_e);
 
         context = (vx_context)vxAllocate(sizeof(vx_context_s));
@@ -341,7 +347,26 @@ VX_PRIVATE_API vx_context vxoContext_Create()
         context->processor.running = vx_true_e;
         context->processor.thread = vxCreateThread((vx_thread_routine_f)&vxGraphThreadRoutine, &context->processor);
 
+        if (gcmIS_ERROR(gcLoadKernelCompiler()))
+        {
+            goto ErrorExit;
+        }
+
+        gcoOS_GetEnv(gcvNULL, "VC_OPTION", &oldEnv);
+        if (oldEnv)
+        {
+            gcoOS_StrCatSafe(newEnv, 128, oldEnv);
+        }
+        gcoOS_StrCatSafe(newEnv, 128, " -CLVIRCG:1 -OCLPASS_KERNEL_STRUCT_ARG_BY_VALUE:1");
+        gcoOS_SetEnv(gcvNULL, "VC_OPTION", newEnv);
+
         vxSingletonContext = context;
+
+        gcoOS_GetEnv(gcvNULL, "VX_EXTENSION_LIBS", &oldEnv);
+        if (oldEnv != NULL)
+        {
+			vxLoadKernels(context, oldEnv);
+        }
     }
     else
     {
@@ -488,6 +513,8 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
 
         vxmASSERT(context->base.lock);
         vxDestroyMutex(context->base.lock);
+
+        gcUnloadKernelCompiler();
 
         if (vxInRuntimeDebugMode()) vxZeroMemory(context, sizeof(vx_context_s));
 

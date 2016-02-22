@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -105,15 +105,16 @@ OBJECTS := \
 	$(OBJ_DIR)/gc_vsc_old_optimizer.o \
 	$(OBJ_DIR)/gc_vsc_old_optimizer_loadtime.o \
 	$(OBJ_DIR)/gc_vsc_old_optimizer_util.o \
-	$(OBJ_DIR)/gc_vsc_old_mc_dump.o \
 
 ifeq ($(VSC_VIR_BUILD),1)
 OBJECTS += \
 	$(OBJ_DIR)/gc_vsc_asm_al_codec.o \
-	$(OBJ_DIR)/gc_vsc_chip_desc.o \
+	$(OBJ_DIR)/gc_vsc_chip_uarch_caps.o \
 	$(OBJ_DIR)/gc_vsc_chip_mc_codec.o \
+	$(OBJ_DIR)/gc_vsc_chip_mc_dump.o \
 	$(OBJ_DIR)/gc_vsc_chip_state_programming.o \
 	$(OBJ_DIR)/gc_vsc_drvi_compile.o \
+	$(OBJ_DIR)/gc_vsc_drvi_ep_dump.o \
 	$(OBJ_DIR)/gc_vsc_drvi_link.o \
 	$(OBJ_DIR)/gc_vsc_drvi_recompile.o \
 	$(OBJ_DIR)/gc_vsc_gcsl_vir_converter.o \
@@ -121,6 +122,7 @@ OBJECTS += \
 	$(OBJ_DIR)/gc_vsc_utils_array.o \
 	$(OBJ_DIR)/gc_vsc_utils_base_node.o \
 	$(OBJ_DIR)/gc_vsc_utils_bit_op.o \
+	$(OBJ_DIR)/gc_vsc_utils_data_digest.o \
 	$(OBJ_DIR)/gc_vsc_utils_dump.o \
 	$(OBJ_DIR)/gc_vsc_utils_err.o \
 	$(OBJ_DIR)/gc_vsc_utils_math.o \
@@ -157,6 +159,7 @@ OBJECTS += \
 	$(OBJ_DIR)/gc_vsc_vir_lower_common_func.o \
 	$(OBJ_DIR)/gc_vsc_vir_pattern.o \
 	$(OBJ_DIR)/gc_vsc_vir_hl_2_ml.o \
+	$(OBJ_DIR)/gc_vsc_vir_hl_2_ml_expand.o \
 	$(OBJ_DIR)/gc_vsc_vir_ll_2_mc.o \
 	$(OBJ_DIR)/gc_vsc_vir_ml_2_ll.o \
 	$(OBJ_DIR)/gc_vsc_options.o \

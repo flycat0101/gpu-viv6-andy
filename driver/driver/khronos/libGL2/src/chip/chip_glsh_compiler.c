@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -469,6 +469,20 @@ float2Bool(
     }
 }
 
+static void
+int2Int(
+    GLint * Destination,
+    const GLint * Source,
+    GLsizei Count
+    )
+{
+    GLsizei i;
+
+    for (i = 0; i < Count; ++i)
+    {
+        Destination[i] = Source[i];
+    }
+}
 
 static void
 int2Bool(
@@ -1647,6 +1661,73 @@ OnError:
     return GL_FALSE;
 }
 
+
+__GL_INLINE gceUNIFORMCVT
+gcChipQueryUniformConvert(
+    GLProgram program,
+    gcSHADER_TYPE      dataType
+    )
+{
+    gceUNIFORMCVT convert = gcvUNIFORMCVT_NONE;
+    gctBOOL ishalti = gcvFALSE;
+
+
+    gcmHEADER_ARG("program=0x%x dataType=%d", program, dataType);
+
+    ishalti = gcSHADER_IsHaltiCompiler(program->vertexShader);
+
+    /*
+    ** For es20 shaders, compiler always uses float in the machine code.
+    ** It is needed to convert app-specified INT data into float before send to HW
+    ** Note: 1) Bool was already converted to INT 0/1 when specifying
+    **       2) There is no uint data in es20 shaders
+    ** For es30 shaders, if a boolean of user-def UB was mapped to reg. It need to
+    ** be converted to 0/1 before send to HW. Booleans in default/private UB were
+    ** already converted when specifying.
+    */
+    switch (dataType)
+    {
+        case gcSHADER_BOOLEAN_X1:
+        case gcSHADER_BOOLEAN_X2:
+        case gcSHADER_BOOLEAN_X3:
+        case gcSHADER_BOOLEAN_X4:
+#if TREAT_ES20_INTEGER_AS_FLOAT
+            if (!ishalti)
+            {
+                convert = gcvUNIFORMCVT_TO_FLOAT;
+            }
+            else
+            {
+#endif
+
+#if TREAT_ES20_INTEGER_AS_FLOAT
+            }
+#endif
+            break;
+
+        case gcSHADER_INTEGER_X1:
+        case gcSHADER_INTEGER_X2:
+        case gcSHADER_INTEGER_X3:
+        case gcSHADER_INTEGER_X4:
+        case gcSHADER_SAMPLER_2D:
+        case gcSHADER_SAMPLER_3D:
+        case gcSHADER_SAMPLER_CUBIC:
+#if TREAT_ES20_INTEGER_AS_FLOAT
+            if (!ishalti)
+            {
+                convert = gcvUNIFORMCVT_TO_FLOAT;
+            }
+#endif
+            break;
+
+        default:
+            break;
+    }
+
+    gcmFOOTER_ARG("return=%d", convert);
+    return convert;
+}
+
 static GLboolean
 flushGLSLUniforms(
     IN __GLcontext * gc
@@ -2641,6 +2722,7 @@ GLint __glChipUniforms(
     gctSIZE_T length;
     gctUINT32 sampler;
     GLenum error = GL_NO_ERROR;
+    gceUNIFORMCVT cvt = gcvUNIFORMCVT_NONE;
 
     if (Values == gcvNULL)
     {
@@ -2688,6 +2770,7 @@ GLint __glChipUniforms(
         Count = length;
     }
 
+    cvt = gcChipQueryUniformConvert(program, type);
     switch (type)
     {
     case gcSHADER_FLOAT_X1:
@@ -2733,11 +2816,17 @@ GLint __glChipUniforms(
         {
         case gcSHADER_BOOLEAN_X1:
         case gcSHADER_INTEGER_X1:
+            if (cvt == gcvUNIFORMCVT_TO_FLOAT)
             int2Bool(uniform->data, Values, Count);
+            else
+            int2Int(uniform->data, Values, Count);
             break;
 
         case gcSHADER_FLOAT_X1:
+            if (cvt == gcvUNIFORMCVT_TO_FLOAT)
             float2Bool(uniform->data, Values, Count);
+            else
+            float2Int(uniform->data, Values, Count);
             break;
 
         default:
@@ -2752,11 +2841,17 @@ GLint __glChipUniforms(
         {
         case gcSHADER_BOOLEAN_X2:
         case gcSHADER_INTEGER_X2:
+            if (cvt == gcvUNIFORMCVT_TO_FLOAT)
             int2Bool(uniform->data, Values, 2 * Count);
+            else
+            int2Int(uniform->data, Values, 2 * Count);
             break;
 
         case gcSHADER_FLOAT_X2:
+            if (cvt == gcvUNIFORMCVT_TO_FLOAT)
             float2Bool(uniform->data, Values, 2 * Count);
+            else
+            float2Int(uniform->data, Values, 2 * Count);
             break;
 
         default:
@@ -2771,11 +2866,17 @@ GLint __glChipUniforms(
         {
         case gcSHADER_BOOLEAN_X3:
         case gcSHADER_INTEGER_X3:
+            if (cvt == gcvUNIFORMCVT_TO_FLOAT)
             int2Bool(uniform->data, Values, 3 * Count);
+            else
+            int2Int(uniform->data, Values, 3 * Count);
             break;
 
         case gcSHADER_FLOAT_X3:
+            if (cvt == gcvUNIFORMCVT_TO_FLOAT)
             float2Bool(uniform->data, Values, 3 * Count);
+            else
+            float2Int(uniform->data, Values, 3 * Count);
             break;
 
         default:
@@ -2790,11 +2891,17 @@ GLint __glChipUniforms(
         {
         case gcSHADER_BOOLEAN_X4:
         case gcSHADER_INTEGER_X4:
+            if (cvt == gcvUNIFORMCVT_TO_FLOAT)
             int2Bool(uniform->data, Values, 4 * Count);
+            else
+            int2Int(uniform->data, Values, 4 * Count);
             break;
 
         case gcSHADER_FLOAT_X4:
+            if (cvt == gcvUNIFORMCVT_TO_FLOAT)
             float2Bool(uniform->data, Values, 4 * Count);
+            else
+            float2Int(uniform->data, Values, 4 * Count);
             break;
 
         default:
@@ -2807,7 +2914,10 @@ GLint __glChipUniforms(
         gcmASSERT(index == 0);
         if (type == inputType)
         {
+            if (cvt == gcvUNIFORMCVT_TO_FLOAT)
             _Int2Float(uniform->data, Values, 1 * Count);
+            else
+            int2Int(uniform->data, Values, 1 * Count);
         }
         else
         {
@@ -2819,7 +2929,10 @@ GLint __glChipUniforms(
         gcmASSERT(index == 0);
         if (type == inputType)
         {
+            if (cvt == gcvUNIFORMCVT_TO_FLOAT)
             _Int2Float(uniform->data, Values, 2 * Count);
+            else
+            int2Int(uniform->data, Values, 2 * Count);
         }
         else
         {
@@ -2831,7 +2944,10 @@ GLint __glChipUniforms(
         gcmASSERT(index == 0);
         if (type == Type)
         {
+            if (cvt == gcvUNIFORMCVT_TO_FLOAT)
             _Int2Float(uniform->data, Values, 3 * Count);
+            else
+            int2Int(uniform->data, Values, 3 * Count);
         }
         else
         {
@@ -2843,7 +2959,10 @@ GLint __glChipUniforms(
         gcmASSERT(index == 0);
         if (type == inputType)
         {
+            if (cvt == gcvUNIFORMCVT_TO_FLOAT)
             _Int2Float(uniform->data, Values, 4 * Count);
+            else
+            int2Int(uniform->data, Values, 4 * Count);
         }
         else
         {
@@ -2864,7 +2983,10 @@ GLint __glChipUniforms(
 
         if (inputType == gcSHADER_INTEGER_X1)
         {
+            if (cvt == gcvUNIFORMCVT_TO_FLOAT)
             _Int2Float(uniform->data, Values, Count);
+            else
+            int2Int(uniform->data, Values, Count);
 
             /* Get sampler. */
             gcmVERIFY_OK(gcUNIFORM_GetSampler(uniform->uniform[0], &sampler));
@@ -3036,12 +3158,15 @@ GLboolean __glChipGetUniforms(
     gctSIZE_T length;
     GLsizei bytes;
     GLsizei count;
+    gceUNIFORMCVT cvt = gcvUNIFORMCVT_NONE;
 
     uniform = &program->uniforms[Location];
     if (gcmIS_ERROR(gcUNIFORM_GetType(uniform->uniform[0], &type, (gctSIZE_T *)&length)))
     {
         return GL_FALSE;
     }
+
+    cvt = gcChipQueryUniformConvert(program, type);
 
     if (Type == GL_FLOAT) {
         switch (type) {
@@ -3094,7 +3219,10 @@ GLboolean __glChipGetUniforms(
             default:
                 return GL_FALSE;
         }
+        if (cvt == gcvUNIFORMCVT_TO_FLOAT)
         float2Int(Values, uniform->data, count);
+        else
+        int2Int(Values, uniform->data, count);
         return GL_TRUE;
     }
     return GL_FALSE;

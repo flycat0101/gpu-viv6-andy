@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -19,6 +19,8 @@
 #include "chip/gc_vsc_chip_state_programming.h"
 #include "vir/transform/gc_vsc_vir_uniform.h"
 #include "vir/transform/gc_vsc_vir_vectorization.h"
+
+#define SUPPORT_ATTR_ALIAS   0
 
 gceSTATUS vscInitializeShaderHWInfo(SHADER_HW_INFO* pShaderHwInfo, SHADER_EXECUTABLE_PROFILE* pSEP)
 {
@@ -438,6 +440,69 @@ static gctBOOL _IsFakeSIV(VIR_Shader* pUpperShader, VIR_Shader* pLowerShader,
     return gcvFALSE;
 }
 
+static VSC_ErrCode _CheckIoAliasedLocationPerExeObj(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
+                                                    VIR_Shader* pShader,
+                                                    VIR_IdList* pVirIoIdLsts,
+                                                    gctBOOL bInput)
+{
+    VSC_ErrCode                errCode = VSC_ERR_NONE;
+    VSC_BIT_VECTOR             locationMask;
+    VIR_Symbol*                pVirIoSym;
+    gctUINT                    i, virIo, thisVirIoRegCount, location;
+    gctUINT                    virIoCount = VIR_IdList_Count(pVirIoIdLsts);
+
+    vscBV_Initialize(&locationMask, &pBaseLinkHelper->pmp.mmWrapper, MAX_SHADER_IO_NUM);
+
+    for (virIo = 0; virIo < virIoCount; virIo ++)
+    {
+        pVirIoSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pVirIoIdLsts, virIo));
+
+        if (VIR_Symbol_GetName(pVirIoSym) > VIR_NAME_UNKNOWN &&
+            VIR_Symbol_GetName(pVirIoSym) <= VIR_NAME_BUILTIN_LAST)
+        {
+            continue;
+        }
+
+        thisVirIoRegCount = VIR_Symbol_GetVirIoRegCount(pShader, pVirIoSym);
+        location = VIR_Symbol_GetLocation(pVirIoSym);
+
+        if (location != -1)
+        {
+            for (i = (gctUINT)location;
+                 i < (gctUINT)location + thisVirIoRegCount;
+                 i ++)
+            {
+#if !SUPPORT_ATTR_ALIAS
+                if (bInput && (i >= MAX_SHADER_IO_NUM) && (pShader->shaderKind == VIR_SHADER_VERTEX))
+                {
+                    errCode = VSC_ERR_NOT_SUPPORTED;
+                    ON_ERROR(errCode, "Check aliased location");
+                }
+                else
+                {
+                    gcmASSERT(i < MAX_SHADER_IO_NUM);
+                }
+#else
+                gcmASSERT(i < MAX_SHADER_IO_NUM);
+#endif
+
+                if (vscBV_TestBit(&locationMask, i))
+                {
+                    errCode = VSC_ERR_LOCATION_ALIASED;
+                    ON_ERROR(errCode, "Check aliased location");
+                }
+
+                vscBV_SetBit(&locationMask, i);
+            }
+        }
+    }
+
+OnError:
+    vscBV_Finalize(&locationMask);
+
+    return errCode;
+}
+
 static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
                                                           FSL_STAGE fslStage,
                                                           VIR_Shader* pUpperShader,
@@ -473,6 +538,25 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
     if (outputCount == 0 && attrCount == 0)
     {
         return VSC_ERR_NONE;
+    }
+
+    /* Check io aliased locations. NOTE that it looks spec needs this check before true IO linkage, but if
+       aliased IOs are not used by shader, we actually can regard the shader as good shader because there
+       will not be ambigous for counterpart from linked shaders. Do we need put this check to the end of
+       this function??? */
+    if (fslStage == FSL_STAGE_API_SPEC_CHECK)
+    {
+        errCode = _CheckIoAliasedLocationPerExeObj(pBaseLinkHelper,
+                                                   pUpperShader,
+                                                   pOutputIdLstsOfUpperShader,
+                                                   gcvFALSE);
+        CHECK_ERROR(errCode, "Check io aliased location");
+
+        errCode = _CheckIoAliasedLocationPerExeObj(pBaseLinkHelper,
+                                                   pLowerShader,
+                                                   pAttrIdLstsOfLowerShader,
+                                                   gcvTRUE);
+        CHECK_ERROR(errCode, "Check io aliased location");
     }
 
     vscBV_Initialize(&outputWorkingMask, &pBaseLinkHelper->pmp.mmWrapper, outputCount);
@@ -616,7 +700,7 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
                 /* Add layer to input of ps */
                 pAttrSym = VIR_Shader_AddBuiltinAttribute(pLowerShader, VIR_TYPE_UINT32, gcvFALSE, VIR_NAME_LAYER);
 
-                /* per HW requirement, layer is highp*/
+                /* Per HW requirement, layer is highp*/
                 VIR_Symbol_SetPrecision(pAttrSym, VIR_PRECISION_HIGH);
 
                 pAttrSym->layout.llFirstSlot = pOutputSym->layout.llFirstSlot = ioIdx;
@@ -836,6 +920,7 @@ static VSC_ErrCode _CalcInputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBase
                          i < (gctUINT)location + thisAttrRegCount;
                          i ++)
                     {
+#if !SUPPORT_ATTR_ALIAS
                         if (i >= MAX_SHADER_IO_NUM && pShader->shaderKind == VIR_SHADER_VERTEX)
                         {
                             errCode = VSC_ERR_NOT_SUPPORTED;
@@ -845,6 +930,9 @@ static VSC_ErrCode _CalcInputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBase
                         {
                             gcmASSERT(i < MAX_SHADER_IO_NUM);
                         }
+#else
+                        gcmASSERT(i < MAX_SHADER_IO_NUM);
+#endif
                         vscBV_SetBit(&inputWorkingMask, i);
                     }
                 }
@@ -861,15 +949,19 @@ static VSC_ErrCode _CalcInputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBase
                      i < ioIdx + thisAttrRegCount;
                      i ++)
                 {
-                        if (i >= MAX_SHADER_IO_NUM && pShader->shaderKind == VIR_SHADER_VERTEX)
-                        {
-                            errCode = VSC_ERR_NOT_SUPPORTED;
-                            ON_ERROR(errCode, "Calc input ll slot");
-                        }
-                        else
-                        {
-                            gcmASSERT(i < MAX_SHADER_IO_NUM);
-                        }
+#if !SUPPORT_ATTR_ALIAS
+                    if (i >= MAX_SHADER_IO_NUM && pShader->shaderKind == VIR_SHADER_VERTEX)
+                    {
+                        errCode = VSC_ERR_NOT_SUPPORTED;
+                        ON_ERROR(errCode, "Calc input ll slot");
+                    }
+                    else
+                    {
+                        gcmASSERT(i < MAX_SHADER_IO_NUM);
+                    }
+#else
+                    gcmASSERT(i < MAX_SHADER_IO_NUM);
+#endif
 
                     vscBV_SetBit(&inputWorkingMask, i);
                 }
@@ -910,6 +1002,7 @@ static VSC_ErrCode _CalcInputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBase
                          i < ioIdx + thisAttrRegCount;
                          i ++)
                     {
+#if !SUPPORT_ATTR_ALIAS
                         if (i >= MAX_SHADER_IO_NUM && pShader->shaderKind == VIR_SHADER_VERTEX)
                         {
                             errCode = VSC_ERR_NOT_SUPPORTED;
@@ -919,6 +1012,9 @@ static VSC_ErrCode _CalcInputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBase
                         {
                             gcmASSERT(i < MAX_SHADER_IO_NUM);
                         }
+#else
+                        gcmASSERT(i < MAX_SHADER_IO_NUM);
+#endif
 
                         vscBV_SetBit(&inputWorkingMask, i);
                     }
@@ -1105,6 +1201,97 @@ OnError:
     return errCode;
 }
 
+static VSC_ErrCode _CheckInputAliasedLocation(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
+                                              VIR_Shader* pShader)
+{
+    VSC_ErrCode                errCode = VSC_ERR_NONE;
+    VIR_AttributeIdList        workingPerVtxPxlAttrIdLst, workingPerPrimAttrIdLst;
+
+    _ConvertVirPerVtxPxlAndPerPrimIoList(pShader, &pBaseLinkHelper->pmp.mmWrapper,
+                                         gcvTRUE, &workingPerVtxPxlAttrIdLst, &workingPerPrimAttrIdLst);
+
+    /* Per vtx/Pxl */
+    errCode = _CheckIoAliasedLocationPerExeObj(pBaseLinkHelper, pShader, &workingPerVtxPxlAttrIdLst, gcvTRUE);
+    ON_ERROR(errCode, "Check io aliased location");
+
+    /* Per prim */
+    errCode = _CheckIoAliasedLocationPerExeObj(pBaseLinkHelper, pShader, &workingPerPrimAttrIdLst, gcvTRUE);
+    ON_ERROR(errCode, "Check io aliased location");
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode _CheckOutputAliasedLocation(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
+                                               VIR_Shader* pShader)
+{
+    VSC_ErrCode                errCode = VSC_ERR_NONE;
+    VIR_OutputIdList           workingPerVtxPxlAttrIdLst, workingPerPrimAttrIdLst;
+
+    _ConvertVirPerVtxPxlAndPerPrimIoList(pShader, &pBaseLinkHelper->pmp.mmWrapper,
+                                         gcvFALSE, &workingPerVtxPxlAttrIdLst, &workingPerPrimAttrIdLst);
+
+    /* Per vtx/Pxl */
+    errCode = _CheckIoAliasedLocationPerExeObj(pBaseLinkHelper, pShader, &workingPerVtxPxlAttrIdLst, gcvFALSE);
+    ON_ERROR(errCode, "Check io aliased location");
+
+    /* Per prim */
+    errCode = _CheckIoAliasedLocationPerExeObj(pBaseLinkHelper, pShader, &workingPerPrimAttrIdLst, gcvFALSE);
+    ON_ERROR(errCode, "Check io aliased location");
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode _CheckUniformAliasedLocation(VSC_BASE_LINKER_HELPER* pBaseLinkHelper, VIR_Shader* pShader)
+{
+    VSC_ErrCode                errCode = VSC_ERR_NONE;
+    VSC_BIT_VECTOR             locationMask;
+    VIR_UniformIdList*         uniformList = VIR_Shader_GetUniforms(pShader);
+    VIR_Symbol*                uniformSym;
+    gctUINT                    uniformIdx, logicalCount;
+    gctUINT                    uniformCount = VIR_IdList_Count(uniformList);
+    gctINT                     i, location;
+
+    if (uniformCount == 0)
+    {
+        return VSC_ERR_NONE;
+    }
+
+    vscBV_Initialize(&locationMask, &pBaseLinkHelper->pmp.mmWrapper, GetGLMaxUniformLocations());
+
+    for (uniformIdx = 0; uniformIdx < uniformCount; uniformIdx++)
+    {
+        uniformSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(uniformList, uniformIdx));
+
+        if (VIR_Symbol_GetUniformKind(uniformSym) != VIR_UNIFORM_STRUCT)
+        {
+            continue;
+        }
+
+        location = VIR_Symbol_GetLocation(uniformSym);
+        logicalCount = VIR_Shader_GetLogicalCount(pShader, VIR_Symbol_GetType(uniformSym));
+
+        if (location != -1)
+        {
+            for (i = location; i < location + (gctINT)logicalCount; i ++)
+            {
+                if (vscBV_TestBit(&locationMask, i))
+                {
+                    errCode = VSC_ERR_LOCATION_ALIASED;
+                    ON_ERROR(errCode, "Check uniform aliased location");
+                }
+
+                vscBV_SetBit(&locationMask, i);
+            }
+        }
+    }
+
+OnError:
+    vscBV_Finalize(&locationMask);
+    return errCode;
+}
+
 static VSC_ErrCode _LinkUniformBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
                                                       VIR_Shader* pUpperShader,
                                                       VIR_Shader* pLowerShader,
@@ -1117,12 +1304,9 @@ static VSC_ErrCode _LinkUniformBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pB
     gctUINT                    uniformIdx;
     VIR_Symbol*                upperUniformSym;
     gctBOOL                    checkPrecision = gcvTRUE;
-    gcePATCH_ID                patchId;
-
-    gcoHAL_GetPatchID(gcvNULL, &patchId);
 
     /* Skip uniform precision check for some APPs to make link pass. */
-    if (patchId == gcvPATCH_AXX_SAMPLE)
+    if (VIR_Shader_GetPatchId(pUpperShader) == gcvPATCH_AXX_SAMPLE)
     {
         checkPrecision = gcvFALSE;
     }
@@ -1132,7 +1316,6 @@ static VSC_ErrCode _LinkUniformBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pB
         gctBOOL                matched = gcvFALSE;
         upperUniformSym = VIR_Shader_GetSymFromId(pUpperShader, VIR_IdList_GetId(upperUniformList, uniformIdx));
 
-        /* TODO: Check UBO. */
         if (VIR_Symbol_GetUniformKind(upperUniformSym) != VIR_UNIFORM_NORMAL &&
             VIR_Symbol_GetUniformKind(upperUniformSym) != VIR_UNIFORM_STRUCT)
         {
@@ -1192,7 +1375,6 @@ static VSC_ErrCode _LinkUniformsBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* p
     {
         lowerUniformSym = VIR_Shader_GetSymFromId(pLowerShader, VIR_IdList_GetId(lowerUniformList, uniformIdx));
 
-        /* TODO: Check UBO. */
         if (VIR_Symbol_GetUniformKind(lowerUniformSym) != VIR_UNIFORM_NORMAL &&
             VIR_Symbol_GetUniformKind(lowerUniformSym) != VIR_UNIFORM_STRUCT)
         {
@@ -1214,6 +1396,92 @@ static VSC_ErrCode _LinkUniformsBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* p
 
 OnError:
     vscBV_Finalize(&uniformWorkingMask);
+    return errCode;
+}
+
+static VSC_ErrCode _LinkUboBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
+                                                  VIR_Shader* pUpperShader,
+                                                  VIR_Shader* pLowerShader,
+                                                  VIR_Symbol* pLowerUboSym,
+                                                  VSC_BIT_VECTOR* uboWorkingMask)
+{
+    VSC_ErrCode                errCode = VSC_ERR_NONE;
+    VIR_UBOIdList*             upperUBOList = VIR_Shader_GetUniformBlocks(pUpperShader);
+    gctUINT                    upperUboCount = VIR_IdList_Count(upperUBOList);
+    gctUINT                    uboIdx;
+    VIR_Symbol*                upperUboSym;
+
+    for (uboIdx = 0; uboIdx < upperUboCount; uboIdx++)
+    {
+        gctBOOL                matched = gcvFALSE;
+        upperUboSym = VIR_Shader_GetSymFromId(pUpperShader, VIR_IdList_GetId(upperUBOList, uboIdx));
+
+        if (vscBV_TestBit(uboWorkingMask, uboIdx))
+        {
+            continue;
+        }
+
+        errCode = VIR_UBO_Identical(pLowerShader,
+                                    pLowerUboSym,
+                                    pUpperShader,
+                                    upperUboSym,
+                                    &matched);
+
+        ON_ERROR(errCode, "Check ubo error");
+
+        if (matched)
+        {
+            vscBV_SetBit(uboWorkingMask, uboIdx);
+            break;
+        }
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode _LinkUbosBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
+                                                  VIR_Shader* pUpperShader,
+                                                  VIR_Shader* pLowerShader)
+{
+    VSC_ErrCode                errCode = VSC_ERR_NONE;
+    VIR_UBOIdList*             upperUBOList = VIR_Shader_GetUniformBlocks(pUpperShader);
+    VIR_UBOIdList*             lowerUBOList = VIR_Shader_GetUniformBlocks(pLowerShader);
+    gctUINT                    upperUBOCount = VIR_IdList_Count(upperUBOList);
+    gctUINT                    lowerUBOCount = VIR_IdList_Count(lowerUBOList);
+    gctUINT                    uboIdx;
+    VIR_Symbol*                lowerUBOSym;
+    VSC_BIT_VECTOR             uboWorkingMask;
+
+    if (upperUBOCount == 0 || lowerUBOCount == 0)
+    {
+        return VSC_ERR_NONE;
+    }
+
+    vscBV_Initialize(&uboWorkingMask, &pBaseLinkHelper->pmp.mmWrapper, upperUBOCount);
+
+    for (uboIdx = 0; uboIdx < lowerUBOCount; uboIdx++)
+    {
+        lowerUBOSym = VIR_Shader_GetSymFromId(pLowerShader, VIR_IdList_GetId(lowerUBOList, uboIdx));
+
+        if (VIR_Symbol_GetUBO(lowerUBOSym)->blockSize > GetGLMaxUniformBLockSize())
+        {
+            errCode = VSC_ERR_UNIFORMS_TOO_MANY;
+            ON_ERROR(errCode, "The block size of ubo \"%s\" is too big.",
+                              VIR_Shader_GetSymNameString(pLowerShader, lowerUBOSym));
+        }
+
+        errCode = _LinkUboBetweenTwoShaderStages(pBaseLinkHelper,
+                                                 pUpperShader,
+                                                 pLowerShader,
+                                                 lowerUBOSym,
+                                                 &uboWorkingMask);
+        ON_ERROR(errCode, "Link ubo \"%s\" between two shader stages",
+                          VIR_Shader_GetSymNameString(pLowerShader, lowerUBOSym));
+    }
+
+OnError:
+    vscBV_Finalize(&uboWorkingMask);
     return errCode;
 }
 
@@ -1247,11 +1515,11 @@ static void _CountIOBlockList(VIR_Shader* pShader, VSC_MM* pMM, gctBOOL bInput,
     }
 }
 
-static VSC_ErrCode _LinkIOBlockBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
-                                                               VIR_Shader* pUpperShader,
-                                                               VIR_Shader* pLowerShader,
-                                                               VIR_IOBIdList* pOutputIdListOfUpperShader,
-                                                               VIR_IOBIdList* pInputIdListsOfLowerShader)
+static VSC_ErrCode _LinkIOBlockBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
+                                                      VIR_Shader* pUpperShader,
+                                                      VIR_Shader* pLowerShader,
+                                                      VIR_IOBIdList* pOutputIdListOfUpperShader,
+                                                      VIR_IOBIdList* pInputIdListsOfLowerShader)
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     gctUINT                    inputIdx, outputIdx;
@@ -1350,9 +1618,8 @@ static VSC_ErrCode _LinkIOBBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBaseL
     _CountIOBlockList(pLowerShader, &pBaseLinkHelper->pmp.mmWrapper,
                       gcvTRUE, &intputBlockOfLowerShader);
 
-    errCode = _LinkIOBlockBetweenTwoShaderStagesPerExeObj(pBaseLinkHelper, pUpperShader, pLowerShader,
-                                                          &outputBlockOfUpperShader,
-                                                          &intputBlockOfLowerShader);
+    errCode = _LinkIOBlockBetweenTwoShaderStages(pBaseLinkHelper, pUpperShader, pLowerShader,
+                                                 &outputBlockOfUpperShader, &intputBlockOfLowerShader);
     ON_ERROR(errCode, "Link IBO between two shader stages per vtx/pxl");
 
 OnError:
@@ -1378,36 +1645,54 @@ static VSC_ErrCode _LinkIoAmongShaderStages(VSC_PROGRAM_LINKER_HELPER* pPgLinkHe
                                                         pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx]);
                 ON_ERROR(errCode, "Link Io between two shader stages");
             }
-            else if (fslStage == FSL_STAGE_LL_SLOT_CALC)
+            else
             {
                 /* Only consider input of first active stage */
-                errCode = _CalcInputLowLevelSlot(&pPgLinkHelper->baseHelper,
-                                                 pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx],
-                                                 gcvFALSE);
-                ON_ERROR(errCode, "Calc LL slot of input");
+
+                if (fslStage == FSL_STAGE_API_SPEC_CHECK)
+                {
+                    errCode = _CheckInputAliasedLocation(&pPgLinkHelper->baseHelper,
+                                                         pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx]);
+                    ON_ERROR(errCode, "Check input aliased location");
+                }
+                else if (fslStage == FSL_STAGE_LL_SLOT_CALC)
+                {
+                    errCode = _CalcInputLowLevelSlot(&pPgLinkHelper->baseHelper,
+                                                     pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx],
+                                                     gcvFALSE);
+                    ON_ERROR(errCode, "Calc LL slot of input");
+                }
             }
 
             pPreStage = pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx];
         }
     }
 
-    if (pPreStage && (fslStage == FSL_STAGE_LL_SLOT_CALC))
+    if (pPreStage)
     {
         /* Only consider output of last active stage */
 
-        if (pPreStage->shaderKind == VIR_SHADER_FRAGMENT)
+        if (fslStage == FSL_STAGE_API_SPEC_CHECK)
         {
-            /* Because 0x0401 is programed in VSC, so we need
-               force llFirstSlot same as location. But it is unsafe if spec allows location
-               of PS be changable. So it is better to move 0x0401
-               programming out of VSC at least. */
-            errCode = _CalcOutputLowLevelSlot(&pPgLinkHelper->baseHelper, pPreStage, gcvTRUE);
+            errCode = _CheckOutputAliasedLocation(&pPgLinkHelper->baseHelper, pPreStage);
+            ON_ERROR(errCode, "Check output aliased location");
         }
-        else
+        else if (fslStage == FSL_STAGE_LL_SLOT_CALC)
         {
-            errCode = _CalcOutputLowLevelSlot(&pPgLinkHelper->baseHelper, pPreStage, gcvFALSE);
+            if (pPreStage->shaderKind == VIR_SHADER_FRAGMENT)
+            {
+                /* Because 0x0401 is programed in VSC, so we need
+                   force llFirstSlot same as location. But it is unsafe if spec allows location
+                   of PS be changable. So it is better to move 0x0401
+                   programming out of VSC at least. */
+                errCode = _CalcOutputLowLevelSlot(&pPgLinkHelper->baseHelper, pPreStage, gcvTRUE);
+            }
+            else
+            {
+                errCode = _CalcOutputLowLevelSlot(&pPgLinkHelper->baseHelper, pPreStage, gcvFALSE);
+            }
+            ON_ERROR(errCode, "Calc LL slot of output");
         }
-        ON_ERROR(errCode, "Calc LL slot of output");
     }
 
 OnError:
@@ -1423,6 +1708,10 @@ static VSC_ErrCode _LinkUniformAmongShaderStages(VSC_PROGRAM_LINKER_HELPER* pPgL
     {
         if (pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx])
         {
+            errCode = _CheckUniformAliasedLocation(&pPgLinkHelper->baseHelper,
+                                                   pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx]);
+            ON_ERROR(errCode, "Link Uniforms between two shader stages");
+
             for (stageIdx1 = 0; stageIdx1 < stageIdx; stageIdx1 ++)
             {
                 if (pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx1])
@@ -1431,6 +1720,11 @@ static VSC_ErrCode _LinkUniformAmongShaderStages(VSC_PROGRAM_LINKER_HELPER* pPgL
                                                                   pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx1],
                                                                   pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx]);
                     ON_ERROR(errCode, "Link Uniforms between two shader stages");
+
+                    errCode = _LinkUbosBetweenTwoShaderStages(&pPgLinkHelper->baseHelper,
+                                                             pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx1],
+                                                             pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx]);
+                    ON_ERROR(errCode, "Link Uniform blocks between two shader stages");
                 }
             }
         }
@@ -2110,11 +2404,11 @@ static VSC_ErrCode _FindVectorizableIoPackets(VSC_BASE_LINKER_HELPER* pBaseLinkH
     return errCode;
 }
 
-static VSC_ErrCode _DoIoVectorizatioBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
-                                                                    VIR_Shader* pUpperShader,
-                                                                    VIR_Shader* pLowerShader,
-                                                                    VIR_AttributeIdList* pAttrIdLstsOfLowerShader,
-                                                                    VIR_OutputIdList* pOutputIdLstsOfUpperShader)
+static VSC_ErrCode _DoIoVectorizationBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
+                                                                     VIR_Shader* pUpperShader,
+                                                                     VIR_Shader* pLowerShader,
+                                                                     VIR_AttributeIdList* pAttrIdLstsOfLowerShader,
+                                                                     VIR_OutputIdList* pOutputIdLstsOfUpperShader)
 {
     VSC_ErrCode                 errCode = VSC_ERR_NONE;
     gctUINT                     attrCount = VIR_IdList_Count(pAttrIdLstsOfLowerShader);
@@ -2187,15 +2481,15 @@ static VSC_ErrCode _DoIoVectorizationBetweenTwoShaderStages(VSC_BASE_LINKER_HELP
                                          &workingPerPrimAttrIdLstOfUpperShader);
 
     /* Per vtx/Pxl */
-    errCode = _DoIoVectorizatioBetweenTwoShaderStagesPerExeObj(pBaseLinkHelper, pUpperShader, pLowerShader,
-                                                               &workingPerVtxPxlAttrIdLstOfLowerShader,
-                                                               &workingPerVtxPxlAttrIdLstOfUpperShader);
+    errCode = _DoIoVectorizationBetweenTwoShaderStagesPerExeObj(pBaseLinkHelper, pUpperShader, pLowerShader,
+                                                                &workingPerVtxPxlAttrIdLstOfLowerShader,
+                                                                &workingPerVtxPxlAttrIdLstOfUpperShader);
     ON_ERROR(errCode, "Do Io vectorization between two shader stages per vtx/pxl");
 
     /* Per prim */
-    errCode = _DoIoVectorizatioBetweenTwoShaderStagesPerExeObj(pBaseLinkHelper, pUpperShader, pLowerShader,
-                                                               &workingPerPrimAttrIdLstOfLowerShader,
-                                                               &workingPerPrimAttrIdLstOfUpperShader);
+    errCode = _DoIoVectorizationBetweenTwoShaderStagesPerExeObj(pBaseLinkHelper, pUpperShader, pLowerShader,
+                                                                &workingPerPrimAttrIdLstOfLowerShader,
+                                                                &workingPerPrimAttrIdLstOfUpperShader);
     ON_ERROR(errCode, "Do Io vectorization between two shader stages per prim");
 
 OnError:
@@ -3233,7 +3527,7 @@ static VSC_ErrCode _CalcSamplerBaseOffset(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelp
                                                   &samplerCount);
             ON_ERROR(errCode, "Calc sampler Count");
 
-            if (samplerCount > (gctINT)pPgLinkHelper->baseHelper.pHwCfg->maxSamplerCountForOneShader)
+            if (samplerCount > (gctINT)pPgLinkHelper->baseHelper.pHwCfg->maxSamplerCountPerShader)
             {
                 errCode = VSC_ERR_OUT_OF_RESOURCE;
                 ON_ERROR(errCode, "Calc sampler Count");
@@ -3523,6 +3817,16 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
         {
             if (pPgLinkParam->pShaderArray[stageIdx])
             {
+                /* Aliased location check */
+
+                errCode = _CheckInputAliasedLocation(&pgLinkHelper.baseHelper, pPgLinkParam->pShaderArray[stageIdx]);
+                ON_ERROR(errCode, "Check input aliased location");
+
+                errCode = _CheckOutputAliasedLocation(&pgLinkHelper.baseHelper, pPgLinkParam->pShaderArray[stageIdx]);
+                ON_ERROR(errCode, "Check output aliased location");
+
+                /* LL-slot calculation */
+
                 errCode = _CalcInputLowLevelSlot(&pgLinkHelper.baseHelper, pPgLinkParam->pShaderArray[stageIdx], gcvTRUE);
                 ON_ERROR(errCode, "CalcInputLowLevelSlot of linkage");
 
@@ -5425,7 +5729,7 @@ static VSC_ErrCode _AnalyzeHwSamplerRFProgrammingHints(VSC_HW_PIPELINE_SHADERS_P
             for (stageIdx = 0; stageIdx < activeHwShaderStageCount; stageIdx ++)
             {
                 if (ppActiveShHwInfoArray[stageIdx]->pSEP->samplerMapping.hwSamplerRegCount >
-                    pHwPipelineShsParam->pHwCfg->maxSamplerCountForOneShader)
+                    pHwPipelineShsParam->pHwCfg->maxSamplerCountPerShader)
                 {
                     return VSC_ERR_OUT_OF_RESOURCE;
                 }
@@ -5801,6 +6105,7 @@ static void _CalcHwThreadCount(gctUINT shStage,
 static gctUINT _AnalyzeHwUSCSizeForVs(gctUINT baseMaxThreadCount,
                                       gctUINT realUSCThreshold,
                                       gctUINT maxHwTGThreadCount,
+                                      gctUINT maxResCashWinSize,
                                       gctUINT iteIndex,
                                       gctBOOL bUseRawThreadCount,
                                       gctUINT vsOutputSizePerThread,
@@ -5828,7 +6133,8 @@ static gctUINT _AnalyzeHwUSCSizeForVs(gctUINT baseMaxThreadCount,
 
     *pExpectedResCashWinSize = (*pRealUsedMaxThreadCount < 128) ? (*pRealUsedMaxThreadCount / 4) :
                                (*pRealUsedMaxThreadCount / 2);
-    *pExpectedResCashWinSize = (*pExpectedResCashWinSize > 256) ? 256 : *pExpectedResCashWinSize;
+    *pExpectedResCashWinSize = (*pExpectedResCashWinSize > maxResCashWinSize) ?
+                               maxResCashWinSize : *pExpectedResCashWinSize;
     *pExpectedResCashWinSize = vscMAX(3, *pExpectedResCashWinSize);
 
     totalThreadCount = VSC_UTILS_ALIGN(*pRealUsedMaxThreadCount, 4) + /* Output vertices */
@@ -5893,6 +6199,7 @@ static gctUINT _AnalyzeHwUSCSizeForHs(gctUINT baseMaxThreadCount,
 static gctUINT _AnalyzeHwUSCSizeForDs(gctUINT baseMaxThreadCount,
                                       gctUINT realUSCThreshold,
                                       gctUINT maxHwTGThreadCount,
+                                      gctUINT maxResCashWinSize,
                                       gctUINT iteIndex,
                                       gctBOOL bUseRawThreadCount,
                                       gctUINT dsOutputSizePerThread,
@@ -5909,6 +6216,7 @@ static gctUINT _AnalyzeHwUSCSizeForDs(gctUINT baseMaxThreadCount,
     return _AnalyzeHwUSCSizeForVs(baseMaxThreadCount,
                                   realUSCThreshold,
                                   maxHwTGThreadCount,
+                                  maxResCashWinSize,
                                   iteIndex,
                                   bUseRawThreadCount,
                                   dsOutputSizePerThread,
@@ -6154,9 +6462,11 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
     gctUINT                             realUSCThreshold[VSC_MAX_HW_PIPELINE_SHADER_STAGE_COUNT] = {31, 31, 31, 63, 0};
     gctBOOL                             bExceedThreshold[VSC_MAX_HW_PIPELINE_SHADER_STAGE_COUNT];
     gctUINT                             totalExpectedUSCSize, stageIdx, i, perVtxOutputSize;
+    gctINT                              totalAllocatedUSCSizeInKbyte = 0, unAllocatedUSCSizeInKbyte, deltaUSCSizeInKbyte;
     gctUINT                             vsDownStreamVerticesCountPerHwTG, dsDownStreamVerticesCountPerHwTG;
     gctUINT                             maxHwTGThreadCount = pHwPipelineShsParam->pHwCfg->maxCoreCount * 4;
     gctUINT                             realMaxHwUSCSizeInKbyte = pHwPipelineShsParam->pHwCfg->maxUSCSizeInKbyte;
+    gctUINT                             maxResCashWinSize = pHwPipelineShsParam->pHwCfg->maxResultCacheWinSize;
     USC_ANALYZE_TRIAL_TYPE              anaTrialType;
     gctBOOL                             bUSCAlloced;
 
@@ -6196,8 +6506,9 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
             expectedResCashWinSize[VSC_GFX_SHADER_STAGE_VS] = (maxRawThreadCount[VSC_GFX_SHADER_STAGE_VS] < 128) ?
                                                               (maxRawThreadCount[VSC_GFX_SHADER_STAGE_VS] / 4) :
                                                               (maxRawThreadCount[VSC_GFX_SHADER_STAGE_VS] / 2);
-            expectedResCashWinSize[VSC_GFX_SHADER_STAGE_VS] = (expectedResCashWinSize[VSC_GFX_SHADER_STAGE_VS] > 256) ?
-                                                              256 : expectedResCashWinSize[VSC_GFX_SHADER_STAGE_VS];
+            expectedResCashWinSize[VSC_GFX_SHADER_STAGE_VS] = (expectedResCashWinSize[VSC_GFX_SHADER_STAGE_VS] > maxResCashWinSize) ?
+                                                              maxResCashWinSize : expectedResCashWinSize[VSC_GFX_SHADER_STAGE_VS];
+            expectedResCashWinSize[VSC_GFX_SHADER_STAGE_VS] = vscMAX(3, expectedResCashWinSize[VSC_GFX_SHADER_STAGE_VS]);
 
             pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].hwProgrammingHints.uscSizeInKbyte =
                                                                          realUSCThreshold[VSC_GFX_SHADER_STAGE_VS];
@@ -6215,12 +6526,17 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
     /* We will firstly select a minimum parallelism combination, and then increase it
        to max USC limitation with following relation,
        1. VS + GS + (PS)           ----> thread count ratio = a : 1
-       2. VS + HS + DS + (PS)      ----> thread count ratio = b : c : 1,
-       3. VS + HS + DS + GS + (PS) ----> thread count ratio = b : c : a : 1,
+       2. VS + HS + DS + (PS)      ----> thread count ratio = b : c : 1(see NOTE),
+       3. VS + HS + DS + GS + (PS) ----> thread count ratio = b : c : a(see NOTE) : 1,
 
        a is input vertex count of GS
        b is input CP count of HS
        c is output CP count of HS
+
+       NOTE: Due to FF tessellator (TPG) will generate lots of domain-location which will kick
+             off a DS thread for each, and for the most of cases, we actully don't know exact
+             number about how many domain-locations will be generated by FF, so ratio number for
+             DS might be changed based on experience number or experimental number.
     */
     if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].pSEP)
     {
@@ -6288,7 +6604,8 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
         }
         else
         {
-            baseMaxThreadCount[VSC_GFX_SHADER_STAGE_DS] = 1;
+            /* Change it from 1 to 6 for tuning 'Tess test' of GFX4.0 feature test */
+            baseMaxThreadCount[VSC_GFX_SHADER_STAGE_DS] = 6;
         }
 
         realMaxHwUSCSizeInKbyte --;
@@ -6375,6 +6692,7 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
                                      _AnalyzeHwUSCSizeForDs(baseMaxThreadCount[VSC_GFX_SHADER_STAGE_DS],
                                                             realUSCThreshold[VSC_GFX_SHADER_STAGE_DS],
                                                             maxHwTGThreadCount,
+                                                            maxResCashWinSize,
                                                             i,
                                                             (anaTrialType != USC_ANALYZE_TRIAL_TYPE_MANY_HW_TGS),
                                                             dsOutputSizePerThread,
@@ -6421,6 +6739,7 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
                                      _AnalyzeHwUSCSizeForVs(baseMaxThreadCount[VSC_GFX_SHADER_STAGE_VS],
                                                             realUSCThreshold[VSC_GFX_SHADER_STAGE_VS],
                                                             maxHwTGThreadCount,
+                                                            maxResCashWinSize,
                                                             i,
                                                             (anaTrialType != USC_ANALYZE_TRIAL_TYPE_MANY_HW_TGS),
                                                             vsOutputSizePerThread,
@@ -6502,6 +6821,65 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
         if (bUSCAlloced && anaTrialType == USC_ANALYZE_TRIAL_TYPE_MANY_HW_TGS)
         {
             break;
+        }
+    }
+
+    /* Finally, let's assign unallocated pages to critical stage */
+    for (stageIdx = 0; stageIdx < VSC_MAX_HW_PIPELINE_SHADER_STAGE_COUNT; stageIdx ++)
+    {
+        if (pOutHwShdsLinkInfo->shHwInfoArray[stageIdx].pSEP)
+        {
+            totalAllocatedUSCSizeInKbyte += (gctINT)pOutHwShdsLinkInfo->shHwInfoArray[stageIdx].hwProgrammingHints.uscSizeInKbyte;
+        }
+    }
+
+    if (totalAllocatedUSCSizeInKbyte < (gctINT)realMaxHwUSCSizeInKbyte)
+    {
+        unAllocatedUSCSizeInKbyte = (gctINT)realMaxHwUSCSizeInKbyte - totalAllocatedUSCSizeInKbyte;
+
+        /* Order of critical stage is DS, HS, GS, VS */
+        if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_DS].pSEP && unAllocatedUSCSizeInKbyte > 0)
+        {
+            deltaUSCSizeInKbyte = realUSCThreshold[VSC_GFX_SHADER_STAGE_DS] -
+                                        pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_DS].hwProgrammingHints.uscSizeInKbyte;
+
+            pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_DS].hwProgrammingHints.uscSizeInKbyte +=
+                                        ((unAllocatedUSCSizeInKbyte > deltaUSCSizeInKbyte) ? deltaUSCSizeInKbyte : unAllocatedUSCSizeInKbyte);
+
+            unAllocatedUSCSizeInKbyte -= deltaUSCSizeInKbyte;
+        }
+
+        if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_HS].pSEP && unAllocatedUSCSizeInKbyte > 0)
+        {
+            deltaUSCSizeInKbyte = realUSCThreshold[VSC_GFX_SHADER_STAGE_HS] -
+                                        pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_HS].hwProgrammingHints.uscSizeInKbyte;
+
+            pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_HS].hwProgrammingHints.uscSizeInKbyte +=
+                                        ((unAllocatedUSCSizeInKbyte > deltaUSCSizeInKbyte) ? deltaUSCSizeInKbyte : unAllocatedUSCSizeInKbyte);
+
+            unAllocatedUSCSizeInKbyte -= deltaUSCSizeInKbyte;
+        }
+
+        if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_GS].pSEP && unAllocatedUSCSizeInKbyte > 0)
+        {
+            deltaUSCSizeInKbyte = realUSCThreshold[VSC_GFX_SHADER_STAGE_GS] -
+                                        pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_GS].hwProgrammingHints.uscSizeInKbyte;
+
+            pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_GS].hwProgrammingHints.uscSizeInKbyte +=
+                                        ((unAllocatedUSCSizeInKbyte > deltaUSCSizeInKbyte) ? deltaUSCSizeInKbyte : unAllocatedUSCSizeInKbyte);
+
+            unAllocatedUSCSizeInKbyte -= deltaUSCSizeInKbyte;
+        }
+
+        if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].pSEP && unAllocatedUSCSizeInKbyte > 0)
+        {
+            deltaUSCSizeInKbyte = realUSCThreshold[VSC_GFX_SHADER_STAGE_VS] -
+                                        pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].hwProgrammingHints.uscSizeInKbyte;
+
+            pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].hwProgrammingHints.uscSizeInKbyte +=
+                                        ((unAllocatedUSCSizeInKbyte > deltaUSCSizeInKbyte) ? deltaUSCSizeInKbyte : unAllocatedUSCSizeInKbyte);
+
+            unAllocatedUSCSizeInKbyte -= deltaUSCSizeInKbyte;
         }
     }
 

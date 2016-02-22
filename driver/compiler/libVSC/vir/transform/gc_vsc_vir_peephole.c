@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -17,6 +17,7 @@ void VSC_PH_Peephole_Init(
     IN OUT VSC_PH_Peephole* ph,
     IN VIR_Shader* shader,
     IN VIR_DEF_USAGE_INFO* du_info,
+    IN VSC_HW_CONFIG* hwCfg,
     IN VSC_OPTN_PHOptions* options,
     IN VIR_Dumper* dumper
     )
@@ -24,11 +25,13 @@ void VSC_PH_Peephole_Init(
     VSC_PH_Peephole_SetShader(ph, shader);
     VSC_PH_Peephole_SetCurrBB(ph, gcvNULL);
     VSC_PH_Peephole_SetDUInfo(ph, du_info);
+    VSC_PH_Peephole_SetHwCfg(ph, hwCfg);
     VSC_PH_Peephole_SetOptions(ph, options);
     VSC_PH_Peephole_SetDumper(ph, dumper);
     vscPMP_Intialize(VSC_PH_Peephole_GetPmp(ph), gcvNULL, 1024,
                      sizeof(void*), gcvTRUE);
      VSC_PH_Peephole_SetCfgChanged(ph, gcvFALSE);
+     VSC_PH_Peephole_SetExprChanged(ph, gcvFALSE);
 }
 
 void VSC_PH_Peephole_Final(
@@ -170,6 +173,1962 @@ static VSC_PH_MergedInst* _VSC_PH_Peephole_NewMergedInst(
     return mergedInst;
 }
 
+/* new PH code start */
+typedef struct VSC_PH_TREE_NODE
+{
+    gctUINT id;
+    VIR_Instruction* inst;
+    gctUINT channel;
+} VSC_PH_Tree_Node;
+
+#define VSC_PH_Tree_Node_GetID(N)                                           ((N)->id)
+#define VSC_PH_Tree_Node_GetInst(N)                                         ((N)->inst)
+#define VSC_PH_Tree_Node_SetInst(N, i)                                      ((N)->inst = (i))
+#define VSC_PH_Tree_Node_GetChannel(N)                                      ((N)->channel)
+#define VSC_PH_Tree_Node_Setchannel(N, c)                                   ((N)->channel = (c))
+
+static void _VSC_PH_Tree_Node_Dump(
+    IN VSC_PH_Tree_Node* node,
+    IN VIR_Dumper* dumper
+    )
+{
+    if(VSC_PH_Tree_Node_GetInst(node))
+    {
+        VIR_LOG(dumper, "Node id: %d, channel: %d\n", VSC_PH_Tree_Node_GetID(node), VSC_PH_Tree_Node_GetChannel(node));
+        VIR_Inst_Dump(dumper, VSC_PH_Tree_Node_GetInst(node));
+    }
+}
+
+#define VSC_PH_TREE_N 2
+#define VSC_PH_TREE_MAX_LEVEL 3
+#define VSC_PH_TREE_NODE_COUNT 15
+
+typedef struct VSC_PH_TREE
+{
+    VSC_PH_Tree_Node nodes[VSC_PH_TREE_NODE_COUNT];
+} VSC_PH_Tree;
+
+#define VSC_PH_Tree_GetRoot(tree)                                           (&(tree)->nodes[0])
+#define VSC_PH_Tree_GetNode(tree, i)                                        (&(tree)->nodes[i])
+#define VSC_PH_Tree_GetParentIDFromID(i)                                    (((i) - 1) / 2)
+#define VSC_PH_Tree_GetFirstChildIDFromID(i)                                ((i) * 2 + 1)
+#define VSC_PH_Tree_GetSecondChildIDFromID(i)                               ((i) * 2 + 2)
+#define VSC_PH_Tree_GetNthChildIDFromID(i, j)                               ((i) * 2 + j + 1)
+#define VSC_PH_Tree_GetParentFromID(tree, i)                                VSC_PH_Tree_GetNode(tree, VSC_PH_Tree_GetParentIDFromID(i))
+#define VSC_PH_Tree_GetFirstChildFromID(tree, i)                            VSC_PH_Tree_GetNode(tree, VSC_PH_Tree_GetFirstChildIDFromID(i))
+#define VSC_PH_Tree_GetSecondChildFromID(tree, i)                           VSC_PH_Tree_GetNode(tree, VSC_PH_Tree_GetSecondChildIDFromID(i))
+#define VSC_PH_Tree_GetNthChildFromID(tree, i, j)                           VSC_PH_Tree_GetNode(tree, VSC_PH_Tree_GetNthChildIDFromID(i, j))
+#define VSC_PH_Tree_GetParentFromNode(tree, node)                           VSC_PH_Tree_GetNode(tree, VSC_PH_Tree_GetParentIDFromID(VSC_PH_Tree_Node_GetID(node)))
+#define VSC_PH_Tree_GetFirstChildFromNode(tree, node)                       VSC_PH_Tree_GetNode(tree, VSC_PH_Tree_GetFirstChildIDFromID(VSC_PH_Tree_Node_GetID(node)))
+#define VSC_PH_Tree_GetSecondChildFromNode(tree, node)                      VSC_PH_Tree_GetNode(tree, VSC_PH_Tree_GetSecondChildIDFromID(VSC_PH_Tree_Node_GetID(node)))
+#define VSC_PH_Tree_GetNthChildFromNode(tree, node, i)                      VSC_PH_Tree_GetNode(tree, VSC_PH_Tree_GetNthChildIDFromID(VSC_PH_Tree_Node_GetID(node), i))
+
+static gctUINT _VSC_PH_Tree_GetLevelFromID(
+    IN gctUINT ID
+    )
+{
+    gctUINT level = 0;
+
+    while(ID)
+    {
+        ID >>= 1;
+        level++;
+    }
+
+    return level;
+}
+
+static void _VSC_PH_Tree_Dump(
+    IN VSC_PH_Tree* tree,
+    IN VIR_Dumper* dumper
+    )
+{
+    gctUINT i;
+
+    VIR_LOG(dumper, "PH tree:\n");
+    for(i = 0; i < VSC_PH_TREE_NODE_COUNT; i++)
+    {
+        _VSC_PH_Tree_Node_Dump(VSC_PH_Tree_GetNode(tree, i), dumper);
+    }
+}
+
+typedef gctUINT (*VSC_PH_FuncP)(
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VSC_PH_Tree* tree,
+    IN OUT void* dynamicInputOutput,
+    IN gctUINT argCount,
+    IN gctUINT* args
+    );
+/********************************************** tree building requirment functions starts **********************************************/
+
+gctUINT _VSC_PH_Func_NodeLevelLessThan(
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VSC_PH_Tree* tree,
+    IN OUT void* dynamicInputOutput,
+    IN gctUINT argCount,
+    IN gctUINT* args
+    )
+{
+    gctUINT level = args[0];
+
+    gcmASSERT(argCount == 1);
+    return _VSC_PH_Tree_GetLevelFromID(VSC_PH_Tree_Node_GetID((VSC_PH_Tree_Node*)dynamicInputOutput)) < level;
+}
+
+/********************************************** tree building requirment functions ends **********************************************/
+
+/********************************************** tree transform requirment functions starts **********************************************/
+
+gctUINT _VSC_PH_Func_GetNodeOpCode(
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VSC_PH_Tree* tree,
+    IN OUT void* dynamicInputOutput,
+    IN gctUINT argCount,
+    IN gctUINT* args
+    )
+{
+    VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+    gctUINT nodeId = args[0];
+
+    gcmASSERT(argCount == 1);
+
+    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_REQUIREMENTS))
+    {
+        VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+        gctUINT i;
+
+        VIR_LOG(dumper, "%s got %d parameters:", "_VSC_PH_Func_GetNodeOpCode", argCount);
+        for(i = 0; i < argCount; i++)
+        {
+            VIR_LOG(dumper, " %x", args[i]);
+        }
+    }
+
+    {
+        VSC_PH_Tree_Node* node = VSC_PH_Tree_GetNode(tree, nodeId);
+        VIR_Instruction* inst = VSC_PH_Tree_Node_GetInst(node);
+
+        return inst ? VIR_Inst_GetOpcode(inst) : VIR_OP_NOP;
+    }
+}
+
+gctUINT _VSC_PH_Func_GetNodeSourceBaseTypeId(
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VSC_PH_Tree* tree,
+    IN OUT void* dynamicInputOutput,
+    IN gctUINT argCount,
+    IN gctUINT* args
+    )
+{
+    VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+    gctUINT nodeId = args[0];
+    gctUINT operandId = args[1];
+
+    gcmASSERT(argCount == 2);
+
+    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_REQUIREMENTS))
+    {
+        VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+        gctUINT i;
+
+        VIR_LOG(dumper, "%s got %d parameters:", "_VSC_PH_Func_GetNodeSourceBaseTypeId", argCount);
+        for(i = 0; i < argCount; i++)
+        {
+            VIR_LOG(dumper, " %x", args[i]);
+        }
+    }
+
+    {
+        VSC_PH_Tree_Node* node = VSC_PH_Tree_GetNode(tree, nodeId);
+        VIR_Instruction* inst = VSC_PH_Tree_Node_GetInst(node);
+        VIR_Operand* operand = VIR_Inst_GetSource(inst, operandId);
+        VIR_TypeId typeId = VIR_Operand_GetType(operand);
+
+        return VIR_GetTypeComponentType(typeId);
+    }
+}
+
+gctUINT _VSC_PH_Func_TwoSourcesHavingTheSameSym(
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VSC_PH_Tree* tree,
+    IN OUT void* dynamicInputOutput,
+    IN gctUINT argCount,
+    IN gctUINT* args
+    )
+{
+    VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+    gctUINT node0Id = args[0];
+    gctUINT inst0SourceId = args[1];
+    gctUINT node1Id = args[2];
+    gctUINT inst1SourceId = args[3];
+
+    gcmASSERT(argCount == 4);
+
+    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_REQUIREMENTS))
+    {
+        VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+        gctUINT i;
+
+        VIR_LOG(dumper, "%s got %d parameters:", "_VSC_PH_Func_TwoSourcesHavingTheSameSym", argCount);
+        for(i = 0; i < argCount; i++)
+        {
+            VIR_LOG(dumper, " %x", args[i]);
+        }
+    }
+
+    {
+        VSC_PH_Tree_Node* node0 = VSC_PH_Tree_GetNode(tree, node0Id);
+        VIR_Instruction* inst0 = VSC_PH_Tree_Node_GetInst(node0);
+        VIR_Operand* inst0Source = VIR_Inst_GetSource(inst0, inst0SourceId);
+        VSC_PH_Tree_Node* node1 = VSC_PH_Tree_GetNode(tree, node1Id);
+        VIR_Instruction* inst1 = VSC_PH_Tree_Node_GetInst(node1);
+        VIR_Operand* inst1Source = VIR_Inst_GetSource(inst1, inst1SourceId);
+
+        return VIR_Operand_SameIndexedSymbol(inst0Source, inst1Source);
+    }
+}
+
+gctUINT _VSC_PH_Func_SourceHavingDefBeforeRoot(
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VSC_PH_Tree* tree,
+    IN OUT void* dynamicInputOutput,
+    IN gctUINT argCount,
+    IN gctUINT* args
+    )
+{
+    VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+    gctUINT nodeId = args[0];
+    gctUINT instSourceId = args[1];
+
+    gcmASSERT(argCount == 2);
+
+    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_REQUIREMENTS))
+    {
+        VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+        gctUINT i;
+
+        VIR_LOG(dumper, "%s got %d parameters:", "_VSC_PH_Func_SourceHavingDefBeforeRoot", argCount);
+        for(i = 0; i < argCount; i++)
+        {
+            VIR_LOG(dumper, " %x", args[i]);
+        }
+    }
+
+    {
+        VSC_PH_Tree_Node* root = VSC_PH_Tree_GetRoot(tree);
+        VIR_Instruction* rootInst = VSC_PH_Tree_Node_GetInst(root);
+        VSC_PH_Tree_Node* node = VSC_PH_Tree_GetNode(tree, nodeId);
+        VIR_Instruction* nodeInst = VSC_PH_Tree_Node_GetInst(node);
+        gctUINT nodeChannel = VSC_PH_Tree_Node_GetChannel(node);
+        VIR_Operand* nodeInstSrc = VIR_Inst_GetSource(nodeInst, instSourceId);
+        VIR_Swizzle nodeInstSrcSwizzle = VIR_Operand_GetSwizzle(nodeInstSrc);
+        VIR_Swizzle nodeInstSrcChannelSwizzle = VIR_Swizzle_GetChannel(nodeInstSrcSwizzle, nodeChannel);
+        VIR_Enable nodeInstSrcChannelEnable = (VIR_Enable)(1 << (gctUINT)nodeInstSrcChannelSwizzle);
+
+        VIR_Instruction* nextInst = nodeInst;
+        while(nextInst != rootInst)
+        {
+            VIR_OpCode nextOpcode = VIR_Inst_GetOpcode(nextInst);
+            if(VIR_OPCODE_hasDest(nextOpcode))
+            {
+                VIR_Operand* nextInstDest = VIR_Inst_GetDest(nextInst);
+                VIR_Enable nextInstDestEnable = VIR_Operand_GetEnable(nextInstDest);
+
+                if(VIR_Operand_SameSymbol(nodeInstSrc, nextInstDest))
+                {
+                    if(nextInstDestEnable & nodeInstSrcChannelEnable)
+                    {
+                        return gcvTRUE;
+                    }
+                }
+
+                if(!VIR_Operand_GetIsConstIndexing(nodeInstSrc) && VIR_Operand_GetRelAddrMode(nodeInstSrc))
+                {
+                    gctUINT relIndexingSymId = VIR_Operand_GetRelIndexing(nodeInstSrc);
+                    VIR_Symbol* nextInstDestSym = VIR_Operand_GetSymbol(nextInstDest);
+                    gctUINT relIndexingRegIndexed = VIR_Operand_GetRelAddrMode(nodeInstSrc);
+
+                    if(VIR_Symbol_GetIndex(nextInstDestSym) == relIndexingSymId &&
+                       (nextInstDestEnable & (1 << (relIndexingRegIndexed - 1))))
+                    {
+                        return gcvTRUE;
+                    }
+                }
+            }
+            nextInst = VIR_Inst_GetNext(nextInst);
+        }
+
+        return gcvFALSE;
+    }
+}
+
+gctUINT _VSC_PH_Func_SourceIsImm(
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VSC_PH_Tree* tree,
+    IN OUT void* dynamicInputOutput,
+    IN gctUINT argCount,
+    IN gctUINT* args
+    )
+{
+    VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+    gctUINT nodeId = args[0];
+    gctUINT instSourceId = args[1];
+
+    gcmASSERT(argCount == 2);
+
+    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_REQUIREMENTS))
+    {
+        VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+        gctUINT i;
+
+        VIR_LOG(dumper, "%s got %d parameters:", "_VSC_PH_Func_SourceIsImm", argCount);
+        for(i = 0; i < argCount; i++)
+        {
+            VIR_LOG(dumper, " %x", args[i]);
+        }
+    }
+
+    {
+        VSC_PH_Tree_Node* node = VSC_PH_Tree_GetNode(tree, nodeId);
+        VIR_Instruction* nodeInst = VSC_PH_Tree_Node_GetInst(node);
+        VIR_Operand* nodeInstSrc = VIR_Inst_GetSource(nodeInst, instSourceId);
+
+        return VIR_Operand_isImm(nodeInstSrc) || VIR_Operand_isConst(nodeInstSrc);
+    }
+}
+
+/********************************************** tree transform requirment functions ends **********************************************/
+
+typedef struct VSC_PH_RESULTINSTSYMOPERAND
+{
+    VIR_Instruction* srcFromInst[VIR_CHANNEL_COUNT];
+    gctUINT srcFromOperandNum[VIR_CHANNEL_COUNT];              /* used for dump only */
+    VIR_Operand* srcFromOperand[VIR_CHANNEL_COUNT];
+    VIR_Swizzle srcSwizzle[VIR_CHANNEL_COUNT];
+} VSC_PH_ResultInstSymOperand;
+
+#define VSC_PH_ResultInstSymOperand_GetNthSrcFromInst(riso, i)              ((riso)->srcFromInst[i])
+#define VSC_PH_ResultInstSymOperand_SetNthSrcFromInst(riso, i, inst)        ((riso)->srcFromInst[i] = (inst))
+#define VSC_PH_ResultInstSymOperand_GetNthSrcFromOperandNum(riso, i)        ((riso)->srcFromOperandNum[i])
+#define VSC_PH_ResultInstSymOperand_SetNthSrcFromOperandNum(riso, i, on)    ((riso)->srcFromOperandNum[i] = (on))
+#define VSC_PH_ResultInstSymOperand_GetNthSrcFromOperand(riso, i)           ((riso)->srcFromOperand[i])
+#define VSC_PH_ResultInstSymOperand_SetNthSrcFromOperand(riso, i, op)       ((riso)->srcFromOperand[i] = (op))
+#define VSC_PH_ResultInstSymOperand_GetNthSrcSwizzle(riso, i)               ((riso)->srcSwizzle[i])
+#define VSC_PH_ResultInstSymOperand_SetNthSrcSwizzle(riso, i, s)            ((riso)->srcSwizzle[i] = (s))
+
+static void
+_VSC_PH_ResultInstSymOperand_Dump(
+    IN VSC_PH_ResultInstSymOperand* symOperand,
+    IN gctUINT channelCount,
+    IN VIR_Dumper* dumper
+    )
+{
+    gctUINT i;
+
+    for(i = 0; i < channelCount; i++)
+    {
+        VIR_Inst_Dump(dumper, VSC_PH_ResultInstSymOperand_GetNthSrcFromInst(symOperand, i));
+        VIR_LOG(dumper, "operand number: %d, swizzle: ", VSC_PH_ResultInstSymOperand_GetNthSrcFromOperandNum(symOperand, i));
+        VIR_Swizzle_Dump(dumper, VSC_PH_ResultInstSymOperand_GetNthSrcSwizzle(symOperand, i));
+        VIR_LOG(dumper, "\n");
+        VIR_LOG_FLUSH(dumper);
+    }
+}
+
+typedef struct VSC_PH_RESULTINSTCONSTOPERAND
+{
+    union
+    {
+        gctINT int32Val[VIR_CHANNEL_COUNT];
+        gctUINT uint32Val[VIR_CHANNEL_COUNT];
+        gctFLOAT float32Val[VIR_CHANNEL_COUNT];
+    } constVal;
+} VSC_PH_ResultInstConstOperand;
+
+#define VSC_PH_ResultInstConstOperand_GetNthConvstVal(rico, i)          ((rico)->constVal.uint32Val[i])
+#define VSC_PH_ResultInstConstOperand_SetNthConvstVal(rico, i, cv)      ((rico)->constVal.uint32Val[i] = (cv))
+#define VSC_PH_ResultInstConstOperand_GetNthInt32Val(rico, i)           ((rico)->constVal.int32Val[i])
+#define VSC_PH_ResultInstConstOperand_SetNthInt32Val(rico, i, cv)       ((rico)->constVal.int32Val[i] = (cv))
+#define VSC_PH_ResultInstConstOperand_GetNthUint32Val(rico, i)          ((rico)->constVal.uint32Val[i])
+#define VSC_PH_ResultInstConstOperand_SetNthUint32Val(rico, i, cv)      ((rico)->constVal.uint32Val[i] = (cv))
+#define VSC_PH_ResultInstConstOperand_GetNthFloat32Val(rico, i)         ((rico)->constVal.float32Val[i])
+#define VSC_PH_ResultInstConstOperand_SetNthFloat32Val(rico, i, cv)     ((rico)->constVal.float32Val[i] = (cv))
+
+void static
+_VSC_PH_ResultInstConstOperand_Dump(
+    IN VSC_PH_ResultInstConstOperand* constOperand,
+    IN gctUINT channelCount,
+    IN VIR_TypeId typeId,
+    IN VIR_Dumper* dumper
+    )
+{
+    gctUINT i;
+
+    switch(typeId)
+    {
+        case VIR_TYPE_INT32:
+        {
+            VIR_LOG(dumper, "int32 const values: ");
+            for(i = 0; i < channelCount; i++)
+            {
+                VIR_LOG(dumper, "%d ", VSC_PH_ResultInstConstOperand_GetNthInt32Val(constOperand, i));
+            }
+            break;
+        }
+        case VIR_TYPE_UINT32:
+        {
+            VIR_LOG(dumper, "uint32 const values: ");
+            for(i = 0; i < channelCount; i++)
+            {
+                VIR_LOG(dumper, "%d ", VSC_PH_ResultInstConstOperand_GetNthUint32Val(constOperand, i));
+            }
+            break;
+        }
+        case VIR_TYPE_FLOAT32:
+        {
+            VIR_LOG(dumper, "float32 const values: ");
+            for(i = 0; i < channelCount; i++)
+            {
+                VIR_LOG(dumper, "%f ", VSC_PH_ResultInstConstOperand_GetNthFloat32Val(constOperand, i));
+            }
+            break;
+        }
+        default:
+            gcmASSERT(0);
+    }
+
+    VIR_LOG(dumper, "\n");
+    VIR_LOG_FLUSH(dumper);
+}
+
+typedef struct VSC_PH_RESULTINSTOPERAND
+{
+    gctBOOL isConst;
+    gctUINT channelCount;
+    VIR_TypeId baseTypeId;
+    union
+    {
+        VSC_PH_ResultInstSymOperand symOperand;
+        VSC_PH_ResultInstConstOperand constVal;
+    } u;
+} VSC_PH_ResultInstOperand;
+
+#define VSC_PH_ResultInstOperand_GetIsConst(rio)                        ((rio)->isConst)
+#define VSC_PH_ResultInstOperand_SetIsConst(rio, ic)                    ((rio)->isConst = (ic))
+#define VSC_PH_ResultInstOperand_GetChannelCount(rio)                   ((rio)->channelCount)
+#define VSC_PH_ResultInstOperand_SetChannelCount(rio, cc)               ((rio)->channelCount = (cc))
+#define VSC_PH_ResultInstOperand_GetBaseTypeId(rio)                     ((rio)->baseTypeId)
+#define VSC_PH_ResultInstOperand_SetBaseTypeId(rio, bti)                ((rio)->baseTypeId = (bti))
+#define VSC_PH_ResultInstOperand_IncChannelCount(rio)                   ((rio)->channelCount++)
+#define VSC_PH_ResultInstOperand_GetSymOperand(rio)                     (&(rio)->u.symOperand)
+#define VSC_PH_ResultInstOperand_GetConstOperand(rio)                   (&(rio)->u.constVal)
+
+static void
+_VSC_PH_ResultInstOperand_Dump(
+    VSC_PH_ResultInstOperand* operand,
+    VIR_Dumper* dumper
+    )
+{
+    VIR_LOG(dumper, "channel count: %d\n", VSC_PH_ResultInstOperand_GetChannelCount(operand));
+    if(VSC_PH_ResultInstOperand_GetIsConst(operand))
+    {
+        _VSC_PH_ResultInstConstOperand_Dump(VSC_PH_ResultInstOperand_GetConstOperand(operand),
+                                            VSC_PH_ResultInstOperand_GetChannelCount(operand),
+                                            VSC_PH_ResultInstOperand_GetBaseTypeId(operand),
+                                            dumper);
+    }
+    else
+    {
+        _VSC_PH_ResultInstSymOperand_Dump(VSC_PH_ResultInstOperand_GetSymOperand(operand),
+                                          VSC_PH_ResultInstOperand_GetChannelCount(operand),
+                                          dumper);
+    }
+}
+
+static void
+_VSC_PH_ResultInstOperand_AppendSymOperand(
+    IN OUT VSC_PH_ResultInstOperand* operand,
+    IN VIR_Instruction* inst,
+    IN gctUINT operandNum,
+    IN VIR_Operand* opnd,
+    IN VIR_Swizzle swizzle
+    )
+{
+    gctUINT channelCount = VSC_PH_ResultInstOperand_GetChannelCount(operand);
+    VSC_PH_ResultInstSymOperand* symOperand = VSC_PH_ResultInstOperand_GetSymOperand(operand);
+    VIR_TypeId opndTypeId = VIR_Operand_GetType(opnd);
+    VIR_TypeId opndBaseTypeId = VIR_GetTypeComponentType(opndTypeId);
+
+    gcmASSERT(channelCount == 0  || !VSC_PH_ResultInstOperand_GetIsConst(operand));
+    gcmASSERT(VSC_PH_ResultInstOperand_GetBaseTypeId(operand) == VIR_TYPE_UNKNOWN  || VSC_PH_ResultInstOperand_GetBaseTypeId(operand) == opndBaseTypeId);
+    gcmASSERT(((gctUINT8)swizzle & 0x7c) == 0);         /* must be a single channel swizzle */
+
+    VSC_PH_ResultInstSymOperand_SetNthSrcFromInst(symOperand, channelCount, inst);
+    VSC_PH_ResultInstSymOperand_SetNthSrcFromOperandNum(symOperand, channelCount, operandNum);
+    VSC_PH_ResultInstSymOperand_SetNthSrcFromOperand(symOperand, channelCount, opnd);
+    VSC_PH_ResultInstSymOperand_SetNthSrcSwizzle(symOperand, channelCount, swizzle);
+    VSC_PH_ResultInstOperand_IncChannelCount(operand);
+    VSC_PH_ResultInstOperand_SetIsConst(operand, gcvFALSE);
+    VSC_PH_ResultInstOperand_SetBaseTypeId(operand, opndBaseTypeId);
+}
+
+static void
+_VSC_PH_ResultInstOperand_AppendImm(
+    IN OUT VSC_PH_ResultInstOperand* operand,
+    IN VIR_TypeId typeId,
+    IN gctUINT imm
+    )
+{
+    gctUINT channelCount = VSC_PH_ResultInstOperand_GetChannelCount(operand);
+    VSC_PH_ResultInstConstOperand* constVal = VSC_PH_ResultInstOperand_GetConstOperand(operand);
+
+    gcmASSERT(channelCount == 0  || VSC_PH_ResultInstOperand_GetIsConst(operand));
+    gcmASSERT(VSC_PH_ResultInstOperand_GetBaseTypeId(operand) == VIR_TYPE_UNKNOWN  || VSC_PH_ResultInstOperand_GetBaseTypeId(operand) == typeId);
+
+    VSC_PH_ResultInstConstOperand_SetNthConvstVal(constVal, channelCount, imm);
+    VSC_PH_ResultInstOperand_IncChannelCount(operand);
+    VSC_PH_ResultInstOperand_SetIsConst(operand, gcvTRUE);
+    VSC_PH_ResultInstOperand_SetBaseTypeId(operand, typeId);
+}
+
+typedef struct VSC_PH_ResultInst
+{
+    VIR_OpCode opcode;
+    VSC_PH_ResultInstOperand operands[VIR_MAX_SRC_NUM];
+} VSC_PH_ResultInst;
+
+#define VSC_PH_ResultInst_GetOpcode(ri)                         ((ri)->opcode)
+#define VSC_PH_ResultInst_SetOpcode(ri, oc)                     ((ri)->opcode = (oc))
+#define VSC_PH_ResultInst_GetOperands(ri, i)                    ((ri)->operands)
+#define VSC_PH_ResultInst_GetNthOperand(ri, i)                  (&(ri)->operands[i])
+
+static void
+_VSC_PH_ResultInst_Dump(
+    VSC_PH_ResultInst* resultInst,
+    VIR_Dumper* dumper
+    )
+{
+    gctUINT i;
+
+    VIR_LOG(dumper, "ph result inst:\nopcode: %s\n", VIR_OPCODE_GetName(VSC_PH_ResultInst_GetOpcode(resultInst)));
+    for(i = 0; i < VIR_OPCODE_GetSrcOperandNum(VSC_PH_ResultInst_GetOpcode(resultInst)); i++)
+    {
+        VIR_LOG(dumper, "operand %d:\n");
+        _VSC_PH_ResultInstOperand_Dump(VSC_PH_ResultInst_GetNthOperand(resultInst, i), dumper);
+    }
+}
+
+
+/********************************************** tree transformation functions starts **********************************************/
+
+gctUINT _VSC_PH_Func_InitResultInstOpcode(
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VSC_PH_Tree* tree,
+    IN OUT void* dynamicInputOutput,
+    IN gctUINT argCount,
+    IN gctUINT* args
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+    VSC_PH_ResultInst* resultInst = (VSC_PH_ResultInst*)dynamicInputOutput;
+    VIR_OpCode opcode = (VIR_OpCode)args[0];
+    gctUINT i;
+
+    gcmASSERT(argCount == 1);
+
+    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_TRANSFORMS))
+    {
+        VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+        gctUINT i;
+
+        VIR_LOG(dumper, "%s got %d parameters:", "_VSC_PH_Func_InitResultInstOpcode", argCount);
+        for(i = 0; i < argCount; i++)
+        {
+            VIR_LOG(dumper, " %x", args[i]);
+        }
+    }
+
+    VSC_PH_ResultInst_SetOpcode(resultInst, opcode);
+    for(i = 0; i < VIR_OPCODE_GetSrcOperandNum(opcode); i++)
+    {
+        VSC_PH_ResultInstOperand* operand = VSC_PH_ResultInst_GetNthOperand(resultInst, i);
+        VSC_PH_ResultInstOperand_SetChannelCount(operand, 0);
+    }
+
+    return errCode;
+}
+
+gctUINT _VSC_PH_Func_AppendResultInstOperand(
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VSC_PH_Tree* tree,
+    IN OUT void* dynamicInputOutput,
+    IN gctUINT argCount,
+    IN gctUINT* args
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+    VSC_PH_ResultInst* resultInst = (VSC_PH_ResultInst*)dynamicInputOutput;
+    gctUINT resultSrcNum = args[0];
+    gctUINT fromNodeID = args[1];
+    gctUINT fromSrcNum = args[2];
+
+    gcmASSERT(argCount == 3);
+    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_TRANSFORMS))
+    {
+        VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+        gctUINT i;
+
+        VIR_LOG(dumper, "%s got %d parameters:", "_VSC_PH_Func_AppendResultInstOperand", argCount);
+        for(i = 0; i < argCount; i++)
+        {
+            VIR_LOG(dumper, " %x", args[i]);
+        }
+    }
+
+    {
+        VSC_PH_ResultInstOperand* resultOperand = VSC_PH_ResultInst_GetNthOperand(resultInst, resultSrcNum);
+        VSC_PH_Tree_Node* fromNode = VSC_PH_Tree_GetNode(tree, fromNodeID);
+        VIR_Instruction* fromNodeInst = VSC_PH_Tree_Node_GetInst(fromNode);
+        gctUINT fromChannel = VSC_PH_Tree_Node_GetChannel(fromNode);
+        VIR_Operand* fromNodeInstSrc = VIR_Inst_GetSource(fromNodeInst, fromSrcNum);
+        VIR_Swizzle fromNodeInstSrcSwizzle = VIR_Operand_GetSwizzle(fromNodeInstSrc);
+        VIR_Swizzle fromNodeInstSrcChannelSwizzle = VIR_Swizzle_GetChannel(fromNodeInstSrcSwizzle, fromChannel);
+
+        _VSC_PH_ResultInstOperand_AppendSymOperand(resultOperand, fromNodeInst, fromSrcNum, fromNodeInstSrc, fromNodeInstSrcChannelSwizzle);
+    }
+
+    return errCode;
+}
+
+gctUINT _VSC_PH_Func_AppendResultInstImm(
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VSC_PH_Tree* tree,
+    IN OUT void* dynamicInputOutput,
+    IN gctUINT argCount,
+    IN gctUINT* args
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+    VSC_PH_ResultInst* resultInst = (VSC_PH_ResultInst*)dynamicInputOutput;
+    gctUINT resultSrcNum = args[0];
+    VIR_TypeId baseTypeId = (VIR_TypeId)args[1];
+    gctUINT imm = args[2];
+
+    gcmASSERT(argCount == 3);
+    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_TRANSFORMS))
+    {
+        VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+        gctUINT i;
+
+        VIR_LOG(dumper, "%s got %d parameters:", "_VSC_PH_Func_AppendResultInstImm", argCount);
+        for(i = 0; i < argCount; i++)
+        {
+            VIR_LOG(dumper, " %x", args[i]);
+        }
+    }
+
+    {
+        VSC_PH_ResultInstOperand* resultOperand = VSC_PH_ResultInst_GetNthOperand(resultInst, resultSrcNum);
+
+        _VSC_PH_ResultInstOperand_AppendImm(resultOperand, baseTypeId, imm);
+    }
+
+    return errCode;
+}
+
+gctUINT _VSC_PH_Func_AppendResultInstImmAsOperand(
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VSC_PH_Tree* tree,
+    IN OUT void* dynamicInputOutput,
+    IN gctUINT argCount,
+    IN gctUINT* args
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+    VSC_PH_ResultInst* resultInst = (VSC_PH_ResultInst*)dynamicInputOutput;
+    gctUINT resultSrcNum = args[0];
+    gctUINT fromNodeID = args[1];
+    gctUINT fromSrcNum = args[2];
+
+    gcmASSERT(argCount == 3);
+    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_TRANSFORMS))
+    {
+        VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+        gctUINT i;
+
+        VIR_LOG(dumper, "%s got %d parameters:", "_VSC_PH_Func_AppendResultInstImmAsOperand", argCount);
+        for(i = 0; i < argCount; i++)
+        {
+            VIR_LOG(dumper, " %x", args[i]);
+        }
+    }
+
+    {
+        VSC_PH_ResultInstOperand* resultOperand = VSC_PH_ResultInst_GetNthOperand(resultInst, resultSrcNum);
+        VSC_PH_Tree_Node* fromNode = VSC_PH_Tree_GetNode(tree, fromNodeID);
+        VIR_Instruction* fromNodeInst = VSC_PH_Tree_Node_GetInst(fromNode);
+        gctUINT fromChannel = VSC_PH_Tree_Node_GetChannel(fromNode);
+        VIR_Operand* fromNodeInstSrc = VIR_Inst_GetSource(fromNodeInst, fromSrcNum);
+        VIR_Swizzle fromNodeInstSrcSwizzle = VIR_Operand_GetSwizzle(fromNodeInstSrc);
+        VIR_Swizzle fromNodeInstSrcChannelSwizzle = VIR_Swizzle_GetChannel(fromNodeInstSrcSwizzle, fromChannel);
+
+        if(VIR_Operand_isImm(fromNodeInstSrc))
+        {
+            VIR_TypeId baseTypeId = VIR_Operand_GetType(fromNodeInstSrc);
+            switch(baseTypeId)
+            {
+                case VIR_TYPE_INT32:
+                {
+                    gctINT32 imm = VIR_Operand_GetImmediateInt(fromNodeInstSrc);
+                    _VSC_PH_ResultInstOperand_AppendImm(resultOperand, baseTypeId, (gctUINT32)imm);
+                    break;
+                }
+                case VIR_TYPE_UINT32:
+                {
+                    gctUINT32 imm = VIR_Operand_GetImmediateUint(fromNodeInstSrc);
+                    _VSC_PH_ResultInstOperand_AppendImm(resultOperand, baseTypeId, (gctUINT32)imm);
+                    break;
+                }
+                case VIR_TYPE_FLOAT32:
+                {
+                    gctFLOAT imm = VIR_Operand_GetImmediateFloat(fromNodeInstSrc);
+                    _VSC_PH_ResultInstOperand_AppendImm(resultOperand, baseTypeId, *(gctUINT32*)&imm);
+                    break;
+                }
+                default:
+                    gcmASSERT(0);
+            }
+        }
+        else if(VIR_Operand_isConst(fromNodeInstSrc))
+        {
+            VIR_Shader* shader = VSC_PH_Peephole_GetShader(ph);
+            VIR_ConstId constId = VIR_Operand_GetConstId(fromNodeInstSrc);
+            VIR_Const* constVal = VIR_Shader_GetConstFromId(shader, constId);
+            VIR_TypeId constValTypeId = constVal->type;
+            VIR_TypeId constValBaseTypeId = VIR_GetTypeComponentType(constValTypeId);
+
+            switch(constValBaseTypeId)
+            {
+                case VIR_TYPE_INT32:
+                {
+                    gctINT32 imm = constVal->value.vecVal.i32Value[fromNodeInstSrcChannelSwizzle];
+                    _VSC_PH_ResultInstOperand_AppendImm(resultOperand, constValBaseTypeId, (gctUINT32)imm);
+                    break;
+                }
+                case VIR_TYPE_UINT32:
+                {
+                    gctUINT32 imm = constVal->value.vecVal.u32Value[fromNodeInstSrcChannelSwizzle];
+                    _VSC_PH_ResultInstOperand_AppendImm(resultOperand, constValBaseTypeId, (gctUINT32)imm);
+                    break;
+                }
+                case VIR_TYPE_FLOAT32:
+                {
+                    gctFLOAT imm = constVal->value.vecVal.f32Value[fromNodeInstSrcChannelSwizzle];
+                    _VSC_PH_ResultInstOperand_AppendImm(resultOperand, constValBaseTypeId, *(gctUINT32*)&imm);
+                    break;
+                }
+                default:
+                    gcmASSERT(0);
+            }
+        }
+    }
+
+    return errCode;
+}
+
+gctUINT _VSC_PH_Func_AppendResultInstImmAsTwoOperandsComputation(
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VSC_PH_Tree* tree,
+    IN OUT void* dynamicInputOutput,
+    IN gctUINT argCount,
+    IN gctUINT* args
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+    VSC_PH_ResultInst* resultInst = (VSC_PH_ResultInst*)dynamicInputOutput;
+    gctUINT resultSrcNum = args[0];
+    gctUINT fromNodeID0 = args[1];
+    gctUINT fromSrcNum0 = args[2];
+    gctUINT fromNodeID1= args[3];
+    gctUINT fromSrcNum1 = args[4];
+    VIR_OpCode opcode = (VIR_OpCode)args[5];
+
+    gcmASSERT(argCount == 6);
+    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_TRANSFORMS))
+    {
+        VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+        gctUINT i;
+
+        VIR_LOG(dumper, "%s got %d parameters:", "_VSC_PH_Func_AppendResultInstImmAsTwoOperandsComputation", argCount);
+        for(i = 0; i < argCount; i++)
+        {
+            VIR_LOG(dumper, " %x", args[i]);
+        }
+    }
+
+    {
+        VSC_PH_ResultInstOperand* resultOperand = VSC_PH_ResultInst_GetNthOperand(resultInst, resultSrcNum);
+        VSC_PH_Tree_Node* fromNode0 = VSC_PH_Tree_GetNode(tree, fromNodeID0);
+        VIR_Instruction* fromNodeInst0 = VSC_PH_Tree_Node_GetInst(fromNode0);
+        gctUINT fromChannel0 = VSC_PH_Tree_Node_GetChannel(fromNode0);
+        VIR_Operand* fromNodeInstSrc0 = VIR_Inst_GetSource(fromNodeInst0, fromSrcNum0);
+        VIR_TypeId fromNodeInstSrcTypeId0 = VIR_Operand_GetType(fromNodeInstSrc0);
+        VIR_TypeId fromNodeInstSrcBaseTypeId0 = VIR_GetTypeComponentType(fromNodeInstSrcTypeId0);
+        VIR_Swizzle fromNodeInstSrcSwizzle0 = VIR_Operand_GetSwizzle(fromNodeInstSrc0);
+        VIR_Swizzle fromNodeInstSrcChannelSwizzle0 = VIR_Swizzle_GetChannel(fromNodeInstSrcSwizzle0, fromChannel0);
+        VSC_PH_Tree_Node* fromNode1 = VSC_PH_Tree_GetNode(tree, fromNodeID1);
+        VIR_Instruction* fromNodeInst1 = VSC_PH_Tree_Node_GetInst(fromNode1);
+        gctUINT fromChannel1 = VSC_PH_Tree_Node_GetChannel(fromNode1);
+        VIR_Operand* fromNodeInstSrc1 = VIR_Inst_GetSource(fromNodeInst1, fromSrcNum1);
+        VIR_TypeId fromNodeInstSrcTypeId1 = VIR_Operand_GetType(fromNodeInstSrc1);
+        VIR_TypeId fromNodeInstSrcBaseTypeId1 = VIR_GetTypeComponentType(fromNodeInstSrcTypeId1);
+        VIR_Swizzle fromNodeInstSrcSwizzle1 = VIR_Operand_GetSwizzle(fromNodeInstSrc1);
+        VIR_Swizzle fromNodeInstSrcChannelSwizzle1 = VIR_Swizzle_GetChannel(fromNodeInstSrcSwizzle1, fromChannel1);
+
+        gctUINT32 imm0 = 0, imm1 = 0;
+
+
+        if(VIR_Operand_isImm(fromNodeInstSrc0))
+        {
+            imm0 = VIR_Operand_GetImmediateInt(fromNodeInstSrc0);
+        }
+        else if(VIR_Operand_isConst(fromNodeInstSrc0))
+        {
+            VIR_Shader* shader = VSC_PH_Peephole_GetShader(ph);
+            VIR_ConstId constId0 = VIR_Operand_GetConstId(fromNodeInstSrc0);
+            VIR_Const* constVal0 = VIR_Shader_GetConstFromId(shader, constId0);
+
+            imm0 = constVal0->value.vecVal.u32Value[fromNodeInstSrcChannelSwizzle0];
+        }
+        else
+        {
+            gcmASSERT(0);
+        }
+
+        if(VIR_Operand_isImm(fromNodeInstSrc1))
+        {
+            imm1 = VIR_Operand_GetImmediateInt(fromNodeInstSrc1);
+        }
+        else if(VIR_Operand_isConst(fromNodeInstSrc1))
+        {
+            VIR_Shader* shader = VSC_PH_Peephole_GetShader(ph);
+            VIR_ConstId constId1 = VIR_Operand_GetConstId(fromNodeInstSrc1);
+            VIR_Const* constVal1 = VIR_Shader_GetConstFromId(shader, constId1);
+
+            imm1 = constVal1->value.vecVal.u32Value[fromNodeInstSrcChannelSwizzle1];
+        }
+        else
+        {
+            gcmASSERT(0);
+        }
+
+        gcmASSERT(fromNodeInstSrcBaseTypeId0 == fromNodeInstSrcBaseTypeId1 ||
+                  (fromNodeInstSrcBaseTypeId0 == VIR_TYPE_INT32 && fromNodeInstSrcBaseTypeId1 == VIR_TYPE_UINT32) ||
+                  (fromNodeInstSrcBaseTypeId0 == VIR_TYPE_UINT32 && fromNodeInstSrcBaseTypeId1 == VIR_TYPE_INT32));
+
+        switch(fromNodeInstSrcBaseTypeId0)
+        {
+            case VIR_TYPE_INT32:
+            {
+                gctINT32 imm0i32 = (gctINT32)imm0;
+                gctINT32 imm1i32 = (gctINT32)imm1;
+                gctINT32 result = 0;
+
+                switch(opcode)
+                {
+                    case VIR_OP_ADD:
+                        result = imm0i32 + imm1i32;
+                        break;
+                    case VIR_OP_SUB:
+                        result = imm0i32 - imm1i32;
+                        break;
+                    case VIR_OP_MUL:
+                        result = imm0i32 * imm1i32;
+                        break;
+                    case VIR_OP_DIV:
+                        result = imm0i32 / imm1i32;
+                        break;
+                    default:
+                        gcmASSERT(0);
+                }
+                _VSC_PH_ResultInstOperand_AppendImm(resultOperand, VIR_TYPE_INT32, (gctUINT32)result);
+                break;
+            }
+            case VIR_TYPE_UINT32:
+            {
+                if(fromNodeInstSrcBaseTypeId1 == VIR_TYPE_INT32)
+                {
+                    gctINT32 imm0i32 = (gctINT32)imm0;
+                    gctINT32 imm1i32 = (gctINT32)imm1;
+                    gctINT32 result = 0;
+
+                    switch(opcode)
+                    {
+                        case VIR_OP_ADD:
+                            result = imm0i32 + imm1i32;
+                            break;
+                        case VIR_OP_SUB:
+                            result = imm0i32 - imm1i32;
+                            break;
+                        case VIR_OP_MUL:
+                            result = imm0i32 * imm1i32;
+                            break;
+                        case VIR_OP_DIV:
+                            result = imm0i32 / imm1i32;
+                            break;
+                        default:
+                            gcmASSERT(0);
+                    }
+                    _VSC_PH_ResultInstOperand_AppendImm(resultOperand, VIR_TYPE_INT32, (gctUINT32)result);
+                }
+                else
+                {
+                    gctUINT32 imm0u32 = (gctUINT32)imm0;
+                    gctUINT32 imm1u32 = (gctUINT32)imm1;
+                    gctUINT32 result = 0;
+
+                    switch(opcode)
+                    {
+                        case VIR_OP_ADD:
+                            result = imm0u32 + imm1u32;
+                            break;
+                        case VIR_OP_SUB:
+                            result = imm0u32 - imm1u32;
+                            break;
+                        case VIR_OP_MUL:
+                            result = imm0u32 * imm1u32;
+                            break;
+                        case VIR_OP_DIV:
+                            result = imm0u32 / imm1u32;
+                            break;
+                        default:
+                            gcmASSERT(0);
+                    }
+                    _VSC_PH_ResultInstOperand_AppendImm(resultOperand, VIR_TYPE_UINT32, (gctUINT32)result);
+                }
+                break;
+            }
+            case VIR_TYPE_FLOAT32:
+            {
+                gctFLOAT imm0f32 = *(gctFLOAT*)&imm0;
+                gctFLOAT imm1f32 = *(gctFLOAT*)&imm1;
+                gctFLOAT result = 0.0;
+
+                switch(opcode)
+                {
+                    case VIR_OP_ADD:
+                        result = imm0f32 + imm1f32;
+                        break;
+                    case VIR_OP_SUB:
+                        result = imm0f32 - imm1f32;
+                        break;
+                    case VIR_OP_MUL:
+                        result = imm0f32 * imm1f32;
+                        break;
+                    case VIR_OP_DIV:
+                        result = imm0f32 / imm1f32;
+                        break;
+                    default:
+                        gcmASSERT(0);
+                }
+                _VSC_PH_ResultInstOperand_AppendImm(resultOperand, VIR_TYPE_FLOAT32, *(gctUINT32*)&result);
+                break;
+            }
+            default:
+                gcmASSERT(0);
+        }
+    }
+
+    return errCode;
+}
+
+/********************************************** tree transformation functions end **********************************************/
+
+#define VSC_PH_STEP_OPER_MAX_ARG_COUNT 6
+typedef struct VSC_PH_OPER
+{
+    VSC_PH_FuncP func;
+    gctUINT expected;
+    gctUINT argCount;
+    gctUINT arguments[VSC_PH_STEP_OPER_MAX_ARG_COUNT];
+} VSC_PH_Oper;
+
+#define VSC_PH_Oper_GetFunc(o)                                              ((o)->func)
+#define VSC_PH_Oper_GetExpected(o)                                          ((o)->expected)
+#define VSC_PH_Oper_GetArgCount(o)                                          ((o)->argCount)
+#define VSC_PH_Oper_GetArguments(o)                                         ((o)->arguments)
+
+static gctBOOL VSC_PH_Oper_PerformBuildRequirements(
+    IN VSC_PH_Oper* oper,
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VSC_PH_Tree* tree,
+    IN OUT void* dynamicInputOutput
+    )
+{
+    VSC_PH_FuncP func = VSC_PH_Oper_GetFunc(oper);
+    gctUINT expected = VSC_PH_Oper_GetExpected(oper);
+    gctUINT argCount = VSC_PH_Oper_GetArgCount(oper);
+    gctUINT* arguments = VSC_PH_Oper_GetArguments(oper);
+    gctUINT result = (*func)(ph, tree, dynamicInputOutput, argCount, arguments);
+
+    return expected == result;
+}
+
+static gctBOOL VSC_PH_Oper_PerformTransRequirements(
+    IN VSC_PH_Oper* oper,
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VSC_PH_Tree* tree,
+    IN OUT void* dynamicInputOutput
+    )
+{
+    VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+    VSC_PH_FuncP func = VSC_PH_Oper_GetFunc(oper);
+    gctUINT expected = VSC_PH_Oper_GetExpected(oper);
+    gctUINT argCount = VSC_PH_Oper_GetArgCount(oper);
+    gctUINT* arguments = VSC_PH_Oper_GetArguments(oper);
+    gctUINT result = (*func)(ph, tree, dynamicInputOutput, argCount, arguments);
+
+    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_REQUIREMENTS))
+    {
+        VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+
+        VIR_LOG(dumper, ", got output %x. expected result is %x\n", result, expected);
+    }
+    return expected == result;
+}
+
+static gctBOOL VSC_PH_Oper_PerformTransformations(
+    IN VSC_PH_Oper* oper,
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VSC_PH_Tree* tree,
+    IN OUT void* dynamicInputOutput
+    )
+{
+    VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+    VSC_PH_FuncP func = VSC_PH_Oper_GetFunc(oper);
+    gctUINT expected = VSC_PH_Oper_GetExpected(oper);
+    gctUINT argCount = VSC_PH_Oper_GetArgCount(oper);
+    gctUINT* arguments = VSC_PH_Oper_GetArguments(oper);
+    gctUINT result = (*func)(ph, tree, dynamicInputOutput, argCount, arguments);
+
+    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_TRANSFORMS))
+    {
+        VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+
+        VIR_LOG(dumper, ", got output %x. expected result is %x\n", result, expected);
+    }
+    return expected == result;
+}
+
+typedef struct VSC_PH_STEP
+{
+    gctUINT endDist;
+    VSC_PH_Oper oper;
+} VSC_PH_Step;
+
+#define VSC_PH_Step_GetEndDist(s)                                           ((s)->endDist)
+#define VSC_PH_Step_GetOper(s)                                              (&(s)->oper)
+
+static VSC_PH_Step _VSC_PH_Add_Steps[] = {
+    {1, {_VSC_PH_Func_NodeLevelLessThan, gcvTRUE, 1, {VSC_PH_TREE_MAX_LEVEL}}},
+    /*
+        ADD t0, s.x, s.y
+        ADD t1, t0, s.z
+
+        DP3 t1, s.xyz, 1.0
+    */
+    {6, {_VSC_PH_Func_GetNodeSourceBaseTypeId, VIR_TYPE_FLOAT32, 2, {0, 1}}},
+    {5, {_VSC_PH_Func_GetNodeOpCode, VIR_OP_ADD, 1, {1}}},
+    {4, {_VSC_PH_Func_TwoSourcesHavingTheSameSym, gcvTRUE, 4, {0, 1, 1, 0}}},
+    {3, {_VSC_PH_Func_TwoSourcesHavingTheSameSym, gcvTRUE, 4, {0, 1, 1, 1}}},
+    {2, {_VSC_PH_Func_SourceHavingDefBeforeRoot, gcvFALSE, 2, {1, 0}}},
+    {1, {_VSC_PH_Func_SourceHavingDefBeforeRoot, gcvFALSE, 2, {1, 1}}},
+    {7, {_VSC_PH_Func_InitResultInstOpcode, VSC_ERR_NONE, 1, {VIR_OP_DP3}}},
+    {6, {_VSC_PH_Func_AppendResultInstOperand, VSC_ERR_NONE, 3, {0, 1, 0}}},
+    {5, {_VSC_PH_Func_AppendResultInstOperand, VSC_ERR_NONE, 3, {0, 1, 1}}},
+    {4, {_VSC_PH_Func_AppendResultInstOperand, VSC_ERR_NONE, 3, {0, 0, 1}}},
+    {3, {_VSC_PH_Func_AppendResultInstImm, VSC_ERR_NONE, 3, {1, VIR_TYPE_FLOAT32, 0x3f800000 /* 1.0 */}}},
+    {2, {_VSC_PH_Func_AppendResultInstImm, VSC_ERR_NONE, 3, {1, VIR_TYPE_FLOAT32, 0x3f800000 /* 1.0 */}}},
+    {1, {_VSC_PH_Func_AppendResultInstImm, VSC_ERR_NONE, 3, {1, VIR_TYPE_FLOAT32, 0x3f800000 /* 1.0 */}}},
+    {0, {0}}
+};
+
+
+static VSC_PH_Step _VSC_PH_Mad_Steps[] = {
+    {1, {_VSC_PH_Func_NodeLevelLessThan, gcvTRUE, 1, {1}}},
+    /*
+        MUL t0, s0, c0
+        MAD t1, t0, c1, s1
+
+        MAD t1, s0, (c0 * c1), s1
+    */
+    {4, {_VSC_PH_Func_GetNodeOpCode, VIR_OP_MUL, 1, {1}}},
+    {3, {_VSC_PH_Func_SourceIsImm, gcvTRUE, 2, {0, 1}}},
+    {2, {_VSC_PH_Func_SourceIsImm, gcvTRUE, 2, {1, 1}}},
+    {1, {_VSC_PH_Func_SourceHavingDefBeforeRoot, gcvFALSE, 2, {1, 0}}},
+    {4, {_VSC_PH_Func_InitResultInstOpcode, VSC_ERR_NONE, 1, {VIR_OP_MAD}}},
+    {3, {_VSC_PH_Func_AppendResultInstOperand, VSC_ERR_NONE, 3, {0, 1, 0}}},
+    {2, {_VSC_PH_Func_AppendResultInstImmAsTwoOperandsComputation, VSC_ERR_NONE, 6, {1, 0, 1, 1, 1, VIR_OP_MUL}}},
+    {1, {_VSC_PH_Func_AppendResultInstOperand, VSC_ERR_NONE, 3, {2, 0, 2}}},
+    {0, {0}}
+};
+
+static VSC_PH_Step* _VSC_PH_GetOpSteps(
+    VIR_OpCode opcode
+    )
+{
+    switch(opcode)
+    {
+        case VIR_OP_ADD:
+            return _VSC_PH_Add_Steps;
+        case VIR_OP_MAD:
+            return _VSC_PH_Mad_Steps;
+        default:
+            return gcvNULL;
+    }
+}
+
+static void _VSC_PH_BuildSubTree(
+    IN OUT VSC_PH_Peephole* ph,
+    IN VIR_Instruction* inst,
+    IN gctUINT channel,
+    IN VSC_PH_Step* steps,
+    IN OUT VSC_PH_Tree* tree,
+    IN OUT VSC_PH_Tree_Node* subRoot
+    )
+{
+    VIR_BB* bb = VIR_Inst_GetBasicBlock(inst);
+    VSC_PH_Step* currentStep = steps;
+    gctBOOL buildReqMet = gcvTRUE;
+
+    VSC_PH_Tree_Node_SetInst(subRoot, inst);
+    VSC_PH_Tree_Node_Setchannel(subRoot, channel);
+
+    if(inst == BB_GET_START_INST(bb))
+    {
+        return;
+    }
+
+    while(gcvTRUE)
+    {
+        VSC_PH_Oper* oper = VSC_PH_Step_GetOper(currentStep);
+
+        buildReqMet = VSC_PH_Oper_PerformBuildRequirements(oper, ph, tree, subRoot);
+        if(!buildReqMet || VSC_PH_Step_GetEndDist(currentStep) == 1)
+        {
+            break;
+        }
+        currentStep++;
+    }
+
+    if(buildReqMet)
+    {
+        gctUINT i;
+
+        for(i = 0; i < VIR_Inst_GetSrcNum(inst) && i < VSC_PH_TREE_N; i++)
+        {
+            VIR_Operand* src = VIR_Inst_GetSource(inst, i);
+            if(VIR_Operand_GetOpKind(src) == VIR_OPND_SYMBOL || VIR_Operand_GetOpKind(src) == VIR_OPND_SAMPLER_INDEXING)
+            {
+                VIR_Swizzle srcSwizzle = VIR_Operand_GetSwizzle(src);
+                VIR_Swizzle srcChannelSwizzle = VIR_Swizzle_GetChannel(srcSwizzle, channel);
+                VIR_Enable srcChannelEnable = (VIR_Enable)(1 << (gctUINT)srcChannelSwizzle);
+                VIR_Instruction* srcDefInst = gcvNULL;
+                VIR_Instruction* prev = VIR_Inst_GetPrev(inst);
+
+                while(gcvTRUE)
+                {
+                    VIR_OpCode prevOpcode = VIR_Inst_GetOpcode(prev);
+
+                    if(VIR_OPCODE_hasDest(prevOpcode))
+                    {
+                        VIR_Operand* prevDest = VIR_Inst_GetDest(prev);
+                        VIR_Enable prevDestEnable = VIR_Operand_GetEnable(prevDest);
+
+                        if(prevDestEnable & srcChannelEnable &&
+                            VIR_Operand_SameSymbol(prevDest, src))
+                        {
+                            srcDefInst = prev;
+                            break;
+                        }
+                    }
+                    if(prev == BB_GET_START_INST(bb))
+                    {
+                        break;
+                    }
+                    prev = VIR_Inst_GetPrev(prev);
+                }
+                if(srcDefInst)
+                {
+                    _VSC_PH_BuildSubTree(ph, srcDefInst, (gctUINT)srcChannelSwizzle, steps, tree, VSC_PH_Tree_GetNthChildFromNode(tree, subRoot, i));
+                }
+            }
+        }
+    }
+}
+
+static VSC_ErrCode _VSC_PH_BuildTree(
+    IN VSC_PH_Peephole* ph,
+    IN VIR_Instruction* inst,
+    IN gctUINT channel,
+    IN VSC_PH_Step* steps,
+    IN OUT VSC_PH_Tree* tree
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+    VSC_PH_Tree_Node* root;
+
+    root = VSC_PH_Tree_GetRoot(tree);
+    _VSC_PH_BuildSubTree(ph, inst, channel, steps, tree, root);
+
+    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_BUILT_TREE))
+    {
+        _VSC_PH_Tree_Dump(tree, VSC_PH_Peephole_GetDumper(ph));
+    }
+
+    return errCode;
+}
+
+typedef struct VSC_PH_RESULTINSTS
+{
+    VSC_PH_ResultInst resultInsts[VIR_CHANNEL_COUNT];
+} VSC_PH_ResultInsts;
+
+#define VSC_PH_ResultInstsGetNthInst(ris, i)                    (&(ris)->resultInsts[i])
+#define VSC_PH_ResultInstsGetMthInstOpcode(ris, i)              (VSC_PH_ResultInst_GetOpcode(&(ris)->resultInsts[i]))
+#define VSC_PH_ResultInstsGetMthInstNthOpnd(ris, i, j)          (VSC_PH_ResultInst_GetNthOperand(&(ris)->resultInsts[i], j))
+
+static gctBOOL VSC_PH_ResultInsts_CanMerge(
+    IN VSC_PH_Peephole* ph,
+    IN VSC_PH_ResultInsts* resultInsts,
+    IN VIR_Instruction* inst
+    )
+{
+    VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+    VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+    VIR_OpCode mergedOpcode = VIR_OP_NOP;
+    VIR_Operand* instDest = VIR_Inst_GetDest(inst);
+    VIR_Enable instDestEnable = VIR_Operand_GetEnable(instDest);
+    gctUINT channel;
+    gctBOOL canMerge = gcvTRUE;
+    gctINT firstChannel = -1;
+
+    for(channel = 0; channel < VIR_CHANNEL_COUNT; channel++)
+    {
+        if(instDestEnable & (1 << channel))
+        {
+            VSC_PH_ResultInst* currentResultInst = VSC_PH_ResultInstsGetNthInst(resultInsts, channel);
+
+            if(VSC_PH_ResultInst_GetOpcode(currentResultInst) == VIR_OP_NOP)
+            {
+                if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MERGING))
+                {
+                    VIR_LOG(dumper, "channel %d has not result inst. \n", channel);
+                }
+                canMerge = gcvFALSE;
+                break;
+            }
+
+            if(mergedOpcode == VIR_OP_NOP)
+            {
+                mergedOpcode = VSC_PH_ResultInst_GetOpcode(currentResultInst);
+            }
+            else if(mergedOpcode != VSC_PH_ResultInst_GetOpcode(currentResultInst))
+            {
+                if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MERGING))
+                {
+                    VIR_LOG(dumper, "different opcodes. \n");
+                }
+                canMerge = gcvFALSE;
+                break;
+            }
+
+            if(firstChannel == -1)
+            {
+                firstChannel = channel;
+            }
+            else if(!VIR_OPCODE_isComponentwise(mergedOpcode))
+            {
+                if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MERGING))
+                {
+                    VIR_LOG(dumper, "multiple result insts(%d, %d), not componentwise. \n", firstChannel, channel);
+                }
+                canMerge = gcvFALSE;
+                break;
+            }
+            else
+            {
+                VSC_PH_ResultInst* firstChannelInst = VSC_PH_ResultInstsGetNthInst(resultInsts, firstChannel);
+                gctUINT srcNum;
+                gctBOOL srcMatch = gcvTRUE;
+
+                gcmASSERT(mergedOpcode != VIR_OP_NOP);
+                for(srcNum = 0; srcNum < VIR_OPCODE_GetSrcOperandNum(mergedOpcode); srcNum++)
+                {
+                    VSC_PH_ResultInstOperand* firstChannelInstOperand = VSC_PH_ResultInst_GetNthOperand(firstChannelInst, srcNum);
+                    VSC_PH_ResultInstOperand* currentChannelInstOperand = VSC_PH_ResultInst_GetNthOperand(currentResultInst, srcNum);
+
+                    gcmASSERT(VSC_PH_ResultInstOperand_GetChannelCount(firstChannelInstOperand) == 1);
+                    gcmASSERT(VSC_PH_ResultInstOperand_GetChannelCount(currentChannelInstOperand) == 1);
+
+                    if(VSC_PH_ResultInstOperand_GetIsConst(firstChannelInstOperand) != VSC_PH_ResultInstOperand_GetIsConst(firstChannelInstOperand))
+                    {
+                        if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MERGING))
+                        {
+                            VIR_LOG(dumper, "source(%d's %d) dosen't match source(%d's %d). \n", firstChannel, srcNum, channel, srcNum);
+                        }
+                        srcMatch = gcvFALSE;
+                        break;
+                    }
+
+                    if(VSC_PH_ResultInstOperand_GetBaseTypeId(firstChannelInstOperand) != VSC_PH_ResultInstOperand_GetBaseTypeId(firstChannelInstOperand))
+                    {
+                        if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MERGING))
+                        {
+                            VIR_LOG(dumper, "source(%d's %d) dosen't match source(%d's %d). \n", firstChannel, srcNum, channel, srcNum);
+                        }
+                        srcMatch = gcvFALSE;
+                        break;
+                    }
+
+                    if(!VSC_PH_ResultInstOperand_GetIsConst(firstChannelInstOperand))
+                    {
+                        VSC_PH_ResultInstSymOperand* firstChannelInstSymOperand = VSC_PH_ResultInstOperand_GetSymOperand(firstChannelInstOperand);
+                        VSC_PH_ResultInstSymOperand* currentChannelInstSymOperand = VSC_PH_ResultInstOperand_GetSymOperand(currentChannelInstOperand);
+
+                        if(!VIR_Operand_SameIndexedSymbol(VSC_PH_ResultInstSymOperand_GetNthSrcFromOperand(firstChannelInstSymOperand, 0),
+                                                   VSC_PH_ResultInstSymOperand_GetNthSrcFromOperand(currentChannelInstSymOperand, 0)))
+                        {
+                            if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MERGING))
+                            {
+                                VIR_LOG(dumper, "source(%d's %d) dosen't match source(%d's %d). \n", firstChannel, srcNum, channel, srcNum);
+                            }
+                            srcMatch = gcvFALSE;
+                            break;
+                        }
+                    }
+                }
+
+                if(!srcMatch)
+                {
+                    canMerge = gcvFALSE;
+                    break;
+                }
+            }
+        }
+    }
+
+    return mergedOpcode != VIR_OP_NOP && canMerge;
+}
+
+static VSC_ErrCode _VSC_PH_MergeAndAddResultInsts(
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VIR_Instruction* inst,
+    IN OUT VSC_PH_ResultInsts* resultInsts
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_DEF_USAGE_INFO* duInfo = VSC_PH_Peephole_GetDUInfo(ph);
+    VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+    VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+    VIR_OpCode mergedOpcode;
+    VIR_Operand* instDest = VIR_Inst_GetDest(inst);
+    VIR_Enable instDestEnable = VIR_Operand_GetEnable(instDest);
+    VIR_TypeId instDestTypeId = VIR_Operand_GetType(instDest);
+    VIR_Shader* shader = VSC_PH_Peephole_GetShader(ph);
+    VIR_Function* func = VIR_Shader_GetCurrentFunction(shader);
+    VIR_Instruction* newInst = gcvNULL;
+    VIR_Operand* newInstDest;
+    gctUINT channel;
+    gctINT firstHandledChannel = -1;
+
+    gctUINT constMatrix[VIR_MAX_SRC_NUM][VIR_CHANNEL_COUNT];
+    gctUINT constLength[VIR_MAX_SRC_NUM] = {0};
+    gctUINT constBaseTypeId[VIR_MAX_SRC_NUM];
+    VIR_Swizzle constSwizzle[VIR_MAX_SRC_NUM] = {VIR_SWIZZLE_XXXX};
+
+    for(channel = 0; channel < VIR_CHANNEL_COUNT; channel++)
+    {
+        if(instDestEnable & (1 << channel))
+        {
+            break;
+        }
+    }
+
+    mergedOpcode = VSC_PH_ResultInstsGetMthInstOpcode(resultInsts, channel);
+    VIR_Function_AddInstructionAfter(func, mergedOpcode, instDestTypeId, inst, &newInst);
+    newInstDest = VIR_Inst_GetDest(newInst);
+    VIR_Operand_Copy(newInstDest, instDest);
+    /* du update for newInstDest */
+    {
+        VIR_OperandInfo newInstDestInfo;
+        VIR_GENERAL_DU_ITERATOR instDuIter;
+        VIR_USAGE* instUsage;
+        VIR_NATIVE_DEF_FLAGS nativeDefFlags;
+
+        VIR_Operand_GetOperandInfo(newInst, newInstDest, &newInstDestInfo);
+        memset(&nativeDefFlags, 0, sizeof(nativeDefFlags));
+        nativeDefFlags.bIsOutput = newInstDestInfo.isOutput;
+        vscVIR_AddNewDef(duInfo,
+                         newInst,
+                         newInstDestInfo.u1.virRegInfo.startVirReg,
+                         newInstDestInfo.u1.virRegInfo.virRegCount,
+                         instDestEnable,
+                         VIR_HALF_CHANNEL_MASK_FULL,
+                         &nativeDefFlags,
+                         gcvNULL);
+
+        for(channel = 0; channel < VIR_CHANNEL_NUM; channel++)
+        {
+            if(!(instDestEnable & (1 << channel)))
+            {
+                continue;
+            }
+
+            vscVIR_InitGeneralDuIterator(&instDuIter, duInfo, inst, newInstDestInfo.u1.virRegInfo.virReg, (VIR_Enable)channel, gcvFALSE);
+
+            for(instUsage = vscVIR_GeneralDuIterator_First(&instDuIter); instUsage != gcvNULL;
+                instUsage = vscVIR_GeneralDuIterator_Next(&instDuIter))
+            {
+                VIR_Instruction* instUsageInst = instUsage->usageKey.pUsageInst;
+                VIR_Operand* instUsageInstOperand = instUsage->usageKey.pOperand;
+
+                vscVIR_AddNewUsageToDef(duInfo,
+                                        newInst,
+                                        instUsageInst,
+                                        instUsageInstOperand,
+                                        instUsage->usageKey.bIsIndexingRegUsage,
+                                        newInstDestInfo.u1.virRegInfo.startVirReg,
+                                        newInstDestInfo.u1.virRegInfo.virRegCount,
+                                        (VIR_Enable)(1 << channel),
+                                        VIR_HALF_CHANNEL_MASK_FULL,
+                                        gcvNULL);
+            }
+        }
+    }
+
+    for(channel = 0; channel < VIR_CHANNEL_COUNT; channel++)
+    {
+        if(instDestEnable & (1 << channel))
+        {
+            VSC_PH_ResultInst* resultInst = VSC_PH_ResultInstsGetNthInst(resultInsts, channel);
+            gctUINT srcNum;
+
+            for(srcNum = 0; srcNum < VIR_OPCODE_GetSrcOperandNum(mergedOpcode); srcNum++)
+            {
+                VSC_PH_ResultInstOperand* resultInstOperand = VSC_PH_ResultInst_GetNthOperand(resultInst, srcNum);
+                VIR_Operand* newInstOperand = VIR_Inst_GetSource(newInst, srcNum);
+
+                if(VIR_OPCODE_isComponentwise(mergedOpcode))
+                {
+                    gcmASSERT(VSC_PH_ResultInstOperand_GetChannelCount(resultInstOperand) == 1);
+                    if(VSC_PH_ResultInstOperand_GetIsConst(resultInstOperand))
+                    {
+                        VSC_PH_ResultInstConstOperand* constOperand = VSC_PH_ResultInstOperand_GetConstOperand(resultInstOperand);
+                        gctUINT i;
+
+                        constBaseTypeId[srcNum] = VSC_PH_ResultInstOperand_GetBaseTypeId(resultInstOperand);
+                        /* skip duplicated const */
+                        for(i = 0; i < constLength[srcNum]; i++)
+                        {
+                            if(constMatrix[srcNum][i] == VSC_PH_ResultInstConstOperand_GetNthUint32Val(constOperand, 0))
+                            {
+                                VIR_Swizzle_SetChannel(constSwizzle[srcNum], channel, i);
+                                break;
+                            }
+                        }
+                        if(i == constLength[srcNum])
+                        {
+                            constMatrix[srcNum][constLength[srcNum]] = VSC_PH_ResultInstConstOperand_GetNthUint32Val(constOperand, 0);
+                            VIR_Swizzle_SetChannel(constSwizzle[srcNum], channel, constLength[srcNum]);
+                            constLength[srcNum]++;
+                        }
+
+                        if(firstHandledChannel == -1)
+                        {
+                            VIR_Operand_SetType(newInstOperand,
+                                                VIR_TypeId_ComposeNonOpaqueType(VSC_PH_ResultInstOperand_GetBaseTypeId(resultInstOperand),
+                                                                                VIR_Enable_Channel_Count(instDestEnable),
+                                                                                1));
+                        }
+                    }
+                    else
+                    {
+                        VSC_PH_ResultInstSymOperand* symOperand = VSC_PH_ResultInstOperand_GetSymOperand(resultInstOperand);
+                        VIR_Operand* fromOperand = VSC_PH_ResultInstSymOperand_GetNthSrcFromOperand(symOperand, 0);
+                        VIR_Swizzle swizzle = VSC_PH_ResultInstSymOperand_GetNthSrcSwizzle(symOperand, 0);
+                        VIR_Swizzle newSwizzle;
+
+                        if(firstHandledChannel == -1)
+                        {
+                            VIR_Operand_Copy(newInstOperand, fromOperand);
+                            VIR_Operand_SetType(newInstOperand,
+                                                VIR_TypeId_ComposeNonOpaqueType(VSC_PH_ResultInstOperand_GetBaseTypeId(resultInstOperand),
+                                                                                VIR_Enable_Channel_Count(instDestEnable),
+                                                                                1));
+                        }
+
+                        newSwizzle = VIR_Operand_GetSwizzle(newInstOperand);
+                        VIR_Swizzle_SetChannel(newSwizzle, channel, swizzle);
+                        VIR_Operand_SetSwizzle(newInstOperand, newSwizzle);
+                        /* du update for newInstOperand */
+                        {
+                            VIR_Instruction* fromInst = VSC_PH_ResultInstSymOperand_GetNthSrcFromInst(symOperand, 0);
+                            VIR_OperandInfo newInstOperandInfo;
+                            VIR_GENERAL_UD_ITERATOR fromOperandUdIter;
+                            VIR_DEF* fromOperandDef;
+
+                            VIR_Operand_GetOperandInfo(fromInst, fromOperand, &newInstOperandInfo);
+                            vscVIR_InitGeneralUdIterator(&fromOperandUdIter, duInfo, fromInst, fromOperand, gcvFALSE, gcvFALSE);
+
+                            for(fromOperandDef = vscVIR_GeneralUdIterator_First(&fromOperandUdIter); fromOperandDef != gcvNULL;
+                                fromOperandDef = vscVIR_GeneralUdIterator_Next(&fromOperandUdIter))
+                            {
+                                VIR_Instruction* fromOperandDefInst = fromOperandDef->defKey.pDefInst;
+
+                                vscVIR_AddNewUsageToDef(duInfo,
+                                                        fromOperandDefInst,
+                                                        newInst,
+                                                        newInstOperand,
+                                                        gcvFALSE,
+                                                        newInstOperandInfo.u1.virRegInfo.startVirReg,
+                                                        newInstOperandInfo.u1.virRegInfo.virRegCount,
+                                                        (VIR_Enable)(1 << swizzle),
+                                                        VIR_HALF_CHANNEL_MASK_FULL,
+                                                        gcvNULL);
+                            }
+                            if(newInstOperandInfo.indexingVirRegNo != VIR_INVALID_REG_NO)
+                            {
+                                vscVIR_InitGeneralUdIterator(&fromOperandUdIter, duInfo, fromInst, fromOperand, gcvTRUE, gcvFALSE);
+
+                                for(fromOperandDef = vscVIR_GeneralUdIterator_First(&fromOperandUdIter); fromOperandDef != gcvNULL;
+                                    fromOperandDef = vscVIR_GeneralUdIterator_Next(&fromOperandUdIter))
+                                {
+                                    VIR_Instruction* fromOperandDefInst = fromOperandDef->defKey.pDefInst;
+
+                                    vscVIR_AddNewUsageToDef(duInfo,
+                                                            fromOperandDefInst,
+                                                            newInst,
+                                                            newInstOperand,
+                                                            gcvTRUE,
+                                                            newInstOperandInfo.indexingVirRegNo,
+                                                            1,
+                                                            (VIR_Enable)(newInstOperandInfo.indexingKind),
+                                                            VIR_HALF_CHANNEL_MASK_FULL,
+                                                            gcvNULL);
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    if(VSC_PH_ResultInstOperand_GetIsConst(resultInstOperand))
+                    {
+                        VSC_PH_ResultInstConstOperand* constOperand = VSC_PH_ResultInstOperand_GetConstOperand(resultInstOperand);
+                        gctUINT i;
+
+                        for(i = 0; i < VSC_PH_ResultInstOperand_GetChannelCount(resultInstOperand); i++)
+                        {
+                            gctUINT j;
+
+                            constBaseTypeId[srcNum] = VSC_PH_ResultInstOperand_GetBaseTypeId(resultInstOperand);
+                            /* skip duplicated const */
+                            for(j = 0; j < i; j++)
+                            {
+                                if(constMatrix[srcNum][j] == VSC_PH_ResultInstConstOperand_GetNthUint32Val(constOperand, i))
+                                {
+                                    VIR_Swizzle_SetChannel(constSwizzle[srcNum], i, j);
+                                    break;
+                                }
+                            }
+                            if(j == i)
+                            {
+                                constMatrix[srcNum][constLength[srcNum]] = VSC_PH_ResultInstConstOperand_GetNthUint32Val(constOperand, i);
+                                VIR_Swizzle_SetChannel(constSwizzle[srcNum], i, constLength[srcNum]);
+                                constLength[srcNum]++;
+                            }
+                        }
+
+                    }
+                    else
+                    {
+                        VSC_PH_ResultInstSymOperand* symOperand = VSC_PH_ResultInstOperand_GetSymOperand(resultInstOperand);
+                        gctUINT i;
+
+                        for(i = 0; i < VSC_PH_ResultInstOperand_GetChannelCount(resultInstOperand); i++)
+                        {
+                            VIR_Operand* fromOperand = VSC_PH_ResultInstSymOperand_GetNthSrcFromOperand(symOperand, i);
+                            VIR_Swizzle swizzle = VSC_PH_ResultInstSymOperand_GetNthSrcSwizzle(symOperand, i);
+                            VIR_Swizzle newSwizzle;
+
+                            if(i == 0)
+                            {
+                                VIR_Operand_Copy(newInstOperand, fromOperand);
+                            }
+
+                            newSwizzle = VIR_Operand_GetSwizzle(newInstOperand);
+                            VIR_Swizzle_SetChannel(newSwizzle, i, swizzle);
+                            VIR_Operand_SetSwizzle(newInstOperand, newSwizzle);
+                            /* du update for newInstOperand */
+                            {
+                                VIR_Instruction* fromInst = VSC_PH_ResultInstSymOperand_GetNthSrcFromInst(symOperand, i);
+                                VIR_OperandInfo newInstOperandInfo;
+                                VIR_GENERAL_UD_ITERATOR fromOperandUdIter;
+                                VIR_DEF* fromOperandDef;
+
+                                VIR_Operand_GetOperandInfo(fromInst, fromOperand, &newInstOperandInfo);
+                                vscVIR_InitGeneralUdIterator(&fromOperandUdIter, duInfo, fromInst, fromOperand, gcvFALSE, gcvFALSE);
+
+                                for(fromOperandDef = vscVIR_GeneralUdIterator_First(&fromOperandUdIter); fromOperandDef != gcvNULL;
+                                    fromOperandDef = vscVIR_GeneralUdIterator_Next(&fromOperandUdIter))
+                                {
+                                    VIR_Instruction* fromOperandDefInst = fromOperandDef->defKey.pDefInst;
+
+                                    vscVIR_AddNewUsageToDef(duInfo,
+                                                            fromOperandDefInst,
+                                                            newInst,
+                                                            newInstOperand,
+                                                            gcvFALSE,
+                                                            newInstOperandInfo.u1.virRegInfo.startVirReg,
+                                                            newInstOperandInfo.u1.virRegInfo.virRegCount,
+                                                            (VIR_Enable)(1 << swizzle),
+                                                            VIR_HALF_CHANNEL_MASK_FULL,
+                                                            gcvNULL);
+                                }
+                                if(newInstOperandInfo.indexingVirRegNo != VIR_INVALID_REG_NO)
+                                {
+                                    vscVIR_InitGeneralUdIterator(&fromOperandUdIter, duInfo, fromInst, fromOperand, gcvTRUE, gcvFALSE);
+
+                                    for(fromOperandDef = vscVIR_GeneralUdIterator_First(&fromOperandUdIter); fromOperandDef != gcvNULL;
+                                        fromOperandDef = vscVIR_GeneralUdIterator_Next(&fromOperandUdIter))
+                                    {
+                                        VIR_Instruction* fromOperandDefInst = fromOperandDef->defKey.pDefInst;
+
+                                        vscVIR_AddNewUsageToDef(duInfo,
+                                                                fromOperandDefInst,
+                                                                newInst,
+                                                                newInstOperand,
+                                                                gcvTRUE,
+                                                                newInstOperandInfo.indexingVirRegNo,
+                                                                1,
+                                                                (VIR_Enable)(newInstOperandInfo.indexingKind),
+                                                                VIR_HALF_CHANNEL_MASK_FULL,
+                                                                gcvNULL);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    VIR_Operand_SetType(newInstOperand,
+                                        VIR_TypeId_ComposeNonOpaqueType(VSC_PH_ResultInstOperand_GetBaseTypeId(resultInstOperand),
+                                                                        VSC_PH_ResultInstOperand_GetChannelCount(resultInstOperand),
+                                                                        1));
+                }
+            }
+
+            if(firstHandledChannel == -1)
+            {
+                firstHandledChannel = channel;
+            }
+        }
+    }
+
+    /* set src constant value */
+    {
+        gctUINT srcNum;
+        for(srcNum = 0; srcNum < VIR_OPCODE_GetSrcOperandNum(mergedOpcode); srcNum++)
+        {
+            VIR_Operand* newInstSrc = VIR_Inst_GetSource(newInst, srcNum);
+
+            if(constLength[srcNum] > 0)
+            {
+                if(constLength[srcNum] == 1)
+                {
+                    switch(constBaseTypeId[srcNum])
+                    {
+                        case VIR_TYPE_INT32:
+                            VIR_Operand_SetImmediateInt(newInstSrc, (gctINT)constMatrix[srcNum][0]);
+                            break;
+                        case VIR_TYPE_UINT32:
+                            VIR_Operand_SetImmediateUint(newInstSrc, constMatrix[srcNum][0]);
+                            break;
+                        case VIR_TYPE_FLOAT32:
+                            VIR_Operand_SetImmediateFloat(newInstSrc, *(gctFLOAT*)&constMatrix[srcNum][0]);
+                            break;
+                        default:
+                            gcmASSERT(0);
+                    }
+                }
+                else
+                {
+
+                }
+            }
+        }
+    }
+
+    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_OUTPUT_INST))
+    {
+        VIR_LOG(dumper, "new instrucion:\n");
+        VIR_Inst_Dump(dumper, newInst);
+    }
+
+    return errCode;
+}
+
+static VSC_ErrCode _VSC_PH_RemoveInst(
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VIR_Instruction* inst
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_DEF_USAGE_INFO* duInfo = VSC_PH_Peephole_GetDUInfo(ph);
+    VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
+
+    if(VIR_OPCODE_hasDest(opcode))
+    {
+        VIR_Operand* instDest = VIR_Inst_GetDest(inst);
+        VIR_Enable instDestEnable = VIR_Operand_GetEnable(instDest);
+        VIR_OperandInfo instDestInfo;
+        gctUINT8 channel;
+
+        VIR_Operand_GetOperandInfo(inst, instDest, &instDestInfo);
+
+        for(channel = 0; channel < VIR_CHANNEL_COUNT; channel++)
+        {
+            if(instDestEnable & (1 << channel))
+            {
+                vscVIR_DeleteDef(duInfo, inst, instDestInfo.u1.virRegInfo.startVirReg, instDestInfo.u1.virRegInfo.virRegCount, (VIR_Enable)(1 << channel), VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+            }
+        }
+    }
+
+    {
+        gctUINT i;
+
+        for(i = 0; i < VIR_OPCODE_GetSrcOperandNum(opcode); i++)
+        {
+            VIR_Operand* instSrc = VIR_Inst_GetSource(inst, i);
+            VIR_Swizzle instSrcSwizzle = VIR_Operand_GetSwizzle(instSrc);
+            VIR_Enable instSrcEnable = VIR_Swizzle_2_Enable(instSrcSwizzle);
+            VIR_OperandInfo instSrcInfo;
+            VIR_GENERAL_UD_ITERATOR instSrcUdIter;
+            VIR_DEF* instSrcDef;
+
+            VIR_Operand_GetOperandInfo(inst, instSrc, &instSrcInfo);
+            vscVIR_InitGeneralUdIterator(&instSrcUdIter, duInfo, inst, instSrc, gcvFALSE, gcvFALSE);
+
+            for(instSrcDef = vscVIR_GeneralUdIterator_First(&instSrcUdIter); instSrcDef != gcvNULL; instSrcDef = vscVIR_GeneralUdIterator_Next(&instSrcUdIter))
+            {
+                VIR_Instruction* instSrcDefInst = instSrcDef->defKey.pDefInst;
+
+                vscVIR_DeleteUsage(duInfo,
+                                   instSrcDefInst,
+                                   inst,
+                                   instSrc,
+                                   gcvFALSE,
+                                   instSrcInfo.u1.virRegInfo.startVirReg,
+                                   instSrcInfo.u1.virRegInfo.virRegCount,
+                                   instSrcEnable,
+                                   VIR_HALF_CHANNEL_MASK_FULL,
+                                   gcvNULL);
+            }
+            if(instSrcInfo.indexingVirRegNo != VIR_INVALID_REG_NO)
+            {
+                vscVIR_InitGeneralUdIterator(&instSrcUdIter, duInfo, inst, instSrc, gcvTRUE, gcvFALSE);
+
+                for(instSrcDef = vscVIR_GeneralUdIterator_First(&instSrcUdIter); instSrcDef != gcvNULL; instSrcDef = vscVIR_GeneralUdIterator_Next(&instSrcUdIter))
+                {
+                    VIR_Instruction* instSrcDefInst = instSrcDef->defKey.pDefInst;
+
+                    vscVIR_DeleteUsage(duInfo,
+                                       instSrcDefInst,
+                                       inst,
+                                       instSrc,
+                                       gcvTRUE,
+                                       instSrcInfo.indexingVirRegNo,
+                                       1,
+                                       (VIR_Enable)instSrcInfo.indexingKind,
+                                       VIR_HALF_CHANNEL_MASK_FULL,
+                                       gcvNULL);
+                }
+            }
+        }
+    }
+
+    {
+        VIR_Shader* shader = VSC_PH_Peephole_GetShader(ph);
+        VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+        VIR_Function* func = VIR_Shader_GetCurrentFunction(shader);
+
+        if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_OUTPUT_INST))
+        {
+            VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+
+            VIR_LOG(dumper, "removed instrucion:\n");
+            VIR_Inst_Dump(dumper, inst);
+        }
+        VIR_Function_RemoveInstruction(func, inst);
+    }
+    return errCode;
+}
+
+static VSC_ErrCode _VSC_PH_PerformOnInst(
+    IN OUT VSC_PH_Peephole* ph,
+    IN OUT VIR_Instruction* inst
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+    VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
+    VSC_PH_Step* steps = _VSC_PH_GetOpSteps(opcode);
+    VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+
+    if(steps)
+    {
+        if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_INPUT_INST))
+        {
+            VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+
+            VIR_LOG(dumper, "start peephole optimization for inst:\n");
+            VIR_Inst_Dump(dumper, inst);
+        }
+
+        if(VIR_OPCODE_isComponentwise(opcode))
+        {
+            VIR_Operand* dest = VIR_Inst_GetDest(inst);
+            VIR_Enable enable = VIR_Operand_GetEnable(dest);
+            gctUINT channel;
+            VSC_PH_ResultInsts resultInsts;
+
+            gcoOS_MemFill(&resultInsts, 0, sizeof(VSC_PH_ResultInsts));
+            for(channel = 0; channel < VIR_CHANNEL_COUNT; channel++)
+            {
+                VSC_PH_Step* currentStep = steps;
+                VIR_Enable channelEnable = (VIR_Enable)(1 << channel);
+                if(enable & channelEnable)
+                {
+                    VSC_PH_Tree tree = {
+                                        {
+                                         {0, gcvNULL},
+                                         {1, gcvNULL},
+                                         {2, gcvNULL},
+                                         {3, gcvNULL},
+                                         {4, gcvNULL},
+                                         {5, gcvNULL},
+                                         {6, gcvNULL},
+                                         {7, gcvNULL},
+                                         {8, gcvNULL},
+                                         {9, gcvNULL},
+                                         {10, gcvNULL},
+                                         {11, gcvNULL},
+                                         {12, gcvNULL},
+                                         {13, gcvNULL},
+                                         {14, gcvNULL}
+                                        }
+                                       };
+                    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_BUILT_TREE) ||
+                       VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_REQUIREMENTS) ||
+                       VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_TRANSFORMS))
+                    {
+                        VIR_LOG(dumper, "for channel %d:\n", channel);
+                    }
+
+                    _VSC_PH_BuildTree(ph, inst, channel, currentStep, &tree);
+                    currentStep += VSC_PH_Step_GetEndDist(currentStep);
+                    while(VSC_PH_Step_GetEndDist(currentStep))
+                    {
+                        gctBOOL reqMet = gcvTRUE;
+
+                        while(gcvTRUE)
+                        {
+                            VSC_PH_Oper* oper = VSC_PH_Step_GetOper(currentStep);
+                            reqMet = VSC_PH_Oper_PerformTransRequirements(oper, ph, &tree, gcvNULL);
+                            if(!reqMet || VSC_PH_Step_GetEndDist(currentStep) == 1)
+                            {
+                                currentStep++;
+                                break;
+                            }
+                            currentStep++;
+                        }
+
+                        if(reqMet)
+                        {
+                            while(gcvTRUE)
+                            {
+                                VSC_PH_Oper* oper = VSC_PH_Step_GetOper(currentStep);
+#if gcdDEBUG
+                                gctBOOL result = VSC_PH_Oper_PerformTransformations(oper, ph, &tree, VSC_PH_ResultInstsGetNthInst(&resultInsts, channel));
+                                gcmASSERT(result);
+#else
+                                VSC_PH_Oper_PerformTransformations(oper, ph, &tree, VSC_PH_ResultInstsGetNthInst(&resultInsts, channel));
+#endif
+                                if(VSC_PH_Step_GetEndDist(currentStep) == 1)
+                                {
+                                    break;
+                                }
+                                currentStep++;
+                            }
+
+                            _VSC_PH_ResultInst_Dump(VSC_PH_ResultInstsGetNthInst(&resultInsts, channel), dumper);
+
+                            /* one transformation is enough */
+                            break;
+                        }
+                        else
+                        {
+                            currentStep += VSC_PH_Step_GetEndDist(currentStep);
+                            currentStep += VSC_PH_Step_GetEndDist(currentStep);
+                        }
+                    }
+                }
+            }
+
+            if(VSC_PH_ResultInsts_CanMerge(ph, &resultInsts, inst))
+            {
+                _VSC_PH_MergeAndAddResultInsts(ph, inst, &resultInsts);
+                _VSC_PH_RemoveInst(ph, inst);
+                VSC_PH_Peephole_SetExprChanged(ph, gcvTRUE);
+            }
+        }
+    }
+
+    return errCode;
+}
+
+static VSC_ErrCode _VSC_PH_PerformOnBB(
+    IN OUT VSC_PH_Peephole* ph
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_BB* bb = VSC_PH_Peephole_GetCurrBB(ph);
+    VIR_Instruction* inst = BB_GET_START_INST(bb);
+
+    if(inst)
+    {
+        while(gcvTRUE)
+        {
+            _VSC_PH_PerformOnInst(ph, inst);
+            if(inst == BB_GET_END_INST(bb))
+            {
+                break;
+            }
+            inst = VIR_Inst_GetNext(inst);
+        }
+    }
+
+    return errCode;
+}
+
+/* new PH code end */
+
 static gctBOOL _VSC_PH_DoesOpcodeSupportLValueModifier(
     IN VIR_OpCode opcode
     )
@@ -179,8 +2138,8 @@ static gctBOOL _VSC_PH_DoesOpcodeSupportLValueModifier(
         return gcvFALSE;
     }
 
-    if (opcode == VIR_OP_LOAD      ||
-        opcode == VIR_OP_LOAD_ATTR ||
+    if (VIR_OPCODE_isMemLd(opcode)  ||
+        opcode == VIR_OP_LOAD_ATTR  ||
         opcode == VIR_OP_ATTR_LD)
     {
         return gcvFALSE;
@@ -214,6 +2173,7 @@ static VSC_ErrCode _VSC_PH_GenerateLValueModifier(
     gctUINT8 channel;
     VIR_GENERAL_UD_ITERATOR ud_iter;
     VIR_DEF* def;
+    VIR_NATIVE_DEF_FLAGS nativeDefFlags;
 
     inst_src0 = VIR_Inst_GetSource(inst, 0);
     inst_src0_swizzle = VIR_Operand_GetSwizzle(inst_src0);
@@ -292,7 +2252,7 @@ static VSC_ErrCode _VSC_PH_GenerateLValueModifier(
 
     /* check prerequisite and collect work set at the same time */
     work_set = vscHTBL_Create(VSC_PH_Peephole_GetMM(ph), vscHFUNC_Default, vscHKCMP_Default, 512);
-    vscVIR_InitGeneralUdIterator(&ud_iter, VSC_PH_Peephole_GetDUInfo(ph), inst, inst_src0, gcvFALSE);
+    vscVIR_InitGeneralUdIterator(&ud_iter, VSC_PH_Peephole_GetDUInfo(ph), inst, inst_src0, gcvFALSE, gcvFALSE);
     def = vscVIR_GeneralUdIterator_First(&ud_iter);
 
     /* inst_src0 should have def. */
@@ -387,7 +2347,8 @@ static VSC_ErrCode _VSC_PH_GenerateLValueModifier(
         /* inst should be the only use of def_inst */
         {
             VIR_Instruction* breaking_use;
-            if(!vscVIR_IsUniqueUsageInstOfDefInst(VSC_PH_Peephole_GetDUInfo(ph), def_inst, inst, &breaking_use))
+            if(!vscVIR_IsUniqueUsageInstOfDefInst(VSC_PH_Peephole_GetDUInfo(ph), def_inst, inst, gcvNULL,
+                                                  gcvFALSE, &breaking_use, gcvNULL, gcvNULL))
             {
                 if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MODIFIER))
                 {
@@ -502,9 +2463,12 @@ static VSC_ErrCode _VSC_PH_GenerateLValueModifier(
                 vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), work_inst, inst_src0_info.u1.virRegInfo.virReg,
                                  1, old_work_inst_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
                 VIR_Operand_ReplaceDefOperandWithDef(work_inst_dest, inst_dest, new_work_inst_enable);
+
+                memset(&nativeDefFlags, 0, sizeof(nativeDefFlags));
+                nativeDefFlags.bIsInput = inst_dest_info.isInput;
+                nativeDefFlags.bIsOutput = inst_dest_info.isOutput;
                 vscVIR_AddNewDef(VSC_PH_Peephole_GetDUInfo(ph), work_inst, inst_dest_info.u1.virRegInfo.virReg, 1,
-                                 new_work_inst_enable, VIR_HALF_CHANNEL_MASK_FULL,
-                                 inst_dest_info.isInput, inst_dest_info.isOutput, gcvNULL);
+                                 new_work_inst_enable, VIR_HALF_CHANNEL_MASK_FULL, &nativeDefFlags, gcvNULL);
 
                 if (!(VIR_Inst_GetOpcode(work_inst) == VIR_OP_DP2
                     || VIR_Inst_GetOpcode(work_inst) == VIR_OP_DP3
@@ -554,11 +2518,11 @@ static VSC_ErrCode _VSC_PH_GenerateLValueModifier(
                             enable = VIR_Swizzle_2_Enable(swizzle);
                         }
 
-                        vscVIR_DeleteUsage(VSC_PH_Peephole_GetDUInfo(ph), inst, inst_usage_inst, inst_usage_opnd,
+                        vscVIR_DeleteUsage(VSC_PH_Peephole_GetDUInfo(ph), inst, inst_usage_inst, inst_usage_opnd, gcvFALSE,
                                            inst_dest_info.u1.virRegInfo.virReg, 1,
                                            (VIR_Enable)(enable & inst_dest_enable), VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
                         if(new_work_inst_enable & enable)
-                            vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), work_inst, inst_usage_inst, inst_usage_opnd,
+                            vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), work_inst, inst_usage_inst, inst_usage_opnd, gcvFALSE,
                                                     inst_dest_info.u1.virRegInfo.virReg, 1, (VIR_Enable)(new_work_inst_enable & enable),
                                                     VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
                     }
@@ -583,7 +2547,7 @@ static VSC_ErrCode _VSC_PH_GenerateLValueModifier(
 
         /* delete the usage info of the src of input inst */
         vscVIR_DeleteUsage(VSC_PH_Peephole_GetDUInfo(ph), VIR_ANY_DEF_INST, inst,
-                           inst_src0, inst_src0_info.u1.virRegInfo.virReg, 1,
+                           inst_src0, gcvFALSE, inst_src0_info.u1.virRegInfo.virReg, 1,
                            inst_src0_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
         /* delete the def info of the dest of input inst */
         vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), inst, inst_dest_info.u1.virRegInfo.virReg,
@@ -785,7 +2749,8 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
             /* in case of loop, inst should be the only def of usage_inst */
             {
                 VIR_Instruction* breaking_def;
-                if(!vscVIR_IsUniqueDefInstOfUsageInst(VSC_PH_Peephole_GetDUInfo(ph), usage_inst, usage_opnd, inst, &breaking_def))
+                if(!vscVIR_IsUniqueDefInstOfUsageInst(VSC_PH_Peephole_GetDUInfo(ph), usage_inst, usage_opnd,
+                                                      usage->usageKey.bIsIndexingRegUsage, inst, &breaking_def))
                 {
                     if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MODIFIER))
                     {
@@ -847,7 +2812,7 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
 
             def_inst_set = vscHTBL_Create(VSC_PH_Peephole_GetMM(ph), vscHFUNC_Default, vscHKCMP_Default, 512);
 
-            vscVIR_InitGeneralUdIterator(&inst_ud_iter, VSC_PH_Peephole_GetDUInfo(ph), inst, inst_src0, gcvFALSE);
+            vscVIR_InitGeneralUdIterator(&inst_ud_iter, VSC_PH_Peephole_GetDUInfo(ph), inst, inst_src0, gcvFALSE, gcvFALSE);
             for(def = vscVIR_GeneralUdIterator_First(&inst_ud_iter); def != gcvNULL;
                 def = vscVIR_GeneralUdIterator_Next(&inst_ud_iter))
             {
@@ -886,7 +2851,7 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
                 VIR_Operand_ReplaceUseOperandWithUse(work_opnd, inst_src0, swizzle);
                 VIR_Operand_SetModifier(work_opnd, VSC_PH_ModifierToGen_GetModifier(mtg));
                 vscVIR_DeleteUsage(VSC_PH_Peephole_GetDUInfo(ph), VIR_ANY_DEF_INST, work_inst,
-                                   work_opnd, inst_dest_info.u1.virRegInfo.virReg, 1,
+                                   work_opnd, gcvFALSE, inst_dest_info.u1.virRegInfo.virReg, 1,
                                    old_work_inst_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
 
                 if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MODIFIER))
@@ -923,7 +2888,7 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
                            the channels used in work_inst is a subset of the enable of inst*/
                         if(enable & work_inst_enable)
                         {
-                            vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, work_inst, work_opnd,
+                            vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, work_inst, work_opnd, gcvFALSE,
                                                     inst_src0_info.u1.virRegInfo.virReg, 1,
                                                     (VIR_Enable)(enable & work_inst_enable), VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
                         }
@@ -933,7 +2898,7 @@ static VSC_ErrCode _VSC_PH_GenerateRValueModifier(
         }
 
         vscVIR_DeleteUsage(VSC_PH_Peephole_GetDUInfo(ph), VIR_ANY_DEF_INST,
-                           inst, inst_src0, inst_src0_info.u1.virRegInfo.virReg,
+                           inst, inst_src0, gcvFALSE, inst_src0_info.u1.virRegInfo.virReg,
                            1, inst_src0_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
         vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), inst, inst_dest_info.u1.virRegInfo.virReg,
                          1, inst_dest_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
@@ -1187,6 +3152,22 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
                 break;
             }
 
+            /* the result of mul must be of the same basic type of its usage in add/sub */
+            if(VIR_GetTypeComponentType(VIR_Operand_GetType(mul_dest)) != VIR_GetTypeComponentType(VIR_Operand_GetType(use_inst_opnd)))
+            {
+                if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MAD))
+                {
+                    VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+                    VIR_LOG(dumper, "not processed because of its usage in:\n");
+                    VIR_LOG_FLUSH(dumper);
+                    VIR_Inst_Dump(dumper, use_inst);
+                    VIR_LOG(dumper, "\nis not of the same basic type of the def\n");
+                    VIR_LOG_FLUSH(dumper);
+                }
+                invalid_case = gcvTRUE;
+                break;
+            }
+
             /* use_inst should not have different rounding mode from the mul instruction */
             use_inst_dest = VIR_Inst_GetDest(use_inst);
             if(VIR_Operand_GetRoundMode(use_inst_dest) != VIR_Operand_GetRoundMode(mul_dest))
@@ -1304,7 +3285,8 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
             /* in case of loop, mul should be the only def of add/sub usage. */
             {
                 VIR_Instruction* breaking_def;
-                if(!vscVIR_IsUniqueDefInstOfUsageInst(VSC_PH_Peephole_GetDUInfo(ph), use_inst, use_inst_opnd, mul, &breaking_def))
+                if(!vscVIR_IsUniqueDefInstOfUsageInst(VSC_PH_Peephole_GetDUInfo(ph), use_inst, use_inst_opnd,
+                                                      usage->usageKey.bIsIndexingRegUsage, mul, &breaking_def))
                 {
                     if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MODIFIER))
                     {
@@ -1370,7 +3352,7 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
             VIR_GENERAL_UD_ITERATOR inst_ud_iter;
             VIR_DEF* def;
 
-            vscVIR_InitGeneralUdIterator(&inst_ud_iter, VSC_PH_Peephole_GetDUInfo(ph), mul, mul_src0, gcvFALSE);
+            vscVIR_InitGeneralUdIterator(&inst_ud_iter, VSC_PH_Peephole_GetDUInfo(ph), mul, mul_src0, gcvFALSE, gcvFALSE);
             for(def = vscVIR_GeneralUdIterator_First(&inst_ud_iter); def != gcvNULL;
                 def = vscVIR_GeneralUdIterator_Next(&inst_ud_iter))
             {
@@ -1378,7 +3360,7 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
                 vscHTBL_DirectSet(def_inst_set0, (void*)def_inst, gcvNULL);
             }
 
-            vscVIR_InitGeneralUdIterator(&inst_ud_iter, VSC_PH_Peephole_GetDUInfo(ph), mul, mul_src1, gcvFALSE);
+            vscVIR_InitGeneralUdIterator(&inst_ud_iter, VSC_PH_Peephole_GetDUInfo(ph), mul, mul_src1, gcvFALSE, gcvFALSE);
             for(def = vscVIR_GeneralUdIterator_First(&inst_ud_iter); def != gcvNULL;
                 def = vscVIR_GeneralUdIterator_Next(&inst_ud_iter))
             {
@@ -1415,7 +3397,7 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
             }
 
             vscVIR_DeleteUsage(VSC_PH_Peephole_GetDUInfo(ph), VIR_ANY_DEF_INST, add_sub,
-                               mul_dest_usage, mul_dest_info.u1.virRegInfo.virReg, 1,
+                               mul_dest_usage, gcvFALSE, mul_dest_info.u1.virRegInfo.virReg, 1,
                                mul_dest_usage_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
             VIR_Function_DupOperand(func, mul_src0, &mad_src0);
             VIR_Function_DupOperand(func, mul_src1, &mad_src1);
@@ -1497,7 +3479,7 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
 
                     if (def_dest_enable & mad_src0_enable)
                     {
-                        vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, add_sub, mad_src0,
+                        vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, add_sub, mad_src0, gcvFALSE,
                                                 mul_src0_info.u1.virRegInfo.virReg, 1, (VIR_Enable)(def_dest_enable & mad_src0_enable),
                                                 VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
                     }
@@ -1520,7 +3502,7 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
 
                     if (def_dest_enable & mad_src1_enable)
                     {
-                        vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, add_sub, mad_src1,
+                        vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, add_sub, mad_src1, gcvFALSE,
                                                 mul_src1_info.u1.virRegInfo.virReg, 1,
                                                 (VIR_Enable)(def_dest_enable & mad_src1_enable),
                                                 VIR_HALF_CHANNEL_MASK_FULL,
@@ -1545,10 +3527,10 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
         /* remove the use of mul_src0 and mul_src1 */
         {
             vscVIR_DeleteUsage(VSC_PH_Peephole_GetDUInfo(ph), VIR_ANY_DEF_INST, mul,
-                               mul_src0, mul_src0_info.u1.virRegInfo.virReg, 1,
+                               mul_src0, gcvFALSE, mul_src0_info.u1.virRegInfo.virReg, 1,
                                mul_src0_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
             vscVIR_DeleteUsage(VSC_PH_Peephole_GetDUInfo(ph), VIR_ANY_DEF_INST, mul,
-                               mul_src1, mul_src1_info.u1.virRegInfo.virReg, 1,
+                               mul_src1, gcvFALSE, mul_src1_info.u1.virRegInfo.virReg, 1,
                                mul_src1_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
         }
         /* remove the def of mul */
@@ -1760,7 +3742,8 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
             /* in case of loop, sqrt should be the only def of rcp usage. */
             {
                 VIR_Instruction* breaking_def;
-                if(!vscVIR_IsUniqueDefInstOfUsageInst(VSC_PH_Peephole_GetDUInfo(ph), use_inst, use_inst_opnd, sqrt, &breaking_def))
+                if(!vscVIR_IsUniqueDefInstOfUsageInst(VSC_PH_Peephole_GetDUInfo(ph), use_inst, use_inst_opnd,
+                                                      usage->usageKey.bIsIndexingRegUsage, sqrt, &breaking_def))
                 {
                     if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MODIFIER))
                     {
@@ -1823,7 +3806,7 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
             VIR_GENERAL_UD_ITERATOR inst_ud_iter;
             VIR_DEF* def;
 
-            vscVIR_InitGeneralUdIterator(&inst_ud_iter, VSC_PH_Peephole_GetDUInfo(ph), sqrt, sqrt_src0, gcvFALSE);
+            vscVIR_InitGeneralUdIterator(&inst_ud_iter, VSC_PH_Peephole_GetDUInfo(ph), sqrt, sqrt_src0, gcvFALSE, gcvFALSE);
             for(def = vscVIR_GeneralUdIterator_First(&inst_ud_iter); def != gcvNULL;
                 def = vscVIR_GeneralUdIterator_Next(&inst_ud_iter))
             {
@@ -1856,7 +3839,7 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
             }
 
             vscVIR_DeleteUsage(VSC_PH_Peephole_GetDUInfo(ph), VIR_ANY_DEF_INST, rcp,
-                               sqrt_dest_usage, sqrt_dest_info.u1.virRegInfo.virReg, 1,
+                               sqrt_dest_usage, gcvFALSE, sqrt_dest_info.u1.virRegInfo.virReg, 1,
                                sqrt_dest_usage_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
             VIR_Function_DupOperand(func, sqrt_src0, &rsq_src0);
             VIR_Operand_SetSwizzle(rsq_src0, rsq_src0_swizzle);
@@ -1887,7 +3870,7 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
 
                     if (def_dest_enable & rsq_src0_enable)
                     {
-                        vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, rcp, rsq_src0,
+                        vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, rcp, rsq_src0, gcvFALSE,
                                                 sqrt_src0_info.u1.virRegInfo.virReg, 1, (VIR_Enable)(def_dest_enable & rsq_src0_enable),
                                                 VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
                     }
@@ -1910,7 +3893,7 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
         /* remove the use of sqrt_src0 */
         {
             vscVIR_DeleteUsage(VSC_PH_Peephole_GetDUInfo(ph), VIR_ANY_DEF_INST, sqrt,
-                               sqrt_src0, sqrt_src0_info.u1.virRegInfo.virReg, 1,
+                               sqrt_src0, gcvFALSE, sqrt_src0_info.u1.virRegInfo.virReg, 1,
                                sqrt_src0_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
         }
         /* remove the def of sqrt */
@@ -1940,7 +3923,387 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
     return errCode;
 }
 
-static VSC_ErrCode _VSC_PH_RecordUsages(
+static VSC_ErrCode _VSC_PH_GenerateLShiftedLS(
+    IN OUT VSC_PH_Peephole* ph,
+    IN VIR_Instruction* lshift,
+    OUT gctBOOL* generated
+    )
+{
+    VSC_ErrCode errCode  = VSC_ERR_NONE;
+    VIR_Shader* shader = VSC_PH_Peephole_GetShader(ph);
+    VIR_Function* func = VIR_Shader_GetCurrentFunction(shader);
+    VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+    VIR_Swizzle lshift_src0_swizzle;
+    VIR_Enable lshift_enable, lshift_src0_enable;
+    VIR_GENERAL_DU_ITERATOR du_iter;
+    VIR_Operand *lshift_dest, *lshift_src0, *lshift_src1;
+    VIR_OperandInfo lshift_dest_info, lshift_src0_info;
+    gctUINT8 channel;
+    VSC_HASH_TABLE* ls_set;
+    gctBOOL invalid_case = gcvFALSE;
+    gctBOOL bNeedDelLShift = gcvTRUE;
+
+    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_LSHIFT_LS))
+    {
+        VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+        VIR_LOG(dumper, "\nlshift instruction:\n");
+        VIR_LOG_FLUSH(dumper);
+        VIR_Inst_Dump(dumper, lshift);
+        VIR_LOG_FLUSH(dumper);
+    }
+
+    lshift_dest = VIR_Inst_GetDest(lshift);
+    if(VIR_Operand_GetModifier(lshift_dest))
+    {
+        if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_LSHIFT_LS))
+        {
+            VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+            VIR_LOG(dumper, "cannot be processed because its dest has modifier.\n");
+            VIR_LOG_FLUSH(dumper);
+        }
+        if(generated != gcvNULL)
+        {
+            *generated = gcvFALSE;
+        }
+        return errCode;
+    }
+
+    lshift_enable = VIR_Operand_GetEnable(lshift_dest);
+    if (lshift_enable != VIR_ENABLE_X &&
+        lshift_enable != VIR_ENABLE_Y &&
+        lshift_enable != VIR_ENABLE_Z &&
+        lshift_enable != VIR_ENABLE_W)
+    {
+        return errCode;
+    }
+
+    VIR_Operand_GetOperandInfo(lshift, lshift_dest, &lshift_dest_info);
+    gcmASSERT(~lshift_dest_info.isTempVar && ~lshift_dest_info.isVecConst);
+
+    /* the result of lshift can not be an output */
+    if (lshift_dest_info.isOutput)
+    {
+        if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_LSHIFT_LS))
+        {
+            VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+            VIR_LOG(dumper, "not processed because its result is an output.\n");
+            VIR_LOG_FLUSH(dumper);
+        }
+        if(generated != gcvNULL)
+        {
+            *generated = gcvFALSE;
+        }
+        return errCode;
+    }
+
+    lshift_src1 = VIR_Inst_GetSource(lshift, 1);
+    if (VIR_Operand_GetOpKind(lshift_src1) != VIR_OPND_IMMEDIATE ||
+        lshift_src1->u1.uConst >= 8)
+    {
+        return errCode;
+    }
+
+    lshift_src0 = VIR_Inst_GetSource(lshift, 0);
+    VIR_Operand_GetOperandInfo(lshift, lshift_src0, &lshift_src0_info);
+    lshift_src0_swizzle = VIR_Operand_GetSwizzle(lshift_src0);
+    lshift_src0_enable = VIR_Swizzle_2_Enable(lshift_src0_swizzle);
+
+    ls_set = vscHTBL_Create(VSC_PH_Peephole_GetMM(ph), _VSC_PH_OpndTarget_HFUNC, _VSC_PH_OpndTarget_HKCMP, 512);
+    /* get usage of lshift's dest in per channel way*/
+    for(channel = 0; channel < VIR_CHANNEL_NUM; channel++)
+    {
+        VIR_USAGE* usage;
+        if(!(lshift_enable & (1 << channel)))
+        {
+            continue;
+        }
+
+        /*  */
+        vscVIR_InitGeneralDuIterator(&du_iter, VSC_PH_Peephole_GetDUInfo(ph), lshift, lshift_dest_info.u1.virRegInfo.virReg, channel, gcvFALSE);
+        for(usage = vscVIR_GeneralDuIterator_First(&du_iter); usage != gcvNULL;
+            usage = vscVIR_GeneralDuIterator_Next(&du_iter))
+        {
+            VIR_Instruction* use_inst;
+            VIR_Operand* use_inst_dest;
+            VIR_Operand* use_inst_opnd;
+
+            if(vscHTBL_DirectTestAndGet(ls_set, (void*)&(usage->usageKey), gcvNULL))
+            {
+                continue;
+            }
+
+            use_inst = usage->usageKey.pUsageInst;
+            use_inst_opnd = usage->usageKey.pOperand;
+
+            /* the result of lshift must be used in L/S */
+            if(!VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(use_inst)) &&
+               !VIR_OPCODE_isMemSt(VIR_Inst_GetOpcode(use_inst)))
+            {
+                bNeedDelLShift = gcvFALSE;
+                continue;
+            }
+
+            if (use_inst_opnd != VIR_Inst_GetSource(use_inst, 1))
+            {
+                invalid_case = gcvTRUE;
+                break;
+            }
+
+            /* use_inst should not have different rounding mode from the lshift instruction */
+            use_inst_dest = VIR_Inst_GetDest(use_inst);
+            if(VIR_Operand_GetRoundMode(use_inst_dest) != VIR_Operand_GetRoundMode(lshift_dest))
+            {
+                if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_LSHIFT_LS))
+                {
+                    VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+                    VIR_LOG(dumper, "not processed because of its usage in:\n");
+                    VIR_LOG_FLUSH(dumper);
+                    VIR_Inst_Dump(dumper, use_inst);
+                    VIR_LOG(dumper, "\nhas different rounding mode\n");
+                    VIR_LOG_FLUSH(dumper);
+                }
+                invalid_case = gcvTRUE;
+                break;
+            }
+
+            /* use_inst_opnd should not have modifiers. could be improved here */
+            if(VIR_Operand_GetModifier(use_inst_opnd))
+            {
+                if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_LSHIFT_LS))
+                {
+                    VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+                    VIR_LOG(dumper, "not processed because of its usage in:\n");
+                    VIR_LOG_FLUSH(dumper);
+                    VIR_Inst_Dump(dumper, use_inst);
+                    VIR_LOG(dumper, "\nhas modifier\n");
+                    VIR_LOG_FLUSH(dumper);
+                }
+                invalid_case = gcvTRUE;
+                break;
+            }
+
+            /* lshift and L/S should be in the same bb */
+            if(VIR_Inst_GetBasicBlock(lshift) != VIR_Inst_GetBasicBlock(use_inst))
+            {
+                if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_LSHIFT_LS))
+                {
+                    VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+                    VIR_LOG(dumper, "not processed because of the following usage and lshift are not in the same bb:\n");
+                    VIR_LOG_FLUSH(dumper);
+                    VIR_Inst_Dump(dumper, use_inst);
+                    VIR_LOG_FLUSH(dumper);
+                }
+                invalid_case = gcvTRUE;
+                break;
+            }
+
+            /* dest of lshift should cover its usage in L/S */
+            {
+                VIR_Swizzle swizzle = VIR_Operand_GetSwizzle(use_inst_opnd);
+                VIR_Enable ls_enable = VIR_Swizzle_2_Enable(swizzle);
+                if(!VIR_Enable_Covers(lshift_enable, ls_enable))
+                {
+                    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_LSHIFT_LS))
+                    {
+                        VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+                        VIR_LOG(dumper, "not processed because of the following usage is not covered:\n");
+                        VIR_LOG_FLUSH(dumper);
+                        VIR_Inst_Dump(dumper, use_inst);
+                        VIR_LOG_FLUSH(dumper);
+                    }
+                    invalid_case = gcvTRUE;
+                    break;
+                }
+            }
+
+            /* in case of loop, lshift should be the only def of ls usage. */
+            {
+                VIR_Instruction* breaking_def;
+                if(!vscVIR_IsUniqueDefInstOfUsageInst(VSC_PH_Peephole_GetDUInfo(ph), use_inst, use_inst_opnd,
+                                                      usage->usageKey.bIsIndexingRegUsage, lshift, &breaking_def))
+                {
+                    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MODIFIER))
+                    {
+                        VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+                        VIR_LOG(dumper, "prevented by another def instruction:\n");
+                        VIR_LOG_FLUSH(dumper);
+                        VIR_Inst_Dump(dumper, breaking_def);
+                        VIR_LOG(dumper, "\nto usage instruction:\n");
+                        VIR_LOG_FLUSH(dumper);
+                        VIR_Inst_Dump(dumper, use_inst);
+                        VIR_LOG_FLUSH(dumper);
+                    }
+                    invalid_case = gcvTRUE;
+                    break;
+                }
+            }
+            /* there should be no def of lshift_src0 between lshift and use_inst */
+            {
+                VIR_Instruction* next = VIR_Inst_GetNext(lshift);
+                while(next != use_inst)
+                {
+                    if(VIR_Operand_SameLocation(lshift, lshift_src0, next, VIR_Inst_GetDest(next)))
+                    {
+                        if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_LSHIFT_LS))
+                        {
+                            VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+                            VIR_LOG(dumper, "not processed because between lshift and use_inst:\n");
+                            VIR_LOG_FLUSH(dumper);
+                            VIR_Inst_Dump(dumper, use_inst);
+                            VIR_LOG(dumper, "\nthis intruction redefs lshift_src0:\n");
+                            VIR_LOG_FLUSH(dumper);
+                            VIR_Inst_Dump(dumper, next);
+                            VIR_LOG_FLUSH(dumper);
+                        }
+                        invalid_case = gcvTRUE;
+                        break;
+                    }
+                    next = VIR_Inst_GetNext(next);
+                }
+            }
+
+            vscHTBL_DirectSet(ls_set, (void*)_VSC_PH_Peephole_NewOpndTarget(ph, usage), gcvNULL);
+        }
+
+        if(invalid_case)
+        {
+            break;
+        }
+    }
+
+    if(!invalid_case && HTBL_GET_ITEM_COUNT(ls_set))
+    {
+        VSC_HASH_TABLE* def_inst_set0 = vscHTBL_Create(VSC_PH_Peephole_GetMM(ph), vscHFUNC_Default, vscHKCMP_Default, 512);
+        VSC_HASH_ITERATOR iter;
+        VSC_DIRECT_HNODE_PAIR pair;
+        VIR_Swizzle mapping_swizzle0 = VIR_Enable_GetMappingSwizzle(lshift_enable, lshift_src0_swizzle);
+
+        /* collect the def of the src0 of the lshift inst, and delete the usage between lshift's src0's def and lshift's src0 */
+        {
+            VIR_GENERAL_UD_ITERATOR inst_ud_iter;
+            VIR_DEF* def;
+
+            vscVIR_InitGeneralUdIterator(&inst_ud_iter, VSC_PH_Peephole_GetDUInfo(ph), lshift, lshift_src0, gcvFALSE, gcvFALSE);
+            for(def = vscVIR_GeneralUdIterator_First(&inst_ud_iter); def != gcvNULL;
+                def = vscVIR_GeneralUdIterator_Next(&inst_ud_iter))
+            {
+                VIR_Instruction* def_inst = def->defKey.pDefInst;
+                vscHTBL_DirectSet(def_inst_set0, (void*)def_inst, gcvNULL);
+            }
+        }
+
+        /* do the transformation */
+        vscHTBLIterator_Init(&iter, ls_set);
+        for(pair = vscHTBLIterator_DirectFirst(&iter);
+            IS_VALID_DIRECT_HNODE_PAIR(&pair); pair = vscHTBLIterator_DirectNext(&iter))
+        {
+            VIR_USAGE* usage = (VIR_USAGE*)VSC_DIRECT_HNODE_PAIR_FIRST(&pair);
+            VIR_Instruction* ls = usage->usageKey.pUsageInst;
+            VIR_Operand* lshift_dest_usage = usage->usageKey.pOperand;
+            VIR_Swizzle lshift_dest_usage_swizzle = VIR_Operand_GetSwizzle(lshift_dest_usage);
+            VIR_Enable lshift_dest_usage_enable = VIR_Swizzle_2_Enable(lshift_dest_usage_swizzle);
+
+            VIR_Swizzle lshifted_ls_src1_swizzle = VIR_Swizzle_ApplyMappingSwizzle(lshift_dest_usage_swizzle, mapping_swizzle0);
+            VIR_Enable lshifted_ls_src1_enable = VIR_Swizzle_2_Enable(lshifted_ls_src1_swizzle);
+            VIR_Operand* lshifted_ls_src1;
+
+            if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_LSHIFT_LS))
+            {
+                VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+                VIR_LOG(dumper, "merges with instruction:\n");
+                VIR_LOG_FLUSH(dumper);
+                VIR_Inst_Dump(dumper, ls);
+                VIR_LOG_FLUSH(dumper);
+            }
+
+            vscVIR_DeleteUsage(VSC_PH_Peephole_GetDUInfo(ph), VIR_ANY_DEF_INST, ls,
+                               lshift_dest_usage, gcvFALSE, lshift_dest_info.u1.virRegInfo.virReg, 1,
+                               lshift_dest_usage_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+
+            VIR_Function_DupOperand(func, lshift_src0, &lshifted_ls_src1);
+            VIR_Operand_SetSwizzle(lshifted_ls_src1, lshifted_ls_src1_swizzle);
+
+            VIR_Inst_SetSource(ls, 1, lshifted_ls_src1);
+            VIR_Operand_SetLShift(lshifted_ls_src1, lshift_src1->u1.uConst);
+
+            /* add the use of ls_src1 to the def of lshift_src0 */
+            {
+                VSC_HASH_ITERATOR def_inst_set_iter;
+                VSC_DIRECT_HNODE_PAIR def_inst_set_pair;
+                vscHTBLIterator_Init(&def_inst_set_iter, def_inst_set0);
+                for(def_inst_set_pair = vscHTBLIterator_DirectFirst(&def_inst_set_iter);
+                    IS_VALID_DIRECT_HNODE_PAIR(&def_inst_set_pair); def_inst_set_pair = vscHTBLIterator_DirectNext(&def_inst_set_iter))
+                {
+                    VIR_Instruction* def_inst = (VIR_Instruction*)VSC_DIRECT_HNODE_PAIR_FIRST(&def_inst_set_pair);
+                    VIR_Enable def_dest_enable;
+                    if(!VIR_IS_IMPLICIT_DEF_INST(def_inst))
+                    {
+                        VIR_Operand* def_dest = VIR_Inst_GetDest(def_inst);
+                        def_dest_enable = VIR_Operand_GetEnable(def_dest);
+                    }
+                    else
+                    {
+                        def_dest_enable = VIR_ENABLE_XYZW;
+                    }
+
+                    if (def_dest_enable & lshifted_ls_src1_enable)
+                    {
+                        vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, ls, lshifted_ls_src1, gcvFALSE,
+                                                lshift_src0_info.u1.virRegInfo.virReg, 1, (VIR_Enable)(def_dest_enable & lshifted_ls_src1_enable),
+                                                VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+                    }
+                }
+            }
+            if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_LSHIFT_LS))
+            {
+                VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+                VIR_LOG(dumper, "into:\n");
+                VIR_LOG_FLUSH(dumper);
+                VIR_Inst_Dump(dumper, ls);
+                VIR_LOG_FLUSH(dumper);
+            }
+        }
+        if(generated != gcvNULL)
+        {
+            *generated = gcvTRUE;
+        }
+
+        if (bNeedDelLShift)
+        {
+            /* remove the use of lshift_src0 */
+            vscVIR_DeleteUsage(VSC_PH_Peephole_GetDUInfo(ph), VIR_ANY_DEF_INST, lshift,
+                                lshift_src0, gcvFALSE, lshift_src0_info.u1.virRegInfo.virReg, 1,
+                                lshift_src0_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+
+            /* remove the def of lshift */
+            vscVIR_DeleteDef(VSC_PH_Peephole_GetDUInfo(ph), lshift, lshift_dest_info.u1.virRegInfo.virReg,
+                             1, lshift_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
+
+            VIR_Function_RemoveInstruction(func, lshift);
+        }
+
+        vscHTBL_Destroy(def_inst_set0);
+    }
+    else
+    {
+        if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_LSHIFT_LS)
+            && !invalid_case && HTBL_GET_ITEM_COUNT(ls_set) == 0)
+        {
+            VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+            VIR_LOG(dumper, "is prevented from being merging because there is no following L/S instruction.\n");
+            VIR_LOG_FLUSH(dumper);
+        }
+        if(generated != gcvNULL)
+        {
+            *generated = gcvFALSE;
+        }
+    }
+
+    vscHTBL_Destroy(ls_set);
+    return errCode;
+}
+
+    static VSC_ErrCode _VSC_PH_RecordUsages(
     IN VSC_PH_Peephole      *ph,
     IN VIR_Instruction      *inst,
     IN OUT VSC_HASH_TABLE   *usages_set
@@ -2032,6 +4395,7 @@ static VSC_ErrCode _VSC_PH_ReplaceUsages(
                 VIR_ANY_DEF_INST,
                 use_inst,
                 use_opnd,
+                gcvFALSE,
                 use_opnd_info.u1.virRegInfo.virReg,
                 1,
                 use_enable,
@@ -2049,6 +4413,7 @@ static VSC_ErrCode _VSC_PH_ReplaceUsages(
             merged_inst,
             use_inst,
             new_src,
+            gcvFALSE,
             merged_inst_dst_info.u1.virRegInfo.virReg,
             1,
             VIR_Swizzle_2_Enable(VIR_Swizzle_ApplyMappingSwizzle(use_swizzle, mapping_swizzle)),
@@ -2172,7 +4537,7 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
     }
 
     /* get def of inst's src */
-    vscVIR_InitGeneralUdIterator(&ud_iter, VSC_PH_Peephole_GetDUInfo(ph), inst, inst_src0, gcvFALSE);
+    vscVIR_InitGeneralUdIterator(&ud_iter, VSC_PH_Peephole_GetDUInfo(ph), inst, inst_src0, gcvFALSE, gcvFALSE);
     for (pDef = vscVIR_GeneralUdIterator_First(&ud_iter); pDef != gcvNULL;
          pDef = vscVIR_GeneralUdIterator_Next(&ud_iter))
     {
@@ -2310,14 +4675,14 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
                     merged_inst_dst,
                     new_dst,
                     merged_inst->enable);
+
                 vscVIR_AddNewDef(VSC_PH_Peephole_GetDUInfo(ph),
                     merged_inst->inst,
                     merged_inst_dst_info.u1.virRegInfo.virReg,
                     1,
                     merged_inst->enable,
                     VIR_HALF_CHANNEL_MASK_FULL,
-                    gcvFALSE, /* isInput ? */
-                    gcvFALSE, /* isOutput ? */
+                    gcvNULL,
                     gcvNULL);
 
                 VIR_Operand_SetSwizzle(merged_inst_src,
@@ -2328,6 +4693,7 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
                             mergeKey->defKey->pDefInst,
                             merged_inst->inst,
                             merged_inst_src,
+                            gcvFALSE,
                             merged_inst_src_info.u1.virRegInfo.virReg,
                             1,
                             merged_inst->enable,
@@ -2352,6 +4718,7 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
                 VIR_ANY_DEF_INST,
                 inst,
                 inst_src0,
+                gcvFALSE,
                 inst_src0_info.u1.virRegInfo.virReg,
                 1,
                 inst_src0_enable,
@@ -2583,40 +4950,6 @@ static gctBOOL _VSC_PH_EvaluateChecking(
     return gcvTRUE;
 }
 
-/* instruction src is uniquely defined and used */
-static gctBOOL
-_VSC_PH_SrcUniqueDef(
-    IN OUT VSC_PH_Peephole  *ph,
-    IN VIR_Instruction      *inst,
-    IN VIR_Operand          *inst_src,
-    OUT VIR_Instruction     **def_inst)
-{
-    VIR_GENERAL_UD_ITERATOR ud_iter;
-    VIR_DEF                 *pDef;
-
-    gcmASSERT(VIR_Operand_IsOwnerInst(inst_src, inst));
-
-    vscVIR_InitGeneralUdIterator(&ud_iter, VSC_PH_Peephole_GetDUInfo(ph), inst, inst_src, gcvFALSE);
-    for (pDef = vscVIR_GeneralUdIterator_First(&ud_iter); pDef != gcvNULL;
-         pDef = vscVIR_GeneralUdIterator_Next(&ud_iter))
-    {
-        /* the def has to be the only def */
-        VIR_Instruction *defInst = pDef->defKey.pDefInst;
-        if (defInst == VIR_INPUT_DEF_INST)
-        {
-            break;
-        }
-        if (vscVIR_IsUniqueDefInstOfUsageInst(VSC_PH_Peephole_GetDUInfo(ph), inst, inst_src, defInst, gcvNULL) &&
-            vscVIR_IsUniqueUsageInstOfDefInst(VSC_PH_Peephole_GetDUInfo(ph), defInst, inst, gcvNULL))
-        {
-            *def_inst = defInst;
-            return gcvTRUE;
-        }
-    }
-
-    return gcvFALSE;
-}
-
 static gctBOOL
 _VSC_PH_SrcFromUniqueLDARR(
     IN OUT VSC_PH_Peephole  *ph,
@@ -2631,7 +4964,8 @@ _VSC_PH_SrcFromUniqueLDARR(
     {
         currSrc = VIR_Inst_GetSource(inst, i);
 
-        if (_VSC_PH_SrcUniqueDef(ph, inst, currSrc, def_inst) &&
+        if (vscVIR_DoesUsageInstHaveUniqueDefInst(VSC_PH_Peephole_GetDUInfo(ph), inst, currSrc, gcvFALSE, def_inst) &&
+            vscVIR_IsUniqueUsageInstOfDefInst(VSC_PH_Peephole_GetDUInfo(ph), *def_inst, inst, gcvNULL, gcvFALSE, gcvNULL, gcvNULL, gcvNULL) &&
             VIR_Inst_GetOpcode(*def_inst) == VIR_OP_LDARR)
         {
             *inst_src = currSrc;
@@ -2652,14 +4986,8 @@ static VSC_ErrCode _VSC_PH_MoveDefCode(
     VSC_ErrCode         errCode  = VSC_ERR_NONE;
     VIR_Dumper          *dumper = VSC_PH_Peephole_GetDumper(ph);
     VSC_OPTN_PHOptions  *options = VSC_PH_Peephole_GetOptions(ph);
-    VIR_Shader          *shader = VSC_PH_Peephole_GetShader(ph);
-    VIR_Function        *func = VIR_Shader_GetCurrentFunction(shader);
-
     gctBOOL             invalidCase = gcvFALSE;
-
-    VIR_Instruction *preDefInst = VIR_Inst_GetPrev(defInst);
-    VIR_Instruction *nextDefInst = VIR_Inst_GetNext(defInst);
-    VIR_Instruction *prevInst = VIR_Inst_GetPrev(inst);
+    VIR_Instruction     *nextDefInst = VIR_Inst_GetNext(defInst);
 
     if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MOV_DEF))
     {
@@ -2671,12 +4999,12 @@ static VSC_ErrCode _VSC_PH_MoveDefCode(
 
     gcmASSERT(inst_src != gcvNULL);
     gcmASSERT(nextDefInst);
-    gcmASSERT(prevInst);
+    gcmASSERT(VIR_Inst_GetPrev(inst));
 
     /* if the defInst and inst is not next to each other, move defInst down */
     if (nextDefInst != inst)
     {
-        gcmASSERT(prevInst != defInst);
+        gcmASSERT(VIR_Inst_GetPrev(inst) != defInst);
 
         /* defInst and inst is at the same BB */
         if(VIR_Inst_GetBasicBlock(defInst) == VIR_Inst_GetBasicBlock(inst))
@@ -2728,33 +5056,7 @@ static VSC_ErrCode _VSC_PH_MoveDefCode(
                 VIR_LOG_FLUSH(dumper);
             }
 
-            /* change the instruction prev/next pointer, BB firstInst pointer,
-                shader's firstInst pointer */
-            if (preDefInst)
-            {
-                VIR_Inst_SetPrev(nextDefInst, preDefInst);
-                VIR_Inst_SetNext(preDefInst, nextDefInst);
-                if(VIR_Inst_GetBasicBlock(defInst) != VIR_Inst_GetBasicBlock(preDefInst))
-                {
-                    BB_SET_START_INST(VIR_Inst_GetBasicBlock(defInst), nextDefInst);
-                }
-            }
-            else
-            {
-                gcmASSERT(BB_GET_START_INST(VIR_Inst_GetBasicBlock(defInst)) == defInst);
-                BB_SET_START_INST(VIR_Inst_GetBasicBlock(defInst), nextDefInst);
-                VIR_Inst_SetPrev(nextDefInst, gcvNULL);
-                if(func->instList.pHead == defInst)
-                {
-                    func->instList.pHead = nextDefInst;
-                }
-            }
-
-            VIR_Inst_SetNext(prevInst, defInst);
-            VIR_Inst_SetPrev(defInst, prevInst);
-
-            VIR_Inst_SetPrev(inst, defInst);
-            VIR_Inst_SetNext(defInst, inst);
+            VIR_Function_MoveInstructionBefore(VIR_Inst_GetFunction(defInst), inst, defInst);
         }
     }
 
@@ -2875,6 +5177,36 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
         }
     }
 
+    /* merge lshift+L/S instructions to left-shifted L/S instruction */
+    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetOPTS(options), VSC_OPTN_PHOptions_OPTS_LSHIFT_LS) &&
+       VSC_PH_Peephole_GetHwCfg(ph)->hwFeatureFlags.hasHalti4)
+    {
+        if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_LSHIFT_LS))
+        {
+            VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+            VIR_LOG(dumper, "%s\nLSHIFT_LS started\n%s\n", VSC_TRACE_SHARP_LINE, VSC_TRACE_SHARP_LINE);
+            VIR_LOG_FLUSH(dumper);
+        }
+        inst = BB_GET_START_INST(bb);
+        while(inst != VIR_Inst_GetNext(BB_GET_END_INST(bb)))
+        {
+            VIR_OpCode opc;
+
+            opc = VIR_Inst_GetOpcode(inst);
+            if(opc == VIR_OP_LSHIFT)
+            {
+                _VSC_PH_GenerateLShiftedLS(ph, inst, gcvNULL);
+            }
+            inst = VIR_Inst_GetNext(inst);
+        }
+        if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_LSHIFT_LS))
+        {
+            VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+            VIR_LOG(dumper, "%s\nLSHIFT_LS ended\n%s\n", VSC_TRACE_SHARP_LINE, VSC_TRACE_SHARP_LINE);
+            VIR_LOG_FLUSH(dumper);
+        }
+    }
+
     /* vectorize instructions*/
     if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetOPTS(options), VSC_OPTN_PHOptions_OPTS_VEC))
     {
@@ -2932,7 +5264,7 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
             gctBOOL     checkingResult;
 
             opc = VIR_Inst_GetOpcode(inst);
-            if(opc == VIR_OP_JMPC)
+            if (opc == VIR_OP_JMPC || opc == VIR_OP_CMOV)
             {
                 VIR_Operand_GetOperandInfo(inst,
                     VIR_Inst_GetSource(inst, 0),
@@ -2954,19 +5286,42 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
                             VIR_LOG_FLUSH(dumper);
                         }
 
-                        if (checkingResult)
+                        if (opc == VIR_OP_JMPC)
                         {
-                             /* change instruction to jmp*/
-                            VIR_Inst_SetOpcode(inst, VIR_OP_JMP);
-                            VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
-                            VIR_Inst_SetSrcNum(inst, 0);
+                            if (checkingResult)
+                            {
+                                 /* change instruction to jmp*/
+                                VIR_Inst_SetOpcode(inst, VIR_OP_JMP);
+                                VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
+                                VIR_Inst_SetSrcNum(inst, 0);
+                            }
+                            else
+                            {
+                                /*change instruction to nop*/
+                                VIR_Inst_SetOpcode(inst, VIR_OP_NOP);
+                                VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
+                                VIR_Inst_SetSrcNum(inst, 0);
+                                VIR_Inst_SetDest(inst, gcvNULL);
+                            }
                         }
                         else
                         {
-                            /*change instruction to nop*/
-                            VIR_Inst_SetOpcode(inst, VIR_OP_NOP);
-                            VIR_Inst_SetSrcNum(inst, 0);
-                            VIR_Inst_SetDest(inst, gcvNULL);
+                            if (checkingResult)
+                            {
+                                 /* change instruction to MOV*/
+                                VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
+                                VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
+                                VIR_Inst_SetSource(inst, 0, VIR_Inst_GetSource(inst, 2));
+                                VIR_Inst_SetSrcNum(inst, 1);
+                            }
+                            else
+                            {
+                                /*change instruction to nop*/
+                                VIR_Inst_SetOpcode(inst, VIR_OP_NOP);
+                                VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
+                                VIR_Inst_SetSrcNum(inst, 0);
+                                VIR_Inst_SetDest(inst, gcvNULL);
+                            }
                         }
 
                         if (VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options),
@@ -3023,7 +5378,9 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
                 VIR_OPCODE_isAtom(opc))
             {
                 srcOpnd = VIR_Inst_GetSource(inst, 0);
-                if (_VSC_PH_SrcUniqueDef(ph, inst, srcOpnd, &defInst))
+
+                if (vscVIR_DoesUsageInstHaveUniqueDefInst(VSC_PH_Peephole_GetDUInfo(ph), inst, srcOpnd, gcvFALSE, &defInst) &&
+                    vscVIR_IsUniqueUsageInstOfDefInst(VSC_PH_Peephole_GetDUInfo(ph), defInst, inst, gcvNULL, gcvFALSE, gcvNULL, gcvNULL, gcvNULL))
                 {
                     _VSC_PH_MoveDefCode(ph, inst, srcOpnd, defInst);
                 }
@@ -3035,7 +5392,8 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
                 _VSC_PH_MoveDefCode(ph, inst, srcOpnd, defInst);
 
                 srcOpnd = VIR_Inst_GetSource(defInst, 1);
-                if (_VSC_PH_SrcUniqueDef(ph, defInst, srcOpnd, &defDefInst))
+                if (vscVIR_DoesUsageInstHaveUniqueDefInst(VSC_PH_Peephole_GetDUInfo(ph), defInst, srcOpnd, gcvFALSE, &defDefInst) &&
+                    vscVIR_IsUniqueUsageInstOfDefInst(VSC_PH_Peephole_GetDUInfo(ph), defDefInst, defInst, gcvNULL, gcvFALSE, gcvNULL, gcvNULL, gcvNULL))
                 {
                     _VSC_PH_MoveDefCode(ph, defInst, srcOpnd, defDefInst);
                 }
@@ -3130,6 +5488,7 @@ VSC_ErrCode VSC_PH_Peephole_PerformOnFunction(
                 }
 
                 VSC_PH_Peephole_SetCurrBB(ph, bb);
+                errCode = _VSC_PH_PerformOnBB(ph);
                 errCode = _VSC_PH_DoPeepholeForBB(ph);
                 scheduled = gcvTRUE;
             }

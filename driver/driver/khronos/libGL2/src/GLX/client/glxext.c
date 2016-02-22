@@ -1370,13 +1370,6 @@ GLvoid __glXInteruptHandler(GLvoid)
 */
 __GLXdisplayPrivate *__glXInitialize(Display* dpy)
 {
-#ifdef DEBUG
-    if (getenv("GL_DEBUG_BREAK")) {
-        static int ttt = 1;
-        while (ttt);
-        ttt = 0;
-    }
-#endif
     XExtDisplayInfo *info = __glXFindDisplay(dpy);
     XExtData **privList, *private, *found;
     __GLXdisplayPrivate *dpyPriv;
@@ -1414,12 +1407,6 @@ __GLXdisplayPrivate *__glXInitialize(Display* dpy)
     if (!XDamageQueryExtension(dpy, &event_base, &error_base)) {
         printf("The X server does not have Xdamage extensions!\n");
         return 0;
-    }
-
-    /* Find out if Unity2D or Unity3D desktop is running, set currentDesktop here */
-    const char *desktop = getenv("VIV_DESKTOP");
-    if (desktop) {
-        currentDesktop = atoi(desktop);
     }
 
     /*

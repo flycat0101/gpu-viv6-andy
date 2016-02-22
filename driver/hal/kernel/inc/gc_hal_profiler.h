@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -263,6 +263,7 @@ extern "C" {
 #define VPG_ES30_DRAW   0x210000
 #define VPG_VG11_TIME   0x220000
 #define VPG_FE          0x230000
+#define VPG_MULTI_GPU   0x240000
 #define VPG_END         0xff0000
 
 /* Info. */
@@ -446,6 +447,7 @@ extern "C" {
 
 #define VPC_ES30_DRAW_NO            (VPG_ES30_DRAW + 1)
 #define VPC_ES11_DRAW_NO            (VPG_ES11_DRAW + 1)
+#define VPC_ES30_GPU_NO             (VPG_MULTI_GPU + 1)
 #endif
 
 #if VIVANTE_PROFILER_ALL_COUNTER

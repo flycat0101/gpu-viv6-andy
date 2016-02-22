@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -82,8 +82,8 @@ hwc_module_t HAL_MODULE_INFO_SYM =
     common:
     {
         tag:           HARDWARE_MODULE_TAG,
-        version_major: 2,
-        version_minor: 4,
+        module_api_version: 0,
+        hal_api_version:    0,
         id:            HWC_HARDWARE_MODULE_ID,
         name:          "Hardware Composer Module",
         author:        "Vivante Corporation",
@@ -166,7 +166,10 @@ hwc_device_open(
 
     /* Initialize variables. */
     context->device.common.tag     = HARDWARE_DEVICE_TAG;
-#if ANDROID_SDK_VERSION >= 21
+#if ANDROID_SDK_VERSION >= 23
+    /* HWC version 1.5 for Marshmallow. */
+    context->device.common.version = HWC_DEVICE_API_VERSION_1_5;
+#elif ANDROID_SDK_VERSION >= 21
     /* HWC version 1.4 for Lollipop. */
     context->device.common.version = HWC_DEVICE_API_VERSION_1_4;
 #elif ANDROID_SDK_VERSION >= 19
@@ -310,13 +313,8 @@ hwc_device_open(
     {
         context->multiSourceBltEx = gcvTRUE;
         context->msSourceMirror   = gcvTRUE;
-        context->msMaxSource      = 8;
         context->msByteAlignment  = gcvTRUE;
         context->msYuvSourceCount = 1;
-    }
-    else
-    {
-        context->msMaxSource = 4;
     }
 
     /* Check multi-source blit Ex feature. */
@@ -327,6 +325,9 @@ hwc_device_open(
         context->multiSourceBltV2 = gcvTRUE;
         context->msYuvSourceCount = 8;
     }
+
+    context->msMaxSource = context->multiSourceBltEx ? 8
+                         : context->multiSourceBlt ? 4 : 0;
 
     if (gcoHAL_IsFeatureAvailable(context->hal, gcvFEATURE_2D_ALL_QUAD))
     {
@@ -445,33 +446,36 @@ hwc_device_open(
     *device = &context->device.common;
 
     /* Print infomation. */
-    LOGI("Vivante HWComposer v%d.%d\n"
+    LOGI("Vivante HWComposer v2.4\n"
          "Device:               %p\n"
          "Separated 2D:         %s\n"
          "YUV separate stride : %s\n"
-         "Multi-source blit   : %s\n"
-         "  Source mirror     : %s\n"
+         "Multi-source blit   : %s\n",
+         (void *) context,
+         (context->separated2D      ? "YES" : "NO"),
+         (context->yuvSeparateStride? "YES" : "NO"),
+         (context->multiSourceBlt   ? "YES" : "NO"));
+
+    if (context->multiSourceBlt)
+    {
+    LOGI("  Source mirror     : %s\n"
          "  Max source count  : %d\n"
          "  Byte alignment    : %s\n"
          "  Source rotation   : %s\n"
          "  Source offsets:   : %s\n"
-         "  Scaling:          : %s\n"
-         "OPF/YUV blit        : %s\n"
-         "Tiled input         : %s\n"
-         "Compression         : %s\n"
-         "Filter stretch      : %s\n",
-         HMI.common.version_major,
-         HMI.common.version_minor,
-         (void *) context,
-         (context->separated2D      ? "YES" : "NO"),
-         (context->yuvSeparateStride? "YES" : "NO"),
-         (context->multiSourceBlt   ? "YES" : "NO"),
+         "  Scaling:          : %s\n",
          (context->msSourceMirror   ? "YES" : "NO"),
          (context->msMaxSource),
          (context->msByteAlignment  ? "YES" : "NO"),
          (context->msSourceRotation ? "YES" : "NO"),
          (context->msSourceOffset   ? "YES" : "NO"),
-         (context->multiSourceBltV2 ? "YES" : "NO"),
+         (context->multiSourceBltV2 ? "YES" : "NO"));
+    }
+
+    LOGI("OPF/YUV blit        : %s\n"
+         "Tiled input         : %s\n"
+         "Compression         : %s\n"
+         "Filter stretch      : %s\n",
          (context->opf              ? "YES" : "NO"),
          (context->tiledInput       ? "YES" : "NO"),
          (context->compression      ? "YES" : "NO"),

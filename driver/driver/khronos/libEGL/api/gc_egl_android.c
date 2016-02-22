@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -237,8 +237,13 @@ struct eglWindowInfo
     volatile int32_t    dequeueCount;
 
     /* Framebuffer buffer handles. */
-    void *              bufferCache[32];
     EGLint              bufferCacheCount;
+
+    struct
+    {
+        void *          handle;
+        EGLint          age;
+    } bufferCache[32];
 };
 
 static int
@@ -581,7 +586,7 @@ _GetWindowProperties(
         {
 #if ANDROID_SDK_VERSION < 14
             /* Unknown. Will query later. */
-            Info->queuesToComposer = -1;
+            Info->queuesToComposer = (EGLBoolean) ~0U;
 #   else
             /* Queues to composer if has HW_COMPOSER usage. */
             Info->queuesToComposer = (usage & GRALLOC_USAGE_HW_COMPOSER)
@@ -814,7 +819,6 @@ _ApiDisconnect(
 #endif
 }
 
-#if ANDROID_SDK_VERSION >= 17
 static inline void
 _CacheWindowBuffer(
     NativeWindowType Window,
@@ -822,33 +826,34 @@ _CacheWindowBuffer(
     android_native_buffer_t * Buffer
     )
 {
-    if (Info->bufferCacheCount < Info->bufferCount)
+    EGLint i;
+    void * handle = (void *) Buffer->handle;
+
+    if ((Info->bufferCount > 0) &&
+        (Info->bufferCacheCount >= Info->bufferCount))
     {
-        EGLint i;
-        void * handle = (void *) Buffer->handle;
+        /* No need to check more cache. */
+        return;
+    }
 
-        for (i = 0; i < Info->bufferCacheCount; i++)
+    for (i = 0; i < Info->bufferCacheCount; i++)
+    {
+        if (Info->bufferCache[i].handle == handle)
         {
-            if (Info->bufferCache[i] == handle)
-            {
-                /* The buffer handle is already cached. */
-                break;
-            }
-        }
-
-        if (i == Info->bufferCacheCount)
-        {
-            LOGV("%s: win=%p cache handle[%d]=%p", __func__, Window, i, handle);
-
-            /* Not cached yet, cache it. */
-            Info->bufferCache[i++] = handle;
-
-            /* This assignment should be atomic to support concurrent. */
-            Info->bufferCacheCount = i;
+            /* The buffer handle is already cached. */
+            return;
         }
     }
+
+    LOGV("%s: win=%p cache handle[%d]=%p", __func__, Window, i, handle);
+
+    /* Not cached yet, cache it. */
+    Info->bufferCache[i].handle = handle;
+    Info->bufferCache[i].age    = 0;
+
+    /* This assignment should be atomic to support concurrent. */
+    Info->bufferCacheCount = i + 1;
 }
-#endif
 
 #if gcdENABLE_RENDER_INTO_WINDOW && gcdENABLE_3D && (ANDROID_SDK_VERSION >= 14)
 /*
@@ -1034,6 +1039,12 @@ _QueryRenderMode(
         if (info->consumerUsage & GRALLOC_USAGE_HW_CAMERA_MASK)
         {
             /* Disable no-resolve when the consumer requires linear. */
+            renderMode = VEGL_INDIRECT_RENDERING;
+            break;
+        }
+
+        if (patchId == gcvPATCH_DEQP)
+        {
             renderMode = VEGL_INDIRECT_RENDERING;
             break;
         }
@@ -1658,23 +1669,66 @@ veglGetWindowBackBuffer(
     BackBuffer->context = buffer;
     BackBuffer->flip    = gcvTRUE;
 
-#if ANDROID_SDK_VERSION >= 17
-    if (info->hwFramebuffer)
-    {
-        /*
-         * Cache window buffer handle for HWC.
-         * Cache framebuffer handles here is safe. The handles must be queued
-         * back before it is set to fb-target layer in hwc set function.
-         * Then eglGetRenderBufferVIV is called with the fb-target handle as
-         * its parameter.
-         */
-        _CacheWindowBuffer(win, info, buffer);
-    }
-#endif
+    /*
+     * Cache window buffer handle.
+     */
+    _CacheWindowBuffer(win, info, buffer);
 
     LOGV("%s: win=%p buffer=%p surface=%p", __func__,
          win, buffer, BackBuffer->surface);
     return EGL_TRUE;
+}
+
+EGLBoolean
+veglUpdateBufferAge(
+    IN VEGLDisplay Display,
+    IN VEGLSurface Surface,
+    IN struct eglBackBuffer * BackBuffer
+    )
+{
+    VEGLWindowInfo winInfo = Surface->winInfo;
+    android_native_buffer_t * buffer;
+    EGLint i;
+
+    buffer = (android_native_buffer_t *) BackBuffer->context;
+
+    for (i = 0; i < winInfo->bufferCacheCount; i++)
+    {
+        winInfo->bufferCache[i].age += 1;
+
+        if (winInfo->bufferCache[i].handle == buffer->handle)
+        {
+            winInfo->bufferCache[i].age = 1;
+        }
+    }
+
+    return EGL_TRUE;
+}
+
+EGLBoolean
+veglQueryBufferAge(
+    IN VEGLDisplay Display,
+    IN VEGLSurface Surface,
+    IN struct eglBackBuffer * BackBuffer,
+    OUT EGLint *BufferAge
+    )
+{
+    VEGLWindowInfo winInfo = Surface->winInfo;
+    android_native_buffer_t * buffer;
+    EGLint i;
+
+    buffer = (android_native_buffer_t *) BackBuffer->context;
+
+    for (i = 0; i < winInfo->bufferCacheCount; i++)
+    {
+        if (winInfo->bufferCache[i].handle == buffer->handle)
+        {
+            *BufferAge = winInfo->bufferCache[i].age;
+            return EGL_TRUE;
+        }
+    }
+
+    return EGL_FALSE;
 }
 
 EGLBoolean
@@ -1870,7 +1924,7 @@ veglSynchronousPost(
          * For versions before ics, get the variable here.
          */
 #if ANDROID_SDK_VERSION < 14
-        if (info->queuesToComposer < 0)
+        if (info->queuesToComposer == (EGLBoolean) ~0U)
         {
             int flag = 0;
 
@@ -1909,7 +1963,7 @@ veglHasWindowBuffer(
 
     for (i = 0; i < info->bufferCacheCount; i++)
     {
-        if (info->bufferCache[i] == Handle)
+        if (info->bufferCache[i].handle == Handle)
         {
             return EGL_TRUE;
         }

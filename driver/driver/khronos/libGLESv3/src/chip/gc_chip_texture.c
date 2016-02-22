@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -726,9 +726,11 @@ gcChipResidentTextureLevel(
         __GLchipFmtMapInfo *formatMapInfo = gcvNULL;
         GLboolean renderMipmap = GL_FALSE;
         gceSURF_COLOR_SPACE srcColorSpace = gcvSURF_COLOR_SPACE_LINEAR;
-        __GLchipMipmapInfo *chipMipLevel = &texInfo->mipLevel[face][level];
+        __GLchipMipmapInfo *chipMipLevel = &texInfo->mipLevels[level];
         __GLchipFmtPatch patchCase = __GL_CHIP_FMT_PATCH_NONE;
-        gceSURF_FORMAT format ;
+        GLint numSlices = mipmap->arrays > 1 ? mipmap->arrays : mipmap->depth;
+        gceSURF_FORMAT format;
+        GLint i;
 
         mipmap = &texObj->faceMipmap[face][level];
 
@@ -760,7 +762,7 @@ gcChipResidentTextureLevel(
                  (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_COMPRESSION_V1) == gcvTRUE) &&
                  ((gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TEXTURE_TILE_STATUS_READ) == gcvTRUE) ||
                   (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TILE_FILLER) == gcvTRUE) ||
-                  (chipCtx->patchId == gcvPATCH_GTFES30)
+                  (chipCtx->patchId == gcvPATCH_GTFES30) || gcdPROC_IS_WEBGL(chipCtx->patchId)
                  ) &&
                  (texObj->targetIndex != __GL_TEXTURE_2D_ARRAY_INDEX) &&
                  (texObj->targetIndex != __GL_TEXTURE_3D_INDEX)
@@ -791,15 +793,6 @@ gcChipResidentTextureLevel(
         formatMapInfo = gcChipGetFormatMapInfo(gc, mipmap->formatInfo->drvFormat, patchCase);
 
         chipMipLevel->formatMapInfo = formatMapInfo;
-        /* Initialize other levels if it is an array texture */
-        if (mipmap->arrays > 1)
-        {
-            GLint arrayIdx;
-            for (arrayIdx = 1; arrayIdx < mipmap->arrays; ++arrayIdx)
-            {
-                texInfo->mipLevel[arrayIdx][level].formatMapInfo = formatMapInfo;
-            }
-        }
 
         GL_ASSERT((formatMapInfo->flags & __GL_CHIP_FMTFLAGS_CANT_FOUND_HAL_FORMAT) == GL_FALSE);
         GL_ASSERT(formatMapInfo->readFormat != gcvSURF_UNKNOWN);
@@ -816,8 +809,7 @@ gcChipResidentTextureLevel(
 
         if (texObj->samples > 0)
         {
-            GLint i;
-            for (i = 0; i < formatMapInfo->numSamples; i++)
+            for (i = 0; i < formatMapInfo->numSamples; ++i)
             {
                 if (formatMapInfo->samples[i] >= texObj->samples)
                 {
@@ -852,15 +844,45 @@ gcChipResidentTextureLevel(
                                           __GL_IS_TEXTURE_ARRAY(texObj->targetIndex) ? 1 : texObj->arrays,
                                           gcvPOOL_DEFAULT,
                                           texObj->samplesUsed,
-                                          gcvFALSE,
+                                          (gctBOOL)texObj->params.contentProtected,
                                           gcvNULL));
 
-#if __GL_CHIP_STENCIL_TEST_OPT
-        gcChipPatchStencilOptReset(&texInfo->mipLevel[face][level].stencilOpt,
-                                   (gctSIZE_T)mipmap->width,
-                                   (gctSIZE_T)mipmap->height,
-                                   (gctSIZE_T)mipmap->formatInfo->stencilSize);
-#endif
+        if (chipCtx->needStencilOpt)
+        {
+            if (mipmap->formatInfo->stencilSize > 0)
+            {
+                if (!chipMipLevel->stencilOpt)
+                {
+                    /* For cubemap, all 6 slice will be allocated once,
+                    ** but only 1 face will be touched by the call.
+                    */
+                    GLint totalSlices = (texObj->targetIndex == __GL_TEXTURE_3D_INDEX)
+                                      ? mipmap->depth
+                                      : texObj->arrays;
+
+                    gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                              totalSlices * gcmSIZEOF(__GLchipStencilOpt),
+                                              (gctPOINTER*)&chipMipLevel->stencilOpt));
+                    gcoOS_ZeroMemory(chipMipLevel->stencilOpt, totalSlices * gcmSIZEOF(__GLchipStencilOpt));
+                }
+
+                for (i = 0; i < numSlices; ++i)
+                {
+                    gcChipPatchStencilOptReset(&chipMipLevel->stencilOpt[face + i],
+                                               (gctSIZE_T)mipmap->width,
+                                               (gctSIZE_T)mipmap->height,
+                                               (gctSIZE_T)mipmap->formatInfo->stencilSize);
+                }
+            }
+            else
+            {
+                if (chipMipLevel->stencilOpt)
+                {
+                    gcmONERROR(gcoOS_Free(gcvNULL, (gctPOINTER)chipMipLevel->stencilOpt));
+                    chipMipLevel->stencilOpt = gcvNULL;
+                }
+            }
+        }
 
         if (texObj->fboList)
         {
@@ -886,7 +908,7 @@ gcChipResidentTextureLevel(
                         if (attachPoint->objType == GL_TEXTURE &&
                             attachPoint->objName == texObj->name &&
                             attachPoint->level == level &&
-                            (texObj->targetIndex != __GL_TEXTURE_CUBEMAP_INDEX || face == attachPoint->chosenFace))
+                            attachPoint->face == face)
                         {
                             if (gcChipTexNeedShadow(gc,
                                                     texObj,
@@ -896,17 +918,17 @@ gcChipResidentTextureLevel(
                                                     &attachPoint->samplesUsed)
                                )
                             {
-                                gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, level, face, attachPoint->chosenDepth);
+                                gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, level, attachPoint->slice);
                                 gcmONERROR(gcChipRellocShadowResource(gc,
                                                                       texView.surf,
                                                                       attachPoint->samplesUsed,
-                                                                      &chipMipLevel->shadow[attachPoint->chosenDepth],
+                                                                      &chipMipLevel->shadow[attachPoint->slice],
                                                                       chipMipLevel->formatMapInfo,
                                                                       GL_TRUE));
                             }
                             else
                             {
-                                __GLchipResourceShadow *shadow = &chipMipLevel->shadow[attachPoint->chosenDepth];
+                                __GLchipResourceShadow *shadow = &chipMipLevel->shadow[attachPoint->slice];
 
                                 if(shadow && shadow->surface)
                                 {
@@ -935,31 +957,6 @@ gcChipResidentTextureLevel(
             GLboolean needDecompress = GL_FALSE;
             gctSIZE_T compressedSize = mipmap->compressedSize;
             gctSIZE_T skipImgs = (gctSIZE_T)gc->clientState.pixel.unpackModes.skipImages;
-            GLint slices = 0;
-            GLint i;
-
-            switch (texObj->targetIndex)
-            {
-            case __GL_TEXTURE_2D_INDEX:
-            case __GL_TEXTURE_CUBEMAP_INDEX:
-                slices = 1;
-                skipImgs = 0;
-                break;
-            case __GL_TEXTURE_2D_ARRAY_INDEX:
-            case __GL_TEXTURE_CUBEMAP_ARRAY_INDEX:
-                slices = mipmap->arrays;
-                break;
-            case __GL_TEXTURE_3D_INDEX:
-                slices = mipmap->depth;
-                GL_ASSERT(compressed != gcvTRUE);
-                break;
-
-            case __GL_TEXTURE_2D_MS_INDEX:
-            case __GL_TEXTURE_2D_MS_ARRAY_INDEX:
-                /* MS texture is not uploadable */
-                GL_ASSERT(0);
-                break;
-            }
 
             /*
             ** If core format indicate it's compressed AND there is mismatch within core->requestHAL->readHAL,
@@ -1127,29 +1124,33 @@ gcChipResidentTextureLevel(
                 break;
 
             default:
-                /* Only uncompressed textures need to take unpack mode into consideration */
-                gcChipProcessPixelStore(gc,
-                                        &gc->clientState.pixel.unpackModes,
-                                        (gctSIZE_T)mipmap->width,
-                                        (gctSIZE_T)mipmap->height,
-                                        mipmap->format,
-                                        mipmap->type,
-                                        skipImgs,
-                                        &rowStride,
-                                        &imgHeight,
-                                        &buf);
-                pixels = buf;
-
-                if ((mipmap->formatInfo->drvFormat == __GL_FMT_SRGB8_ALPHA8) ||
-                    (mipmap->formatInfo->drvFormat == __GL_FMT_SRGB8))
                 {
-                    srcColorSpace = gcvSURF_COLOR_SPACE_NONLINEAR;
-                }
+                    gctSIZE_T skipOffset = 0;
 
+                    /* Only uncompressed textures need to take unpack mode into consideration */
+                    gcChipProcessPixelStore(gc,
+                                            &gc->clientState.pixel.unpackModes,
+                                            (gctSIZE_T)mipmap->width,
+                                            (gctSIZE_T)mipmap->height,
+                                            mipmap->format,
+                                            mipmap->type,
+                                            skipImgs,
+                                            &rowStride,
+                                            &imgHeight,
+                                            &skipOffset);
+
+                    pixels = (gctPOINTER)((gctINT8_PTR)buf + skipOffset);
+
+                    if ((mipmap->formatInfo->drvFormat == __GL_FMT_SRGB8_ALPHA8) ||
+                        (mipmap->formatInfo->drvFormat == __GL_FMT_SRGB8))
+                    {
+                        srcColorSpace = gcvSURF_COLOR_SPACE_NONLINEAR;
+                    }
+                }
                 break;
             }
 
-            for (i = 0; i < slices; ++i)
+            for (i = 0; i < numSlices; ++i)
             {
                 if (compressed)
                 {
@@ -1176,16 +1177,8 @@ gcChipResidentTextureLevel(
                                                  srcColorSpace));
                 }
 
-                if (__GL_IS_TEXTURE_ARRAY(texObj->targetIndex))
-                {
-                    texInfo->mipLevel[i][level].shadow[0].masterDirty = GL_TRUE;
-                    texInfo->mipLevel[i][level].shadow[0].shadowDirty = GL_FALSE;
-                }
-                else
-                {
-                    texInfo->mipLevel[face][level].shadow[i].masterDirty = GL_TRUE;
-                    texInfo->mipLevel[face][level].shadow[i].shadowDirty = GL_FALSE;
-                }
+                texInfo->mipLevels[level].shadow[face + i].masterDirty = GL_TRUE;
+                texInfo->mipLevels[level].shadow[face + i].shadowDirty = GL_FALSE;
             }
 
             if (needClean)
@@ -1197,13 +1190,12 @@ gcChipResidentTextureLevel(
             CHIP_TEX_IMAGE_UPTODATE(texInfo, level);
         }
 
-
         if (renderMipmap)
         {
             /* Set up direct render into mipmap surface  */
             gcmONERROR(gcoTEXTURE_RenderIntoMipMap2(texInfo->object,
                                                     level,
-                                                    texInfo->mipLevel[face][level].shadow[0].masterDirty));
+                                                    texInfo->mipLevels[level].shadow[face].masterDirty));
 
             /* set update flag as it will be rendered later. not very precisely*/
             CHIP_TEX_IMAGE_UPTODATE(texInfo, level);
@@ -1233,11 +1225,10 @@ gcChipCreateTexture(
     __GLtextureObject *texObj
     )
 {
-    GLuint face, level;
+    GLuint level;
     __GLchipTextureInfo *texInfo;
     gctSIZE_T size;
     GLvoid *pointer = NULL;
-    __GLchipMipmapInfo *mipmaps = NULL;
     __GLchipResourceShadow *shadows = NULL;
     gceSTATUS status = gcvSTATUS_OK;
 
@@ -1258,29 +1249,22 @@ gcChipCreateTexture(
 
     texInfo->rendered = GL_FALSE;
 
-    size = texObj->maxFaces * sizeof(__GLchipMipmapInfo*)
-         + texObj->maxFaces * texObj->maxLevels * sizeof(__GLchipMipmapInfo)
-         + texObj->maxFaces * texObj->maxLevels * texObj->maxDepths *sizeof(__GLchipResourceShadow);
+    size = texObj->maxLevels * sizeof(__GLchipMipmapInfo)
+         + texObj->maxLevels * texObj->maxSlices * sizeof(__GLchipResourceShadow);
+
     pointer = gc->imports.calloc(gc, 1, size);
     if (!pointer)
     {
         gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
     }
 
-    texInfo->mipLevel = (__GLchipMipmapInfo**)pointer;
-    mipmaps = (__GLchipMipmapInfo*)(texInfo->mipLevel + texObj->maxFaces);
-    shadows = (__GLchipResourceShadow*)(mipmaps + texObj->maxFaces * texObj->maxLevels);
+    texInfo->mipLevels = (__GLchipMipmapInfo*)pointer;
+    shadows = (__GLchipResourceShadow*)(texInfo->mipLevels + texObj->maxLevels);
 
-    for (face = 0; face < texObj->maxFaces; ++face)
+    for (level = 0; level < texObj->maxLevels; ++level)
     {
-        texInfo->mipLevel[face] = mipmaps;
-        mipmaps += texObj->maxLevels;
-
-        for (level = 0; level < texObj->maxLevels; ++level)
-        {
-            texInfo->mipLevel[face][level].shadow = shadows;
-            shadows += texObj->maxDepths;
-        }
+        texInfo->mipLevels[level].shadow = shadows;
+        shadows += texObj->maxSlices;
     }
 
     texInfo->direct.dirty = GL_FALSE;
@@ -1467,8 +1451,8 @@ gcChipResolveDrawToTempBitmap(
 {
     gceSTATUS status;
     gceSURF_FORMAT format  = gcvSURF_UNKNOWN;
-    GLuint  surfWidth    = 0;
-    GLuint  surfHeight   = 0;
+    GLuint  drawRTWidth    = 0;
+    GLuint  drawRTHeight   = 0;
 
     gcmHEADER_ARG("chipCtx=0x%x srcView=0x%x SourceX=%d SourceY=%d Width=%d Height=%d",
                     chipCtx, srcView, SourceX, SourceY, Width, Height);
@@ -1492,15 +1476,14 @@ gcChipResolveDrawToTempBitmap(
 
         gcsSURF_VIEW tmpView = {gcvNULL, 0, 1};
         gcsSURF_RESOLVE_ARGS rlvArgs = {0};
-        GLboolean surfYInverted = (gcoSURF_QueryFlags(srcView->surf, gcvSURF_FLAG_CONTENT_YINVERTED) == gcvSTATUS_TRUE);
 
-        gcmERR_BREAK(gcoSURF_GetSize(srcView->surf, &surfWidth, &surfHeight, gcvNULL));
+        gcmERR_BREAK(gcoSURF_GetSize(srcView->surf, &drawRTWidth, &drawRTHeight, gcvNULL));
 
         /* Clamp coordinates. */
         left   = gcmMAX(SourceX, 0);
         top    = gcmMAX(SourceY, 0);
-        right  = gcmMIN(SourceX + Width,  (GLint) surfWidth);
-        bottom = gcmMIN(SourceY + Height, (GLint) surfHeight);
+        right  = gcmMIN(SourceX + Width,  (GLint) drawRTWidth);
+        bottom = gcmMIN(SourceY + Height, (GLint) drawRTHeight);
 
         if ((right <= 0) || (bottom <= 0))
         {
@@ -1513,18 +1496,13 @@ gcChipResolveDrawToTempBitmap(
                                                  &resW,
                                                  &resH));
 
-        if (((gctUINT) right < resW) || ((gctUINT) bottom < resH))
-        {
-            gcmERR_BREAK(gcvSTATUS_INVALID_ARGUMENT);
-        }
-
         /* Convert GL coordinates. */
         sourceX = left;
 
         /* Adjust to right rectangle */
-        if (surfYInverted)
+        if (chipCtx->readYInverted)
         {
-            sourceY = (gctINT)(surfHeight - bottom);
+            sourceY = (gctINT)(chipCtx->readRTHeight - bottom);
         }
         else
         {
@@ -1532,23 +1510,18 @@ gcChipResolveDrawToTempBitmap(
         }
 
         rlvArgs.version = gcvHAL_ARG_VERSION_V2;
-        rlvArgs.uArgs.v2.yInverted  = surfYInverted;
+        rlvArgs.uArgs.v2.yInverted  = chipCtx->readYInverted;
         rlvArgs.uArgs.v2.numSlices = 1;
 
         /* Determine the aligned source origin. */
         rlvArgs.uArgs.v2.srcOrigin.x = sourceX & ~(resX - 1);
         rlvArgs.uArgs.v2.srcOrigin.y = sourceY & ~(resY - 1);
-        if (rlvArgs.uArgs.v2.srcOrigin.x + (gctINT)resW > (GLint)surfWidth)
+        if ((rlvArgs.uArgs.v2.srcOrigin.x + (gctINT)resW > (GLint)drawRTWidth) &&
+            (rlvArgs.uArgs.v2.srcOrigin.x > 0)
+           )
         {
-            rlvArgs.uArgs.v2.srcOrigin.x = (surfWidth - resW) & ~(resX - 1);
+            rlvArgs.uArgs.v2.srcOrigin.x = (chipCtx->drawRTWidth - resW) & ~(resX - 1);
         }
-
-        if (rlvArgs.uArgs.v2.srcOrigin.y + (gctINT)resH > (GLint)surfHeight)
-        {
-            rlvArgs.uArgs.v2.srcOrigin.y = (surfHeight - resH) & ~(resY - 1);
-        }
-
-        GL_ASSERT((rlvArgs.uArgs.v2.srcOrigin.x >= 0) && (rlvArgs.uArgs.v2.srcOrigin.y >= 0));
 
         /* Determine the origin adjustment. */
         chipCtx->tempX = sourceX - rlvArgs.uArgs.v2.srcOrigin.x;
@@ -1574,12 +1547,12 @@ gcChipResolveDrawToTempBitmap(
 
         tmpView.surf = chipCtx->tempBitmap;
         /* Resolve the aligned area. */
-        gcmERR_BREAK(gcoSURF_ResolveRect_v2(srcView, &tmpView, &rlvArgs));
+        gcmERR_BREAK(gcoSURF_ResolveRect(srcView, &tmpView, &rlvArgs));
 
         /* Make sure the operation is complete. */
         gcmERR_BREAK(gcoHAL_Commit( chipCtx->hal, gcvTRUE));
 
-        if (surfYInverted)
+        if (chipCtx->readYInverted)
         {
             /* Compute the pointer to the last line. */
             chipCtx->tempLastLine
@@ -1624,7 +1597,7 @@ gcChipOrphanTexMipmap(
         gcoSURF newSurf = gcvNULL;
         GLint baseLevel = texObj->params.baseLevel;
         __GLmipMapLevel *baseMipmap = &texObj->faceMipmap[0][baseLevel];
-        __GLchipMipmapInfo *chipMipLevel = &texInfo->mipLevel[0][baseLevel];
+        __GLchipMipmapInfo *chipMipLevel = &texInfo->mipLevels[baseLevel];
 
         gcmONERROR(gcoTEXTURE_GetMipMap(texInfo->object, baseLevel, &oldSurf));
 
@@ -1714,12 +1687,12 @@ gcChipCopyTexImage(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    __GLchipContext   *chipCtx  = CHIP_CTXINFO(gc);
-    __GLmipMapLevel   *mipmap  = &texObj->faceMipmap[face][level];
-    __GLchipTextureInfo *texInfo = (__GLchipTextureInfo *)texObj->privateData;
-    __GLchipMipmapInfo  *chipMipLevel = &texInfo->mipLevel[face][level];
-    gctBOOL             useResolve = gcvFALSE;
-    gctBOOL             useShader = gcvFALSE;
+    __GLchipContext*     chipCtx = CHIP_CTXINFO(gc);
+    __GLmipMapLevel*     mipmap  = &texObj->faceMipmap[face][level];
+    __GLchipTextureInfo* texInfo = (__GLchipTextureInfo *)texObj->privateData;
+    __GLchipMipmapInfo*  chipMipLevel = &texInfo->mipLevels[level];
+    gctBOOL              tryResolve = gcvFALSE;
+    gctBOOL              tryShader = gcvFALSE;
     gcsSURF_VIEW         texView = {gcvNULL, 0, 1};
     gcsSURF_VIEW         srcView = {gcvNULL, 0, 1};
 
@@ -1738,33 +1711,31 @@ gcChipCopyTexImage(
 
     chipMipLevel->formatMapInfo = gcChipGetFormatMapInfo(gc, mipmap->formatInfo->drvFormat, __GL_CHIP_FMT_PATCH_NONE);
 
-    /* Add the mipmap. If it already exists, the call will be ignored. */
-    gcmONERROR(gcoTEXTURE_AddMipMap(texInfo->object,
-                                    level,
-                                    mipmap->requestedFormat,
-                                    chipMipLevel->formatMapInfo->readFormat,
-                                    (gctSIZE_T)mipmap->width,
-                                    (gctSIZE_T)mipmap->height,
-                                    1,
-                                    texObj->arrays,
-                                    gcvPOOL_DEFAULT,
-                                    &texView.surf));
-    texView.firstSlice = face;
-
-    /* Whether resolve can handle the copy? Should be aligned and face==0 */
-    if ((__GL_TEXTURE_2D_INDEX != texObj->targetIndex) ||
-        (x & 0xF) ||
-        (y & 0x8) ||
-        (mipmap->width & 0xF) ||
-        (mipmap->height & 0x8)
-        || (chipCtx->readYInverted)
-        )
+    if (texInfo->eglImage.source)
     {
-        useResolve = gcvFALSE;
+        gcmONERROR(gcChipTexSyncEGLImage(gc, texObj, gcvFALSE));
     }
     else
     {
-        useResolve = gcvTRUE;
+        /* Add the mipmap. If it already exists, the call will be ignored. */
+        gcmONERROR(gcoTEXTURE_AddMipMap(texInfo->object,
+                                        level,
+                                        mipmap->requestedFormat,
+                                        chipMipLevel->formatMapInfo->readFormat,
+                                        (gctSIZE_T)mipmap->width,
+                                        (gctSIZE_T)mipmap->height,
+                                        1,
+                                        texObj->arrays,
+                                        gcvPOOL_DEFAULT,
+                                        &texView.surf));
+    }
+
+    texView.firstSlice = face;
+
+    /* Whether resolve can handle the copy? Should be aligned and face==0 */
+    if (__GL_TEXTURE_2D_INDEX == texObj->targetIndex)
+    {
+        tryResolve = gcvTRUE;
     }
 
     /* Whether shader draw can handle the copy */
@@ -1776,11 +1747,7 @@ gcChipCopyTexImage(
         chipCtx->chipFeature.hasSupertiledTx
         )
     {
-        useShader = gcvTRUE;
-    }
-    else
-    {
-        useShader = gcvFALSE;
+        tryShader = gcvTRUE;
     }
 
     /* TBD: Filter out unsupported cases later */
@@ -1788,7 +1755,7 @@ gcChipCopyTexImage(
 
     if (patchId == gcvPATCH_GTFES30)
     {
-        useShader = GL_FALSE;
+        tryShader = GL_FALSE;
     }
 
     /* If chipCtx->readRT is a shadow surface, we should sync it to master resource
@@ -1796,87 +1763,88 @@ gcChipCopyTexImage(
     ** meaning (format) with master surface, such as SRGB encoding.
     ** Even for the same format between shadow and master, then we only sync once.
     */
-    srcView = gcChipMasterSyncFromShadow(gc, &chipCtx->readRtView, GL_TRUE);
+    srcView = gcChipFboSyncFromShadowSurface(gc, &chipCtx->readRtView, GL_TRUE);
 
-    if (srcView.surf && srcView.surf->info.isMsaa)
+    if (srcView.surf && srcView.surf->isMsaa)
     {
-        if ((!gcChipIsResolvable(srcView.surf->info.format) ||
-             !gcChipIsResolvable(texView.surf->info.format)))
+        if ((!gcChipIsResolvable(srcView.surf->format) ||
+             !gcChipIsResolvable(texView.surf->format)))
         {
-            useResolve = gcvFALSE;
+            tryResolve = gcvFALSE;
         }
 
-        useShader = gcvFALSE;
+        tryShader = gcvFALSE;
     }
 
-    if (useResolve)
+    do
     {
-        gctINT32 width  = __GL_MIN(mipmap->width,  (gctINT32)chipCtx->readRTWidth  - x);
-        gctINT32 height = __GL_MIN(mipmap->height, (gctINT32)chipCtx->readRTHeight - y);
+        gctINT width  = __GL_MIN(mipmap->width,  (gctINT32)chipCtx->readRTWidth  - x);
+        gctINT height = __GL_MIN(mipmap->height, (gctINT32)chipCtx->readRTHeight - y);
 
-        if (width > 0 && height > 0)
+        if (tryResolve)
         {
-            gceORIENTATION srcOrient, dstOrient;
-            gcsSURF_RESOLVE_ARGS rlvArgs = {0};
+            if (width > 0 && height > 0)
+            {
+                gcsSURF_RESOLVE_ARGS rlvArgs = {0};
 
-            rlvArgs.version = gcvHAL_ARG_VERSION_V2;
-            rlvArgs.uArgs.v2.srcOrigin.x = x;
-            rlvArgs.uArgs.v2.srcOrigin.y = y;
-            rlvArgs.uArgs.v2.rectSize.x  = width;
-            rlvArgs.uArgs.v2.rectSize.y  = height;
-            rlvArgs.uArgs.v2.numSlices = 1;
+                rlvArgs.version = gcvHAL_ARG_VERSION_V2;
+                rlvArgs.uArgs.v2.srcOrigin.x = x;
+                rlvArgs.uArgs.v2.srcOrigin.y = chipCtx->readYInverted
+                                               ? (gctINT) (chipCtx->readRTHeight - y - height) : y;
+                rlvArgs.uArgs.v2.rectSize.x  = width;
+                rlvArgs.uArgs.v2.rectSize.y  = height;
+                rlvArgs.uArgs.v2.yInverted = chipCtx->readYInverted;
+                rlvArgs.uArgs.v2.numSlices = 1;
+                rlvArgs.uArgs.v2.gpuOnly   = gcvTRUE;
 
-            /* Flush the surfaces. */
-            gcmONERROR(gcoSURF_Flush(srcView.surf));
-            /* Disable the tile status and decompress the buffers. */
-            gcmONERROR(gcoSURF_DisableTileStatus(srcView.surf, gcvTRUE));
-            /* Disable the tile status for the destination. */
-            gcmONERROR(gcoSURF_DisableTileStatus(texView.surf, gcvTRUE));
+                status = gcoSURF_ResolveRect(&srcView, &texView, &rlvArgs);
 
-            /* Set orientation the same with read buffer */
-            gcmONERROR(gcoSURF_QueryOrientation(srcView.surf, &srcOrient));
-            gcmONERROR(gcoSURF_QueryOrientation(texView.surf, &dstOrient));
-
-            gcmONERROR(gcoSURF_SetOrientation(texView.surf, srcOrient));
-            gcmONERROR(gcoSURF_ResolveRect_v2(&srcView, &texView, &rlvArgs));
-            gcmONERROR(gcoSURF_SetOrientation(texView.surf, dstOrient));
-        }
-    }
-    else if (useShader)
-    {
-        gscSURF_BLITDRAW_BLIT blitArgs;
-
-        gcmONERROR(gcoTEXTURE_RenderIntoMipMap2(texInfo->object,
-                                                level,
-                                                chipMipLevel->shadow[0].masterDirty));
-
-        gcmONERROR(gcoTEXTURE_GetMipMap(texInfo->object, level, &texView.surf));
-
-        __GL_MEMZERO(&blitArgs, sizeof(blitArgs));
-        blitArgs.srcRect.left = x;
-        blitArgs.srcRect.top = y;
-        blitArgs.srcRect.right = x + mipmap->width;
-        blitArgs.srcRect.bottom = y + mipmap->height;
-        blitArgs.dstRect.left = 0;
-        blitArgs.dstRect.top = 0;
-        blitArgs.dstRect.right = mipmap->width;
-        blitArgs.dstRect.bottom = mipmap->height;
-        blitArgs.filterMode = gcvTEXTURE_POINT;
-
-        blitArgs.yReverse = chipCtx->readYInverted;
-        if (chipCtx->readYInverted)
-        {
-            blitArgs.srcRect.top = (gctINT32)(chipCtx->readRTHeight - (y + mipmap->height));
-            blitArgs.srcRect.bottom = (gctINT32)(chipCtx->readRTHeight - y);
+                if (gcmIS_SUCCESS(status))
+                {
+                    /* Done with resolve. */
+                    break;
+                }
+            }
         }
 
-        gcmONERROR(gcoSURF_DrawBlit_v2(&srcView, &texView, &blitArgs));
-    }
-    else
-    {
-        gctINT32 width  = __GL_MIN(mipmap->width,  (gctINT32)chipCtx->readRTWidth  - x);
-        gctINT32 height = __GL_MIN(mipmap->height, (gctINT32)chipCtx->readRTHeight - y);
+        if (tryShader)
+        {
+            gscSURF_BLITDRAW_BLIT blitArgs;
 
+            gcmONERROR(gcoTEXTURE_RenderIntoMipMap2(texInfo->object,
+                                                    level,
+                                                    chipMipLevel->shadow[face].masterDirty));
+
+            gcmONERROR(gcoTEXTURE_GetMipMap(texInfo->object, level, &texView.surf));
+
+            __GL_MEMZERO(&blitArgs, sizeof(blitArgs));
+            blitArgs.srcRect.left = x;
+            blitArgs.srcRect.top = y;
+            blitArgs.srcRect.right = x + width;
+            blitArgs.srcRect.bottom = y + height;
+            blitArgs.dstRect.left = 0;
+            blitArgs.dstRect.top = 0;
+            blitArgs.dstRect.right = width;
+            blitArgs.dstRect.bottom = height;
+            blitArgs.filterMode = gcvTEXTURE_POINT;
+
+            blitArgs.yReverse = chipCtx->readYInverted;
+            if (chipCtx->readYInverted)
+            {
+                blitArgs.srcRect.top = (gctINT32)(chipCtx->readRTHeight - (y + mipmap->height));
+                blitArgs.srcRect.bottom = (gctINT32)(chipCtx->readRTHeight - y);
+            }
+
+            status = gcoSURF_DrawBlit(&srcView, &texView, &blitArgs);
+
+            if (gcmIS_SUCCESS(status))
+            {
+                /* Done with shader. */
+                break;
+            }
+        }
+
+        /* Finally, try CPU copy. */
         if (gcmIS_SUCCESS(gcChipResolveDrawToTempBitmap(chipCtx,
                                                         &srcView,
                                                         x, y,
@@ -1923,17 +1891,12 @@ gcChipCopyTexImage(
             blitArgs.dstHeight          = height;
             blitArgs.dstDepth           = 1;
             blitArgs.xReverse           = gcvFALSE;
+            blitArgs.yReverse           = gcvFALSE;
             blitArgs.scissorTest        = gcvFALSE;
-            blitArgs.yReverse           = chipCtx->readYInverted;
-
-            if (chipCtx->readYInverted)
-            {
-                blitArgs.srcY = (gctINT)(chipCtx->readRTHeight - (y + height));
-            }
-
             gcmONERROR(gcoSURF_BlitCPU(&blitArgs));
         }
     }
+    while (gcvFALSE);
 
 #if defined(ANDROID) && gcdANDROID_IMPLICIT_NATIVE_BUFFER_SYNC
     /*
@@ -1943,7 +1906,7 @@ gcChipCopyTexImage(
     gcChipFBOSyncEGLImageNativeBuffer(gc, chipCtx->readRtView.surf, GL_TRUE);
 #endif
 
-    texInfo->mipLevel[face][level].shadow[0].masterDirty = GL_TRUE;
+    texInfo->mipLevels[level].shadow[face].masterDirty = GL_TRUE;
     CHIP_TEX_IMAGE_UPTODATE(texInfo, level);
 
 OnError:
@@ -1980,7 +1943,7 @@ OnError:
 
         if (gcmIS_SUCCESS(gcoSURF_BlitCPU(&args)))
         {
-            texInfo->mipLevel[face][level].shadow[0].masterDirty = GL_TRUE;
+            texInfo->mipLevels[level].shadow[face].masterDirty = GL_TRUE;
             CHIP_TEX_IMAGE_UPTODATE(texInfo, level);
         }
     }
@@ -2004,11 +1967,11 @@ gcChipTexSubImage(
     const GLvoid       * buf
     )
 {
-    __GLchipTextureInfo  *texInfo = (__GLchipTextureInfo *)texObj->privateData;
     gceSTATUS status = gcvSTATUS_OK;
-    gctUINT32 physicalAddress = gcvINVALID_ADDRESS;
-    gctSIZE_T offset = __GL_PTR2SIZE(buf);
+    __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)texObj->privateData;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
+    __GLchipVertexBufferInfo *unpackBufInfo = gcvNULL;
+    gctUINT32 physicalAddress = gcvINVALID_ADDRESS;
 
     gcmHEADER_ARG("gc=0x%x texObj=0x%x face=%d level=%d xoffset=%d yoffset=%d"
                    "zoffset=%d width=%d height=%d depth=%d buf=0x%x",
@@ -2040,19 +2003,7 @@ gcChipTexSubImage(
         gcmONERROR(gcChipTexSyncEGLImage(gc, texObj, gcvTRUE));
     }
 
-    if (unpackBufObj)
-    {
-        __GLchipVertexBufferInfo *bufInfo = (__GLchipVertexBufferInfo *)(unpackBufObj->privateData);
-
-        gcmONERROR(gcChipProcessPBO(gc, unpackBufObj, &buf));
-        gcmONERROR(gcoBUFOBJ_Lock(bufInfo->bufObj, &physicalAddress, gcvNULL));
-
-        physicalAddress += (gctUINT32)offset;
-
-        gcmONERROR(gcoBUFOBJ_GetFence(bufInfo->bufObj,  gcvFENCE_TYPE_READ));
-    }
-
-    if (buf)
+    if (buf || unpackBufObj)
     {
         GLint i;
         gctSIZE_T rowStride = 0;
@@ -2062,13 +2013,12 @@ gcChipTexSubImage(
         gceSURF_FORMAT imageFormat = gcvSURF_UNKNOWN;
         gceSURF_COLOR_SPACE srcColorSpace = gcvSURF_COLOR_SPACE_LINEAR;
         __GLmipMapLevel *mipmap = &texObj->faceMipmap[face][level];
+        __GLchipMipmapInfo *mipLevel = &texInfo->mipLevels[level];
         gceTEXTURE_FACE halFace = (__GL_TEXTURE_CUBEMAP_INDEX == texObj->targetIndex)
                                 ? gcvFACE_POSITIVE_X + face : gcvFACE_NONE;
         gctSIZE_T skipImgs = (__GL_IS_TEXTURE_ARRAY(texObj->targetIndex) ||
                              texObj->targetIndex == __GL_TEXTURE_3D_INDEX) ?
                              (gctSIZE_T)gc->clientState.pixel.unpackModes.skipImages : 0;
-
-        skipOffset = __GL_PTR2SIZE(buf);
 
         gcChipProcessPixelStore(gc,
                                 &gc->clientState.pixel.unpackModes,
@@ -2079,14 +2029,20 @@ gcChipTexSubImage(
                                 skipImgs,
                                 &rowStride,
                                 &imgHeight,
-                                &buf);
+                                &skipOffset);
 
-        skipOffset = __GL_PTR2SIZE(buf) - skipOffset;
-
-        if (gcvINVALID_ADDRESS != physicalAddress)
+        if (unpackBufObj)
         {
+            unpackBufInfo = (__GLchipVertexBufferInfo*)(unpackBufObj->privateData);
+
+            skipOffset += __GL_PTR2SIZE(buf);
+            GL_ASSERT(unpackBufInfo);
+            gcmONERROR(gcoBUFOBJ_Lock(unpackBufInfo->bufObj, &physicalAddress, (gctPOINTER*)&buf));
+            gcmONERROR(gcoBUFOBJ_GetFence(unpackBufInfo->bufObj, gcvFENCE_TYPE_READ));
+
             physicalAddress += (gctUINT32)skipOffset;
         }
+        buf = (gctPOINTER)((gctINT8_PTR)buf + skipOffset);
 
         gcChipUtilGetImageFormat(mipmap->format, mipmap->type, &imageFormat, gcvNULL);
 
@@ -2096,131 +2052,55 @@ gcChipTexSubImage(
             srcColorSpace = gcvSURF_COLOR_SPACE_NONLINEAR;
         }
 
-        switch (texObj->targetIndex)
+        for (i = 0; i < depth; ++i)
         {
-        case __GL_TEXTURE_2D_INDEX:
-        case __GL_TEXTURE_CUBEMAP_INDEX:
-            gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc, texObj, face, level, 0));
+            gctUINT32 slicePhyAddress;
+            gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc, texObj, face, level, zoffset + i));
+
+            slicePhyAddress = (physicalAddress == gcvINVALID_ADDRESS)
+                            ? gcvINVALID_ADDRESS
+                            : (physicalAddress + (gctUINT32)(rowStride * imgHeight * i));
 
             gcmONERROR(gcoTEXTURE_UploadSub(texInfo->object,
                                             level,
                                             halFace,
                                             (gctSIZE_T)xoffset, (gctSIZE_T)yoffset,
                                             (gctSIZE_T)width, (gctSIZE_T)height,
-                                            0,
-                                            buf,
+                                            zoffset + i,
+                                            (const GLvoid*)((GLbyte*)buf + rowStride * imgHeight * i),
                                             rowStride,
                                             imageFormat,
                                             srcColorSpace,
-                                            physicalAddress));
+                                            slicePhyAddress));
+
+            mipLevel->shadow[face + zoffset + i].masterDirty = GL_TRUE;
 
             if (texInfo->eglImage.image)
             {
-                gcsSURF_VIEW mipView = gcChipGetTextureSurface(chipCtx, texObj, level, face, 0);
+                gcsSURF_VIEW mipView = gcChipGetTextureSurface(chipCtx, texObj, level, face + zoffset + i);
 
                 if (mipView.surf)
                 {
-                     gcmONERROR(gcChipSetImageSrc(texInfo->eglImage.image, mipView.surf));
+                    gcmONERROR(gcChipSetImageSrc(texInfo->eglImage.image, mipView.surf));
                 }
             }
 
-            texInfo->mipLevel[face][level].shadow[0].masterDirty = GL_TRUE;
-            break;
-
-        case __GL_TEXTURE_2D_ARRAY_INDEX:
-        case __GL_TEXTURE_CUBEMAP_ARRAY_INDEX:
-            for (i = 0; i < depth; ++i)
+            if (chipCtx->needStencilOpt &&
+                mipLevel->stencilOpt &&
+                mipmap->formatInfo->stencilSize > 0)
             {
-                gctUINT32 slicePhyAddress;
-                gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc, texObj, i+zoffset, level, 0));
+                gcsRECT rect;
 
-                slicePhyAddress = (physicalAddress == gcvINVALID_ADDRESS)
-                                ? gcvINVALID_ADDRESS
-                                : (physicalAddress + (gctUINT32)(rowStride * imgHeight * i));
+                rect.left   = xoffset;
+                rect.right  = xoffset + width - 1;
+                rect.top    = yoffset;
+                rect.bottom = yoffset + height - 1;
 
-                gcmONERROR(gcoTEXTURE_UploadSub(texInfo->object,
-                                                level,
-                                                halFace,
-                                                (gctSIZE_T)xoffset, (gctSIZE_T)yoffset,
-                                                (gctSIZE_T)width, (gctSIZE_T)height,
-                                                i+zoffset,
-                                                (const GLvoid*)((GLbyte*)buf + rowStride * imgHeight * i),
-                                                rowStride,
-                                                imageFormat,
-                                                srcColorSpace,
-                                                slicePhyAddress));
-
-                texInfo->mipLevel[i+zoffset][level].shadow[0].masterDirty = GL_TRUE;
-
-                if (texInfo->eglImage.image)
-                {
-                    gcsSURF_VIEW mipView = gcChipGetTextureSurface(chipCtx,texObj,level,i+zoffset, 0);
-
-                    if (mipView.surf)
-                    {
-                        gcmONERROR(gcChipSetImageSrc(texInfo->eglImage.image, mipView.surf));
-                    }
-                }
+                gcChipPatchStencilOptWrite(gc, &mipLevel->stencilOpt[face + zoffset + i], &rect, 0, 0, GL_TRUE);
             }
-            break;
-
-        case __GL_TEXTURE_3D_INDEX:
-            for (i = 0; i < depth; ++i)
-            {
-                gctUINT32 slicePhyAddress;
-                gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc, texObj, face, level, i+zoffset));
-
-                slicePhyAddress = (physicalAddress == gcvINVALID_ADDRESS)
-                                ? gcvINVALID_ADDRESS
-                                : (physicalAddress + (gctUINT32)(rowStride * imgHeight * i));
-
-                gcmONERROR(gcoTEXTURE_UploadSub(texInfo->object,
-                                                level,
-                                                halFace,
-                                                (gctSIZE_T)xoffset, (gctSIZE_T)yoffset,
-                                                (gctSIZE_T)width, (gctSIZE_T)height,
-                                                i+zoffset,
-                                                (const GLvoid*)((GLbyte*)buf + rowStride * imgHeight * i),
-                                                rowStride,
-                                                imageFormat,
-                                                srcColorSpace,
-                                                slicePhyAddress));
-
-                texInfo->mipLevel[face][level].shadow[i+zoffset].masterDirty = GL_TRUE;
-
-                if (texInfo->eglImage.image)
-                {
-                    gcsSURF_VIEW mipView = gcChipGetTextureSurface(chipCtx,texObj,level,face,  i+zoffset);
-
-                    if (mipView.surf)
-                    {
-                        gcmONERROR(gcChipSetImageSrc(texInfo->eglImage.image, mipView.surf));
-                    }
-                }
-            }
-            break;
-
-        default:
-            GL_ASSERT(0);
-            break;
         }
-
-#if __GL_CHIP_STENCIL_TEST_OPT
-        if (mipmap->formatInfo->stencilSize > 0)
-        {
-            gcsRECT rect;
-
-            rect.left   = xoffset;
-            rect.right  = xoffset + width - 1;
-            rect.top    = yoffset;
-            rect.bottom = yoffset + height - 1;
-
-            gcChipPatchStencilOptWrite(gc, &texInfo->mipLevel[face][level].stencilOpt, &rect, 0, 0, GL_TRUE);
-        }
-#endif
 
         CHIP_TEX_IMAGE_UPTODATE(texInfo, level);
-
     }
 
     if (unpackBufObj) /* The image is from unpack buffer object */
@@ -2232,6 +2112,12 @@ gcChipTexSubImage(
     }
 
 OnError:
+    /* The image is from unpack buffer object */
+    if (unpackBufInfo && physicalAddress != gcvINVALID_ADDRESS)
+    {
+        gcmONERROR(gcoBUFOBJ_Unlock(unpackBufInfo->bufObj));
+    }
+
     gcmFOOTER();
     return status;
 }
@@ -2253,14 +2139,13 @@ gcChipCopyTexSubImage(
 {
     __GLchipContext *chipCtx         = CHIP_CTXINFO(gc);
     __GLchipTextureInfo * texInfo    = (__GLchipTextureInfo*)texObj->privateData;
-    GLint chosenFace                 = 0;
-    GLint chosenDepth                = 0;
-    gctBOOL useResolve               = gcvFALSE;
-    gctBOOL useShader                = gcvFALSE;
-    __GLmipMapLevel   * mipmap       = &texObj->faceMipmap[face][level];
-    __GLchipMipmapInfo *chipMipLevel = &texInfo->mipLevel[face][level];
-    gcsSURF_VIEW         texView      = {gcvNULL, 0, 1};
-    gcsSURF_VIEW         srcView      = {gcvNULL, 0, 1};
+    gctBOOL tryResolve               = gcvFALSE;
+    gctBOOL tryShader                = gcvFALSE;
+    __GLmipMapLevel    *mipmap       = &texObj->faceMipmap[face][level];
+    __GLchipMipmapInfo *chipMipLevel = &texInfo->mipLevels[level];
+    GLint               slice        = face > 0 ? face : zoffset;
+    gcsSURF_VIEW        texView      = {gcvNULL, 0, 1};
+    gcsSURF_VIEW        srcView      = {gcvNULL, 0, 1};
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("gc=0x%x texObj=0x%x face=%d level=%d x=%d y=%d xoffset=%d yoffset=%d zoffset=%d width=%d height=%d",
@@ -2278,53 +2163,39 @@ gcChipCopyTexSubImage(
     {
         gcmONERROR(gcChipTexSyncEGLImage(gc, texObj, gcvFALSE));
     }
-
-    if (texInfo->eglImage.image == gcvNULL)
+    else
     {
         /* Add the mipmap. If it already exists, the call will be ignored. */
         gcmONERROR(gcoTEXTURE_AddMipMap(texInfo->object,
-                                      level,
-                                      mipmap->requestedFormat,
-                                      chipMipLevel->formatMapInfo->readFormat,
-                                      (gctSIZE_T)mipmap->width,
-                                      (gctSIZE_T)mipmap->height,
-                                      __GL_IS_TEXTURE_ARRAY(texObj->targetIndex) ?
+                                        level,
+                                        mipmap->requestedFormat,
+                                        chipMipLevel->formatMapInfo->readFormat,
+                                        (gctSIZE_T)mipmap->width,
+                                        (gctSIZE_T)mipmap->height,
+                                        __GL_IS_TEXTURE_ARRAY(texObj->targetIndex) ?
                                             (gctSIZE_T)texObj->arrays : (gctSIZE_T)mipmap->depth,
-                                      __GL_IS_TEXTURE_ARRAY(texObj->targetIndex) ? 1 : texObj->arrays,
-                                      gcvPOOL_DEFAULT,
-                                      &texView.surf));
+                                        __GL_IS_TEXTURE_ARRAY(texObj->targetIndex) ? 1 : texObj->arrays,
+                                        gcvPOOL_DEFAULT,
+                                        &texView.surf));
+    }
 
-        /* Check what kind of "copy" we can use. */
-        /* Whether resolve can handle the copy? Should be aligned and face==0 */
-        if ((__GL_TEXTURE_2D_INDEX != texObj->targetIndex)  || (x & 0xF) || (y & 0x7) ||
-            (xoffset & 0xF) || (yoffset & 0x7) ||
-            ((xoffset + width) & 0xF) || ((yoffset + height) & 0x7)
-            || (chipCtx->readYInverted)
-            )
-        {
-            useResolve = gcvFALSE;
-        }
-        else
-        {
-            useResolve = gcvTRUE;
-        }
+    /* Check what kind of "copy" we can use. */
+    /* Whether resolve can handle the copy? Should be aligned and face==0 */
+    if (__GL_TEXTURE_2D_INDEX == texObj->targetIndex)
+    {
+        tryResolve = gcvTRUE;
+    }
 
-        /* Werther shader draw can handle the copy */
-        if ((__GL_TEXTURE_2D_INDEX == texObj->targetIndex) &&
-            mipmap->formatInfo->renderable &&
-            /* Currently no 3Dblit shader for INT sampling. No need check dst for GLcore guarantees. */
-            (mipmap->formatInfo->category != GL_INT && mipmap->formatInfo->category != GL_UNSIGNED_INT) &&
-            ((chipMipLevel->formatMapInfo->flags & __GL_CHIP_FMTFLAGS_FMT_DIFF_READ_WRITE) == 0) &&
-            chipCtx->chipFeature.hasSupertiledTx &&
-            !useResolve
-            )
-        {
-            useShader = gcvTRUE;
-        }
-        else
-        {
-            useShader = gcvFALSE;
-        }
+    /* Werther shader draw can handle the copy */
+    if ((__GL_TEXTURE_2D_INDEX == texObj->targetIndex) &&
+        mipmap->formatInfo->renderable &&
+        /* Currently no 3Dblit shader for INT sampling. No need check dst for GLcore guarantees. */
+        (mipmap->formatInfo->category != GL_INT && mipmap->formatInfo->category != GL_UNSIGNED_INT) &&
+        ((chipMipLevel->formatMapInfo->flags & __GL_CHIP_FMTFLAGS_FMT_DIFF_READ_WRITE) == 0) &&
+        chipCtx->chipFeature.hasSupertiledTx
+        )
+    {
+        tryShader = gcvTRUE;
     }
 
     /* Get mip map for specified level. */
@@ -2332,78 +2203,74 @@ gcChipCopyTexSubImage(
     texView.firstSlice = (__GL_TEXTURE_CUBEMAP_INDEX == texObj->targetIndex) ? face : zoffset;
 
     /* Sync RT from texture before use RT. */
-    srcView = gcChipMasterSyncFromShadow(gc, &chipCtx->readRtView, GL_TRUE);
+    srcView = gcChipFboSyncFromShadowSurface(gc, &chipCtx->readRtView, GL_TRUE);
 
-    if (srcView.surf && srcView.surf->info.isMsaa)
+    if (srcView.surf && srcView.surf->isMsaa)
     {
-        if ((!gcChipIsResolvable(srcView.surf->info.format) ||
-             !gcChipIsResolvable(texView.surf->info.format)))
+        if ((!gcChipIsResolvable(srcView.surf->format) ||
+             !gcChipIsResolvable(texView.surf->format)))
         {
-            useResolve = gcvFALSE;
+            tryResolve = gcvFALSE;
         }
-        useShader = gcvFALSE;
+
+        tryShader = gcvFALSE;
     }
 
     /* If tex is bound to FBO and draw before calling CopyTexSubImage2D, shadow surface is dirty.
        Therefore, we should sync tex data from shadow surface. */
     gcmONERROR(gcChipTexSyncFromShadow(gc, gc->state.texture.activeTexIndex, texObj));
 
-    if (useResolve)
+    do
     {
-        width = __GL_MIN(width, (gctINT32)chipCtx->readRTWidth - x);
-        height = __GL_MIN(height, (gctINT32)chipCtx->readRTHeight - y);
-        width = __GL_MIN(width, mipmap->width - xoffset);
-        height = __GL_MIN(height, mipmap->height - yoffset);
-
-        if (width > 0 && height > 0)
+        if (tryResolve)
         {
-            gceORIENTATION srcOrient, dstOrient;
-            gcsSURF_RESOLVE_ARGS rlvArgs = {0};
+            width = __GL_MIN(width, (gctINT32)chipCtx->readRTWidth - x);
+            height = __GL_MIN(height, (gctINT32)chipCtx->readRTHeight - y);
+            width = __GL_MIN(width, mipmap->width - xoffset);
+            height = __GL_MIN(height, mipmap->height - yoffset);
 
-            rlvArgs.version = gcvHAL_ARG_VERSION_V2;
-            rlvArgs.uArgs.v2.srcOrigin.x = x;
-            rlvArgs.uArgs.v2.srcOrigin.y = y;
-            rlvArgs.uArgs.v2.dstOrigin.x = xoffset;
-            rlvArgs.uArgs.v2.dstOrigin.y = yoffset;
-            rlvArgs.uArgs.v2.rectSize.x  = width;
-            rlvArgs.uArgs.v2.rectSize.y  = height;
-            rlvArgs.uArgs.v2.numSlices = 1;
+            if (width > 0 && height > 0)
+            {
+                gcsSURF_RESOLVE_ARGS rlvArgs = {0};
 
-            /* Flush the surfaces. */
-            gcmONERROR(gcoSURF_Flush(srcView.surf));
-            gcoHAL_Commit(chipCtx->hal, gcvFALSE);
+                rlvArgs.version = gcvHAL_ARG_VERSION_V2;
+                rlvArgs.uArgs.v2.srcOrigin.x = x;
+                rlvArgs.uArgs.v2.srcOrigin.y = chipCtx->readYInverted
+                                               ? (gctINT) (chipCtx->readRTHeight - y - height) : y;
+                rlvArgs.uArgs.v2.dstOrigin.x = xoffset;
+                rlvArgs.uArgs.v2.dstOrigin.y = yoffset;
+                rlvArgs.uArgs.v2.rectSize.x  = width;
+                rlvArgs.uArgs.v2.rectSize.y  = height;
+                rlvArgs.uArgs.v2.yInverted = chipCtx->readYInverted;
+                rlvArgs.uArgs.v2.numSlices = 1;
+                rlvArgs.uArgs.v2.gpuOnly   = gcvTRUE;
 
-            /* Disable the tile status and decompress the buffers. */
-            gcmONERROR(gcoSURF_DisableTileStatus(srcView.surf, gcvTRUE));
-            /* Disable the tile status for the destination. */
-            gcmONERROR(gcoSURF_DisableTileStatus(texView.surf, gcvTRUE));
+                status = gcoSURF_ResolveRect(&srcView, &texView, &rlvArgs);
 
-            /* Set orientation the same with read buffer */
-            gcmONERROR(gcoSURF_QueryOrientation(srcView.surf, &srcOrient));
-            gcmONERROR(gcoSURF_QueryOrientation(texView.surf, &dstOrient));
-
-            gcmONERROR(gcoSURF_SetOrientation(texView.surf, srcOrient));
-            gcmONERROR(gcoSURF_ResolveRect_v2(&srcView, &texView, &rlvArgs));
-            gcmONERROR(gcoSURF_SetOrientation(texView.surf, dstOrient));
-
-            gcoTEXTURE_Flush(texInfo->object);
-        }
-    }
-    else if (useShader)
-    {
-        if (gcmIS_ERROR(gcoTEXTURE_RenderIntoMipMap2(texInfo->object,
-                                                     level,
-                                                     chipMipLevel->shadow[0].masterDirty)))
-        {
-            useShader = gcvFALSE;
+                if (gcmIS_SUCCESS(status))
+                {
+                    gcoTEXTURE_Flush(texInfo->object);
+                    break;
+                }
+            }
         }
 
-        if (gcmIS_ERROR((gcoTEXTURE_GetMipMap(texInfo->object, level, &texView.surf))))
+        if (tryShader)
         {
-            useShader = gcvFALSE;
+            if (gcmIS_ERROR(gcoTEXTURE_RenderIntoMipMap2(texInfo->object,
+                                                         level,
+                                                         chipMipLevel->shadow[slice].masterDirty)))
+            {
+                tryShader = gcvFALSE;
+            }
+
+            if (gcmIS_ERROR((gcoTEXTURE_GetMipMap(texInfo->object, level, &texView.surf))))
+            {
+                tryShader = gcvFALSE;
+            }
         }
 
-        if (useShader)
+        if (tryShader)
         {
             gscSURF_BLITDRAW_BLIT blitArgs;
 
@@ -2425,38 +2292,20 @@ gcChipCopyTexSubImage(
                 blitArgs.srcRect.bottom = (gctINT32)(chipCtx->readRTHeight - y);
             }
 
-            gcmONERROR(gcoSURF_DrawBlit_v2(&srcView, &texView, &blitArgs));
-        }
-    }
+            status = gcoSURF_DrawBlit(&srcView, &texView, &blitArgs);
 
-    if (!useShader && !useResolve)
-    {
+            if (gcmIS_SUCCESS(status))
+            {
+                break;
+            }
+        }
+
+        /* Finally, CPU path. */
         width  = __GL_MIN(width, (gctINT32)chipCtx->readRTWidth - x);
         height = __GL_MIN(height, (gctINT32)chipCtx->readRTHeight - y);
 
-        switch (texObj->targetIndex)
-        {
-        case __GL_TEXTURE_2D_INDEX:
-        case __GL_TEXTURE_CUBEMAP_INDEX:
-            chosenFace  = face;
-            chosenDepth = 0;
-            break;
-        case __GL_TEXTURE_2D_ARRAY_INDEX:
-        case __GL_TEXTURE_CUBEMAP_ARRAY_INDEX:
-            chosenFace  = zoffset;
-            chosenDepth = 0;
-            break;
-        case __GL_TEXTURE_3D_INDEX:
-            chosenFace  = 0;
-            chosenDepth = zoffset;
-            break;
-        default:
-            GL_ASSERT(0);
-            break;
-        }
-
         /* The texture might be drawn before, resolve to texture surface before sub upload */
-        gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc, texObj, chosenFace, level, chosenDepth));
+        gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc, texObj, face, level, zoffset));
 
         /* Resolve the rectangle to the temporary surface. */
         if (gcmIS_SUCCESS(gcChipResolveDrawToTempBitmap(chipCtx,
@@ -2502,16 +2351,12 @@ gcChipCopyTexSubImage(
             blitArgs.dstHeight          = height;
             blitArgs.dstDepth           = 1;
             blitArgs.xReverse           = gcvFALSE;
+            blitArgs.yReverse           = gcvFALSE;
             blitArgs.scissorTest        = gcvFALSE;
-            blitArgs.yReverse           = chipCtx->readYInverted;
-
-            if (chipCtx->readYInverted)
-            {
-                blitArgs.srcY = (gctINT)(chipCtx->readRTHeight - (y + height));
-            }
             gcmONERROR(gcoSURF_BlitCPU(&blitArgs));
         }
     }
+    while (gcvFALSE);
 
 #if defined(ANDROID) && gcdANDROID_IMPLICIT_NATIVE_BUFFER_SYNC
     /*
@@ -2521,7 +2366,7 @@ gcChipCopyTexSubImage(
     gcChipFBOSyncEGLImageNativeBuffer(gc, chipCtx->readRtView.surf, GL_TRUE);
 #endif
 
-    texInfo->mipLevel[chosenFace][level].shadow[chosenDepth].masterDirty = GL_TRUE;
+    chipMipLevel->shadow[slice].masterDirty = GL_TRUE;
     CHIP_TEX_IMAGE_UPTODATE(texInfo, level);
 
 OnError:
@@ -2567,7 +2412,7 @@ OnError:
 
         if (gcmIS_SUCCESS(gcoSURF_BlitCPU(&args)))
         {
-            texInfo->mipLevel[face][level].shadow[0].masterDirty = GL_TRUE;
+            chipMipLevel->shadow[slice].masterDirty = GL_TRUE;
             CHIP_TEX_IMAGE_UPTODATE(texInfo, level);
         }
     }
@@ -2617,8 +2462,11 @@ gcChipTexNeedShadow(
         need = GL_TRUE;
     }
     else if (fmtMapInfo &&
-             (fmtMapInfo->flags &(__GL_CHIP_FMTFLAGS_FMT_DIFF_READ_WRITE |
-                                  __GL_CHIP_FMTFLAGS_LAYOUT_DIFF_READ_WRITE)))
+             (fmtMapInfo->flags & (__GL_CHIP_FMTFLAGS_FMT_DIFF_READ_WRITE |
+                                   __GL_CHIP_FMTFLAGS_LAYOUT_DIFF_READ_WRITE
+                                  )
+             )
+            )
     {
         need = GL_TRUE;
     }
@@ -2672,8 +2520,7 @@ gcChipGetTextureSurface(
     __GLchipContext *chipCtx,
     __GLtextureObject *texObj,
     GLint level,
-    GLint face,
-    GLint zoffset
+    GLint slice
     )
 {
     gcsSURF_VIEW surfView = {gcvNULL, 0, 1};
@@ -2689,8 +2536,8 @@ gcChipGetTextureSurface(
         gcvFACE_POSITIVE_Z,     /* face 4 */
         gcvFACE_NEGATIVE_Z,     /* face 5 */
     };
-    gcmHEADER_ARG("chipCtx=0x%x texObj=0x%x level=%d face=%d zoffset=%d",
-                   chipCtx, texObj, level, face, zoffset);
+
+    gcmHEADER_ARG("chipCtx=0x%x texObj=0x%x level=%d slice=%d", chipCtx, texObj, level, slice);
 
     if (!texInfo || !texInfo->object)
     {
@@ -2701,25 +2548,32 @@ gcChipGetTextureSurface(
     {
     case __GL_TEXTURE_2D_INDEX:
     case __GL_TEXTURE_2D_MS_INDEX:
+        if (slice != 0)
+        {
+            goto OnError;
+        }
         gcmONERROR(gcoTEXTURE_GetMipMap(texInfo->object, level, &surfView.surf));
         break;
 
     case __GL_TEXTURE_CUBEMAP_INDEX:
-        surfView.firstSlice = face;
-        gcmONERROR(gcoTEXTURE_GetMipMapFace(texInfo->object,
-                                            level,
-                                            s_texFaceIndex2HAL[face],
-                                            &surfView.surf,
-                                            gcvNULL));
+        if (slice < 6)
+        {
+            surfView.firstSlice = slice;
+            gcmONERROR(gcoTEXTURE_GetMipMapFace(texInfo->object,
+                                                level,
+                                                s_texFaceIndex2HAL[slice],
+                                                &surfView.surf,
+                                                gcvNULL));
+        }
         break;
     case __GL_TEXTURE_3D_INDEX:
     case __GL_TEXTURE_2D_ARRAY_INDEX:
     case __GL_TEXTURE_2D_MS_ARRAY_INDEX:
     case __GL_TEXTURE_CUBEMAP_ARRAY_INDEX:
-        surfView.firstSlice = __GL_IS_TEXTURE_ARRAY(texObj->targetIndex) ? face : zoffset;
+        surfView.firstSlice = slice;
         gcmONERROR(gcoTEXTURE_GetMipMapSlice(texInfo->object,
                                              level,
-                                             surfView.firstSlice,
+                                             slice,
                                              &surfView.surf,
                                              gcvNULL));
         break;
@@ -2764,10 +2618,9 @@ __glChipDeleteTexture(
 {
 #if __GL_CHIP_PATCH_ENABLED
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-    __GLmipMapLevel *baseMip = &texObj->faceMipmap[0][0];
 #endif
     __GLchipTextureInfo *texInfo = (__GLchipTextureInfo *)texObj->privateData;
-    GLuint face, level, depth;
+    GLuint level, slice;
 
     gcmHEADER_ARG("gc=0x%x texObj=0x%x", gc, texObj);
 
@@ -2778,29 +2631,34 @@ __glChipDeleteTexture(
     }
 
     /* default texture does not create the array */
-    GL_ASSERT(texInfo->mipLevel);
-    for (face = 0; face < texObj->maxFaces; ++face)
+    GL_ASSERT(texInfo->mipLevels);
+    for (level = 0; level < texObj->maxLevels; ++level)
     {
-        GL_ASSERT(texInfo->mipLevel[face]);
-        for (level = 0; level < texObj->maxLevels; ++level)
+        __GLchipMipmapInfo *mipLevel = &texInfo->mipLevels[level];
+        for (slice = 0; slice < texObj->maxSlices; ++slice)
         {
-            __GLchipMipmapInfo *mipLevel = &texInfo->mipLevel[face][level];
-            for (depth = 0; depth < texObj->maxDepths; ++depth)
+            if (mipLevel->shadow[slice].surface)
             {
-                if (mipLevel->shadow[depth].surface)
-                {
-                    gcmVERIFY_OK(gcoSURF_Destroy(mipLevel->shadow[depth].surface));
-                    mipLevel->shadow[depth].surface = gcvNULL;
-                }
+                gcmVERIFY_OK(gcoSURF_Destroy(mipLevel->shadow[slice].surface));
+                mipLevel->shadow[slice].surface = gcvNULL;
             }
         }
+
+        if (mipLevel->stencilOpt)
+        {
+            gcmVERIFY_OK(gcoOS_Free(gcvNULL, (gctPOINTER)mipLevel->stencilOpt));
+            mipLevel->stencilOpt = gcvNULL;
+        }
     }
-    gc->imports.free(gc, texInfo->mipLevel);
-    texInfo->mipLevel = gcvNULL;
+    gc->imports.free(gc, texInfo->mipLevels);
+    texInfo->mipLevels = gcvNULL;
+
 
 #if __GL_CHIP_PATCH_ENABLED
     if (chipCtx->patchId == gcvPATCH_GTFES30 && texObj->immutable)
     {
+        __GLmipMapLevel *baseMip = &texObj->faceMipmap[0][0];
+
         if (texObj->targetIndex == __GL_TEXTURE_2D_INDEX &&
             texObj->immutableLevels == 1 &&
             (GLuint)baseMip->width == gc->constants.maxTextureSize &&
@@ -2868,7 +2726,7 @@ __glChipDetachTexture(
     gcoSURF *surfList = gcvNULL;
     gcoSURF surf;
     GLuint  surfCount = 0;
-    GLuint  face, level, depth;
+    GLuint  level, slice;
     gceSTATUS status;
     gcmHEADER_ARG("gc=0x%x texObj=0x%x", gc, texObj);
 
@@ -2882,19 +2740,15 @@ __glChipDetachTexture(
 
     /* collect all surface which could be RT surface*/
     /* step1: collect shadow surface if exist */
-    GL_ASSERT(texInfo->mipLevel);
-    for (face = 0; face < texObj->maxFaces; ++face)
+    GL_ASSERT(texInfo->mipLevels);
+    for (level = 0; level < texObj->maxLevels; ++level)
     {
-        GL_ASSERT(texInfo->mipLevel[face]);
-        for (level = 0; level < texObj->maxLevels; ++level)
+        __GLchipMipmapInfo *mipLevel = &texInfo->mipLevels[level];
+        for (slice = 0; slice < texObj->maxSlices; ++slice)
         {
-            __GLchipMipmapInfo *mipLevel = &texInfo->mipLevel[face][level];
-            for (depth = 0; depth < texObj->maxDepths; ++depth)
+            if (mipLevel->shadow[slice].surface)
             {
-                if (mipLevel->shadow[depth].surface)
-                {
-                    surfList[surfCount++] = mipLevel->shadow[depth].surface;
-                }
+                surfList[surfCount++] = mipLevel->shadow[slice].surface;
             }
         }
     }
@@ -3206,7 +3060,6 @@ gcChipCompressedTexSubImage(
 {
     __GLchipTextureInfo  *texInfo = (__GLchipTextureInfo *)texObj->privateData;
     __GLmipMapLevel *mipmap = &texObj->faceMipmap[face][level];
-    __GLchipMipmapInfo *chipMipLevel = &texInfo->mipLevel[face][level];
     gceTEXTURE_FACE halFace = (__GL_TEXTURE_CUBEMAP_INDEX == texObj->targetIndex)
                             ? gcvFACE_POSITIVE_X + face : gcvFACE_NONE;
     gceSTATUS status = gcvSTATUS_OK;
@@ -3216,7 +3069,6 @@ gcChipCompressedTexSubImage(
     GLboolean needClean = GL_FALSE;
     const GLvoid *pixels = gcvNULL;
     GLboolean needDecompress = GL_FALSE;
-    __GLchipFmtMapInfo *formatMapInfo;
     gceSURF_FORMAT texImageFormat = gcvSURF_UNKNOWN;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
 
@@ -3236,8 +3088,10 @@ gcChipCompressedTexSubImage(
     if (buf)
     {
         GLint i;
-        GLsizei subSliceSize;
-        formatMapInfo = chipMipLevel->formatMapInfo;
+        GLsizei sliceSize = size / depth;
+        __GLchipMipmapInfo *chipMipLevel = &texInfo->mipLevels[level];
+        __GLchipFmtMapInfo *formatMapInfo = chipMipLevel->formatMapInfo;
+
         GL_ASSERT((formatMapInfo->flags & __GL_CHIP_FMTFLAGS_CANT_FOUND_HAL_FORMAT) == GL_FALSE);
         GL_ASSERT(formatMapInfo->readFormat != gcvSURF_UNKNOWN);
 
@@ -3388,11 +3242,9 @@ gcChipCompressedTexSubImage(
             break;
         }
 
-        switch (texObj->targetIndex)
+        for (i = 0; i < depth; ++i)
         {
-        case __GL_TEXTURE_2D_INDEX:
-        case __GL_TEXTURE_CUBEMAP_INDEX:
-            gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc, texObj, face, level, 0));
+            gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc, texObj, face, level, zoffset + i));
 
             if (pixels == gcvNULL)
             {
@@ -3402,74 +3254,29 @@ gcChipCompressedTexSubImage(
                                                           halFace,
                                                           (gctSIZE_T)xoffset, (gctSIZE_T)yoffset,
                                                           (gctSIZE_T)width, (gctSIZE_T)height,
-                                                          0,
-                                                          buf,
-                                                          size));
+                                                          zoffset + i,
+                                                          (const GLvoid*)((GLubyte*)buf + (i * sliceSize)),
+                                                          sliceSize));
             }
             else
             {
                 gcmASSERT(texImageFormat != gcvSURF_UNKNOWN);
+
                 /* Upload uncompressed if hw does not support. */
                 gcmONERROR(gcoTEXTURE_UploadSub(texInfo->object,
                                                 level,
                                                 halFace,
                                                 (gctSIZE_T)xoffset, (gctSIZE_T)yoffset,
                                                 (gctSIZE_T)width, (gctSIZE_T)height,
-                                                0,
-                                                pixels,
+                                                zoffset + i,
+                                                (const GLvoid*)((GLubyte*)pixels + rowStride * height * i),
                                                 rowStride,
                                                 texImageFormat,
                                                 gcvSURF_COLOR_SPACE_LINEAR,
                                                 gcvINVALID_ADDRESS));
             }
 
-            texInfo->mipLevel[face][level].shadow[0].masterDirty = GL_TRUE;
-            break;
-
-        case __GL_TEXTURE_2D_ARRAY_INDEX:
-        case __GL_TEXTURE_CUBEMAP_ARRAY_INDEX:
-            subSliceSize = size / depth;
-            for (i = 0; i < depth; ++i)
-            {
-                gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc, texObj, i+zoffset, level, 0));
-
-                if (pixels == gcvNULL)
-                {
-                    /* Upload compressed if hw supports. */
-                    gcmONERROR(gcoTEXTURE_UploadCompressedSub(texInfo->object,
-                                                              level,
-                                                              halFace,
-                                                              (gctSIZE_T)xoffset, (gctSIZE_T)yoffset,
-                                                              (gctSIZE_T)width, (gctSIZE_T)height,
-                                                              i+zoffset,
-                                                              (const GLvoid*)((GLubyte*)buf + (i * subSliceSize)),
-                                                              subSliceSize));
-                }
-                else
-                {
-                    gcmASSERT(texImageFormat != gcvSURF_UNKNOWN);
-
-                    /* Upload uncompressed if hw does not support. */
-                    gcmONERROR(gcoTEXTURE_UploadSub(texInfo->object,
-                                                    level,
-                                                    halFace,
-                                                    (gctSIZE_T)xoffset, (gctSIZE_T)yoffset,
-                                                    (gctSIZE_T)width, (gctSIZE_T)height,
-                                                    i+zoffset,
-                                                    (const GLvoid*)((GLubyte*)pixels + rowStride * height * i),
-                                                    rowStride,
-                                                    texImageFormat,
-                                                    gcvSURF_COLOR_SPACE_LINEAR,
-                                                    gcvINVALID_ADDRESS));
-                }
-
-                texInfo->mipLevel[i+zoffset][level].shadow[0].masterDirty = GL_TRUE;
-            }
-            break;
-
-        default:
-            GL_ASSERT(0);
-            break;
+            chipMipLevel->shadow[face + zoffset + i].masterDirty = GL_TRUE;
         }
 
         CHIP_TEX_IMAGE_UPTODATE(texInfo, level);
@@ -3514,7 +3321,6 @@ __glChipCompressedTexSubImage2D(
 
     gcmONERROR(gcChipCompressedTexSubImage(gc, texObj, face, level, xoffset, yoffset, 0, width, height, 1, buf, size));
 
-
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;
 
@@ -3547,7 +3353,6 @@ __glChipCompressedTexSubImage3D(
                    gc, texObj, level, xoffset, yoffset, zoffset, width, height, depth, buf, size);
 
     gcmONERROR(gcChipCompressedTexSubImage(gc, texObj, 0, level, xoffset, yoffset, zoffset, width, height, depth, buf, size));
-
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;
@@ -3598,28 +3403,6 @@ __glChipGenerateMipMap(
         patchCase = __GL_CHIP_FMT_PATCH_CASE0;
     }
 
-    for (level = baseLevel; level <= *maxLevel; ++level)
-    {
-        GLint face;
-
-        for (face = 0; face < faces; ++face)
-        {
-            chipMipLevel = &texInfo->mipLevel[face][level];
-            chipMipLevel->formatMapInfo = gcChipGetFormatMapInfo(gc,
-                                                                 baseMipmap->formatInfo->drvFormat,
-                                                                 patchCase);
-        }
-        /* Initialize other levels if it is 2d array */
-        if (baseMipmap->arrays > 1)
-        {
-            GLint arrayIdx;
-            for (arrayIdx = 1; arrayIdx < baseMipmap->arrays; ++arrayIdx)
-            {
-                texInfo->mipLevel[arrayIdx][level].formatMapInfo = texInfo->mipLevel[0][level].formatMapInfo;
-            }
-        }
-    }
-
     gcmONERROR(gcChipOrphanTexMipmap(gc, chipCtx, texObj));
 
     /* Construct the gcoTEXTURE object. */
@@ -3637,10 +3420,12 @@ __glChipGenerateMipMap(
     /* TODO: If the base level was not specified yet, mipmaps in fact cannot be generated.
     ** We should just remove add base level mipmap code.
     */
-    chipMipLevel = &texInfo->mipLevel[0][baseLevel];
+    chipMipLevel = &texInfo->mipLevels[baseLevel];
 
     if (CHIP_TEX_IMAGE_IS_UPTODATE(texInfo, baseLevel) == 0)
     {
+        chipMipLevel->formatMapInfo = gcChipGetFormatMapInfo(gc, baseMipmap->formatInfo->drvFormat, patchCase);
+
         /* Add the base level. If it already exists, the call will be ignored. */
         gcmONERROR(gcoTEXTURE_AddMipMap(texInfo->object,
                                         baseLevel,
@@ -3653,13 +3438,15 @@ __glChipGenerateMipMap(
                                         gcvPOOL_DEFAULT,
                                         gcvNULL));
 
+        GL_ASSERT(chipCtx->needStencilOpt == GL_FALSE);
+
         __GLES_PRINT("ES30: generating mipmap but baselevel has no valid data. garbage is expected for other levels ");
     }
 
     /* When generate mips, we should sync texture surface from corresponding RT surface. */
     gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc, texObj, 0, baseLevel, 0));
 
-    gcmONERROR(gcoTEXTURE_GetMipMap(texInfo->object,baseLevel,&surface));
+    gcmONERROR(gcoTEXTURE_GetMipMap(texInfo->object, baseLevel, &surface));
 
     if (surface)
     {
@@ -3676,10 +3463,13 @@ __glChipGenerateMipMap(
     for (level = baseLevel + 1; level <= *maxLevel; ++level)
     {
         gcoSURF srcSurface = gcvNULL, dstSurface = gcvNULL;
-        gceORIENTATION srcOrientation, dstOrientation;
-        GLint face;
+        __GLmipMapLevel *mipmap = &texObj->faceMipmap[0][level];
+        GLint numSlices = (texObj->targetIndex == __GL_TEXTURE_3D_INDEX) ? mipmap->depth : texObj->arrays;
+        GLint slice;
 
-        chipMipLevel = &texInfo->mipLevel[0][level];
+        chipMipLevel = &texInfo->mipLevels[level];
+
+        chipMipLevel->formatMapInfo = gcChipGetFormatMapInfo(gc, baseMipmap->formatInfo->drvFormat, patchCase);
 
         /* Get the texture surface. */
         gcmONERROR(gcoTEXTURE_GetMipMap(texInfo->object, level - 1, &srcSurface));
@@ -3689,19 +3479,21 @@ __glChipGenerateMipMap(
                                           level,
                                           baseMipmap->requestedFormat,
                                           chipMipLevel->formatMapInfo->readFormat,
-                                          (gctSIZE_T)texObj->faceMipmap[0][level].width,
-                                          (gctSIZE_T)texObj->faceMipmap[0][level].height,
-                                          __GL_IS_TEXTURE_ARRAY(texObj->targetIndex) ? texObj->arrays : texObj->faceMipmap[0][level].depth,
+                                          (gctSIZE_T)mipmap->width,
+                                          (gctSIZE_T)mipmap->height,
+                                          __GL_IS_TEXTURE_ARRAY(texObj->targetIndex) ? texObj->arrays : mipmap->depth,
                                           __GL_IS_TEXTURE_ARRAY(texObj->targetIndex) ? 1 : texObj->arrays,
                                           gcvPOOL_DEFAULT,
                                           0,
-                                          surface->info.hints & gcvSURF_PROTECTED_CONTENT ? gcvTRUE : gcvFALSE,
+                                          surface->hints & gcvSURF_PROTECTED_CONTENT ? gcvTRUE : gcvFALSE,
                                           &dstSurface));
 
-        /* only base leve has valide data, we need to generate data for other mips */
+        /* only base level has valid data, we need to generate data for other mips */
         /* For split texture, we don't need the real data of other mips. Fix bug #8768 */
         if (CHIP_TEX_IMAGE_IS_UPTODATE(texInfo, baseLevel) && !splitTexture)
         {
+            gceORIENTATION srcOrientation, dstOrientation;
+
             /* down sample to create the lower level. */
             gcmONERROR(gcoSURF_QueryOrientation(srcSurface, &srcOrientation));
             gcmONERROR(gcoSURF_QueryOrientation(dstSurface, &dstOrientation));
@@ -3712,13 +3504,12 @@ __glChipGenerateMipMap(
             {
                 if (level == *maxLevel)
                 {
-                    gcmONERROR(gcoTEXTURE_GenerateMipMap(
-                        texInfo->object, baseLevel, level));
+                    gcmONERROR(gcoTEXTURE_GenerateMipMap(texInfo->object, baseLevel, level));
                 }
             }
             else
             {
-                if (gcmIS_ERROR(gcoSURF_Resample_v2(srcSurface, dstSurface)))
+                if (gcmIS_ERROR(gcoSURF_Resample(srcSurface, dstSurface)))
                 {
                     /* record last succeeded level. */
                     if (lastLevel == -1)
@@ -3733,42 +3524,41 @@ __glChipGenerateMipMap(
 #endif
             gcmONERROR(gcoSURF_SetOrientation(dstSurface, dstOrientation));
 
-            for (face = 0; face < faces; ++face)
+            for (slice = 0; slice < numSlices; ++slice)
             {
-                texInfo->mipLevel[face][level].shadow[0].masterDirty = GL_TRUE;
-
-#if __GL_CHIP_STENCIL_TEST_OPT
-                {
-                    __GLmipMapLevel *mipmap = &texObj->faceMipmap[face][level];
-                    if (mipmap->formatInfo->stencilSize > 0)
-                    {
-                        gcsRECT rect;
-
-                        rect.left   = 0;
-                        rect.right  = mipmap->width - 1;
-                        rect.top    = 0;
-                        rect.bottom = mipmap->height - 1;
-
-                        /* TODO: stencil value can be derived from base level using blit */
-                        gcChipPatchStencilOptWrite(gc,
-                                                     &texInfo->mipLevel[face][level].stencilOpt,
-                                                     &rect, 0, 0, GL_TRUE);
-                    }
-                }
-#endif
+                chipMipLevel->shadow[slice].masterDirty = GL_TRUE;
             }
-            /* Initialize other levels if it is 2d array */
-            if (baseMipmap->arrays > 1)
-            {
-                GLint arrayIdx;
-                for (arrayIdx = 1; arrayIdx < baseMipmap->arrays; ++arrayIdx)
-                {
-                    texInfo->mipLevel[arrayIdx][level].shadow[0].masterDirty = GL_TRUE;
-                }
-            }
-
 
             CHIP_TEX_IMAGE_UPTODATE(texInfo, level);
+        }
+
+        if (chipCtx->needStencilOpt)
+        {
+            if (mipmap->formatInfo->stencilSize > 0)
+            {
+                if (!chipMipLevel->stencilOpt)
+                {
+                    gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                              numSlices * gcmSIZEOF(__GLchipStencilOpt),
+                                              (gctPOINTER*)&chipMipLevel->stencilOpt));
+                }
+
+                for (slice = 0; slice < numSlices; ++slice)
+                {
+                    gcChipPatchStencilOptReset(&chipMipLevel->stencilOpt[slice],
+                                               (gctSIZE_T)mipmap->width,
+                                               (gctSIZE_T)mipmap->height,
+                                               (gctSIZE_T)mipmap->formatInfo->stencilSize);
+                }
+            }
+            else
+            {
+                if (chipMipLevel->stencilOpt)
+                {
+                    gcmONERROR(gcoOS_Free(gcvNULL, (gctPOINTER)chipMipLevel->stencilOpt));
+                    chipMipLevel->stencilOpt = gcvNULL;
+                }
+            }
         }
     }
 
@@ -3867,7 +3657,7 @@ __glChipBindTexImage(
                                         &texView.surf));
 
         /* Resolve surface to texture mipmap: no flip in the resolve. */
-        gcmONERROR(gcoSURF_ResolveRect_v2(&surfView, &texView, gcvNULL));
+        gcmONERROR(gcoSURF_ResolveRect(&surfView, &texView, gcvNULL));
         gcmONERROR(gcoSURF_SetOrientation(texView.surf, gcvORIENTATION_TOP_BOTTOM));
     }
 
@@ -3961,6 +3751,27 @@ __glChipTexDirectVIV(
         planarYuv = gcvFALSE;
         break;
 
+    case GL_VIV_YUV420_10_ST:
+        sourceFormat  = gcvSURF_YUV420_10_ST;
+        textureFormat = gcvSURF_YUV420_10_ST;
+        sourceYuv = gcvTRUE;
+        planarYuv = gcvTRUE;
+        break;
+
+    case GL_VIV_YUV420_TILE_ST:
+        sourceFormat  = gcvSURF_YUV420_TILE_ST;
+        textureFormat = gcvSURF_YUV420_TILE_ST;
+        sourceYuv = gcvTRUE;
+        planarYuv = gcvTRUE;
+        break;
+
+    case GL_VIV_YUV420_TILE_10_ST:
+        sourceFormat  = gcvSURF_YUV420_TILE_10_ST;
+        textureFormat = gcvSURF_YUV420_TILE_10_ST;
+        sourceYuv = gcvTRUE;
+        planarYuv = gcvTRUE;
+        break;
+
     case GL_RGBA:
         sourceFormat = gcvSURF_A8B8G8R8;
         gcoTEXTURE_GetClosestFormat(gcvNULL, sourceFormat, &textureFormat);
@@ -3988,9 +3799,26 @@ __glChipTexDirectVIV(
     }
 
     /* Check whether the source can be handled. */
-    if (sourceYuv && planarYuv && !chipCtx->chipFeature.hasYuv420Tiler)
+    if (sourceYuv)
     {
-        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        /*
+         * Planar YUV requires 420tiler (422 not supported)
+         * or yuv-assembler.
+         */
+        if (planarYuv &&
+            !chipCtx->chipFeature.hasYuv420Tiler &&
+            !chipCtx->chipFeature.hasYuvAssembler)
+        {
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+
+        if ((format == GL_VIV_YUV420_10_ST ||
+             format == GL_VIV_YUV420_TILE_ST ||
+             format == GL_VIV_YUV420_TILE_10_ST) &&
+            (!chipCtx->chipFeature.hasYuvAssembler10bit))
+        {
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
     }
 
     /* Test if can sample texture source directly. */
@@ -4038,7 +3866,7 @@ __glChipTexDirectVIV(
     texInfo->direct.textureFormat = textureFormat;
 
     mipmap = &texObj->faceMipmap[0][0];
-    texInfo->mipLevel[0][0].formatMapInfo = gcChipGetFormatMapInfo(gc, mipmap->formatInfo->drvFormat, __GL_CHIP_FMT_PATCH_NONE);
+    texInfo->mipLevels[0].formatMapInfo = gcChipGetFormatMapInfo(gc, mipmap->formatInfo->drvFormat, __GL_CHIP_FMT_PATCH_NONE);
 
     /* Construct the source surface. */
     gcmONERROR(gcoSURF_Construct(
@@ -4066,6 +3894,9 @@ __glChipTexDirectVIV(
 
     case GL_VIV_NV12:
     case GL_VIV_NV21:
+    case GL_VIV_YUV420_10_ST:
+    case GL_VIV_YUV420_TILE_ST:
+    case GL_VIV_YUV420_TILE_10_ST:
         /* Y plane, UV (VU) plane. */
         pixels[0] = memory[0];
         pixels[1] = memory[1];
@@ -4220,6 +4051,21 @@ __glChipTexDirectVIVMap(
         gcoTEXTURE_GetClosestFormat(gcvNULL, sourceFormat, &textureFormat);
         break;
 
+    case GL_ALPHA:
+        sourceFormat = gcvSURF_A8;
+        gcoTEXTURE_GetClosestFormat(gcvNULL, sourceFormat, &textureFormat);
+        break;
+
+    case GL_LUMINANCE_ALPHA:
+        sourceFormat = gcvSURF_A8L8;
+        gcoTEXTURE_GetClosestFormat(gcvNULL, sourceFormat, &textureFormat);
+        break;
+
+    case GL_DEPTH_COMPONENT16:
+        sourceFormat = gcvSURF_D16;
+        gcoTEXTURE_GetClosestFormat(gcvNULL, sourceFormat, &textureFormat);
+        break;
+
     default:
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
@@ -4315,7 +4161,7 @@ __glChipTexDirectVIVMap(
     texInfo->direct.textureFormat = textureFormat;
 
     mipmap = &texObj->faceMipmap[0][0];
-    texInfo->mipLevel[0][0].formatMapInfo = gcChipGetFormatMapInfo(gc, mipmap->formatInfo->drvFormat, __GL_CHIP_FMT_PATCH_NONE);
+    texInfo->mipLevels[0].formatMapInfo = gcChipGetFormatMapInfo(gc, mipmap->formatInfo->drvFormat, __GL_CHIP_FMT_PATCH_NONE);
 
 OnError:
     if (gcmIS_ERROR(status))
@@ -4354,6 +4200,11 @@ GLboolean __glChipCopyImageSubData(
     gcsSURF_VIEW srcView = {gcvNULL, 0, 1};
     gcsSURF_VIEW dstView = {gcvNULL, 0, 1};
     gctINT i;
+    __GLformatInfo * srcFormatInfo = gcvNULL;
+    __GLformatInfo * dstFormatInfo = gcvNULL;
+    __GLmipMapLevel *mipmap = NULL;
+    __GLtextureObject * tex = NULL;
+    __GLrenderbufferObject * rbo = NULL;
 
     gcmHEADER_ARG("gc=0x%x",
                    gc);
@@ -4362,36 +4213,32 @@ GLboolean __glChipCopyImageSubData(
     {
         if (srcType != GL_RENDERBUFFER)
         {
-            if (srcType == __GL_TEXTURE_3D_INDEX)
-            {
-                srcView = gcChipGetTextureSurface(chipCtx, (__GLtextureObject *)srcObject, srcLevel, 0, srcZ + i);
-            }
-            else
-            {
-                srcView = gcChipGetTextureSurface(chipCtx, (__GLtextureObject *)srcObject, srcLevel, srcZ + i, 0);
-            }
+            srcView = gcChipGetTextureSurface(chipCtx, (__GLtextureObject *)srcObject, srcLevel, srcZ + i);
+            tex = (__GLtextureObject *)srcObject;
+            mipmap = &tex->faceMipmap[0][srcLevel];
+            srcFormatInfo = mipmap->formatInfo;
         }
         else
         {
             __GLchipRenderbufferObject *chipRBO = (__GLchipRenderbufferObject*)((__GLrenderbufferObject*)srcObject)->privateData;
             srcView.surf = chipRBO->surface;
+            rbo = (__GLrenderbufferObject*)srcObject;
+            srcFormatInfo = rbo->formatInfo;
         }
 
         if (dstType != GL_RENDERBUFFER)
         {
-            if (dstType == __GL_TEXTURE_3D_INDEX)
-            {
-                dstView = gcChipGetTextureSurface(chipCtx, (__GLtextureObject *)dstObject, dstLevel, 0, dstZ + i);
-            }
-            else
-            {
-                dstView = gcChipGetTextureSurface(chipCtx, (__GLtextureObject *)dstObject, dstLevel, dstZ + i, 0);
-            }
+            dstView = gcChipGetTextureSurface(chipCtx, (__GLtextureObject *)dstObject, dstLevel, dstZ + i);
+            tex = (__GLtextureObject *)dstObject;
+            mipmap = &tex->faceMipmap[0][dstLevel];
+            dstFormatInfo = mipmap->formatInfo;
         }
         else
         {
             __GLchipRenderbufferObject *chipRBO = (__GLchipRenderbufferObject*)((__GLrenderbufferObject*)dstObject)->privateData;
             dstView.surf = chipRBO->surface;
+            rbo = (__GLrenderbufferObject*)dstObject;
+            dstFormatInfo = rbo->formatInfo;
         }
 
         if (srcView.surf && dstView.surf)
@@ -4419,8 +4266,33 @@ GLboolean __glChipCopyImageSubData(
                 rlvArgs.uArgs.v2.dstOrigin.y = dstY;
                 rlvArgs.uArgs.v2.rectSize.x  = width;
                 rlvArgs.uArgs.v2.rectSize.y  = height;
+                rlvArgs.uArgs.v2.srcSwizzle = gcvFALSE;
+                rlvArgs.uArgs.v2.dstSwizzle = gcvFALSE;
 
-                gcmONERROR(gcoSURF_ResolveRect_v2(&srcView, &dstView, &rlvArgs));
+                if (srcView.surf->format !=dstView.surf->format)
+                {
+                    if((srcFormatInfo->glFormat == GL_RGBA8 &&
+                        srcView.surf->format == gcvSURF_A8R8G8B8)  ||
+                        (srcFormatInfo->glFormat == GL_RGB8&&
+                        srcView.surf->format == gcvSURF_X8R8G8B8)  ||
+                        srcFormatInfo->glFormat == GL_SRGB8_ALPHA8 ||
+                        srcFormatInfo->glFormat == GL_SRGB8)
+                    {
+                        rlvArgs.uArgs.v2.srcSwizzle = gcvTRUE;
+                    }
+
+                    if((dstFormatInfo->glFormat == GL_RGBA8 &&
+                        dstView.surf->format == gcvSURF_A8R8G8B8)  ||
+                        (dstFormatInfo->glFormat == GL_RGB8&&
+                        dstView.surf->format == gcvSURF_X8R8G8B8)  ||
+                        dstFormatInfo->glFormat == GL_SRGB8_ALPHA8 ||
+                        dstFormatInfo->glFormat == GL_SRGB8)
+                    {
+                        rlvArgs.uArgs.v2.dstSwizzle = gcvTRUE;
+                    }
+                }
+
+                gcmONERROR(gcoSURF_ResolveRect(&srcView, &dstView, &rlvArgs));
             }
 
             /* TODO, base on format/size do 3D copy and CPUBLIT */
@@ -4540,7 +4412,7 @@ gcChipTexSyncDirectVIV(
                 gcsSURF_VIEW mipView = {mipmap, 0, 1};
 
                 /* Use resolve to upload texture. */
-                gcmONERROR(gcoSURF_ResolveRect_v2(&srcView, &mipView, gcvNULL));
+                gcmONERROR(gcoSURF_ResolveRect(&srcView, &mipView, gcvNULL));
 
                 /* Wait all the pixels done. */
                 gcmVERIFY_OK(gco3D_Semaphore(chipCtx->engine, gcvWHERE_RASTER, gcvWHERE_PIXEL, gcvHOW_SEMAPHORE));
@@ -4733,7 +4605,7 @@ gcChipTexSyncEGLImage(
 #endif
 
                     /* Use resolve to upload texture. */
-                    gcmONERROR(gcoSURF_ResolveRect_v2(&srcView, &mipView, gcvNULL));
+                    gcmONERROR(gcoSURF_ResolveRect(&srcView, &mipView, gcvNULL));
 
 #if defined(ANDROID) && gcdANDROID_IMPLICIT_NATIVE_BUFFER_SYNC
                     if (handle != gcvNULL && handle->hwDoneSignal != 0)
@@ -4795,7 +4667,7 @@ gcChipTexCheckDirtyStateKeep(
     {
         /* If the image source sibling may be changed implicitly,
          * it should be dirty on next draw. */
-        __glBitmaskOR(&gc->shaderProgram.samplerStateKeepDirty, samplerID);
+        __glBitmaskSet(&gc->shaderProgram.samplerStateKeepDirty, samplerID);
     }
 }
 
@@ -4866,21 +4738,15 @@ __glChipCreateEglImageTexture(
     gcsSURF_VIEW texView;
     gctUINT width = 0;
     gctUINT height = 0;
-    GLint chosenFace = 0;
-    GLint chosenDepth = 0;
     khrEGL_IMAGE * eglImage;
     __GLmipMapLevel *mipmap;
-    __GLchipMipmapInfo *chipMipLevel;
-
     gcmHEADER_ARG("gc=0x%x texObj=0x%x face=%d, level=%d depth=%d image=0x%x", gc, texObj, face, level, depth, image);
 
     mipmap = &texObj->faceMipmap[face][level];
 
     texInfo = (__GLchipTextureInfo*)texObj->privateData;
 
-    chipMipLevel = &texInfo->mipLevel[face][level];
-
-    texView = gcChipGetTextureSurface(chipCtx, texObj, level, face, 0);
+    texView = gcChipGetTextureSurface(chipCtx, texObj, level, face);
 
     if (texView.surf == gcvNULL)
     {
@@ -4897,28 +4763,8 @@ __glChipCreateEglImageTexture(
         return EGL_BAD_ACCESS;
     }
 
-    switch (texObj->targetIndex)
-    {
-    case __GL_TEXTURE_2D_INDEX:
-    case __GL_TEXTURE_CUBEMAP_INDEX:
-        chosenFace  = face;
-        chosenDepth = 0;
-        break;
-    case __GL_TEXTURE_2D_ARRAY_INDEX:
-        chosenFace  = depth;
-        chosenDepth = 0;
-        break;
-    case __GL_TEXTURE_3D_INDEX:
-        chosenFace  = 0;
-        chosenDepth = depth;
-        break;
-    default:
-        GL_ASSERT(0);
-        break;
-    }
-
     /* If texture was drawn before, resolve to texture surface before used as EGLimage source */
-    gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc, texObj, chosenFace, level, chosenDepth));
+    gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc, texObj, face, level, depth));
 
     eglImage = (khrEGL_IMAGE*)image;
 
@@ -4930,7 +4776,7 @@ __glChipCreateEglImageTexture(
         gceSURF_FORMAT targetFormat, shadowFormat;
 
         gcmONERROR(gcoSURF_GetSize(texView.surf, &targetW, &targetH, gcvNULL));
-        targetFormat = chipMipLevel->formatMapInfo->readFormat;
+        targetFormat = texInfo->mipLevels[level].formatMapInfo->readFormat;
         targetSamples = 1;
 
         if (eglImage->u.texture.shadowSurface)
@@ -4951,7 +4797,7 @@ __glChipCreateEglImageTexture(
         {
             gceSURF_TYPE surfType = gcvSURF_TYPE_UNKNOWN;
 
-            if (texView.surf->info.formatInfo.fmtClass == gcvFORMAT_CLASS_DEPTH)
+            if (texView.surf->formatInfo.fmtClass == gcvFORMAT_CLASS_DEPTH)
             {
                 surfType = gcvSURF_DEPTH_TS_DIRTY;
             }
@@ -5112,9 +4958,13 @@ __glChipGetTextureAttribFromImage(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    if ((glFormat != gcvNULL) && (glInternalFormat != gcvNULL) && (glType != gcvNULL))
+    if ((glFormat != gcvNULL) || (glInternalFormat != gcvNULL) || (glType != gcvNULL))
     {
         gceSURF_FORMAT surfFormat;
+        GLint format = GL_NONE;
+        GLint internalFormat = GL_NONE;
+        GLint type = GL_NONE;
+
         if (!surface)
         {
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
@@ -5124,109 +4974,127 @@ __glChipGetTextureAttribFromImage(
         switch (surfFormat)
         {
         case gcvSURF_A8B8G8R8:
-            *glFormat = *glInternalFormat = GL_RGBA;
-            *glType = GL_UNSIGNED_BYTE;
+            format = internalFormat = GL_RGBA;
+            type = GL_UNSIGNED_BYTE;
             break;
+
         case gcvSURF_X8B8G8R8:
-            *glFormat = *glInternalFormat = __GL_RGBX8;
-            *glType = GL_UNSIGNED_BYTE;
+            format = internalFormat = __GL_RGBX8;
+            type = GL_UNSIGNED_BYTE;
             break;
+
         case gcvSURF_X8R8G8B8:
-            *glFormat = *glInternalFormat = __GL_BGRX8;
-            *glType = GL_UNSIGNED_BYTE;
+            format = internalFormat = __GL_BGRX8;
+            type = GL_UNSIGNED_BYTE;
             break;
+
         case gcvSURF_A8R8G8B8:
-            *glFormat = *glInternalFormat = GL_BGRA_EXT;
-            *glType = GL_UNSIGNED_BYTE;
+            format = internalFormat = GL_BGRA_EXT;
+            type = GL_UNSIGNED_BYTE;
             break;
 
         case gcvSURF_R5G6B5:
-            *glFormat = *glInternalFormat = GL_RGB;
-            *glType = GL_UNSIGNED_SHORT_5_6_5;
+            format = internalFormat = GL_RGB;
+            type = GL_UNSIGNED_SHORT_5_6_5;
             break;
 
         case gcvSURF_R5G5B5A1:
-            *glFormat = *glInternalFormat = GL_RGBA;
-            *glType = GL_UNSIGNED_SHORT_5_5_5_1;
+            format = internalFormat = GL_RGBA;
+            type = GL_UNSIGNED_SHORT_5_5_5_1;
             break;
 
         case gcvSURF_A1R5G5B5:
-            *glFormat = *glInternalFormat = GL_RGBA;
-            *glType = GL_UNSIGNED_SHORT_5_5_5_1;
+            format = internalFormat = GL_RGBA;
+            type = GL_UNSIGNED_SHORT_5_5_5_1;
             break;
 
         case gcvSURF_X1R5G5B5:
-            *glFormat = *glInternalFormat = GL_RGB;
-            *glType = GL_UNSIGNED_SHORT_5_5_5_1;
+            format = internalFormat = GL_RGB;
+            type = GL_UNSIGNED_SHORT_5_5_5_1;
             break;
 
         case gcvSURF_A4R4G4B4:
         case gcvSURF_R4G4B4A4:
-            *glFormat = *glInternalFormat = GL_RGBA4;
-            *glType = GL_UNSIGNED_SHORT_4_4_4_4;
+            format = internalFormat = GL_RGBA4;
+            type = GL_UNSIGNED_SHORT_4_4_4_4;
             break;
 
         case gcvSURF_X4R4G4B4:
-            *glFormat = *glInternalFormat = GL_RGB;
-            *glType = GL_UNSIGNED_SHORT_4_4_4_4;
+            format = internalFormat = GL_RGB;
+            type = GL_UNSIGNED_SHORT_4_4_4_4;
             break;
 
         case gcvSURF_YV12:
-            *glFormat = GL_VIV_YV12;
-            *glInternalFormat = GL_RGBA;
-            *glType = GL_NONE;
+            format = GL_VIV_YV12;
+            internalFormat = GL_RGBA;
+            type = GL_NONE;
             break;
 
         case gcvSURF_I420:
-            *glFormat = GL_VIV_I420;
-            *glInternalFormat = GL_RGBA;
-            *glType = GL_NONE;
+            format = GL_VIV_I420;
+            internalFormat = GL_RGBA;
+            type = GL_NONE;
             break;
 
         case gcvSURF_NV12:
-            *glFormat  = GL_VIV_NV12;
-            *glInternalFormat = GL_RGBA;
-            *glType = GL_NONE;
+            format  = GL_VIV_NV12;
+            internalFormat = GL_RGBA;
+            type = GL_NONE;
             break;
 
         case gcvSURF_NV21:
-            *glFormat = GL_VIV_NV21;
-            *glInternalFormat = GL_RGBA;
-            *glType = GL_NONE;
+            format = GL_VIV_NV21;
+            internalFormat = GL_RGBA;
+            type = GL_NONE;
             break;
 
         case gcvSURF_YUY2:
-            *glFormat = GL_VIV_YUY2;
-            *glInternalFormat = GL_RGBA;
-            *glType = GL_NONE;
+            format = GL_VIV_YUY2;
+            internalFormat = GL_RGBA;
+            type = GL_NONE;
             break;
 
         case gcvSURF_UYVY:
-            *glFormat = GL_VIV_UYVY;
-            *glInternalFormat = GL_RGBA;
-            *glType = GL_NONE;
+            format = GL_VIV_UYVY;
+            internalFormat = GL_RGBA;
+            type = GL_NONE;
             break;
 
         case gcvSURF_AYUV:
-            *glFormat = GL_VIV_AYUV;
-            *glInternalFormat = GL_RGBA;
-            *glType = GL_NONE;
+            format = GL_VIV_AYUV;
+            internalFormat = GL_RGBA;
+            type = GL_NONE;
             break;
 
         case gcvSURF_NV16:
-            *glFormat = GL_VIV_YUY2;
-            *glInternalFormat = GL_RGBA;
-            *glType = GL_NONE;
+            format = GL_VIV_YUY2;
+            internalFormat = GL_RGBA;
+            type = GL_NONE;
             break;
 
         case gcvSURF_NV61:
-            *glFormat = GL_VIV_UYVY;
-            *glInternalFormat = GL_RGBA;
-            *glType = GL_NONE;
+            format = GL_VIV_UYVY;
+            internalFormat = GL_RGBA;
+            type = GL_NONE;
             break;
 
         default:
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+
+        if (glFormat)
+        {
+            *glFormat = format;
+        }
+
+        if (glInternalFormat)
+        {
+            *glInternalFormat = internalFormat;
+        }
+
+        if (glType)
+        {
+            *glType = type;
         }
     }
 
@@ -5266,7 +5134,7 @@ __glChipEglImageTargetTexture2DOES(
     gctBOOL dirty = gcvFALSE;
     gcoSURF surface;
     __GLmipMapLevel *mipmap = &texObj->faceMipmap[0][0];
-    __GLchipMipmapInfo *chipMipLevel = &texInfo->mipLevel[0][0];
+    __GLchipMipmapInfo *chipMipLevel = &texInfo->mipLevels[0];
 
     gcmHEADER_ARG("gc=0x%x texObj=0x%x target=0x%04x eglImage=0x%x", gc, texObj, target, eglImage);
 
@@ -5336,7 +5204,7 @@ __glChipEglImageTargetTexture2DOES(
             gcsSURF_VIEW imageView  = {image->surface, image->u.texture.sliceIndex, 1};
             gcsSURF_VIEW shadowView = {image->u.texture.shadowSurface, 0, 1};
 
-            gcmONERROR(gcoSURF_ResolveRect_v2(&imageView, &shadowView, gcvNULL));
+            gcmONERROR(gcoSURF_ResolveRect(&imageView, &shadowView, gcvNULL));
             image->u.texture.masterDirty = gcvFALSE;
         }
         surface = image->u.texture.shadowSurface;
@@ -5356,7 +5224,7 @@ __glChipEglImageTargetTexture2DOES(
             gcmONERROR(gcoSURF_QueryOrientation(image->srcSurface, &srcOrient));
 
             gcmONERROR(gcoSURF_SetOrientation(image->surface, srcOrient));
-            gcmONERROR(gcoSURF_ResolveRect_v2(&srcView, &imgView, gcvNULL));
+            gcmONERROR(gcoSURF_ResolveRect(&srcView, &imgView, gcvNULL));
             gcmONERROR(gcoSURF_SetOrientation(image->surface, dstOrient));
 
             gcmONERROR(gcChipSetImageSrc(image, gcvNULL));
@@ -5648,28 +5516,28 @@ __glChipEglImageTargetTexture2DOES(
                     if (attachPoint->objType == GL_TEXTURE &&
                         attachPoint->objName == texObj->name &&
                         attachPoint->level == level &&
-                        (texObj->targetIndex != __GL_TEXTURE_CUBEMAP_INDEX || 0 == attachPoint->chosenFace))
+                        attachPoint->face == 0)
                     {
                         if (gcChipTexNeedShadow(gc,
-                            texObj,
-                            texInfo,
-                            chipMipLevel->formatMapInfo,
-                            attachPoint->samples,
-                            &attachPoint->samplesUsed)
-                            )
+                                                texObj,
+                                                texInfo,
+                                                chipMipLevel->formatMapInfo,
+                                                attachPoint->samples,
+                                                &attachPoint->samplesUsed)
+                           )
                         {
-                            gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, 0, 0, attachPoint->chosenDepth);
+                            gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, 0, attachPoint->slice);
 
                             gcmONERROR(gcChipRellocShadowResource(gc,
-                                texView.surf,
-                                attachPoint->samplesUsed,
-                                &chipMipLevel->shadow[attachPoint->chosenDepth],
-                                chipMipLevel->formatMapInfo,
-                                GL_TRUE));
+                                                                  texView.surf,
+                                                                  attachPoint->samplesUsed,
+                                                                  &chipMipLevel->shadow[attachPoint->slice],
+                                                                  chipMipLevel->formatMapInfo,
+                                                                  GL_TRUE));
                         }
                         else
                         {
-                            __GLchipResourceShadow *shadow = &chipMipLevel->shadow[attachPoint->chosenDepth];
+                            __GLchipResourceShadow *shadow = &chipMipLevel->shadow[attachPoint->slice];
 
                             if(shadow && shadow->surface)
                             {
@@ -5688,7 +5556,7 @@ __glChipEglImageTargetTexture2DOES(
         }
     }
 
-    texInfo->mipLevel[0][0].shadow[0].masterDirty = GL_TRUE;
+    texInfo->mipLevels[0].shadow[0].masterDirty = GL_TRUE;
     CHIP_TEX_IMAGE_UPTODATE(texInfo, level);
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);

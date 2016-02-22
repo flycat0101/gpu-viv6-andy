@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -104,6 +104,14 @@ VX_INTERNAL_CALLBACK_API void vxoArray_Destructor(vx_reference ref)
     vx_array array = (vx_array)ref;
 
     vxoMemory_Free(array->base.context, &array->memory);
+
+    if (array->memAllocInfo.node)
+    {
+        gcoVX_FreeMemoryEx(array->memAllocInfo.physical,
+                        array->memAllocInfo.logical,
+                        array->memAllocInfo.allocatedSize,
+                        array->memAllocInfo.node);
+    }
 }
 
 VX_INTERNAL_API vx_bool vxoArray_InitializeAsVirtual(vx_array array, vx_enum itemType, vx_size capacity)
@@ -336,7 +344,7 @@ VX_PUBLIC_API vx_status vxQueryArray(vx_array array, vx_enum attribute, void *pt
     return VX_SUCCESS;
 }
 
-VX_INTERNAL_API vx_status vxSetArrayAttribute(vx_array array, vx_enum attribute, void *ptr, vx_size size)
+VX_PUBLIC_API vx_status vxSetArrayAttribute(vx_array array, vx_enum attribute, void *ptr, vx_size size)
 {
     if (!vxoArray_IsValid(array)) return VX_ERROR_INVALID_REFERENCE;
 

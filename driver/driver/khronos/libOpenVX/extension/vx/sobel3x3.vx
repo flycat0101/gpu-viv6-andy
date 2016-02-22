@@ -1,0 +1,74 @@
+#include "cl_viv_vx_ext.h"
+
+_viv_uniform unsigned int height;
+vxc_short8 viv_intrinsic_vx_icastD_s(vxc_uchar16 a)  { return 0; }
+
+__kernel void sobel3x3 /* sobel_3x3 */
+(
+    __read_only image2d_t in_image,      //uchar
+    __write_only image2d_t out_image_x,  //short
+    __write_only image2d_t out_image_y  //short
+)
+{
+#if 1
+    int2  coord = (int2)(get_global_id(0), get_global_id(1));
+
+    int2 coord1 = coord + (int2)(-1, -1);
+    vxc_uchar16 v0 = viv_intrinsic_vx_read_imageuc(in_image, coord1);
+
+    int2 coord2 = coord + (int2)(-1, 0);
+    vxc_uchar16 v1 = viv_intrinsic_vx_read_imageuc(in_image, coord2);
+
+    int info = VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0);
+	int infox = VXC_MODIFIER_FILTER(0, 5, 0, VXC_FM_SobelX, 0);
+	int infoy = VXC_MODIFIER_FILTER(0, 5, 0, VXC_FM_SobelY, 0);
+
+    do
+    {
+        int2 coord3 = coord + (int2)(-1, 1);
+        vxc_uchar16 v2 = viv_intrinsic_vx_read_imageuc(in_image, coord3);
+
+        vxc_uchar16 grad_x_t = viv_intrinsic_vxmc_Filter_uc(v0, v1, v2, infox);
+		vxc_short8 grad_x =  viv_intrinsic_vx_icastD_s(grad_x_t);
+
+        vxc_uchar16 grad_y_t = viv_intrinsic_vxmc_Filter_uc(v0, v1, v2, infoy);
+		vxc_short8 grad_y =  viv_intrinsic_vx_icastD_s(grad_y_t);
+
+        viv_intrinsic_vxmc_write_images(out_image_x, coord, grad_x, info);
+        viv_intrinsic_vxmc_write_images(out_image_y, coord, grad_y, info);
+
+        v0 = v1;
+        v1 = v2;
+        coord.y++;
+    }
+    while (coord.y < height) ;
+#else
+    const int pX = get_global_id(0);
+    const int pXPrec = pX - 1;
+    int pY = 0;
+    int info = VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0);
+	int infox = VXC_MODIFIER_FILTER(0, 5, 0, VXC_FM_SobelX, 0);
+	int infoy = VXC_MODIFIER_FILTER(0, 5, 0, VXC_FM_SobelY, 0);
+
+    vxc_uchar16 v0 = viv_intrinsic_vx_read_imageuc(in_image, (int2)(pXPrec, -1));
+    vxc_uchar16 v1 = viv_intrinsic_vx_read_imageuc(in_image, (int2)(pXPrec, pY));
+
+    while (pY < height)
+    {
+        vxc_uchar16 v2 = viv_intrinsic_vx_read_imageuc(in_image, (int2)(pXPrec, pY+1));
+        vxc_uchar16 grad_x_t = viv_intrinsic_vxmc_Filter_uc(v0, v1, v2, infox);
+		vxc_short8 grad_x =  viv_intrinsic_vx_icastD_s(grad_x_t);
+
+        vxc_uchar16 grad_y_t = viv_intrinsic_vxmc_Filter_uc(v0, v1, v2, infoy);
+		vxc_short8 grad_y =  viv_intrinsic_vx_icastD_s(grad_y_t);
+
+        viv_intrinsic_vxmc_write_images(out_image_x, (int2)(pX, pY), grad_x, info);
+        viv_intrinsic_vxmc_write_images(out_image_y, (int2)(pX, pY), grad_y, info);
+
+        v0 = v1;
+        v1 = v2;
+        pY++;
+    }
+#endif
+}
+

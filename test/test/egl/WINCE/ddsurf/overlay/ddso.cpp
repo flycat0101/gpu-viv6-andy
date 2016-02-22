@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -353,7 +353,7 @@ HRESULT InitOGLES()
     /*eglCreateWindowSurface creates an onscreen EGLSurface and returns
     a handle  to it. Any EGL rendering context created with a
     compatible EGLConfig can be used to render into this surface.*/
-    glesSurface = eglCreateWindowSurface(glesDisplay, configs[0], (EGLNativeWindowType)g_pDDSOverlay, configAttribs);
+    glesSurface = eglCreateWindowSurface(glesDisplay, configs[0], (EGLNativeWindowType)g_pDDSOverlay, NULL);
     if(!glesSurface)
         return FailOutput(E_INVALIDARG, TEXT("eglCreateWindowSurface FAILED"));
 

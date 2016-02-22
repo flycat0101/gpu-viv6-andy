@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2033,9 +2033,11 @@ _GenOldConvert_Code(
     gctBOOL isInputFloat = gcvFALSE;
     gctBOOL isInputSigned = gcvFALSE;
     gctBOOL isOutputFloat = gcvFALSE;
+    gctBOOL isOutputSigned = gcvFALSE;
     gctBOOL isOutputINT = gcvFALSE;
     gctBOOL isOutputUINT = gcvFALSE;
     cltELEMENT_TYPE elementType;
+    gctBOOL isOutputMinOverFlow = gcvFALSE, isOutputMaxOverFlow = gcvFALSE;
 
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
     clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
@@ -2109,6 +2111,8 @@ _GenOldConvert_Code(
     switch (IOperand->dataType.elementType) {
 
         case clvTYPE_CHAR:
+            isOutputSigned = gcvTRUE;
+
             clsROPERAND_InitializeIntOrIVecConstant(&outputTypeMaskROperand,
                                     clmGenCodeDataType(T_INT),
                                     0x000000FF);
@@ -2163,6 +2167,8 @@ _GenOldConvert_Code(
             break;
 
         case clvTYPE_SHORT:
+            isOutputSigned = gcvTRUE;
+
             clsROPERAND_InitializeIntOrIVecConstant(&outputTypeMaskROperand,
                                     clmGenCodeDataType(T_INT),
                                     0x0000FFFF);
@@ -2217,6 +2223,7 @@ _GenOldConvert_Code(
             break;
 
         case clvTYPE_INT:
+            isOutputSigned = gcvTRUE;
             isOutputINT = gcvTRUE;
 
             if (isInputFloat) {
@@ -2281,6 +2288,16 @@ _GenOldConvert_Code(
             return gcvSTATUS_INVALID_ARGUMENT;
     }
 
+    if (IOperand->dataType.elementType > elementType)
+    {
+        isOutputMaxOverFlow = gcvTRUE;
+
+        if (isInputSigned && isOutputSigned)
+        {
+            isOutputMinOverFlow = gcvTRUE;
+        }
+    }
+
     if (Saturation) {
         /* Clamp to <TYPE_MIN, TYPE_MAX> */
 
@@ -2294,6 +2311,11 @@ _GenOldConvert_Code(
             if (gcmIS_ERROR(status)) return status;
 
             /* The condition part: arg0 <= TYPE_MIN */
+            if (isOutputMinOverFlow)
+            {
+                OperandsParameters[0].rOperands[0].dataType.elementType =
+                    IOperand->dataType.elementType;
+            }
             status = clGenSelectionCompareConditionCode(Compiler,
                                                         CodeGenerator,
                                                         &selectionContextMin,
@@ -2303,6 +2325,11 @@ _GenOldConvert_Code(
                                                         &OperandsParameters[0].rOperands[0],
                                                         &outputTypeMinROperand);
             if (gcmIS_ERROR(status)) return status;
+
+            if (isOutputMinOverFlow)
+            {
+                OperandsParameters[0].rOperands[0].dataType.elementType = elementType;
+            }
 
             /* The true part for arg0 <= TYPE_MIN */
             status = clDefineSelectionTrueOperandBegin(Compiler,
@@ -2344,6 +2371,12 @@ _GenOldConvert_Code(
             if (gcmIS_ERROR(status)) return status;
 
             /* The condition part: arg0 >= TYPE_MAX */
+            if (isOutputMaxOverFlow)
+            {
+                OperandsParameters[0].rOperands[0].dataType.elementType =
+                    IOperand->dataType.elementType;
+            }
+
             status = clGenSelectionCompareConditionCode(Compiler,
                                                         CodeGenerator,
                                                         &selectionContextMax,
@@ -2353,6 +2386,11 @@ _GenOldConvert_Code(
                                                         &OperandsParameters[0].rOperands[0],
                                                         &outputTypeMaxROperand);
             if (gcmIS_ERROR(status)) return status;
+
+            if (isOutputMaxOverFlow)
+            {
+                OperandsParameters[0].rOperands[0].dataType.elementType = elementType;
+            }
 
             /* The true part for arg0 >= TYPE_MAX */
             status = clDefineSelectionTrueOperandBegin(Compiler,
@@ -4324,7 +4362,28 @@ _GenAs_TypeCode(
 
     /* return input parameter as output */
     rOperand = OperandsParameters[0].rOperands[0];
-    rOperand.dataType.elementType = IOperand->dataType.elementType;
+    if(clmIsElementTypeHighPrecision(IOperand->dataType.elementType))
+    {
+        if(clmGEN_CODE_IsScalarDataType(IOperand->dataType))
+        {
+            if(clmGEN_CODE_IsVectorDataType(rOperand.dataType)) {
+                rOperand.vectorIndex.mode = clvINDEX_CONSTANT;
+                rOperand.vectorIndex.u.constant = 0;
+                rOperand.dataType = gcGetVectorSliceDataType(rOperand.dataType, 1);
+            }
+        }
+        else
+        {
+            clmGEN_CODE_DATA_TYPE_Initialize(rOperand.dataType,
+                                             clmGEN_CODE_vectorSize_GET(IOperand->dataType),
+                                             0,
+                                             rOperand.dataType.elementType);
+        }
+    }
+    else
+    {
+        rOperand.dataType.elementType = IOperand->dataType.elementType;
+    }
     status = clGenGenericCode1(Compiler,
                                PolynaryExpr->exprBase.base.lineNo,
                                PolynaryExpr->exprBase.base.stringNo,

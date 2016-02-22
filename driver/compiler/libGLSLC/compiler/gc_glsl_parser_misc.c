@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -144,38 +144,6 @@ yylex(
 
     gcmFOOTER_ARG("%d", tokenType);
     return tokenType;
-}
-
-gceSTATUS
-sloCOMPILER_LoadBuiltIns(
-    IN sloCOMPILER Compiler
-    )
-{
-    gceSTATUS        status;
-    sleSHADER_TYPE    shaderType;
-
-    gcmHEADER_ARG("Compiler=0x%x", Compiler);
-
-    /* Verify the arguments. */
-    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
-
-    gcmVERIFY_OK(sloCOMPILER_LoadingBuiltIns(Compiler, gcvTRUE));
-
-    /* Load all kind of built-ins */
-    gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
-
-    status = slLoadBuiltIns(Compiler, shaderType);
-
-    if (gcmIS_ERROR(status))
-    {
-        gcmFOOTER();
-        return status;
-    }
-
-    gcmVERIFY_OK(sloCOMPILER_LoadingBuiltIns(Compiler, gcvFALSE));
-
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
 }
 
 gceSTATUS
@@ -2109,7 +2077,7 @@ _CheckErrorAsFuncCall(
     gcmASSERT(PolynaryExpr->funcName->u.funcInfo.localSpace);
 
     if (PolynaryExpr->funcName->isBuiltIn &&
-        PolynaryExpr->funcName->u.funcInfo.hasVarArg)
+        slsFUNC_HAS_FLAG(&(PolynaryExpr->funcName->u.funcInfo), slvFUNC_HAS_VAR_ARG))
     {
         gcmFOOTER_NO();
         return gcvSTATUS_OK;
@@ -6937,7 +6905,6 @@ _CheckDataTypePrecision(
                                                slvREPORT_WARN,
                                                "missing precision for floating point type for variable: '%s'",
                                                Identifier->u.identifier));
-
                DataType->qualifiers.precision = slvPRECISION_QUALIFIER_HIGH;
            }
        }
@@ -8109,23 +8076,16 @@ slParseArrayVariableDecl(
         }
     }
 
-    if ((arrayDataType->qualifiers.storage == slvSTORAGE_QUALIFIER_UNIFORM ||
-         arrayDataType->qualifiers.storage == slvSTORAGE_QUALIFIER_ATTRIBUTE ||
-         arrayDataType->qualifiers.storage == slvSTORAGE_QUALIFIER_FRAGMENT_OUT) &&
-         arrayDataType->qualifiers.layout.id & slvLAYOUT_LOCATION)
+    if (arrayDataType->qualifiers.storage == slvSTORAGE_QUALIFIER_UNIFORM &&
+        arrayDataType->qualifiers.layout.id & slvLAYOUT_LOCATION)
     {
-        gctBOOL inUseAlready;
-        gctINT i, length = 1;
-        for (i = 0; i < arrayDataType->arrayLengthCount; i++)
-        {
-            length *= arrayDataType->arrayLengthList[i];
-        }
+        gctSIZE_T length;
+
+        length = (gctSIZE_T)slsDATA_TYPE_GetLogicalOperandCount(arrayDataType, gcvFALSE);
 
         status = sloCOMPILER_SetUniformLocationInUse(Compiler,
                                                      arrayDataType->qualifiers.layout.location,
-                                                     length,
-                                                     gcvTRUE,
-                                                     &inUseAlready);
+                                                     length);
         if (gcmIS_ERROR(status))
         {
             gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
@@ -8136,14 +8096,51 @@ slParseArrayVariableDecl(
             gcmFOOTER_ARG("<return>=%s", "<nil>");
             return declOrDeclList;
         }
-        if (inUseAlready)
+    }
+
+    if (arrayDataType->qualifiers.storage == slvSTORAGE_QUALIFIER_ATTRIBUTE &&
+        arrayDataType->qualifiers.layout.id & slvLAYOUT_LOCATION)
+    {
+        gctINT i, length = 1;
+        for (i = 0; i < arrayDataType->arrayLengthCount; i++)
+        {
+            length *= arrayDataType->arrayLengthList[i];
+        }
+
+        status = sloCOMPILER_SetInputLocationInUse(Compiler,
+                                                   arrayDataType->qualifiers.layout.location,
+                                                   length);
+        if (gcmIS_ERROR(status))
         {
             gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                             Identifier->lineNo,
                                             Identifier->stringNo,
                                             slvREPORT_ERROR,
-                                            "uniform location from '%d' to '%d' already inuse",
-                                            arrayDataType->qualifiers.layout.location, length));
+                                            "# of attribute beyond limit"));
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return declOrDeclList;
+        }
+    }
+
+    if (arrayDataType->qualifiers.storage == slvSTORAGE_QUALIFIER_FRAGMENT_OUT &&
+        arrayDataType->qualifiers.layout.id & slvLAYOUT_LOCATION)
+    {
+        gctINT i, length = 1;
+        for (i = 0; i < arrayDataType->arrayLengthCount; i++)
+        {
+            length *= arrayDataType->arrayLengthList[i];
+        }
+
+        status = sloCOMPILER_SetOutputLocationInUse(Compiler,
+                                                    arrayDataType->qualifiers.layout.location,
+                                                    length);
+        if (gcmIS_ERROR(status))
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            Identifier->lineNo,
+                                            Identifier->stringNo,
+                                            slvREPORT_ERROR,
+                                            "# of fragment shader outputs beyond limit"));
             gcmFOOTER_ARG("<return>=%s", "<nil>");
             return declOrDeclList;
         }
@@ -9258,7 +9255,7 @@ slParseFuncDecl(
 
     sloCOMPILER_PopCurrentNameSpace(Compiler, gcvNULL);
 
-    FuncName->u.funcInfo.isFuncDef = gcvFALSE;
+    slsFUNC_RESET_FLAG(&(FuncName->u.funcInfo), slvFUNC_DEFINED);
 
     status = sloCOMPILER_CheckNewFuncName(
                                         Compiler,
@@ -11203,7 +11200,7 @@ slParseFuncDef(
 
     sloCOMPILER_PopCurrentNameSpace(Compiler, gcvNULL);
 
-    FuncName->u.funcInfo.isFuncDef = gcvTRUE;
+    slsFUNC_SET_FLAG(&(FuncName->u.funcInfo), slvFUNC_DEFINED);
 
     status = sloCOMPILER_CheckNewFuncName(
                                         Compiler,
@@ -11237,7 +11234,7 @@ slParseFuncDef(
     gcmVERIFY_OK(sloNAME_BindFuncBody(Compiler,
                                       firstFuncName,
                                       Statements));
-    firstFuncName->u.funcInfo.isFuncDef = gcvTRUE;
+    slsFUNC_SET_FLAG(&(firstFuncName->u.funcInfo), slvFUNC_DEFINED);
 
     gcmVERIFY_OK(sloCOMPILER_AddExternalDecl(Compiler, &Statements->base));
 
@@ -11257,6 +11254,8 @@ slParseParameterList(
 {
     gctUINT paramCount = 0;
     gceSTATUS status = gcvSTATUS_OK;
+    gctBOOL hasVoidParameter;
+
     gcmHEADER_ARG("Compiler=0x%x FuncName=0x%x ParamName=0x%x",
                   Compiler, FuncName, ParamName);
 
@@ -11266,20 +11265,22 @@ slParseParameterList(
         return FuncName;
     }
 
+    hasVoidParameter = slsFUNC_HAS_FLAG(&(FuncName->u.funcInfo), slvFUNC_HAS_VOID_PARAM);
+
     /* Add a "void" parameter. */
     if (ParamName == gcvNULL)
     {
         sloNAME_GetParamCount(Compiler, FuncName, &paramCount);
 
-        if (FuncName->u.funcInfo.hasVoidParameter ||
-            paramCount != 0)
+        /* A function can only has one void parameter. */
+        if (hasVoidParameter || paramCount != 0)
         {
             status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
         }
 
-        FuncName->u.funcInfo.hasVoidParameter = gcvTRUE;
+        slsFUNC_SET_FLAG(&(FuncName->u.funcInfo), slvFUNC_HAS_VOID_PARAM);
     }
-    else if (FuncName->u.funcInfo.hasVoidParameter)
+    else if (hasVoidParameter)
     {
         status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
     }
@@ -11811,28 +11812,18 @@ slParseFullySpecifiedType(
                 }
                 else
                 {
-                   gctBOOL inUseAlready;
+                   gctSIZE_T length;
+
+                   length = (gctSIZE_T)slsDATA_TYPE_GetLogicalOperandCount(DataType, gcvFALSE);
                    status = sloCOMPILER_SetUniformLocationInUse(Compiler,
-                                                         TypeQualifier->u.qualifiers.layout.location,
-                                                         DataType->arrayLength > 0 ? DataType->arrayLength : 1,
-                                                         gcvFALSE,
-                                                         &inUseAlready);
+                                                                TypeQualifier->u.qualifiers.layout.location,
+                                                                length);
                    if(gcmIS_ERROR(status)) {
                       gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                       TypeQualifier->lineNo,
                                                       TypeQualifier->stringNo,
                                                       slvREPORT_ERROR,
                                                       "# of uniforms beyond limit"));
-                      gcmFOOTER_ARG("<return>=%s", "<nil>");
-                      return gcvNULL;
-                   }
-                   if(inUseAlready) {
-                      gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                                      TypeQualifier->lineNo,
-                                                      TypeQualifier->stringNo,
-                                                      slvREPORT_ERROR,
-                                                      "uniform location '%d' already inuse",
-                                                      TypeQualifier->u.qualifiers.layout.location));
                       gcmFOOTER_ARG("<return>=%s", "<nil>");
                       return gcvNULL;
                    }
@@ -11864,28 +11855,16 @@ slParseFullySpecifiedType(
              else { /* fragment shader assumed */
                 if(TypeQualifier->u.qualifiers.layout.id) {
                     if(TypeQualifier->u.qualifiers.layout.id & slvLAYOUT_LOCATION) {
-                       gctBOOL inUseAlready = gcvFALSE;
 
                        status = sloCOMPILER_SetOutputLocationInUse(Compiler,
                                                              TypeQualifier->u.qualifiers.layout.location,
-                                                             DataType->arrayLength > 0 ? DataType->arrayLength : 1 ,
-                                                             &inUseAlready);
+                                                             DataType->arrayLength > 0 ? DataType->arrayLength : 1);
                        if(gcmIS_ERROR(status)) {
                           gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                           TypeQualifier->lineNo,
                                                           TypeQualifier->stringNo,
                                                           slvREPORT_ERROR,
                                                           "# of fragment shader outputs beyond limit"));
-                          gcmFOOTER_ARG("<return>=%s", "<nil>");
-                          return gcvNULL;
-                       }
-                       if(inUseAlready) {
-                          gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                                          TypeQualifier->lineNo,
-                                                          TypeQualifier->stringNo,
-                                                          slvREPORT_ERROR,
-                                                          "fragment shader output location '%d' already inuse",
-                                                          TypeQualifier->u.qualifiers.layout.location));
                           gcmFOOTER_ARG("<return>=%s", "<nil>");
                           return gcvNULL;
                        }
@@ -11929,27 +11908,15 @@ slParseFullySpecifiedType(
              else { /* vertex shader assumed */
                  if(TypeQualifier->u.qualifiers.layout.id) {
                     if(TypeQualifier->u.qualifiers.layout.id & slvLAYOUT_LOCATION) {
-                       gctBOOL inUseAlready;
                        status = sloCOMPILER_SetInputLocationInUse(Compiler,
                                                              TypeQualifier->u.qualifiers.layout.location,
-                                                             1 ,
-                                                             &inUseAlready);
+                                                             1);
                        if(gcmIS_ERROR(status)) {
                           gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                           TypeQualifier->lineNo,
                                                           TypeQualifier->stringNo,
                                                           slvREPORT_ERROR,
                                                           "# of vertex shader inputs beyond limit"));
-                          gcmFOOTER_ARG("<return>=%s", "<nil>");
-                          return gcvNULL;
-                       }
-                       if(inUseAlready) {
-                          gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                                          TypeQualifier->lineNo,
-                                                          TypeQualifier->stringNo,
-                                                          slvREPORT_ERROR,
-                                                          "vertex shader input location '%d' already inuse",
-                                                          TypeQualifier->u.qualifiers.layout.location));
                           gcmFOOTER_ARG("<return>=%s", "<nil>");
                           return gcvNULL;
                        }
@@ -13860,111 +13827,6 @@ slParseInterfaceBlockMember(
     return DataType;
 }
 
-#define _sldSharedVariableStorageBlockName  "#sh_sharedVar"
-
-
-gceSTATUS
-slCreateSharedVariableStorageBlock(
-    IN sloCOMPILER Compiler,
-    OUT slsNAME **Block
-)
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    slsDATA_TYPE *  dataType;
-    slsNAME *memberName;
-    slsINTERFACE_BLOCK_MEMBER *blockMember;
-    sltPOOL_STRING  symbolInPool;
-    slsNAME *blockName = gcvNULL;
-    gctPOINTER pointer;
-    slsSHARED_VARIABLE *sharedVariable;
-    slsSLINK_LIST *sharedVariableList;
-
-    gcmHEADER_ARG("Compiler=0x%x Block=0x%x", Compiler, Block);
-
-
-    status = sloCOMPILER_GetSharedVariableList(Compiler,
-                                               &sharedVariableList);
-    if (gcmIS_ERROR(status)) {
-        if(Block) {
-            *Block = gcvNULL;
-        }
-        gcmFOOTER();
-        return status;
-    }
-
-    if(slsSLINK_LIST_IsEmpty(sharedVariableList)) {
-        gcmFOOTER();
-        if(Block) {
-            *Block = gcvNULL;
-        }
-        return gcvSTATUS_OK;
-    }
-
-    status = sloCOMPILER_CreateDataType(Compiler,
-                                        T_BUFFER,
-                                        sloCOMPILER_GetGlobalSpace(Compiler),
-                                        &dataType);
-    if (gcmIS_ERROR(status)) {
-        gcmFOOTER();
-        return status;
-    }
-
-    slmDATA_TYPE_layoutId_SET(dataType, slvLAYOUT_STD430);
-
-    status = sloCOMPILER_AllocatePoolString(Compiler,
-                                            _sldSharedVariableStorageBlockName,
-                                            &symbolInPool);
-    if (gcmIS_ERROR(status)) {
-        gcmFOOTER();
-        return status;
-    }
-
-    status = sloCOMPILER_CreateName(Compiler,
-                                    0,
-                                    0,
-                                    slvINTERFACE_BLOCK_NAME,
-                                    dataType,
-                                    symbolInPool,
-                                    slvEXTENSION_NONE,
-                                    gcvTRUE,
-                                    &blockName);
-    if (gcmIS_ERROR(status)) {
-        gcmFOOTER();
-        return status;
-    }
-
-    gcmASSERT(slsDLINK_LIST_IsEmpty(&blockName->u.interfaceBlockContent.members));
-
-    /*
-    ** transfer the shared variable names to shared variable storage block's member list
-    */
-    FOR_EACH_SLINK_NODE(sharedVariableList, slsSHARED_VARIABLE, sharedVariable)
-    {
-        /* make field global scope */
-        memberName = sharedVariable->name;
-        memberName->dataType->qualifiers.storage = slvSTORAGE_QUALIFIER_STORAGE_BLOCK_MEMBER;
-        memberName->u.variableInfo.interfaceBlock = blockName;
-
-        status = sloCOMPILER_Allocate(Compiler,
-                                      (gctSIZE_T)sizeof(slsINTERFACE_BLOCK_MEMBER),
-                                      (gctPOINTER *) &pointer);
-        if (gcmIS_ERROR(status)) {
-            gcmFOOTER();
-            return status;
-        }
-        blockMember = pointer;
-        blockMember->name = memberName;
-        blockMember->isActive = gcvTRUE;
-
-        slsDLINK_LIST_InsertFirst(&blockName->u.interfaceBlockContent.members, &blockMember->node);
-    }
-
-    if(Block) {
-        *Block = blockName;
-    }
-    gcmFOOTER();
-    return status;
-}
 
 void
 slParseInterfaceBlockDeclBegin(
@@ -14975,23 +14837,16 @@ slParseArrayListVariableDecl(
                                        gcvTRUE,
                                        &arrayDataType));
 
-    if((arrayDataType->qualifiers.storage == slvSTORAGE_QUALIFIER_UNIFORM ||
-        arrayDataType->qualifiers.storage == slvSTORAGE_QUALIFIER_ATTRIBUTE ||
-        arrayDataType->qualifiers.storage == slvSTORAGE_QUALIFIER_FRAGMENT_OUT) &&
+    if(arrayDataType->qualifiers.storage == slvSTORAGE_QUALIFIER_UNIFORM &&
        arrayDataType->qualifiers.layout.id & slvLAYOUT_LOCATION)
     {
-        gctBOOL inUseAlready;
-        gctINT i, length = 1;
-        for(i = 0; i < arrayDataType->arrayLengthCount; i++)
-        {
-            length *= arrayDataType->arrayLengthList[i];
-        }
+        gctSIZE_T length;
+
+        length = (gctSIZE_T)slsDATA_TYPE_GetLogicalOperandCount(arrayDataType, gcvFALSE);
 
         status = sloCOMPILER_SetUniformLocationInUse(Compiler,
-                                                    arrayDataType->qualifiers.layout.location,
-                                                    length,
-                                                    gcvTRUE,
-                                                    &inUseAlready);
+                                                     arrayDataType->qualifiers.layout.location,
+                                                     length);
         if(gcmIS_ERROR(status)) {
             gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                             Identifier->lineNo,
@@ -15001,13 +14856,49 @@ slParseArrayListVariableDecl(
             gcmFOOTER_ARG("<return>=%s", "<nil>");
             return declOrDeclList;
         }
-        if(inUseAlready) {
+    }
+
+    if(arrayDataType->qualifiers.storage == slvSTORAGE_QUALIFIER_ATTRIBUTE &&
+       arrayDataType->qualifiers.layout.id & slvLAYOUT_LOCATION)
+    {
+        gctINT i, length = 1;
+        for(i = 0; i < arrayDataType->arrayLengthCount; i++)
+        {
+            length *= arrayDataType->arrayLengthList[i];
+        }
+
+        status = sloCOMPILER_SetInputLocationInUse(Compiler,
+                                                   arrayDataType->qualifiers.layout.location,
+                                                   length);
+        if(gcmIS_ERROR(status)) {
             gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                             Identifier->lineNo,
                                             Identifier->stringNo,
                                             slvREPORT_ERROR,
-                                            "uniform location from '%d' to '%d' already inuse",
-                                            arrayDataType->qualifiers.layout.location, length));
+                                            "# of uniforms beyond limit"));
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return declOrDeclList;
+        }
+    }
+
+    if(arrayDataType->qualifiers.storage == slvSTORAGE_QUALIFIER_FRAGMENT_OUT &&
+       arrayDataType->qualifiers.layout.id & slvLAYOUT_LOCATION)
+    {
+        gctINT i, length = 1;
+        for(i = 0; i < arrayDataType->arrayLengthCount; i++)
+        {
+            length *= arrayDataType->arrayLengthList[i];
+        }
+
+        status = sloCOMPILER_SetOutputLocationInUse(Compiler,
+                                                    arrayDataType->qualifiers.layout.location,
+                                                    length);
+        if(gcmIS_ERROR(status)) {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            Identifier->lineNo,
+                                            Identifier->stringNo,
+                                            slvREPORT_ERROR,
+                                            "# of fragment shader outputs beyond limit"));
             gcmFOOTER_ARG("<return>=%s", "<nil>");
             return declOrDeclList;
         }

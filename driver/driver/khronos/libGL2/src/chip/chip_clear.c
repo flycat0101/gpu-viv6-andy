@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -42,7 +42,7 @@ static gceSTATUS _clearRect(__GLcontext *gc, IN gcoSURF surface, IN GLuint mask,
             colorClearArgs.color.a.floatValue = gc->state.raster.clear.a;
         }
         colorClearArgs.color.valueType = gcvVALUE_FLOAT;
-        colorClearArgs.flags = gcvCLEAR_COLOR | gcvCLEAR_WITH_GPU_ONLY;
+        colorClearArgs.flags = gcvCLEAR_COLOR;
 
         colorMask = ((gc->state.raster.colorMask[0].redMask ? 0x1 : 0x0) |
                            (gc->state.raster.colorMask[0].greenMask ? 0x2 : 0x0) |
@@ -50,14 +50,14 @@ static gceSTATUS _clearRect(__GLcontext *gc, IN gcoSURF surface, IN GLuint mask,
                            (gc->state.raster.colorMask[0].alphaMask ? 0x8 : 0x0) );
 
         colorClearArgs.colorMask = colorMask;
-        status = gcoSURF_Clear_v2(&surfView, &colorClearArgs);
+        status = gcoSURF_Clear(&surfView, &colorClearArgs);
         if (gcmIS_ERROR(status))
         {
             if ( mask & (GL_COLOR_BUFFER_BIT | GL_ACCUM_BUFFER_BIT) )
             {
                 /* Clear color buffers using software. */
                 colorClearArgs.flags = (colorClearArgs.flags & ~gcvCLEAR_WITH_GPU_ONLY) | gcvCLEAR_WITH_CPU_ONLY;
-                if (gcmIS_ERROR(gcoSURF_Clear_v2(&surfView, &colorClearArgs)))
+                if (gcmIS_ERROR(gcoSURF_Clear(&surfView, &colorClearArgs)))
                 {
                     return GL_INVALID_OPERATION;
                 }
@@ -88,13 +88,13 @@ static gceSTATUS _clearRect(__GLcontext *gc, IN gcoSURF surface, IN GLuint mask,
         dsClearArgs.depthMask = (gctBOOL)gc->state.depth.writeEnable;
         dsClearArgs.stencil = gc->state.stencil.clear;
         dsClearArgs.stencilMask = (gctUINT8)(gc->state.stencil.current.front.writeMask & 0x00FF);
-        dsClearArgs.flags = depthFlags | gcvCLEAR_WITH_GPU_ONLY;
-        status = gcoSURF_Clear_v2(&surfView, &dsClearArgs);
+        dsClearArgs.flags = depthFlags;
+        status = gcoSURF_Clear(&surfView, &dsClearArgs);
         if (gcmIS_ERROR(status))
         {
             /* Clear depth/stencil buffers using software. */
             dsClearArgs.flags = (dsClearArgs.flags & ~gcvCLEAR_WITH_GPU_ONLY) | gcvCLEAR_WITH_CPU_ONLY;
-            if (gcmIS_ERROR(gcoSURF_Clear_v2(&surfView, &dsClearArgs)))
+            if (gcmIS_ERROR(gcoSURF_Clear(&surfView, &dsClearArgs)))
             {
                 return GL_INVALID_OPERATION;
             }

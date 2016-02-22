@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -16,15 +16,31 @@
 #include <VX/vx_types.h>
 #include <stdio.h>
 
-
-vx_status vxConvertDepth(vx_image input, vx_image output, vx_scalar spol, vx_scalar sshf)
+vx_status vxConvertDepth(vx_node node, vx_image input, vx_image output, vx_scalar spol, vx_scalar sshf)
 {
     vx_status status = VX_SUCCESS;
-    gcoVX_Kernel_Context context = {{0}};
     vx_enum policy = 0;
     vx_int32 shift = 0;
     vx_df_image inputFormat, outputFormat;
     vx_uint32 bin[4];
+    gcoVX_Kernel_Context * kernelContext = gcvNULL;
+
+#if gcdVX_OPTIMIZER
+    if (node && node->kernelContext)
+    {
+        kernelContext = (gcoVX_Kernel_Context *) node->kernelContext;
+    }
+    else
+#endif
+    {
+        if (node->kernelContext == VX_NULL)
+        {
+            /* Allocate a local copy for old flow. */
+            node->kernelContext = (gcoVX_Kernel_Context *) vxAllocate(sizeof(gcoVX_Kernel_Context));
+        }
+        kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
+        kernelContext->objects_num = 0;
+    }
 
     vxQueryImage(input, VX_IMAGE_ATTRIBUTE_FORMAT, &inputFormat, sizeof(inputFormat));
     vxQueryImage(output, VX_IMAGE_ATTRIBUTE_FORMAT, &outputFormat, sizeof(outputFormat));
@@ -33,41 +49,49 @@ vx_status vxConvertDepth(vx_image input, vx_image output, vx_scalar spol, vx_sca
     status = vxAccessScalarValue(sshf, &shift);
 
     /*index = 0*/
-    gcoVX_AddObject(&context,GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
+    gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
 
     /*index = 1*/
-    gcoVX_AddObject(&context,GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+    gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
 
-    context.params.kernel       = gcvVX_KERNEL_CONVERTDEPTH;
-    context.params.policy       = (policy == VX_CONVERT_POLICY_SATURATE)?gcvTRUE:gcvFALSE;
-    context.params.volume       = shift;
+    kernelContext->params.kernel        = gcvVX_KERNEL_CONVERTDEPTH;
+    kernelContext->params.policy        = (policy == VX_CONVERT_POLICY_SATURATE)?gcvTRUE:gcvFALSE;
+    kernelContext->params.volume        = shift;
 
     if (outputFormat == VX_DF_IMAGE_S32 || outputFormat == VX_DF_IMAGE_U32)
     {
-        context.params.xstep = 4;
+        kernelContext->params.xstep = 4;
         bin[0] = shift;
     }
     else if (outputFormat == VX_DF_IMAGE_S16 || outputFormat == VX_DF_IMAGE_U16)
     {
-        context.params.xstep = 8;
+        kernelContext->params.xstep = 8;
         bin[0] = FV2(shift);
     }
     else
     {
-        context.params.xstep = 8;
+        kernelContext->params.xstep = 8;
         bin[0] = FV(shift);
         bin[1] = FV2(1);
     }
-    gcoOS_MemCopy(&context.uniforms[0].uniform, bin, sizeof(bin));
-    context.uniforms[0].num = 4 * 4;
-    context.uniforms[0].index = 2;
-    context.uniform_num = 1;
+    gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));
+    kernelContext->uniforms[0].num = 4 * 4;
+    kernelContext->uniforms[0].index = 2;
+    kernelContext->uniform_num = 1;
 
-    status = gcfVX_Kernel(&context);
+    kernelContext->params.evisNoInst = node->base.context->evisNoInst;
+
+    status = gcfVX_Kernel(kernelContext);
+
+#if gcdVX_OPTIMIZER
+    if (!node || !node->kernelContext)
+    {
+        vxFree(kernelContext);
+    }
+#endif
 
     status = vxCommitScalarValue(spol, &policy);
     status = vxCommitScalarValue(sshf, &shift);
 
     return status;
 }
-

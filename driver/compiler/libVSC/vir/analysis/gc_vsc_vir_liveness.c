@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -172,7 +172,7 @@ static void _Update_Liveness_Local_Gen_All_Outputs(VIR_DEF_USAGE_INFO* pDuInfo,
                     gcmASSERT(pDef);
 
                     /* Its def must be ouput def */
-                    if (!pDef->flags.bIsOutput)
+                    if (!pDef->flags.nativeDefFlags.bIsOutput)
                     {
                         gcmASSERT(gcvFALSE);
                     }
@@ -190,6 +190,7 @@ static void _Update_Liveness_Local_Gen(VIR_DEF_USAGE_INFO* pDuInfo,
                                        VSC_STATE_VECTOR* pLocalHalfChannelKillFlow,
                                        VIR_Instruction* pInst,
                                        VIR_Operand* pOperand,
+                                       gctBOOL bForIndexingReg,
                                        gctUINT firstRegNo,
                                        gctUINT regNoRange,
                                        VIR_Enable defEnableMask,
@@ -207,6 +208,7 @@ static void _Update_Liveness_Local_Gen(VIR_DEF_USAGE_INFO* pDuInfo,
     /* Find the usage */
     usageKey.pUsageInst = pInst;
     usageKey.pOperand = pOperand;
+    usageKey.bIsIndexingRegUsage = bForIndexingReg;
     usageIdx = vscBT_HashSearch(&pDuInfo->usageTable, &usageKey);
     if (VIR_INVALID_USAGE_INDEX != usageIdx)
     {
@@ -238,7 +240,7 @@ static void _Update_Liveness_Local_Gen(VIR_DEF_USAGE_INFO* pDuInfo,
 
         if (pDef->defKey.pDefInst < VIR_INPUT_DEF_INST)
         {
-            if (vscVIR_IsUniqueDefInstOfUsageInst(pDuInfo, pInst, pOperand,
+            if (vscVIR_IsUniqueDefInstOfUsageInst(pDuInfo, pInst, pOperand, bForIndexingReg,
                                                   pDef->defKey.pDefInst, gcvNULL) &&
                 VIR_Inst_GetOpcode(pDef->defKey.pDefInst) == VIR_OP_LDARR)
             {
@@ -263,7 +265,9 @@ static void _Update_Liveness_Local_Gen(VIR_DEF_USAGE_INFO* pDuInfo,
 
                 if (VIR_OpndInfo_Is_Virtual_Reg(&operandInfo))
                 {
-                    defEnableMask1 = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pDef->defKey.pDefInst->src[VIR_Operand_Src0]));
+                    defEnableMask1 = VIR_Operand_GetRealUsedChannels(pDef->defKey.pDefInst->src[VIR_Operand_Src0],
+                                                                     pDef->defKey.pDefInst,
+                                                                     gcvNULL);
 
                     _Update_Liveness_Local_Gen(pDuInfo,
                                                pGenFlow,
@@ -271,6 +275,7 @@ static void _Update_Liveness_Local_Gen(VIR_DEF_USAGE_INFO* pDuInfo,
                                                pLocalHalfChannelKillFlow,
                                                pDef->defKey.pDefInst,
                                                pDef->defKey.pDefInst->src[VIR_Operand_Src0],
+                                               gcvFALSE,
                                                firstRegNo1,
                                                regNoRange1,
                                                defEnableMask1,
@@ -294,7 +299,34 @@ static void _Update_Liveness_Local_Gens(VIR_Shader* pShader,
     VIR_SrcOperand_Iterator srcOpndIter;
     VIR_Operand*            pOpnd;
 
-    /* A ldarr inst to attribute array may potentially read all elements in array */
+    /* If dest is accessed by Rb[Ro.single_channel], we need consider Ro usage */
+    if (pInst->dest != gcvNULL)
+    {
+        VIR_Operand_GetOperandInfo(pInst,
+                                   pInst->dest,
+                                   &operandInfo);
+
+        if (operandInfo.indexingVirRegNo != VIR_INVALID_REG_NO)
+        {
+            firstRegNo = operandInfo.indexingVirRegNo;
+            regNoRange = 1;
+            defEnableMask = (1 << operandInfo.componentOfIndexingVirRegNo);
+
+            _Update_Liveness_Local_Gen(pDuInfo,
+                                       pGenFlow,
+                                       pKillFlow,
+                                       pLocalHalfChannelKillFlow,
+                                       pInst,
+                                       pInst->dest,
+                                       gcvTRUE,
+                                       firstRegNo,
+                                       regNoRange,
+                                       defEnableMask,
+                                       (gctUINT8)operandInfo.halfChannelMaskOfIndexingVirRegNo);
+        }
+    }
+
+    /* A ldarr inst to array may potentially read all elements in array */
     if (VIR_Inst_GetOpcode(pInst) == VIR_OP_LDARR)
     {
         VIR_Operand_GetOperandInfo(pInst,
@@ -320,9 +352,10 @@ static void _Update_Liveness_Local_Gens(VIR_Shader* pShader,
                                            pLocalHalfChannelKillFlow,
                                            pInst,
                                            pInst->src[VIR_Operand_Src1],
+                                           gcvFALSE,
                                            operandInfo1.u1.virRegInfo.virReg,
                                            1,
-                                           VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pInst->src[VIR_Operand_Src1])),
+                                           VIR_Operand_GetRealUsedChannels(pInst->src[VIR_Operand_Src1], pInst, gcvNULL),
                                            (gctUINT8)operandInfo1.halfChannelMask);
             }
 
@@ -332,7 +365,7 @@ static void _Update_Liveness_Local_Gens(VIR_Shader* pShader,
 
         if (VIR_OpndInfo_Is_Virtual_Reg(&operandInfo))
         {
-            defEnableMask = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pInst->src[VIR_Operand_Src0]));
+            defEnableMask = VIR_Operand_GetRealUsedChannels(pInst->src[VIR_Operand_Src0], pInst, gcvNULL);
 
             _Update_Liveness_Local_Gen(pDuInfo,
                                        pGenFlow,
@@ -340,6 +373,7 @@ static void _Update_Liveness_Local_Gens(VIR_Shader* pShader,
                                        pLocalHalfChannelKillFlow,
                                        pInst,
                                        pInst->src[VIR_Operand_Src0],
+                                       gcvFALSE,
                                        firstRegNo,
                                        regNoRange,
                                        defEnableMask,
@@ -359,9 +393,19 @@ static void _Update_Liveness_Local_Gens(VIR_Shader* pShader,
 
             if (VIR_OpndInfo_Is_Virtual_Reg(&operandInfo))
             {
-                firstRegNo = operandInfo.u1.virRegInfo.virReg;
-                regNoRange = 1;
-                defEnableMask = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(pOpnd));
+                if (operandInfo.indexingVirRegNo != VIR_INVALID_REG_NO)
+                {
+                    /* For the case of Rb[Ro.single_channel] access */
+
+                    firstRegNo = operandInfo.u1.virRegInfo.startVirReg;
+                    regNoRange = operandInfo.u1.virRegInfo.virRegCount;
+                }
+                else
+                {
+                    firstRegNo = operandInfo.u1.virRegInfo.virReg;
+                    regNoRange = 1;
+                }
+                defEnableMask = VIR_Operand_GetRealUsedChannels(pOpnd, pInst, gcvNULL);
 
                 _Update_Liveness_Local_Gen(pDuInfo,
                                            pGenFlow,
@@ -369,10 +413,31 @@ static void _Update_Liveness_Local_Gens(VIR_Shader* pShader,
                                            pLocalHalfChannelKillFlow,
                                            pInst,
                                            pOpnd,
+                                           gcvFALSE,
                                            firstRegNo,
                                            regNoRange,
                                            defEnableMask,
                                            (gctUINT8)operandInfo.halfChannelMask);
+            }
+
+            /* For the case of Rb[Ro.single_channel] access, we need consider Ro usage */
+            if (operandInfo.indexingVirRegNo != VIR_INVALID_REG_NO)
+            {
+                firstRegNo = operandInfo.indexingVirRegNo;
+                regNoRange = 1;
+                defEnableMask = (1 << operandInfo.componentOfIndexingVirRegNo);
+
+                _Update_Liveness_Local_Gen(pDuInfo,
+                                           pGenFlow,
+                                           pKillFlow,
+                                           pLocalHalfChannelKillFlow,
+                                           pInst,
+                                           pOpnd,
+                                           gcvTRUE,
+                                           firstRegNo,
+                                           regNoRange,
+                                           defEnableMask,
+                                           (gctUINT8)operandInfo.halfChannelMaskOfIndexingVirRegNo);
             }
         }
     }
@@ -392,6 +457,7 @@ static void _Liveness_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS
     gctUINT8               halfChannelMask;
     gctBOOL                bIndexing;
     VSC_STATE_VECTOR       localHalfChannelKillFlow;
+    VIR_OpCode             opcode;
 
     /* 4 states we are using:
        VIR_HALF_CHANNEL_MASK_NONE (0),
@@ -414,12 +480,14 @@ static void _Liveness_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS
                                             gcvNULL,
                                             &bIndexing))
         {
+            opcode = VIR_Inst_GetOpcode(pInst);
+
             /* Since almost all indexings are located inside of loop, and for loop, we can
                not kill indexing dsts because they are potentially killed, not definitely
                killed. So to be easy, we dont kill all indexings now! */
             if (!bIndexing &&
-                !VIR_OPCODE_CONDITIONAL_WRITE(VIR_Inst_GetOpcode(pInst)) &&
-                !VIR_OPCODE_DestOnlyUseEnable(VIR_Inst_GetOpcode(pInst)))
+                !VIR_OPCODE_CONDITIONAL_WRITE(opcode) &&
+                !VIR_OPCODE_DestOnlyUseEnable(opcode))
             {
                 _Update_Liveness_Local_Kill(pDuInfo,
                                             pGenFlow,
@@ -494,7 +562,7 @@ static void _Liveness_Init_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FL
         for (defIdx = 0; defIdx < (gctUINT)pBaseTsDFA->baseDFA.flowSize; defIdx ++)
         {
             pDef = GET_DEF_BY_IDX(pDefTable, defIdx);
-            if (pDef->flags.bIsOutput)
+            if (pDef->flags.nativeDefFlags.bIsOutput)
             {
                 VSC_DU_ITERATOR_INIT(&duIter, &pDef->duChain);
                 pUsageNode = VSC_DU_ITERATOR_FIRST(&duIter);
@@ -681,6 +749,9 @@ static VSC_ErrCode _DoLivenessAnalysis(VIR_CALL_GRAPH* pCg, VIR_LIVENESS_INFO* p
 #if SUPPORT_IPA_DFA
                                              _Liveness_Block_Flow_Combine_From_Callee_Resolver,
                                              _Liveness_Func_Flow_Combine_From_Callers_Resolver
+#else
+                                             gcvNULL,
+                                             gcvNULL
 #endif
                                             };
 
@@ -692,7 +763,14 @@ static VSC_ErrCode _DoLivenessAnalysis(VIR_CALL_GRAPH* pCg, VIR_LIVENESS_INFO* p
                                &tsDfaResolvers);
 
     /* Do analysis! */
-    vscVIR_DoBackwardIterativeTsDFA(pCg, &pLvInfo->baseTsDFA);
+    vscVIR_DoBackwardIterativeTsDFA(pCg,
+                                    &pLvInfo->baseTsDFA,
+#if SUPPORT_IPA_DFA
+                                    gcvTRUE
+#else
+                                    gcvFALSE
+#endif
+                                    );
 
     /* More strict undefined variables check than DU as this check is based on MOP */
     pInFlowOfMainFunc = (VIR_TS_FUNC_FLOW*)vscSRARR_GetElement(&pLvInfo->baseTsDFA.tsFuncFlowArray,
@@ -702,7 +780,7 @@ static VSC_ErrCode _DoLivenessAnalysis(VIR_CALL_GRAPH* pCg, VIR_LIVENESS_INFO* p
         pDef = GET_DEF_BY_IDX(pDefTable, defIdx);
         gcmASSERT(pDef);
 
-        if (!pDef->flags.bIsInput && !pDef->flags.bHwSpecialInput)
+        if (!pDef->flags.nativeDefFlags.bIsInput && !pDef->flags.nativeDefFlags.bHwSpecialInput)
         {
             /* Oops, there are still LVs other than inputs at entry of main func!!!
                That means corresponding regs are not def'ed at least on one path. */

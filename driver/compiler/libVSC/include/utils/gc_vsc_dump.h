@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,6 +13,8 @@
 
 #ifndef __gc_vsc_dump_h_
 #define __gc_vsc_dump_h_
+
+BEGIN_EXTERN_C()
 
 #define INDENT_GAP      4
 #define VSC_GET_DUMPER_FILE()   gcvNULL     /* TODO: get dumper file if set */
@@ -56,6 +58,8 @@ vscDumpMessage(
 extern gctSTRING VSC_TRACE_BAR_LINE;
 extern gctSTRING VSC_TRACE_STAR_LINE;
 extern gctSTRING VSC_TRACE_SHARP_LINE;
+
+END_EXTERN_C()
 
 #endif  /* __gc_vsc_dump_h_ */
 

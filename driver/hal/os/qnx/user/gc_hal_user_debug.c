@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -498,7 +498,7 @@ _Print(
 #endif
 
             _outputBuffer[i].prev = _outputBufferTail;
-            _outputBuffer[i].next =  gcvNULL;
+            _outputBuffer[i].next = gcvNULL;
 
             _outputBufferTail = &_outputBuffer[i];
         }
@@ -891,7 +891,7 @@ gcoOS_DebugTraceZone(
     ...
     )
 {
-    if(Message != gcvNULL && Message[0] == '+') _DumpAPI(Level,Zone);
+    if (Message != gcvNULL && Message[0] == '+') _DumpAPI(Level,Zone);
     /* Verify that the debug level and zone are valid. */
     if ((Level > _debugLevel)
     ||  !(_debugZones[gcmZONE_GET_API(Zone)] & Zone & gcdZONE_MASK)
@@ -1769,7 +1769,6 @@ gcoOS_StackPop(
     {
         gcmPRINT("ERROR(%s): Trace stack underflow.", Function);
     }
-
 }
 
 /*******************************************************************************

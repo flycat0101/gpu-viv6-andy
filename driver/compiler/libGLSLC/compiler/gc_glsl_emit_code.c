@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -12,6 +12,7 @@
 
 
 #include "gc_glsl_emit_code.h"
+#define _USE_F2I_OPCODE  1
 
 gceSTATUS
 sloCODE_EMITTER_NewBasicBlock(
@@ -496,10 +497,12 @@ static gctCONST_STRING OpName[] =
     "gcSL_MOV_LONG",                      /* 0x87 */
     "gcSL_MADSAT",                        /* 0x88 */
     "gcSL_COPY",                          /* 0x89 */
-    "gcSL_IMAGE_ADDR_3D",                 /* 0x8A */
-    "gcSL_GET_SAMPLER_LMM",               /* 0x8B */
-    "gcSL_GET_SAMPLER_LBS",               /* 0x8C */
-    "gcSL_TEXLD_U",                       /* 0x8D */
+    "gcSL_LOAD_L",                        /* 0x8A */
+    "gcSL_STORE_L",                       /* 0x8B */
+    "gcSL_IMAGE_ADDR_3D",                 /* 0x8C */
+    "gcSL_GET_SAMPLER_LMM",               /* 0x8D */
+    "gcSL_GET_SAMPLER_LBS",               /* 0x8E */
+    "gcSL_TEXLD_U",                       /* 0x8F */
 };
 char _checkOpName_size[sizeof(OpName)/sizeof(OpName[0]) == gcSL_MAXOPCODE];
 
@@ -524,25 +527,7 @@ GetHigherPrecison(
     gcSHADER_PRECISION     precision1,
     gcSHADER_PRECISION     precision2)
 {
-    if (precision1 == gcSHADER_PRECISION_HIGH ||
-        precision2 == gcSHADER_PRECISION_HIGH)
-    {
-        return gcSHADER_PRECISION_HIGH;
-    }
-    else if (precision1 == gcSHADER_PRECISION_ANY ||
-             precision2 == gcSHADER_PRECISION_ANY)
-    {
-        return gcSHADER_PRECISION_ANY;
-    }
-    else if (precision1 == gcSHADER_PRECISION_MEDIUM ||
-             precision2 == gcSHADER_PRECISION_MEDIUM)
-    {
-        return gcSHADER_PRECISION_MEDIUM;
-    }
-    else
-    {
-        return precision1;
-    }
+    return precision1 > precision2 ? precision1 : precision2;
 }
 
 static gctCONST_STRING
@@ -1659,6 +1644,7 @@ _AddUniform(
     /*
     ** Current HW can't support 128 bpp image, so if a image is 32bit,
     ** we need to add a extra image layer to handle it.
+    ** But if this image is a buffer, we can support 128 bpp, so we don't need to add this extra layer.
     */
     if (!__SUPPORT_128_BPP_DATA__ &&
         !isUniformImageBuffer((*Uniform)) &&
@@ -2174,7 +2160,9 @@ gcSHADER_TYPE DataType
 {
     gcSL_FORMAT format = gcSL_FLOAT;
 
+#if TREAT_ES20_INTEGER_AS_FLOAT
     if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+#endif
         switch (DataType) {
         case gcSHADER_FLOAT_X1:
         case gcSHADER_FLOAT_X2:
@@ -2282,7 +2270,9 @@ gcSHADER_TYPE DataType
         default:
             gcmASSERT(0);
         }
+#if TREAT_ES20_INTEGER_AS_FLOAT
     }
+#endif
     return format;
 }
 
@@ -3162,7 +3152,9 @@ _EmitSourceConstantWithFormat(
 
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
 
+#if TREAT_ES20_INTEGER_AS_FLOAT
     if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+#endif
         switch (Format) {
         case gcSL_FLOAT:
         case gcSL_FLOAT16:
@@ -3195,6 +3187,7 @@ _EmitSourceConstantWithFormat(
             gcmFOOTER();
             return status;
         }
+#if TREAT_ES20_INTEGER_AS_FLOAT
     }
     else {
         switch (Format) {
@@ -3229,6 +3222,7 @@ _EmitSourceConstantWithFormat(
         constantPtr = (void *) floatConstant;
         /* Format = gcSL_FLOAT; */
     }
+#endif
 
     gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
                                   slvDUMP_CODE_EMITTER,
@@ -3271,7 +3265,9 @@ _EmitSourceConstant(
 
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
 
+#if TREAT_ES20_INTEGER_AS_FLOAT
     if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+#endif
         switch (Source->dataType) {
         case gcSHADER_FLOAT_X1:
         case gcSHADER_FLOAT_X2:
@@ -3315,6 +3311,7 @@ _EmitSourceConstant(
             gcmFOOTER();
             return status;
         }
+#if TREAT_ES20_INTEGER_AS_FLOAT
     }
     else {
         switch (Source->dataType) {
@@ -3356,6 +3353,7 @@ _EmitSourceConstant(
         constantPtr = (void *) floatConstant;
         format = gcSL_FLOAT;
     }
+#endif
 
     gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
                                   slvDUMP_CODE_EMITTER,
@@ -3637,7 +3635,9 @@ _EmitSourceConstant(
 
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
 
+#if TREAT_ES20_INTEGER_AS_FLOAT
     if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+#endif
         switch (Source->dataType) {
         case gcSHADER_FLOAT_X1:
         case gcSHADER_FLOAT_X2:
@@ -3681,6 +3681,7 @@ _EmitSourceConstant(
             gcmFOOTER();
             return status;
         }
+#if TREAT_ES20_INTEGER_AS_FLOAT
     }
     else {
         switch (Source->dataType) {
@@ -3722,6 +3723,7 @@ _EmitSourceConstant(
         constantPtr = (void *) floatConstant;
         format = gcSL_FLOAT;
     }
+#endif
 
     gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
                                   slvDUMP_CODE_EMITTER,
@@ -5127,6 +5129,9 @@ _ConvOpcode(
     case slvOPCODE_CLAMP0MAX:               return gcSL_CLAMP0MAX;
     case slvOPCODE_EMIT_VERTEX:             return gcSL_EMIT_VERTEX;
     case slvOPCODE_END_PRIMITIVE:           return gcSL_END_PRIMITIVE;
+
+    case slvOPCODE_LOAD_L:                  return gcSL_LOAD_L;
+    case slvOPCODE_STORE_L:                 return gcSL_STORE_L;
     default:
         gcmASSERT(0);
         return gcSL_NOP;
@@ -5782,16 +5787,17 @@ _EmitFloatToIntCode(
     )
 {
     gceSTATUS        status;
-    gctBOOL hasInteger = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SUPPORT_INTEGER);
-    gcePATCH_ID patchId = sloCOMPILER_GetPatchID(Compiler);
 
     gcmHEADER();
 
     gcmASSERT(Target);
     gcmASSERT(Source);
 
+#if _USE_F2I_OPCODE
+#if TREAT_ES20_INTEGER_AS_FLOAT
     if (sloCOMPILER_IsHaltiVersion(Compiler))
     {
+#endif
         status = _EmitCode(Compiler,
                            LineNo,
                            StringNo,
@@ -5800,10 +5806,56 @@ _EmitFloatToIntCode(
                            Source,
                            gcvNULL);
         if (gcmIS_ERROR(status)) return status;
+#if TREAT_ES20_INTEGER_AS_FLOAT
     }
-    else if (!hasInteger &&
-             (patchId == gcvPATCH_GLBM25 || patchId == gcvPATCH_MM07))
+    /*
+    ** Right now we don't support INTEGER type for a ES20 shader,
+    ** so we need to convert it to FLOAT.
+    */
+    else
     {
+        /* CONV.RTZ, target, source, float*/
+        gcSHADER binary;
+        gctUINT32 format[1];
+
+        gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
+
+        status = _EmitOpcodeAndTargetFormatted(Compiler,
+                                               LineNo,
+                                               StringNo,
+                                               gcSL_CONV,
+                                               Target,
+                                               gcSL_FLOAT);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTZ);
+
+        status = _EmitSource(Compiler,
+                             LineNo,
+                             StringNo,
+                             Source);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        format[0] = gcSL_FLOAT;
+        status = gcSHADER_AddSourceConstantFormatted(binary, format, gcSL_UINT32);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+    }
+#endif
+#else
+#if TREAT_ES20_INTEGER_AS_FLOAT
+    if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+#endif
+        status = _EmitCode(Compiler,
+                           LineNo,
+                           StringNo,
+                           gcSL_F2I,
+                           Target,
+                           Source,
+                           gcvNULL);
+        if (gcmIS_ERROR(status)) return status;
+#if TREAT_ES20_INTEGER_AS_FLOAT
+    }
+    else {
         slsIOPERAND    intermIOperands[3];
         gcsTARGET    intermTargets[3];
         gcsSOURCE    intermSources[3];
@@ -5865,38 +5917,8 @@ _EmitFloatToIntCode(
 
         if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
     }
-    /*
-    ** Right now we don't support INTEGER type for a ES20 shader,
-    ** so we need to convert it to FLOAT.
-    */
-    else
-    {
-        /* CONV.RTZ, target, source, float*/
-        gcSHADER binary;
-        gctUINT32 format[1];
-
-        gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
-
-        status = _EmitOpcodeAndTargetFormatted(Compiler,
-                                               LineNo,
-                                               StringNo,
-                                               gcSL_CONV,
-                                               Target,
-                                               gcSL_FLOAT);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-        gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTZ);
-
-        status = _EmitSource(Compiler,
-                             LineNo,
-                             StringNo,
-                             Source);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-        format[0] = gcSL_FLOAT;
-        status = gcSHADER_AddSourceConstantFormatted(binary, format, gcSL_UINT32);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-    }
+#endif
+#endif
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -6021,12 +6043,16 @@ _EmitScalarFloatOrIntToBoolCode(
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     /* mov target, true */
+#if TREAT_ES20_INTEGER_AS_FLOAT
     if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+#endif
        gcsSOURCE_InitializeBoolConstant(&constSource, gcSHADER_PRECISION_MEDIUM, gcvTRUE);
+#if TREAT_ES20_INTEGER_AS_FLOAT
     }
     else {
        gcsSOURCE_InitializeFloatConstant(&constSource, gcSHADER_PRECISION_MEDIUM, slmB2F(gcvTRUE));
     }
+#endif
 
     status = _EmitCode(Compiler,
                LineNo,
@@ -6143,12 +6169,16 @@ _EmitAnyCode(
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     /* mov target, true */
+#if TREAT_ES20_INTEGER_AS_FLOAT
     if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+#endif
        gcsSOURCE_InitializeBoolConstant(&constSource, gcSHADER_PRECISION_MEDIUM, gcvTRUE);
+#if TREAT_ES20_INTEGER_AS_FLOAT
     }
     else {
        gcsSOURCE_InitializeFloatConstant(&constSource, gcSHADER_PRECISION_MEDIUM, slmB2F(gcvTRUE));
     }
+#endif
 
     status = _EmitCode(
                         Compiler,
@@ -6177,12 +6207,16 @@ _EmitAnyCode(
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     /* mov target, false */
+#if TREAT_ES20_INTEGER_AS_FLOAT
     if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+#endif
        gcsSOURCE_InitializeBoolConstant(&constSource, gcSHADER_PRECISION_MEDIUM, gcvFALSE);
+#if TREAT_ES20_INTEGER_AS_FLOAT
     }
     else {
        gcsSOURCE_InitializeFloatConstant(&constSource, gcSHADER_PRECISION_MEDIUM, slmB2F(gcvFALSE));
     }
+#endif
 
     status = _EmitCode(
                         Compiler,
@@ -6264,12 +6298,16 @@ _EmitAllCode(
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     /* mov target, true */
+#if TREAT_ES20_INTEGER_AS_FLOAT
     if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+#endif
        gcsSOURCE_InitializeBoolConstant(&constSource, gcSHADER_PRECISION_MEDIUM, gcvTRUE);
+#if TREAT_ES20_INTEGER_AS_FLOAT
     }
     else {
        gcsSOURCE_InitializeFloatConstant(&constSource, gcSHADER_PRECISION_MEDIUM, slmB2F(gcvTRUE));
     }
+#endif
 
     status = _EmitCode(
                         Compiler,
@@ -6322,12 +6360,16 @@ _EmitScalarNotCode(
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     /* mov target, true */
+#if TREAT_ES20_INTEGER_AS_FLOAT
     if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+#endif
        gcsSOURCE_InitializeBoolConstant(&constSource, gcSHADER_PRECISION_MEDIUM, gcvTRUE);
+#if TREAT_ES20_INTEGER_AS_FLOAT
     }
     else {
        gcsSOURCE_InitializeFloatConstant(&constSource, gcSHADER_PRECISION_MEDIUM, slmB2F(gcvTRUE));
     }
+#endif
 
     status = _EmitCode(
                         Compiler,
@@ -6356,12 +6398,16 @@ _EmitScalarNotCode(
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     /* mov target, false */
+#if TREAT_ES20_INTEGER_AS_FLOAT
     if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+#endif
        gcsSOURCE_InitializeBoolConstant(&constSource, gcSHADER_PRECISION_MEDIUM, gcvFALSE);
+#if TREAT_ES20_INTEGER_AS_FLOAT
     }
     else {
        gcsSOURCE_InitializeFloatConstant(&constSource, gcSHADER_PRECISION_MEDIUM, slmB2F(gcvFALSE));
     }
+#endif
 
     status = _EmitCode(
                         Compiler,
@@ -7006,7 +7052,11 @@ _EmitDivCode(
     gcmASSERT(Source1);
 
 
-    if(gcIsIntegerDataType(Target->dataType) && sloCOMPILER_IsHaltiVersion(Compiler))
+    if(gcIsIntegerDataType(Target->dataType)
+#if TREAT_ES20_INTEGER_AS_FLOAT
+        && sloCOMPILER_IsHaltiVersion(Compiler)
+#endif
+      )
     {
         if(Target->precision == gcSHADER_PRECISION_MEDIUM)
         {
@@ -7254,13 +7304,16 @@ _EmitScalarCompareCode(
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     /* mov target, false */
-
+#if TREAT_ES20_INTEGER_AS_FLOAT
     if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+#endif
        gcsSOURCE_InitializeBoolConstant(&constSource, gcSHADER_PRECISION_MEDIUM, gcvFALSE);
+#if TREAT_ES20_INTEGER_AS_FLOAT
     }
     else {
        gcsSOURCE_InitializeFloatConstant(&constSource, gcSHADER_PRECISION_MEDIUM, slmB2F(gcvFALSE));
     }
+#endif
 
     status = _EmitCode(
                         Compiler,
@@ -7289,12 +7342,16 @@ _EmitScalarCompareCode(
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     /* mov target, true */
+#if TREAT_ES20_INTEGER_AS_FLOAT
     if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+#endif
        gcsSOURCE_InitializeBoolConstant(&constSource, gcSHADER_PRECISION_MEDIUM, gcvTRUE);
+#if TREAT_ES20_INTEGER_AS_FLOAT
     }
     else {
        gcsSOURCE_InitializeFloatConstant(&constSource, gcSHADER_PRECISION_MEDIUM, slmB2F(gcvTRUE));
     }
+#endif
 
     status = _EmitCode(
                         Compiler,
@@ -7545,8 +7602,10 @@ _EmitCompareSetCode(
    gcmASSERT(Target);
    gcmASSERT(Cond);
 
+#if TREAT_ES20_INTEGER_AS_FLOAT
     if (sloCOMPILER_IsHaltiVersion(Compiler))
     {
+#endif
         if (Type == gcSHADER_FLOAT_X1)
         {
             gcsSOURCE_InitializeFloatConstant(trueSource, gcSHADER_PRECISION_MEDIUM, slmB2F(gcvTRUE));
@@ -7555,11 +7614,13 @@ _EmitCompareSetCode(
         {
             gcsSOURCE_InitializeBoolConstant(trueSource, gcSHADER_PRECISION_MEDIUM, gcvTRUE);
         }
+#if TREAT_ES20_INTEGER_AS_FLOAT
     }
     else
     {
         gcsSOURCE_InitializeFloatConstant(trueSource, gcSHADER_PRECISION_MEDIUM, slmB2F(gcvTRUE));
     }
+#endif
 
    status = _EmitOpcodeConditionAndTarget(Compiler,
                                           LineNo,
@@ -7622,8 +7683,10 @@ slEmitCompareSetCode(
    gcmASSERT(Source0);
    gcmASSERT(Source1);
 
+#if TREAT_ES20_INTEGER_AS_FLOAT
     if (sloCOMPILER_IsHaltiVersion(Compiler))
     {
+#endif
         if (gcGetComponentDataType(Source0->dataType) == gcSHADER_FLOAT_X1)
         {
             type = gcSHADER_FLOAT_X1;
@@ -7632,11 +7695,13 @@ slEmitCompareSetCode(
         {
             type = gcSHADER_INTEGER_X1;
         }
+#if TREAT_ES20_INTEGER_AS_FLOAT
     }
     else
     {
         type = gcSHADER_FLOAT_X1;
     }
+#endif
 
    /* cmp source0, source1 */
    intermTargetType = gcChangeElementDataType(Target->dataType,
@@ -7685,7 +7750,11 @@ slEmitCompareSetCode(
     /* when using cmp/set pattern to generate compare functions, we would use the data type of source0 for target.
     ** So if source0 is a float and the target is a bool, we need to add a F2I for target.
     */
-    if (sloCOMPILER_IsHaltiVersion(Compiler) && (type == gcSHADER_FLOAT_X1))
+    if (
+#if TREAT_ES20_INTEGER_AS_FLOAT
+        sloCOMPILER_IsHaltiVersion(Compiler) &&
+#endif
+        (type == gcSHADER_FLOAT_X1))
     {
         slsIOPERAND_New(Compiler, &intermIOperand[1], intermTargetType, Target->precision);
         gcsTARGET_InitializeUsingIOperand(&intermTarget[1], &intermIOperand[1]);
@@ -8543,6 +8612,157 @@ OnError:
     return status;
 }
 
+static gceSTATUS
+_EmitLoadLCode(
+              IN sloCOMPILER Compiler,
+              IN gctUINT LineNo,
+              IN gctUINT StringNo,
+              IN gcsTARGET * Target,
+              IN gcsSOURCE * Source0,
+              IN gcsSOURCE * Source1
+              )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    status = _EmitCode(
+                    Compiler,
+                    LineNo,
+                    StringNo,
+                    gcSL_LOAD_L,
+                    Target,
+                    Source0,
+                    Source1);
+
+    if (Target->dataType == gcSHADER_BOOLEAN_X1 ||
+        Target->dataType == gcSHADER_BOOLEAN_X2 ||
+        Target->dataType == gcSHADER_BOOLEAN_X3 ||
+        Target->dataType == gcSHADER_BOOLEAN_X4)
+    {
+        slsIOPERAND iOperand;
+        gcsTARGET target;
+        gcsSOURCE source, newSource;
+        gcsSOURCE zeroSource, oneSource;
+
+        slsIOPERAND_New(Compiler, &iOperand, Target->dataType, Target->precision);
+        gcsTARGET_InitializeUsingIOperand(&target, &iOperand);
+        gcsSOURCE_InitializeUintConstant(&zeroSource, Target->precision, 0);
+        gcsSOURCE_InitializeUintConstant(&oneSource, Target->precision, 1);
+
+        gcsSOURCE_InitializeTempReg(&source,
+                                    (Target)->dataType,
+                                    (Target)->precision,
+                                    (Target)->tempRegIndex,
+                                    _ConvertEnable2Swizzle(Target->enable),
+                                    gcSL_NOT_INDEXED,
+                                    0);
+
+        gcmONERROR(slEmitSelectCode(Compiler,
+                                    LineNo,
+                                    StringNo,
+                                    &target,
+                                    &source,
+                                    &zeroSource,
+                                    &oneSource));
+
+        gcsSOURCE_InitializeUsingIOperand(&newSource, &iOperand);
+
+        gcmONERROR(_EmitCodeImpl1(Compiler,
+                                    LineNo,
+                                    StringNo,
+                                    slvOPCODE_ASSIGN,
+                                    Target,
+                                    &newSource));
+    }
+
+    if (gcmIS_ERROR(status)) { return status; }
+
+OnError:
+    return status;
+}
+
+static gceSTATUS
+_EmitStoreLCode(
+              IN sloCOMPILER Compiler,
+              IN gctUINT LineNo,
+              IN gctUINT StringNo,
+              IN gcsTARGET * Target,
+              IN gcsSOURCE * Source0,
+              IN gcsSOURCE * Source1
+              )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcsSOURCE newSource;
+    const gctINT enableCount[16] = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
+    gctINT i, j;
+
+    if (Target->dataType == gcSHADER_BOOLEAN_X1 ||
+        Target->dataType == gcSHADER_BOOLEAN_X2 ||
+        Target->dataType == gcSHADER_BOOLEAN_X3 ||
+        Target->dataType == gcSHADER_BOOLEAN_X4)
+    {
+        slsIOPERAND iOperand;
+        gcsTARGET target;
+        gcsSOURCE zeroSource, oneSource;
+        gcSL_SWIZZLE newSwizzle[4];
+
+        slsIOPERAND_New(Compiler, &iOperand, Target->dataType, Target->precision);
+        gcsTARGET_InitializeUsingIOperand(&target, &iOperand);
+        gcsSOURCE_InitializeUintConstant(&zeroSource, Target->precision, 0);
+        gcsSOURCE_InitializeUintConstant(&oneSource, Target->precision, 1);
+
+        if (Source1->type != gcvSOURCE_CONSTANT)
+        {
+            for (i = 0; i < enableCount[Target->enable]; i++)
+            {
+                newSwizzle[i] = gcmExtractSwizzle(Source1->u.sourceReg.swizzle, i);
+            }
+            for (j = i; j < 4; j++)
+            {
+                if (i == 0)
+                {
+                    newSwizzle[j] = gcSL_SWIZZLE_X;
+                }
+                else
+                {
+                    newSwizzle[j] = newSwizzle[i - 1];
+                }
+            }
+            Source1->u.sourceReg.swizzle = (gctUINT8)gcmComposeSwizzle(newSwizzle[0],
+                                                             newSwizzle[1],
+                                                             newSwizzle[2],
+                                                             newSwizzle[3]);
+        }
+
+        gcmONERROR(slEmitSelectCode(Compiler,
+                                    LineNo,
+                                    StringNo,
+                                    &target,
+                                    Source1,
+                                    &zeroSource,
+                                    &oneSource));
+
+        gcsSOURCE_InitializeUsingIOperand(&newSource, &iOperand);
+    }
+    else
+    {
+        newSource = *Source1;
+    }
+
+    status = _EmitCode(
+                    Compiler,
+                    LineNo,
+                    StringNo,
+                    gcSL_STORE_L,
+                    Target,
+                    Source0,
+                    &newSource);
+
+    if (gcmIS_ERROR(status)) { return status; }
+
+OnError:
+    return status;
+}
+
 typedef gceSTATUS
 (* sltEMIT_SPECIAL_CODE_FUNC_PTR2)(
     IN sloCOMPILER Compiler,
@@ -8577,6 +8797,8 @@ static slsSPECIAL_CODE_EMITTER2 SpecialCodeEmitterTable2[] =
     {slvOPCODE_IDIV,               _EmitIdivCode},
     {slvOPCODE_LOAD,               _EmitLoadCode},
     {slvOPCODE_STORE1,             _EmitStoreCode},
+    {slvOPCODE_LOAD_L,             _EmitLoadLCode},
+    {slvOPCODE_STORE_L,            _EmitStoreLCode},
 };
 
 const gctUINT SpecialCodeEmitterCount2 =
@@ -8602,6 +8824,8 @@ _EmitCodeImpl2(
 
     if(Opcode == slvOPCODE_LOAD ||
        Opcode == slvOPCODE_STORE1 ||
+       Opcode == slvOPCODE_LOAD_L ||
+       Opcode == slvOPCODE_STORE_L ||
        Opcode == slvOPCODE_ATTR_LD ||
        Opcode == slvOPCODE_ATTR_ST) {
         newSource0 = *Source0;
@@ -8749,12 +8973,16 @@ slEmitTestBranchCode(
 
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
+#if TREAT_ES20_INTEGER_AS_FLOAT
     if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+#endif
        gcsSOURCE_InitializeBoolConstant(&falseSource, gcSHADER_PRECISION_MEDIUM, gcvFALSE);
+#if TREAT_ES20_INTEGER_AS_FLOAT
     }
     else {
        gcsSOURCE_InitializeFloatConstant(&falseSource, gcSHADER_PRECISION_MEDIUM, slmB2F(gcvFALSE));
     }
+#endif
 
     status = _EmitBranchCode(
                         Compiler,

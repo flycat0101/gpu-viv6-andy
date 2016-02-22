@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -93,6 +93,8 @@ struct _cloCOMPILER
         gctUINT32        fpConfig;
         gctBOOL          allowExternSymbols;
         gctUINT          unnamedCount;
+        gctBOOL          hasInt64;
+        gctBOOL          hasImageQuery;
     } context;
     cloPREPROCESSOR      preprocessor;
     cloCODE_EMITTER      codeEmitter;
@@ -219,6 +221,8 @@ cloCOMPILER_Construct(
         compiler->context.needPrintfMemory = gcvFALSE;
         compiler->context.needLocalMemory = gcvFALSE;
         compiler->context.hasLocalMemoryKernelArg = gcvFALSE;
+        compiler->context.hasInt64 = gcvFALSE;
+        compiler->context.hasImageQuery = gcvFALSE;
         compiler->context.constantMemorySize = 0;
         compiler->context.privateMemorySize = 0;
         compiler->context.maxKernelFunctionArgs = 0;
@@ -714,6 +718,7 @@ cloCOMPILER_GenCode(
            Compiler->context.hasLocalMemoryKernelArg ||
            Compiler->context.needConstantMemory) {
         SetShaderMaxLocalTempRegCount(Compiler->binary, cldMaxLocalTempRegs);
+        gcShaderSetHasBaseMemoryAddr(Compiler->binary);
         /* pre-allocate cldMaxLocalTempRegs temp registers,
          * which are reserved for kernel epilog
          */
@@ -784,7 +789,7 @@ gctCHAR *Buffer
          /* initialize to zero */
          gctSIZE_T memoryReqd;
 
-         memoryReqd = clsDECL_GetByteSize(&constantVarName->decl);
+         memoryReqd = clsDECL_GetByteSize(Compiler, &constantVarName->decl);
          if((bufPtr.charPtr + memoryReqd) > endBufPtr) {
             gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                             0,
@@ -1114,8 +1119,21 @@ cloCOMPILER_Compile(
             cloCOMPILER_Free(Compiler, buffer);
         }
 
+        gcShaderClrHasInt64(Compiler->binary);
+        if(_SUPPORT_LONG_ULONG_DATA_TYPE &&
+           Compiler->context.hasInt64) {
+           gcShaderSetHasInt64(Compiler->binary);
+        }
+
+        gcShaderClrHasImageQuery(Compiler->binary);
+        if(Compiler->context.hasImageQuery) {
+           gcShaderSetHasImageQuery(Compiler->binary);
+        }
+
         /* Pack the binary */
         gcmONERROR(gcSHADER_Pack(Compiler->binary));
+
+        gcmONERROR(gcSHADER_AnalyzeFunctions(Compiler->binary, gcvTRUE));
 
         if (StringCount == 1)
         {
@@ -3043,12 +3061,18 @@ IN cltELEMENT_TYPE ElementType
     gctUINT regCount = RegCount;
 
     clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
+    if((cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
+        gcmOPT_oclUseImgIntrinsicQuery()) &&
+        clmIsElementTypeImage(ElementType)) {
+        regCount <<= 1;
+    }
     if(Compiler->context.inKernelFunctionEpilog) {
        return clNewLocalTempRegs(Compiler, regCount);
     }
     if(!cldHandleHighPrecisionInFrontEnd &&
        clmIsElementTypeHighPrecision(ElementType)) { /* need to reserve double the number of registers */
         regCount <<= 1;
+        Compiler->context.hasInt64 = gcvTRUE;
     }
     regIndex = (gctREG_INDEX) gcSHADER_NewTempRegs(Compiler->binary,
                                                    regCount,
@@ -3307,10 +3331,11 @@ clsNAME *Variable
    if(Variable->type == clvPARAMETER_NAME) return gcvSTATUS_OK;
    if(Variable->u.variableInfo.allocated) return gcvSTATUS_OK;
 
-   memoryReqd = clsDECL_GetByteSize(&Variable->decl);
+   memoryReqd = clsDECL_GetByteSize(Compiler, &Variable->decl);
    switch(Variable->decl.dataType->addrSpaceQualifier) {
    case clvQUALIFIER_GLOBAL:
-      memoryOffset = clAlignMemory(Variable,
+      memoryOffset = clAlignMemory(Compiler,
+                                   Variable,
                                    Compiler->context.privateMemorySize);
       Compiler->context.privateMemorySize = memoryOffset + memoryReqd;
       Compiler->context.needPrivateMemory = gcvTRUE;
@@ -3321,7 +3346,8 @@ clsNAME *Variable
          cloIR_SET funcBody;
          funcBody = Compiler->codeGenerator->currentFuncDefContext.funcBody;
          gcmASSERT(funcBody);
-         memoryOffset = clAlignMemory(Variable,
+         memoryOffset = clAlignMemory(Compiler,
+                                      Variable,
                                       funcBody->funcName->u.funcInfo.localMemorySize);
          funcBody->funcName->u.funcInfo.localMemorySize = memoryOffset + memoryReqd;
          Compiler->context.needLocalMemory = gcvTRUE;
@@ -3330,14 +3356,16 @@ clsNAME *Variable
 
    case clvQUALIFIER_NONE:
    case clvQUALIFIER_PRIVATE:
-      memoryOffset = clAlignMemory(Variable,
+      memoryOffset = clAlignMemory(Compiler,
+                                   Variable,
                                    Compiler->context.privateMemorySize);
       Compiler->context.privateMemorySize = memoryOffset + memoryReqd;
       Compiler->context.needPrivateMemory = gcvTRUE;
       break;
 
    case clvQUALIFIER_CONSTANT:
-      memoryOffset = clAlignMemory(Variable,
+      memoryOffset = clAlignMemory(Compiler,
+                                   Variable,
                                    Compiler->context.constantMemorySize);
       Compiler->context.constantMemorySize = memoryOffset + memoryReqd;
       Compiler->context.needConstantMemory = gcvTRUE;
@@ -3406,6 +3434,15 @@ cloCOMPILER Compiler
 )
 {
    return Compiler->context.privateMemorySize;
+}
+
+gceSTATUS
+cloCOMPILER_SetHasImageQuery(
+cloCOMPILER Compiler
+)
+{
+   Compiler->context.hasImageQuery = gcvTRUE;
+   return gcvSTATUS_OK;
 }
 
 gceSTATUS

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -108,6 +108,9 @@ typedef enum _VIR_RA_LR_FLAG
 
     VIR_RA_LRFLAG_DYN_INDEXING      = 0x80, /* whether LR is dynamically indexed */
 
+    VIR_RA_LRFLAG_VX_EVEN           = 0x100, /* whether LR is in VX special instruciton and needs to be put into even number register */
+    VIR_RA_LRFLAG_VX_ODD            = 0x200, /* whether LR is in VX special instruciton and needs to be put into odd number register */
+
 } VIR_RA_LRFlag;
 
 typedef struct VIR_RA_LS_LIVERANGE VIR_RA_LS_Liverange;
@@ -159,6 +162,8 @@ struct VIR_RA_LS_LIVERANGE
 #define isLRLdarrDest(LR)               (((LR)->flags & VIR_RA_LRFLAG_RM_LDARR_DEST) != 0)
 #define isLRMasterWebIdxSet(LR)         (((LR)->flags & VIR_RA_LRFLAG_MASTER_WEB_IDX_SET) != 0)
 #define isLRDynIndexing(LR)             (((LR)->flags & VIR_RA_LRFLAG_DYN_INDEXING) != 0)
+#define isLRVXEven(LR)                  (((LR)->flags & VIR_RA_LRFLAG_VX_EVEN) != 0)
+#define isLRVXOdd(LR)                   (((LR)->flags & VIR_RA_LRFLAG_VX_ODD) != 0)
 
 /* register allocator define */
 typedef struct VIR_REG_ALLOC_LINEAR_SCAN

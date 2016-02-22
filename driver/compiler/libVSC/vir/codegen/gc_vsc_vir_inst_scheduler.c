@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,7 +13,6 @@
 
 #include "gc_vsc.h"
 #include "vir/codegen/gc_vsc_vir_inst_scheduler.h"
-#include "chip/gc_vsc_chip_desc.h"
 
 typedef struct VSC_IS_DEPDAGEDGE VSC_IS_DepDagEdge;
 
@@ -403,6 +402,7 @@ static void _VSC_IS_InstSched_InitBubble(
     VSC_OPTN_ISOptions* options = VSC_IS_InstSched_GetOptions(is);
     gctUINT32 allocatedRegisterCount;
     gctUINT32 groupCount;
+    VSC_HW_UARCH_CAPS* hw_uarch_caps = VSC_IS_InstSched_GetHwUArchCaps(is);
 #ifndef HW_CONFIG
     gctUINT32 requiredGroupCount;
     gctUINT32 countedGroup;
@@ -423,28 +423,32 @@ static void _VSC_IS_InstSched_InitBubble(
     }
     VSC_IS_InstSched_SetRegisterCount(is, allocatedRegisterCount);
 #ifndef HW_CONFIG
-    groupCount = GetRegisterFileLength() / allocatedRegisterCount;
-    requiredGroupCount = GetPipelineCycles() / GetRegisterFileCountPerCore();
+    groupCount = (512 / hw_uarch_caps->hwThreadNumPerHwGrpPerCore) / allocatedRegisterCount;
+    requiredGroupCount = hw_uarch_caps->hwShPipelineCycles / hw_uarch_caps->hwThreadNumPerHwGrpPerCore;
     countedGroup = vscMAX(groupCount - 1, requiredGroupCount);
 
-    texld_bubble = GetTexLoadCycles() / (countedGroup * GetGroupDispatchCycles()) - (GetTexLoadCycles() % (countedGroup * GetGroupDispatchCycles()) ? 0 : 1);
-    memld_bubble = GetMemLoadCycles() / (countedGroup * GetGroupDispatchCycles()) - (GetMemLoadCycles() % (countedGroup * GetGroupDispatchCycles()) ? 0 : 1);
-    texld_bandwidth = GetPortCountBetweenGPUAndTexInterface() / GetPortCountBetweenTexInterfaceAndTexUnit() - 1;
-    memld_bandwidth = GetPortCountBetweenGPUAndL1Interface() / GetPortCountBetweenL1InterfaceAndL1Cache() - 1;
+    texld_bubble = hw_uarch_caps->texldCycles / (countedGroup * hw_uarch_caps->hwShGrpDispatchCycles) -
+                   (hw_uarch_caps->texldCycles % (countedGroup * hw_uarch_caps->hwShGrpDispatchCycles) ? 0 : 1);
+    memld_bubble = hw_uarch_caps->ldCycles / (countedGroup * hw_uarch_caps->hwShGrpDispatchCycles) -
+                   (hw_uarch_caps->ldCycles % (countedGroup * hw_uarch_caps->hwShGrpDispatchCycles) ? 0 : 1);
+    texld_bandwidth = hw_uarch_caps->rqPortCountOfShCore2TUFifo / hw_uarch_caps->rqPortCountOfTUFifo2TU - 1;
+    memld_bandwidth = hw_uarch_caps->rqPortCountOfShCore2L1Fifo / hw_uarch_caps->rqPortCountOfL1Fifo2L1 - 1;
     VSC_IS_InstSched_SetTexldDepBubble(is, texld_bubble);
     VSC_IS_InstSched_SetMemldDepBubble(is, memld_bubble);
     VSC_IS_InstSched_SetTexldInterfaceBubble(is, texld_bandwidth);
     VSC_IS_InstSched_SetMemldInterfaceBubble(is, memld_bandwidth);
 #else
-    groupCount = GetRegisterFileLength() / allocatedRegisterCount - 1;
+    groupCount = (hw_cfg->maxGPRCountPerCore / hw_uarch_caps->hwThreadNumPerHwGrpPerCore) / allocatedRegisterCount - 1;
     if (groupCount <= 0)
     {
         groupCount = 1;
     }
-    texld_bubble = GetTexLoadCycles() / (groupCount * GetGroupDispatchCycles()) - (GetTexLoadCycles() % (groupCount * GetGroupDispatchCycles()) ? 0 : 1);
-    memld_bubble = GetMemLoadCycles() / (groupCount * GetGroupDispatchCycles()) - (GetMemLoadCycles() % (groupCount * GetGroupDispatchCycles()) ? 0 : 1);
-    texld_bandwidth = hw_cfg->maxCoreCount / hw_cfg->texldPerCycle - 1;
-    memld_bandwidth = hw_cfg->maxCoreCount / hw_cfg->texldPerCycle - 1;
+    texld_bubble = hw_uarch_caps->texldCycles / (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) -
+                   (hw_uarch_caps->texldCycles % (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) ? 0 : 1);
+    memld_bubble = hw_uarch_caps->ldCycles / (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) -
+                   (hw_uarch_caps->ldCycles % (groupCount * hw_uarch_caps->hwShGrpDispatchCycles) ? 0 : 1);
+    texld_bandwidth = hw_cfg->maxCoreCount / hw_uarch_caps->texldPerCycle - 1;
+    memld_bandwidth = hw_cfg->maxCoreCount / hw_uarch_caps->texldPerCycle - 1;
     VSC_IS_InstSched_SetTexldDepBubble(is, texld_bubble);
     VSC_IS_InstSched_SetMemldDepBubble(is, memld_bubble);
     VSC_IS_InstSched_SetTexldInterfaceBubble(is, texld_bandwidth);
@@ -462,8 +466,13 @@ static void _VSC_IS_InstSched_Init(
     IN VIR_Dumper* dumper
     )
 {
+    VSC_HW_UARCH_CAPS   hwUArchCaps;
+
+    vscQueryHwMicroArchCaps(hwCfg, &hwUArchCaps);
+
     VSC_IS_InstSched_SetShader(is, shader);
     VSC_IS_InstSched_SetHwCfg(is, hwCfg);
+    VSC_IS_InstSched_SetHwUArchCaps(is, &hwUArchCaps);
     VSC_IS_InstSched_SetCurrBB(is, gcvNULL);
     VSC_IS_InstSched_SetDUInfo(is, du_info);
     VSC_IS_InstSched_SetCurrDepDag(is, gcvNULL);
@@ -611,9 +620,34 @@ static gctBOOL _VSC_IS_OperandsOverlapping(
             opr2_enable = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(opr2));
         }
 
-        return ((opr1_info.u1.virRegInfo.virReg >= opr2_info.u1.virRegInfo.startVirReg && opr1_info.u1.virRegInfo.virReg <= opr2_info.u1.virRegInfo.virReg) ||
-                (opr2_info.u1.virRegInfo.virReg >= opr1_info.u1.virRegInfo.startVirReg && opr2_info.u1.virRegInfo.virReg <= opr1_info.u1.virRegInfo.virReg)) &&
-               (opr1_enable & opr2_enable);
+        if(((opr1_info.u1.virRegInfo.virReg >= opr2_info.u1.virRegInfo.startVirReg && opr1_info.u1.virRegInfo.virReg < opr2_info.u1.virRegInfo.startVirReg + opr2_info.u1.virRegInfo.virRegCount) ||
+                (opr2_info.u1.virRegInfo.virReg >= opr1_info.u1.virRegInfo.startVirReg && opr2_info.u1.virRegInfo.virReg < opr1_info.u1.virRegInfo.startVirReg + opr1_info.u1.virRegInfo.virRegCount)) &&
+               (opr1_enable & opr2_enable))
+        {
+            return gcvTRUE;
+        }
+        if(VIR_Operand_isLvalue(opr1) && !VIR_Operand_GetIsConstIndexing(opr2) && VIR_Operand_GetRelAddrMode(opr2))
+        {
+            VIR_Id relAddrIndex = VIR_Operand_GetRelIndexing(opr2);
+            VIR_Enable enable = (VIR_Enable)(1 << (VIR_Operand_GetRelAddrMode(opr2) - 1));
+
+            if((relAddrIndex >= opr1_info.u1.virRegInfo.startVirReg && relAddrIndex < opr1_info.u1.virRegInfo.startVirReg + opr1_info.u1.virRegInfo.virRegCount) &&
+               (opr1_enable & enable))
+            {
+                return gcvTRUE;
+            }
+        }
+        if(VIR_Operand_isLvalue(opr2) && !VIR_Operand_GetIsConstIndexing(opr1) && VIR_Operand_GetRelAddrMode(opr1))
+        {
+            VIR_Id relAddrIndex = VIR_Operand_GetRelIndexing(opr1);
+            VIR_Enable enable = (VIR_Enable)(1 << (VIR_Operand_GetRelAddrMode(opr1) - 1));
+
+            if((relAddrIndex >= opr2_info.u1.virRegInfo.startVirReg && relAddrIndex < opr2_info.u1.virRegInfo.startVirReg + opr2_info.u1.virRegInfo.virRegCount) &&
+               (opr2_enable & enable))
+            {
+                return gcvTRUE;
+            }
+        }
     }
     /*else if(VIR_Operand_GetOpKind(opr1) == VIR_OPND_SYMBOL &&
         VIR_Operand_GetOpKind(opr2) == VIR_OPND_SYMBOL)*/
@@ -2456,7 +2490,6 @@ static VSC_ErrCode _VSC_IS_DoListScheduling(
         VIR_Instruction* scheduled_tail = gcvNULL;
 
         /* initializations */
-        /*vscMM_Initialize();*/
         _VSC_IS_FW_ListScheduling_Init(&ls, is);
 
 
@@ -2572,7 +2605,6 @@ static VSC_ErrCode _VSC_IS_DoListScheduling(
         VIR_Instruction* scheduled_head = gcvNULL;
 
         /* initializations */
-        /*vscMM_Initialize();*/
         _VSC_IS_BW_ListScheduling_Init(&ls, is);
 
 

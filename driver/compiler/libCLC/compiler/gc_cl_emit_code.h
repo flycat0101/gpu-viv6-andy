@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -70,6 +70,7 @@ gcIsDataTypeEqual(
 
 gctCONST_STRING
 gcGetDataTypeName(
+    IN cloCOMPILER Compiler,
     IN clsGEN_CODE_DATA_TYPE Type
     );
 
@@ -159,6 +160,7 @@ gcGetUniformName(
 
 gctUINT8
 gcGetDefaultEnable(
+    IN cloCOMPILER compiler,
     IN clsGEN_CODE_DATA_TYPE DataType
     );
 
@@ -227,12 +229,12 @@ gcsSUPER_TARGET;
     } \
     while (gcvFALSE)
 
-#define gcsTARGET_InitializeUsingIOperand(target, iOperand) \
+#define gcsTARGET_InitializeUsingIOperand(compiler, target, iOperand) \
     gcsTARGET_Initialize( \
                         (target), \
                         (iOperand)->dataType, \
                         (iOperand)->tempRegIndex, \
-                        gcGetDefaultEnable((iOperand)->dataType), \
+                        gcGetDefaultEnable((compiler), (iOperand)->dataType), \
                         gcSL_NOT_INDEXED, \
                         0)
 

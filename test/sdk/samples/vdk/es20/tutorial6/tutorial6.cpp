@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -33,6 +33,10 @@
  */
 #ifndef GL_GLEXT_PROTOTYPES
 #define GL_GLEXT_PROTOTYPES 1
+#endif
+
+#ifndef EGL_EGLEXT_PROTOTYPES
+#define EGL_EGLEXT_PROTOTYPES 1
 #endif
 
 #include <GLES2/gl2.h>
@@ -703,6 +707,9 @@ int main(int argc, char** argv)
     {
         return 1;
     }
+
+	// Adjust the window size to make sure these size values does not go beyound the screen limits.
+	vdkGetWindowInfo(egl.window, NULL, NULL, &width, &height, NULL, NULL);
 
     // Set window title and show the window.
     vdkSetWindowTitle(egl.window, TUTORIAL_NAME);

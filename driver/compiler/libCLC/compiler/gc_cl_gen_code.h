@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -35,6 +35,11 @@
 
 gctUINT
 clGetOperandCountForRegAlloc(
+IN clsDECL * Decl
+);
+
+gctUINT
+clGetOperandCountForRegAllocByName(
 IN clsNAME * Name
 );
 
@@ -48,10 +53,12 @@ IN clsNAME * Name
     (((Name)->type == clvVARIABLE_NAME || (Name)->type == clvPARAMETER_NAME) && \
       (Name)->u.variableInfo.isAddressed)))
 
+#define clmDECL_IsAggregateTypeOverRegLimit(Decl) \
+   (clmDECL_IsAggregateType(Decl) && clGetOperandCountForRegAlloc(Decl) > _cldMaxOperandCountToUseMemory)
+
 #define clmGEN_CODE_checkVariableForMemory(Name) \
   (_clmCheckVariableForMemory(Name) || \
-   ((Name)->type == clvFUNC_NAME && clmDECL_IsAggregateType(&((Name)->decl)) && \
-    clGetOperandCountForRegAlloc(Name) > _cldMaxOperandCountToUseMemory))
+   ((Name)->type == clvFUNC_NAME && clmDECL_IsAggregateTypeOverRegLimit(&((Name)->decl))))
 
 #define clmIsVariableInConstantAddressSpaceMemory(Name) \
         ((Name)->decl.dataType->addrSpaceQualifier == clvQUALIFIER_CONSTANT && \
@@ -146,6 +153,7 @@ clGetComponentSelectionSlice(
 
 clsCOMPONENT_SELECTION
 clGetDefaultComponentSelection(
+    IN cloCOMPILER Compiler,
     IN clsGEN_CODE_DATA_TYPE DataType
     );
 
@@ -424,14 +432,14 @@ typedef struct _clsLOGICAL_REG
 }
 clsLOGICAL_REG;
 
-#define clsLOGICAL_REG_InitializeTemp(reg, _qualifier, _dataType, _regIndex, _isUnionMember) \
+#define clsLOGICAL_REG_InitializeTemp(compiler, reg, _qualifier, _dataType, _regIndex, _isUnionMember) \
     do \
     { \
         (reg)->qualifier        = (_qualifier); \
         (reg)->dataType            = (_dataType); \
         (reg)->isUnionMember        = (_isUnionMember); \
         (reg)->regIndex            = (_regIndex); \
-        (reg)->componentSelection    = clGetDefaultComponentSelection(_dataType); \
+        (reg)->componentSelection    = clGetDefaultComponentSelection((compiler), (_dataType)); \
     } \
     while (gcvFALSE)
 
@@ -444,7 +452,7 @@ clsLOGICAL_REG;
         (reg)->regIndex            = (_regIndex); \
         (reg)->componentSelection    = (_cs)
 
-#define clsLOGICAL_REG_InitializeAttribute(reg, _qualifier, _dataType,  _attribute, _regIndex, _isUnionMember) \
+#define clsLOGICAL_REG_InitializeAttribute(compiler, reg, _qualifier, _dataType,  _attribute, _regIndex, _isUnionMember) \
     do \
     { \
         (reg)->qualifier        = (_qualifier); \
@@ -452,11 +460,11 @@ clsLOGICAL_REG;
         (reg)->isUnionMember        = (_isUnionMember); \
         (reg)->u.attribute        = (_attribute); \
         (reg)->regIndex            = (_regIndex); \
-        (reg)->componentSelection    = clGetDefaultComponentSelection(_dataType); \
+        (reg)->componentSelection    = clGetDefaultComponentSelection((compiler), (_dataType)); \
     } \
     while (gcvFALSE)
 
-#define clsLOGICAL_REG_InitializeUniform(reg, _qualifier, _dataType, _uniform, _regIndex, _isUnionMember) \
+#define clsLOGICAL_REG_InitializeUniform(compiler, reg, _qualifier, _dataType, _uniform, _regIndex, _isUnionMember) \
     do \
     { \
         (reg)->qualifier        = (_qualifier); \
@@ -464,7 +472,7 @@ clsLOGICAL_REG;
         (reg)->isUnionMember        = (_isUnionMember); \
         (reg)->u.uniform        = (_uniform); \
         (reg)->regIndex            = (_regIndex); \
-        (reg)->componentSelection    = clGetDefaultComponentSelection(_dataType); \
+        (reg)->componentSelection    = clGetDefaultComponentSelection((compiler), (_dataType)); \
     } \
     while (gcvFALSE)
 
@@ -648,10 +656,10 @@ clsLOPERAND;
     } \
     while (gcvFALSE)
 
-#define clsLOPERAND_InitializeTempReg(operand, _qualifier, _dataType, _regIndex) \
+#define clsLOPERAND_InitializeTempReg(compiler, operand, _qualifier, _dataType, _regIndex) \
     do  { \
         (operand)->dataType        = (_dataType); \
-        clsLOGICAL_REG_InitializeTemp(&(operand)->reg, (_qualifier), (_dataType), (_regIndex), gcvFALSE); \
+        clsLOGICAL_REG_InitializeTemp((compiler), &(operand)->reg, (_qualifier), (_dataType), (_regIndex), gcvFALSE); \
         (operand)->arrayIndex.mode    = clvINDEX_NONE; \
         (operand)->matrixIndex.mode    = clvINDEX_NONE; \
         (operand)->vectorIndex.mode    = clvINDEX_NONE; \
@@ -791,11 +799,11 @@ clsROPERAND_CONSTANT_IsAllVectorComponentsEqual(
     } \
     while (gcvFALSE)
 
-#define clsROPERAND_InitializeTempReg(operand, _qualifier, _dataType, _regIndex) \
+#define clsROPERAND_InitializeTempReg(compiler, operand, _qualifier, _dataType, _regIndex) \
     do { \
         (operand)->dataType        = (_dataType); \
         (operand)->isReg        = gcvTRUE; \
-        clsLOGICAL_REG_InitializeTemp(&(operand)->u.reg, (_qualifier), (_dataType), (_regIndex), gcvFALSE); \
+        clsLOGICAL_REG_InitializeTemp((compiler), &(operand)->u.reg, (_qualifier), (_dataType), (_regIndex), gcvFALSE); \
         (operand)->arrayIndex.mode    = clvINDEX_NONE; \
         (operand)->matrixIndex.mode    = clvINDEX_NONE; \
         (operand)->vectorIndex.mode    = clvINDEX_NONE; \
@@ -1000,12 +1008,12 @@ clGetVectorIOperandSlice(
     OUT clsIOPERAND * IOperandSlice
     );
 
-#define clsIOPERAND_Initialize(operand, _dataType, _tempRegIndex) \
+#define clsIOPERAND_Initialize(compiler, operand, _dataType, _tempRegIndex) \
     do { \
         (operand)->dataType    = (_dataType); \
         (operand)->tempRegIndex    = (_tempRegIndex); \
         (operand)->regDataType    = (_dataType); \
-        (operand)->componentSelection = clGetDefaultComponentSelection(_dataType); \
+        (operand)->componentSelection = clGetDefaultComponentSelection((compiler), (_dataType)); \
     } \
     while (gcvFALSE)
 
@@ -1023,7 +1031,7 @@ clGetVectorIOperandSlice(
         (operand)->dataType  = (_dataType); \
         (operand)->tempRegIndex    = clNewTempRegs((compiler), gcGetDataTypeRegSize(_dataType), (_dataType).elementType); \
         (operand)->regDataType    = (_dataType); \
-        (operand)->componentSelection = clGetDefaultComponentSelection(_dataType); \
+        (operand)->componentSelection = clGetDefaultComponentSelection((compiler), (_dataType)); \
     } \
     while (gcvFALSE)
 
@@ -1352,6 +1360,7 @@ typedef enum _cleGEN_CODE_HINT
     clvGEN_SELECTIVE_LOAD_TO     = 0x2000,
     clvGEN_SAVE_ADDRESS_OFFSET   = 0x4000,
     clvGEN_ARRAY_OF_CONSTANTS    = 0x8000,
+    clvGEN_INITIALIZATION        = 0x10000,
 
     clvEVALUATE_ONLY             = 0x80000000
 }
@@ -1415,19 +1424,13 @@ clsGEN_CODE_PARAMETERS;
     (Parameters)->iOperand[(OperandIx)].componentSelection.components = (ComponentIx); \
    } while (gcvFALSE)
 
+struct _clsGEN_CODE_PARAMETERS;
+
 #define clsGEN_CODE_PARAMETERS_Initialize(parameters, _needLOperand, _needROperand) \
     do { \
+        gcoOS_ZeroMemory((parameters), gcmSIZEOF(struct _clsGEN_CODE_PARAMETERS)); \
         (parameters)->needLOperand    = (_needLOperand); \
         (parameters)->needROperand    = (_needROperand); \
-        (parameters)->hasIOperand    = gcvFALSE; \
-        (parameters)->hint        = clvGEN_GENERIC_CODE; \
-        (parameters)->constant        = gcvNULL; \
-        (parameters)->expr        = gcvNULL; \
-        (parameters)->operandCount    = 0; \
-        (parameters)->dataTypes        = gcvNULL; \
-        (parameters)->lOperands        = gcvNULL; \
-        (parameters)->rOperands        = gcvNULL; \
-        (parameters)->elementIndex    = gcvNULL; \
     } \
     while (gcvFALSE)
 
@@ -1473,12 +1476,28 @@ IN clsDECL * Decl
 );
 
 gceSTATUS
+clAllocateFuncResources(
+IN cloCOMPILER Compiler,
+IN cloCODE_GENERATOR CodeGenerator,
+IN clsNAME * FuncName
+);
+
+gceSTATUS
 clGenFuncCallCode(
 IN cloCOMPILER Compiler,
 IN cloCODE_GENERATOR CodeGenerator,
 IN cloIR_POLYNARY_EXPR PolynaryExpr,
 IN clsGEN_CODE_PARAMETERS * operandsParameters,
 IN OUT clsGEN_CODE_PARAMETERS * Parameters
+);
+
+cloIR_POLYNARY_EXPR
+clCreateFuncCallByName(
+IN cloCOMPILER Compiler,
+IN gctUINT LineNo,
+IN gctUINT StringNo,
+IN gctCONST_STRING Name,
+IN cloIR_EXPR Expr
 );
 
 gceSTATUS
@@ -1537,11 +1556,11 @@ struct _cloCODE_GENERATOR
     gctBOOL          hasNEW_SIN_COS_LOG_DIV;
     gctBOOL          supportRTNE;
     gctBOOL          supportAtomic;
+    gctBOOL          fulllySupportIntegerBranch;
     gctUINT          derivedTypeNameBufferSize;
     slsSLINK_LIST    *derivedTypeVariables;
     gctINT16         currentUniformBlockMember;
     gcsUNIFORM_BLOCK uniformBlock;
-
 };
 
 gceSTATUS

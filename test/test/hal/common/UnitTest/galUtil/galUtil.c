@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -3090,7 +3090,7 @@ static gceSTATUS LockVideoNode(
 
     /* Get allocated node in video memory. */
     *Address = iface.u.LockVideoMemory.address;
-    *Memory = (gctPOINTER)iface.u.LockVideoMemory.memory;
+    *Memory = (gctPOINTER)(gctSIZE_T)iface.u.LockVideoMemory.memory;
 
 OnError:
 
@@ -3436,18 +3436,18 @@ gceSTATUS GalCreateTSurfWithPool(
                 if (TileStatusConfig == gcv2D_TSC_V4_COMPRESSED_256B)
                 {
                     alignedWidth = gcmALIGN(Width, 256);
-                    alignedHeight = gcmALIGN(Width, 256);
+                    alignedHeight = gcmALIGN(Height, 256);
                 }
                 else
                 {
                     alignedWidth = gcmALIGN(Width, 128);
-                    alignedHeight = gcmALIGN(Width, 128);
+                    alignedHeight = gcmALIGN(Height, 128);
                 }
             }
             else if (Tiling == gcvSUPERTILED || Tiling == gcvYMAJOR_SUPERTILED)
             {
                 alignedWidth = gcmALIGN(Width, 128);
-                alignedHeight = gcmALIGN(Width, 64);
+                alignedHeight = gcmALIGN(Height, 64);
             }
         }
         else if (TileStatusConfig & gcv2D_TSC_DEC_TPC)
@@ -7143,7 +7143,7 @@ const struct FeatureInfo
     gctBOOL     status;
 } c_featureInfos[] =
 {
-    {"Unknown feature" , "Unknown feature", gcvFEATURE_PIPE_2D, gcvFALSE},
+    {"Unknown feature" , "Unknown feature ", gcvFEATURE_PIPE_2D, gcvFALSE},
     {"gcvFEATURE_2D_NO_COLORBRUSH_INDEX8 " , "ColorBursh or index8", gcvFEATURE_2D_NO_COLORBRUSH_INDEX8, gcvTRUE},
     {"gcvFEATURE_ANDROID_ONLY " , "Android only feature", gcvFEATURE_ANDROID_ONLY, gcvTRUE},
     {"gcvFEATURE_2DPE20 " , "PE2.0 and related function", gcvFEATURE_2DPE20, gcvFALSE},
@@ -7191,6 +7191,8 @@ const struct FeatureInfo
     {"gcvFEATURE_2D_ROTATION_STALL_FIX " , "Fix rotation stall", gcvFEATURE_2D_ROTATION_STALL_FIX, gcvFALSE},
     {"gcvFEATURE_2D_YUV_MODE " , "YUV standard", gcvFEATURE_2D_YUV_MODE, gcvFALSE},
     {"gcvFEATURE_2D_MULTI_SRC_BLT_BILINEAR_FILTER " , "MultiSrc bilinear filter", gcvFEATURE_2D_MULTI_SRC_BLT_BILINEAR_FILTER, gcvFALSE},
+    {"gcvFEATURE_2D_MAJOR_SUPER_TILE " , "supertile output and ymajor supertile", gcvFEATURE_2D_MAJOR_SUPER_TILE, gcvFALSE},
+    {"gcvFEATURE_2D_V4COMPRESSION " , "2D V4 compression", gcvFEATURE_2D_V4COMPRESSION, gcvFALSE},
 };
 
 gceSTATUS GalQueryFeatureStr(

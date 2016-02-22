@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2272,7 +2272,7 @@ gcoVERTEXARRAY_Bind_Ex2(
                 gcoBUFOBJ_FastLock(streamPtr->stream, &streamPtr->physical, (gctPOINTER) &streamPtr->logical);
 
                 gcoBUFOBJ_GetNode(streamPtr->stream, &node);
-                streamPtr->node = node->u.normal.node;
+                streamPtr->nodePtr = node;
             }
             else
             {

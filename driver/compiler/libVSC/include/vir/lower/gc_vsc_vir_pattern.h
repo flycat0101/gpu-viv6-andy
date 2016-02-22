@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -18,7 +18,7 @@
 
 BEGIN_EXTERN_C()
 
-#define VIR_PATTERN_OPND_COUNT  (5)
+#define VIR_PATTERN_OPND_COUNT  (6)
 
 #define VIR_PATTERN_ANYCOND     (-1)
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -81,10 +81,10 @@ static const char extension[] =
     " "
     "EGL_EXT_create_context_robustness"
     " "
-    "EGL_EXT_buffer_age"
-    " "
     "EGL_EXT_protected_surface"
 #if defined(ANDROID)
+    " "
+    "EGL_EXT_buffer_age"
     " "
     "EGL_ANDROID_image_native_buffer"
     " "
@@ -101,6 +101,8 @@ static const char extension[] =
 #if defined(WL_EGL_PLATFORM)
     " "
     "EGL_WL_bind_wayland_display"
+    " "
+    "EGL_WL_create_wayland_buffer_from_image"
 #endif
     ;
 
@@ -120,14 +122,12 @@ static const char clientExtension[] =
      */
 #elif defined(WL_EGL_PLATFORM)
     /* Not ready.
+    " "
     "EGL_KHR_platform_wayland"
+     */
+#elif defined(__GBM__)
     " "
     "EGL_KHR_platform_gbm"
-     */
-#elif defined(LINUX)
-    /* Not ready.
-    "EGL_KHR_platform_gbm"
-     */
 #endif
     ""
     ;
@@ -475,13 +475,14 @@ _SetTraceMode(
             }
 
             veglInitTracerDispatchTable();
-            Once = gcvTRUE;
         }
 
         if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_NO_MT", &veglNoMtEnvVar)) && veglNoMtEnvVar)
         {
             enableSwapWorker = gcvFALSE;
         }
+
+        Once = gcvTRUE;
     }
 
 #if VIVANTE_PROFILER
@@ -643,6 +644,12 @@ veglGetPlatformDisplay(
         break;
 #endif
 
+#if defined(__GBM__)
+    case EGL_PLATFORM_GBM_KHR:
+        /* EGL_KHR_platform_gbm. */
+        break;
+#endif
+
     case 0:
         /*
          * Default platform called by eglGetDisplay.
@@ -650,7 +657,6 @@ veglGetPlatformDisplay(
          */
         break;
 
-    case EGL_PLATFORM_GBM_KHR:
     case EGL_PLATFORM_WAYLAND_KHR:
     default:
         /* Not supported, ie invalid. */
@@ -1468,7 +1474,6 @@ eglInitialize(
     gcmDUMP_API("${EGL eglInitialize 0x%08X}", Dpy);
     VEGL_TRACE_API(Initialize)(Dpy, major, minor);
 
-    _SetTraceMode();
     /* Get thread data. */
     thread = veglGetThreadData();
     if (thread == gcvNULL)

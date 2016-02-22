@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -158,25 +158,25 @@ _PrintCounter(
 
     debugfs_print("%-9s%10s","", "All");
 
-    debugfs_print( "\n");
+    debugfs_print("\n");
 
     debugfs_print("%-9s","Current");
 
     debugfs_print("%10lld", counter->bytes);
 
-    debugfs_print( "\n");
+    debugfs_print("\n");
 
     debugfs_print("%-9s","Maximum");
 
     debugfs_print("%10lld", counter->maxBytes);
 
-    debugfs_print( "\n");
+    debugfs_print("\n");
 
     debugfs_print("%-9s","Total");
 
     debugfs_print("%10lld", counter->totalBytes);
 
-    debugfs_print( "\n");
+    debugfs_print("\n");
 }
 
 static void
@@ -599,7 +599,7 @@ static int debugfs_read_idle()
     debugfs_print("Suspend: %llu ns\n", suspend);
     debugfs_print("\n");
 
-    return 0 ;
+    return 0;
 }
 
 static int debugfs_read_version()
@@ -609,7 +609,7 @@ static int debugfs_read_version()
                   "Build time: %s  %s\n\n",
                   gcvVERSION_STRING, __FILE__, __DATE__, __TIME__);
 
-    return 0 ;
+    return 0;
 }
 
 static int debugfs_write_vidmem(void *cmd)
@@ -702,7 +702,7 @@ static int debugfs_read_interrupts()
 
     debugfs_print("\n");
 
-    return 0 ;
+    return 0;
 }
 
 static int debugfs_quit()

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -698,4 +698,14 @@ VX_PUBLIC_API vx_node vxHalfScaleGaussianNode(vx_graph graph, vx_image input, vx
     vxReleaseScalar(&scalarKernelSize);
 
     return node;
+}
+
+VX_PUBLIC_API vx_node vxExampleNode(vx_graph graph, vx_image input, vx_image output)
+{
+    vx_reference parameters[] = {
+        (vx_reference)input,
+        (vx_reference)output
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_EXAMPLE, parameters, vxmLENGTH_OF(parameters));
 }

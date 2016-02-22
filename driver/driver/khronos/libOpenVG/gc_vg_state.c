@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1681,6 +1681,101 @@ vgmGETSTATE_FUNCTION(VG_MAX_GAUSSIAN_STD_DEVIATION)
         );
 }
 
+/*----------------------------------------------------------------------------*/
+/*--------------------- Extension: Color Key          ------------------------*/
+#if gcdVG_ONLY
+vgmSETSTATE_FUNCTION(VG_EXT_COLOR_KEY)
+{
+    if (Count != 4)
+    {
+        vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+    }
+    else
+    {
+        ValueConverter(Context->colorKeyValues, Values, 28, VG_FALSE, VG_FALSE);
+        Context->colorKeyDirty = gcvTRUE;
+    }
+}
+
+vgmSETSTATE_FUNCTION(VG_EXT_COLOR_KEY_ENABLE)
+{
+    if (Count != 4)
+    {
+        vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+    }
+    else
+    {
+        ValueConverter(Context->colorKeyEnabled, Values, 4, VG_FALSE, VG_FALSE);
+        Context->colorKeyDirty = gcvTRUE;
+    }
+}
+
+vgmGETSTATE_FUNCTION(VG_EXT_COLOR_KEY)
+{
+    ValueConverter(
+        Values, Context->colorKeyValues, 4, VG_FALSE, VG_TRUE
+        );
+}
+
+vgmGETSTATE_FUNCTION(VG_EXT_COLOR_KEY_ENABLE)
+{
+    ValueConverter(
+        Values, Context->colorKeyEnabled, 4, VG_FALSE, VG_TRUE
+        );
+}
+
+vgmGETARRAYSIZE_FUNCTION(VG_EXT_COLOR_KEY)
+{
+    return 28;
+}
+
+vgmGETARRAYSIZE_FUNCTION(VG_EXT_COLOR_KEY_ENABLE)
+{
+    return 4;
+}
+
+/*--------------------- Extension: Color Index          ------------------------*/
+
+vgmSETSTATE_FUNCTION(VG_EXT_COLOR_INDEX)
+{
+    {
+        ValueConverter(Context->colorIndexEntries, Values, Count, VG_FALSE, VG_FALSE);
+        Context->colorIndexDirty = gcvTRUE;
+    }
+}
+
+vgmSETSTATE_FUNCTION(VG_EXT_COLOR_INDEX_COUNT)
+{
+    if (Count != 1)
+    {
+        vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+        Context->colorIndexDirty = gcvTRUE;
+    }
+    else
+    {
+        ValueConverter(&Context->colorIndexEntryCount, Values, 1, VG_FALSE, VG_FALSE);
+    }
+}
+
+vgmGETSTATE_FUNCTION(VG_EXT_COLOR_INDEX)
+{
+    ValueConverter(
+        Values, Context->colorIndexEntries, 256, VG_FALSE, VG_TRUE
+        );
+}
+
+vgmGETSTATE_FUNCTION(VG_EXT_COLOR_INDEX_COUNT)
+{
+    ValueConverter(
+        Values, &Context->colorIndexEntryCount, 1, VG_FALSE, VG_TRUE
+        );
+}
+
+vgmGETARRAYSIZE_FUNCTION(VG_EXT_COLOR_INDEX)
+{
+    return 256;
+}
+#endif
 
 /******************************************************************************\
 ***************************** Context State Array ******************************
@@ -1748,6 +1843,16 @@ static vgsSTATEENTRY _stateArray[] =
     vgmDEFINE_SCALAR_READONLY_ENTRY(VG_MAX_IMAGE_BYTES, INT),
     vgmDEFINE_SCALAR_READONLY_ENTRY(VG_MAX_FLOAT, FLOAT),
     vgmDEFINE_SCALAR_READONLY_ENTRY(VG_MAX_GAUSSIAN_STD_DEVIATION, INT),
+
+#if gcdVG_ONLY
+    /* Color Key States. */
+    vgmDEFINE_ARRAY_ENTRY(VG_EXT_COLOR_KEY, INT, 7, 4),
+    vgmDEFINE_ARRAY_ENTRY(VG_EXT_COLOR_KEY_ENABLE, INT, 1, 4),
+
+    /* Color Index States. */
+    vgmDEFINE_ARRAY_ENTRY(VG_EXT_COLOR_INDEX, INT, 1, 256),
+    vgmDEFINE_SCALAR_ENTRY(VG_EXT_COLOR_INDEX_COUNT, INT),
+#endif
 };
 
 
@@ -1869,6 +1974,18 @@ void vgfSetDefaultStates(
 
     /* Initialize the matrices. */
     vgfInitializeMatrixSet(Context);
+
+#if gcdVG_ONLY
+    /* Initialize the Color Key states. */
+    Context->colorKeyDirty = gcvFALSE;
+    gcoOS_MemFill(Context->colorKeyEnabled, 0, gcmSIZEOF(Context->colorKeyEnabled));                    /* Clear Enable Flags. */
+    gcoOS_MemFill(Context->colorKeyValues, 0, gcmSIZEOF(gctUINT32) * 12);                                /* Set rgb_high[4]. */
+    gcoOS_MemFill(Context->colorKeyValues + 12, 255, gcmSIZEOF(gctUINT32) * 12);   /* Set rgb_low[4]. */
+    gcoOS_MemFill(Context->colorKeyValues + 24, 0, gcmSIZEOF(gctUINT32) * 4);     /* Set alpha_to_set[4]. */
+    /* Initialize the Index Color states. */
+    Context->colorIndexEntryCount = 0;
+    Context->colorIndexDirty      = gcvFALSE;
+#endif
     }
     vgmLEAVESUBAPI(vgfSetDefaultStates);
 }
@@ -2107,6 +2224,22 @@ gceSTATUS vgfUpdateStates(
             Context->vg,
             ImageMode
             ));
+#endif
+
+#if gcdVG_ONLY
+        /* Update Color Key States. */
+        if (Context->colorKeyDirty)
+        {
+            Context->colorKeyDirty = gcvFALSE;
+            gcoVG_SetColorKey(Context->vg, Context->colorKeyValues, Context->colorKeyEnabled);
+        }
+
+        /* Update Index Color States. */
+        if (Context->colorIndexDirty)
+        {
+            Context->colorIndexDirty = gcvFALSE;
+            gcoVG_SetColorIndexTable(Context->vg, Context->colorIndexEntries, Context->colorIndexEntryCount);
+        }
 #endif
     }
     while (gcvFALSE);

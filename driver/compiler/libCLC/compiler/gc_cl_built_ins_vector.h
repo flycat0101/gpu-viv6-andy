@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -130,6 +130,30 @@ static clsBUILTIN_FUNCTION    VectorBuiltinFunctions[] =
     {clvEXTENSION_NONE,    "vstore4",          T_VOID, 3, {T_UCHAR4, T_SIZE_T, T_UCHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
     {clvEXTENSION_NONE,    "vstore8",          T_VOID, 3, {T_UCHAR8, T_SIZE_T, T_UCHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
     {clvEXTENSION_NONE,    "vstore16",         T_VOID, 3, {T_UCHAR16, T_SIZE_T, T_UCHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_VIV_VX,    "vstore2",          T_VOID, 3, {T_SHORT2_PACKED, T_SIZE_T, T_SHORT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore3",          T_VOID, 3, {T_SHORT3_PACKED, T_SIZE_T, T_SHORT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore4",          T_VOID, 3, {T_SHORT4_PACKED, T_SIZE_T, T_SHORT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore8",          T_VOID, 3, {T_SHORT8_PACKED, T_SIZE_T, T_SHORT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore16",         T_VOID, 3, {T_SHORT16_PACKED, T_SIZE_T, T_SHORT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_VIV_VX,    "vstore2",          T_VOID, 3, {T_USHORT2_PACKED, T_SIZE_T, T_USHORT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore3",          T_VOID, 3, {T_USHORT3_PACKED, T_SIZE_T, T_USHORT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore4",          T_VOID, 3, {T_USHORT4_PACKED, T_SIZE_T, T_USHORT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore8",          T_VOID, 3, {T_USHORT8_PACKED, T_SIZE_T, T_USHORT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore16",         T_VOID, 3, {T_USHORT16_PACKED, T_SIZE_T, T_USHORT}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_VIV_VX,    "vstore2",          T_VOID, 3, {T_CHAR2_PACKED, T_SIZE_T, T_CHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore3",          T_VOID, 3, {T_CHAR3_PACKED, T_SIZE_T, T_CHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore4",          T_VOID, 3, {T_CHAR4_PACKED, T_SIZE_T, T_CHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore8",          T_VOID, 3, {T_CHAR8_PACKED, T_SIZE_T, T_CHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore16",         T_VOID, 3, {T_CHAR16_PACKED, T_SIZE_T, T_CHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+
+    {clvEXTENSION_VIV_VX,    "vstore2",          T_VOID, 3, {T_UCHAR2_PACKED, T_SIZE_T, T_UCHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore3",          T_VOID, 3, {T_UCHAR3_PACKED, T_SIZE_T, T_UCHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore4",          T_VOID, 3, {T_UCHAR4_PACKED, T_SIZE_T, T_UCHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore8",          T_VOID, 3, {T_UCHAR8_PACKED, T_SIZE_T, T_UCHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
+    {clvEXTENSION_VIV_VX,    "vstore16",         T_VOID, 3, {T_UCHAR16_PACKED, T_SIZE_T, T_UCHAR}, {0, 0, 1}, {0, 1, 0}, 1, 1},
 
     {clvEXTENSION_NONE,    "vstore2",          T_VOID, 3, {T_HALF2, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
     {clvEXTENSION_NONE,    "vstore3",          T_VOID, 3, {T_HALF3, T_SIZE_T, T_HALF}, {0, 0, 1}, {0, 1, 0}, 1, 1},
@@ -381,6 +405,53 @@ _GenVloadCode(
 }
 
 static gceSTATUS
+_GenPackedVstoreFuncCall(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctCHAR   nameBuf[32];
+    gctSTRING funcNameString = nameBuf;
+    cltPOOL_STRING symbolInPool;
+    gctUINT   offset = 0;
+    gctUINT8 vectorSize;
+    clsGEN_CODE_PARAMETERS parameters[1];
+    clsGEN_CODE_PARAMETERS_Initialize(parameters,
+                                      gcvFALSE,
+                                      gcvFALSE);
+
+    vectorSize = clmGEN_CODE_vectorSize_GET(OperandsParameters[0].rOperands[0].dataType);
+
+    gcmVERIFY_OK(gcoOS_PrintStrSafe(funcNameString,
+                                   32,
+                                   &offset,
+                                   "viv_intrinsic_vx_vstore%d",
+                                   vectorSize));
+    gcmONERROR(cloCOMPILER_FindPoolString(Compiler,
+                                          funcNameString,
+                                          &symbolInPool));
+
+    PolynaryExpr->funcSymbol = symbolInPool;
+    PolynaryExpr->funcName = gcvNULL;
+    gcmONERROR(cloCOMPILER_BindFuncCall(Compiler,
+                                        PolynaryExpr));
+
+    parameters->operandCount = 0;
+    status = clGenFuncCallCode(Compiler,
+                               CodeGenerator,
+                               PolynaryExpr,
+                               OperandsParameters,
+                               parameters);
+OnError:
+    clsGEN_CODE_PARAMETERS_Finalize(parameters);
+    return status;
+}
+
+static gceSTATUS
 _GenVstoreCode(
     IN cloCOMPILER Compiler,
     IN cloCODE_GENERATOR CodeGenerator,
@@ -402,6 +473,14 @@ _GenVstoreCode(
     gcmASSERT(OperandCount == 3);
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand == gcvNULL);
+
+    if(clmIsElementTypePacked(OperandsParameters[0].rOperands[0].dataType.elementType)) {
+        return _GenPackedVstoreFuncCall(Compiler,
+                                        CodeGenerator,
+                                        PolynaryExpr,
+                                        OperandCount,
+                                        OperandsParameters);
+    }
 
     status = clGenScaledIndexOperand(Compiler,
                                      PolynaryExpr->exprBase.base.lineNo,

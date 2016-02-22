@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -131,10 +131,10 @@ VX_INTERNAL_API vx_image vxoImage_LocateROI(vx_image image, OUT vx_rectangle_t *
 
     while (image->parent != VX_NULL && image->parent != image)
     {
-        vx_uint32 plane_offset  = (vx_uint32)(image->memory.logicals[0] - image->parent->memory.logicals[0]);
-        vx_uint32 dy            = plane_offset * image->scales[0][VX_DIM_Y] / image->memory.strides[0][VX_DIM_Y];
-        vx_uint32 dx            = (plane_offset - (dy * image->memory.strides[0][VX_DIM_Y] / image->scales[0][VX_DIM_Y]))
-                                    * image->scales[0][VX_DIM_X] / image->memory.strides[0][VX_DIM_X];
+        vx_size plane_offset    = image->memory.logicals[0] - image->parent->memory.logicals[0];
+        vx_uint32 dy            = (vx_uint32)(plane_offset * image->scales[0][VX_DIM_Y] / image->memory.strides[0][VX_DIM_Y]);
+        vx_uint32 dx            = (vx_uint32)((plane_offset - (dy * image->memory.strides[0][VX_DIM_Y] / image->scales[0][VX_DIM_Y]))
+                                    * image->scales[0][VX_DIM_X] / image->memory.strides[0][VX_DIM_X]);
 
         rect->start_x   += dx;
         rect->end_x     += dx;

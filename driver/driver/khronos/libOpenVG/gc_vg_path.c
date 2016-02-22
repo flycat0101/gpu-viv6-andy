@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -533,17 +533,12 @@ gceSTATUS vgfDrawPath(
         */
         if (Path->boundsDirty && !useSoftwareTS)
         {
-        vgfComputePointAlongPath(
-            Context,
-            Path,
-            0, Path->numSegments,   /* Walk the entire path. */
-            gcvMAX_POS_FLOAT,       /* Point far away. */
-            gcvNULL, gcvNULL,       /* Don't need the coordinates. */
-            gcvNULL, gcvNULL,       /* Don't need the tangent. */
-            gcvNULL,                /* Don't need the length. */
-            gcvNULL, gcvNULL,
-            gcvNULL, gcvNULL
-            );
+            vgfComputeCtrlBounds(
+                Context,
+                Path,
+                gcvNULL, gcvNULL,
+                gcvNULL, gcvNULL
+                );
         }
 
 #endif

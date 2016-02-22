@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,17 +13,6 @@
 
 #include "gc_vsc.h"
 #include "vir/codegen/gc_vsc_vir_mc_gen.h"
-
-void
-gcDumpMCStates(
-               IN gctUINT32 Address,
-               IN gctUINT32 * States,
-               IN gctBOOL OutputFormat,
-               IN gctBOOL OutputHexStates,
-               IN gctBOOL OutputDual16Modifiers,
-               IN gctSIZE_T BufSize,
-               OUT gctSTRING Buffer
-               );
 
 static VSC_ErrCode
 _VSC_MC_GEN_GenInst(
@@ -60,7 +49,7 @@ static void _CheckNeedToBeFixed(IN VIR_Instruction  *Inst, gctUINT* GenCount)
 static VSC_ErrCode
 _VSC_MC_GEN_Initialize(
     IN  VIR_Shader            *Shader,
-    IN  VSC_HW_CONFIG         *HwCfg,
+    IN  VSC_COMPILER_CONFIG   *pComCfg,
     IN  VSC_OPTN_MCGenOptions *Options,
     IN  VIR_Dumper            *Dumper,
     OUT VSC_MCGen             *Gen
@@ -70,11 +59,11 @@ _VSC_MC_GEN_Initialize(
     gcePATCH_ID         patchID = gcvPATCH_INVALID;
 
     Gen->Shader  = Shader;
-    Gen->HwCfg   = HwCfg;
+    Gen->pComCfg = pComCfg;
     Gen->Options = Options;
     Gen->Dumper  = Dumper;
 
-    vscMC_BeginCodec(&Gen->MCCodec, Gen->HwCfg, VIR_Shader_isDual16Mode(Shader));
+    vscMC_BeginCodec(&Gen->MCCodec, Gen->pComCfg->pHwCfg, VIR_Shader_isDual16Mode(Shader), gcvTRUE);
 
     vscPMP_Intialize(&Gen->PMP, gcvNULL, 1024,
                      sizeof(void*), gcvTRUE);
@@ -119,7 +108,7 @@ _VSC_MC_GEN_Finalize(
     )
 {
     Gen->Shader   = gcvNULL;
-    Gen->HwCfg    = gcvNULL;
+    Gen->pComCfg  = gcvNULL;
     Gen->InstMark = gcvNULL;
     vscMC_EndCodec(&Gen->MCCodec);
     vscPMP_Finalize(&Gen->PMP);
@@ -398,11 +387,13 @@ _VSC_MC_GEN_GenOpcode(
         break;
     case VIR_OP_STORE:
     case VIR_OP_STORE_S:
-        *BaseOpcode = (VIR_Inst_Store_Have_Dst(Inst) && Gen->HwCfg->hwFeatureFlags.hasHalti5) ?
+    case VIR_OP_STORE_L:
+        *BaseOpcode = (VIR_Inst_Store_Have_Dst(Inst) && Gen->pComCfg->pHwCfg->hwFeatureFlags.hasHalti5) ?
                       MC_AUXILIARY_OP_CODE_USC_STORE :
                       0x33;
         break;
     case VIR_OP_LOAD:
+    case VIR_OP_LOAD_L:
     case VIR_OP_LOAD_S:
         *BaseOpcode = 0x32;
         break;
@@ -416,14 +407,31 @@ _VSC_MC_GEN_GenOpcode(
         *BaseOpcode = 0x55;
         break;
     case VIR_OP_BARRIER:
-        if (VIR_Shader_GetKind(Gen->Shader) == VIR_SHADER_TESSELLATION_CONTROL &&
-            Gen->HwCfg->maxCoreCount >= 8)
+        if (VIR_Shader_GetKind(Gen->Shader) == VIR_SHADER_TESSELLATION_CONTROL)
         {
-            *BaseOpcode = 0x00;
+            *BaseOpcode = (Gen->pComCfg->pHwCfg->maxCoreCount >= 8) ? 0x00 :
+                                                                      0x2A;
+        }
+        else if (VIR_Shader_GetKind(Gen->Shader) == VIR_SHADER_COMPUTE ||
+                 VIR_Shader_GetKind(Gen->Shader) == VIR_SHADER_CL)
+        {
+            gctUINT workgrpSize = (Gen->Shader->shaderLayout.compute.workGroupSize[0] *
+                                   Gen->Shader->shaderLayout.compute.workGroupSize[1] *
+                                   Gen->Shader->shaderLayout.compute.workGroupSize[2]);
+
+            if ((workgrpSize > 0) &&
+                (workgrpSize <= (Gen->pComCfg->pHwCfg->maxCoreCount * 4)))
+            {
+                *BaseOpcode = 0x00;
+            }
+            else
+            {
+                *BaseOpcode = 0x2A;
+            }
         }
         else
         {
-            *BaseOpcode = 0x2A;
+            gcmASSERT(gcvFALSE);
         }
         break;
     case VIR_OP_MEM_BARRIER:
@@ -618,7 +626,7 @@ _VSC_MC_GEN_GenOpcode(
         break;
     case VIR_OP_IMG_STORE:
     case VIR_OP_VX_IMG_STORE:
-        *BaseOpcode = (VIR_Inst_Store_Have_Dst(Inst) && Gen->HwCfg->hwFeatureFlags.hasHalti5) ?
+        *BaseOpcode = (VIR_Inst_Store_Have_Dst(Inst) && Gen->pComCfg->pHwCfg->hwFeatureFlags.hasHalti5) ?
                       MC_AUXILIARY_OP_CODE_USC_IMG_STORE :
                       0x7A;
         break;
@@ -628,7 +636,7 @@ _VSC_MC_GEN_GenOpcode(
         break;
     case VIR_OP_IMG_STORE_3D:
     case VIR_OP_VX_IMG_STORE_3D:
-        *BaseOpcode = (VIR_Inst_Store_Have_Dst(Inst) && Gen->HwCfg->hwFeatureFlags.hasHalti5) ?
+        *BaseOpcode = (VIR_Inst_Store_Have_Dst(Inst) && Gen->pComCfg->pHwCfg->hwFeatureFlags.hasHalti5) ?
                       MC_AUXILIARY_OP_CODE_USC_IMG_STORE_3D :
                       0x35;
         break;
@@ -645,7 +653,7 @@ _VSC_MC_GEN_GenOpcode(
         *BaseOpcode = 0x78;
         break;
     case VIR_OP_STORE_ATTR:
-        *BaseOpcode = (VIR_Inst_Store_Have_Dst(Inst) && Gen->HwCfg->hwFeatureFlags.hasHalti5) ?
+        *BaseOpcode = (VIR_Inst_Store_Have_Dst(Inst) && Gen->pComCfg->pHwCfg->hwFeatureFlags.hasHalti5) ?
                       MC_AUXILIARY_OP_CODE_USC_STORE_ATTR :
                       0x42;
         break;
@@ -740,22 +748,27 @@ _VSC_MC_GEN_GenOpcode(
         *ExternOpcode = 0x0B;
         break;
     case VIR_OP_VX_DP32X1:
+    case VIR_OP_VX_DP32X1_B:
         *BaseOpcode   = 0x45;
         *ExternOpcode = 0x12;
         break;
     case VIR_OP_VX_DP16X2:
+    case VIR_OP_VX_DP16X2_B:
         *BaseOpcode   = 0x45;
         *ExternOpcode = 0x13;
         break;
     case VIR_OP_VX_DP8X4:
+    case VIR_OP_VX_DP8X4_B:
         *BaseOpcode   = 0x45;
         *ExternOpcode = 0x14;
         break;
     case VIR_OP_VX_DP4X8:
+    case VIR_OP_VX_DP4X8_B:
         *BaseOpcode   = 0x45;
         *ExternOpcode = 0x15;
         break;
     case VIR_OP_VX_DP2X16:
+    case VIR_OP_VX_DP2X16_B:
         *BaseOpcode   = 0x45;
         *ExternOpcode = 0x16;
         break;
@@ -892,27 +905,6 @@ _VSC_MC_GEN_GenCondition(
 }
 
 static gctUINT
-_VSC_MC_GEN_GenSat(
-    IN VIR_Operand *Dest
-    )
-{
-    VIR_Modifier mod  = VIR_Operand_GetModifier(Dest);
-
-    switch (mod)
-    {
-    case VIR_MOD_NONE:
-        return 0x0;
-    case VIR_MOD_SAT_0_TO_1:
-        return 0x1;
-    case VIR_MOD_SAT_0_TO_INF:
-    case VIR_MOD_SAT_NINF_TO_1:
-    default:
-        gcmASSERT(0);
-        return 0x0;
-    }
-}
-
-static gctUINT
 _VSC_MC_GEN_GenRound(
     IN  VSC_MCGen       *Gen,
     IN  VIR_Instruction *Inst
@@ -1014,13 +1006,25 @@ _VSC_MC_GEN_GetInstType(
                   isSymUniformTreatSamplerAsConst(sym));
         imgQual = VIR_Symbol_GetLayoutQualifier(sym);
 
-        return _VSC_MC_GEN_GetInstTypeFromImgFmt(imgQual);
+        /* OCL image type has no layout info */
+        if (imgQual != VIR_LAYQUAL_IMAGE_FORMAT_NONE)
+        {
+            return _VSC_MC_GEN_GetInstTypeFromImgFmt(imgQual);
+        }
+        else
+        {
+            /* need to get the image type from dest for load and src2 for st */
+            Opnd       = (opcode == VIR_OP_IMG_LOAD) ? VIR_Inst_GetDest(Inst)
+                                                     : VIR_Inst_GetSource(Inst, 2);
+            opndKind   = VIR_Operand_GetOpKind(Opnd);
+            ty         = VIR_Operand_GetType(Opnd);
+        }
     }
 
     if (VIR_OPCODE_isTexLd(opcode))
     {
         /* Only v60 HW supports inst-type for texld related insts */
-        if (!Gen->HwCfg->hwFeatureFlags.hasHalti5)
+        if (!Gen->pComCfg->pHwCfg->hwFeatureFlags.hasHalti5)
         {
             return 0x0;
         }
@@ -1067,6 +1071,10 @@ _VSC_MC_GEN_GetInstType(
         return 0x6;
     case VIR_TYPE_UINT8:
         return 0x7;
+    case VIR_TYPE_INT64:
+        return 0xA;
+    case VIR_TYPE_UINT64:
+        return 0xD;
     default:
         gcmASSERT(0);
         return 0x0;
@@ -1119,6 +1127,8 @@ _VSC_MC_GEN_GenInstType(
             return _VSC_MC_GEN_GetInstType(Gen, Inst, VIR_Inst_GetSource(Inst, 0));
         }
     case VIR_OP_STORE:
+    case VIR_OP_STORE_S:
+    case VIR_OP_STORE_L:
     case VIR_OP_STORE_ATTR:
     case VIR_OP_IMG_STORE:
     case VIR_OP_VX_IMG_STORE:
@@ -1199,13 +1209,102 @@ _VSC_MC_GEN_GenSkipHelperFlag(
         (opcode == VIR_OP_VX_IMG_LOAD_3D) ||
         (opcode == VIR_OP_IMG_ADDR)       ||
         (opcode == VIR_OP_IMG_ADDR_3D)    ||
-        (opcode == VIR_OP_STORE)          ||
+        VIR_OPCODE_isMemSt(opcode)        ||
         (opcode == VIR_OP_IMG_STORE)      ||
         (opcode == VIR_OP_VX_IMG_STORE)   ||
         (opcode == VIR_OP_IMG_STORE_3D)   ||
         (opcode == VIR_OP_VX_IMG_STORE_3D))
     {
         return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
+static gctBOOL
+_VSC_MC_GEN_GenDenormFlag(
+    IN  VSC_MCGen      *Gen,
+    IN VIR_Instruction *Inst
+    )
+{
+    if (!(Gen->pComCfg->cFlags & VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO))
+    {
+        if (VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(Inst)) ||
+            VIR_OPCODE_isMemSt(VIR_Inst_GetOpcode(Inst)) ||
+            VIR_Inst_GetOpcode(Inst) == VIR_OP_AQ_CMP ||
+            VIR_Inst_GetOpcode(Inst) == VIR_OP_AQ_SELECT)
+        {
+            return gcvTRUE;
+        }
+    }
+
+    return gcvFALSE;
+}
+
+static gctBOOL
+_VSC_MC_GEN_GenResultSat(
+    IN  VSC_MCGen      *Gen,
+    IN VIR_Instruction *Inst
+    )
+{
+    VIR_Operand*    dstOpnd = VIR_Inst_GetDest(Inst);
+    VIR_Operand*    opnd;
+    VIR_OpCode      opcode = VIR_Inst_GetOpcode(Inst);
+    VIR_TypeId      ty;
+    VIR_TypeId      componentTy;
+
+    /* Currently, we have different pathes to get saturate, however, IR should make
+       sure to put it into same location, so we can uniformly get it */
+
+    if (dstOpnd)
+    {
+        if (VIR_Operand_GetOpKind(dstOpnd) == VIR_OPND_SYMBOL)
+        {
+            if (VIR_Operand_GetModifier(dstOpnd) == VIR_MOD_SAT_0_TO_1)
+            {
+                return gcvTRUE;
+            }
+
+            if (VIR_OPCODE_isVXOnly(opcode))
+            {
+                VIR_EVIS_Modifier evisModifier;
+                gctUINT i;
+
+                /* find EvisModifier operand  */
+                for (i = 0; i < VIR_Inst_GetSrcNum(Inst); i ++)
+                {
+                    VIR_Operand * opnd = VIR_Inst_GetSource(Inst, i);
+                    if (opnd && VIR_Operand_GetOpKind(opnd) == VIR_OPND_EVIS_MODIFIER)
+                    {
+                        evisModifier.u1 = VIR_Operand_GetEvisModifier(opnd);
+
+                        if (evisModifier.u0.clamp)
+                        {
+                            return gcvTRUE;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /* For CL, if the type of stored data is integer, we need force it to be clamped. */
+    if (Gen->Shader->shaderKind == VIR_SHADER_CL)
+    {
+        if (opcode == VIR_OP_IMG_STORE || opcode == VIR_OP_IMG_STORE_3D ||
+            opcode == VIR_OP_VX_IMG_STORE || opcode == VIR_OP_VX_IMG_STORE_3D)
+        {
+            opnd = VIR_Inst_GetSource(Inst, 2);
+            ty  = VIR_Operand_GetType(opnd);
+
+            gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
+            componentTy  = VIR_GetTypeComponentType(ty);
+
+            if (componentTy != VIR_TYPE_FLOAT32 && componentTy != VIR_TYPE_FLOAT16)
+            {
+                return gcvTRUE;
+            }
+        }
     }
 
     return gcvFALSE;
@@ -1227,17 +1326,42 @@ _VSC_MC_GEN_GenInstCtrl(
 
     gcmASSERT(McInstCtrl != gcvNULL);
 
-    McInstCtrl->condOpCode              = _VSC_MC_GEN_GenCondition(Inst);
-    McInstCtrl->roundingMode            = _VSC_MC_GEN_GenRound(Gen, Inst);
-    McInstCtrl->threadType              = _VSC_MC_GEN_GenThreadType(Gen, Inst);
-    McInstCtrl->instType                = _VSC_MC_GEN_GenInstType(Gen, Inst);
-    McInstCtrl->bSkipForHelperKickoff   = _VSC_MC_GEN_GenSkipHelperFlag(Gen, Inst);
-    McInstCtrl->bPacked                 = gcvFALSE;
-    McInstCtrl->u.bInfX0ToZero          = (opCode == VIR_OP_MUL_Z);
-    McInstCtrl->u.maCtrl.bUnderEvisMode = (opCode == VIR_OP_VX_IMG_LOAD    ||
-                                           opCode == VIR_OP_VX_IMG_STORE   ||
-                                           opCode == VIR_OP_VX_IMG_LOAD_3D ||
-                                           opCode == VIR_OP_VX_IMG_STORE_3D);
+    McInstCtrl->condOpCode                      = _VSC_MC_GEN_GenCondition(Inst);
+    McInstCtrl->roundingMode                    = _VSC_MC_GEN_GenRound(Gen, Inst);
+    McInstCtrl->threadType                      = _VSC_MC_GEN_GenThreadType(Gen, Inst);
+    McInstCtrl->instType                        = _VSC_MC_GEN_GenInstType(Gen, Inst);
+    McInstCtrl->bSkipForHelperKickoff           = _VSC_MC_GEN_GenSkipHelperFlag(Gen, Inst);
+    McInstCtrl->bDenorm                         = _VSC_MC_GEN_GenDenormFlag(Gen, Inst);
+    McInstCtrl->bResultSat                      = _VSC_MC_GEN_GenResultSat(Gen, Inst);
+    McInstCtrl->bPacked                         = gcvFALSE;
+
+    /* For a union variable, set value only if the opcode match the requirement. */
+    if (opCode == VIR_OP_MUL_Z || opCode == VIR_OP_NORM_MUL)
+    {
+        McInstCtrl->u.bInfX0ToZero              = gcvTRUE;
+    }
+    if ((VIR_OPCODE_isLocalMemLd(opCode) || VIR_OPCODE_isLocalMemSt(opCode)) ||
+        ((VIR_OPCODE_isMemLd(opCode) || VIR_OPCODE_isMemSt(opCode)) &&
+          gcmOPT_hasFeature(FB_FORCE_LS_ACCESS) /* triage option */    )        )
+    {
+        McInstCtrl->u.maCtrl.bAccessLocalStorage= gcvTRUE;
+    }
+    if (opCode == VIR_OP_VX_IMG_LOAD    ||
+        opCode == VIR_OP_VX_IMG_STORE   ||
+        opCode == VIR_OP_VX_IMG_LOAD_3D ||
+        opCode == VIR_OP_VX_IMG_STORE_3D)
+    {
+        McInstCtrl->u.maCtrl.bUnderEvisMode     = gcvTRUE;
+    }
+
+    if (VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(Inst)) ||
+        VIR_OPCODE_isMemSt(VIR_Inst_GetOpcode(Inst)))
+    {
+        VIR_Operand* pOffsetOpnd = VIR_Inst_GetSource(Inst, 1);
+
+        McInstCtrl->u.maCtrl.u.lsCtrl.bOffsetX3 = ((VIR_Operand_GetModifier(pOffsetOpnd) & VIR_MOD_X3) != 0);
+        McInstCtrl->u.maCtrl.u.lsCtrl.offsetLeftShift = VIR_Operand_GetLShift(pOffsetOpnd);
+    }
 
     if (bVisionInst)
     {
@@ -1330,6 +1454,9 @@ _VSC_MC_GEN_GenOpndSwizzle(
         {
             retSwizzle = (retSwizzle << 2 | (retSwizzle & 0x3));
         }
+
+        /* Make swizzle be kept in LSB8, and not dirty other bits because enable is shifted */
+        retSwizzle &= 0xFF;
     }
 
     return retSwizzle;
@@ -1359,10 +1486,10 @@ _VSC_MC_GEN_GenOpndEnable(
         {
             /* store instruction could have no dest (only the enable used), thus
                its def could be not register allocated */
-            gcmASSERT(VIR_Inst_GetOpcode(Inst) == VIR_OP_STORE ||
-                      VIR_Inst_GetOpcode(Inst) == VIR_OP_STORE_ATTR ||
-                      VIR_Inst_GetOpcode(Inst) == VIR_OP_IMG_STORE ||
-                      VIR_Inst_GetOpcode(Inst) == VIR_OP_VX_IMG_STORE ||
+            gcmASSERT(VIR_OPCODE_isMemSt(VIR_Inst_GetOpcode(Inst))      ||
+                      VIR_Inst_GetOpcode(Inst) == VIR_OP_STORE_ATTR     ||
+                      VIR_Inst_GetOpcode(Inst) == VIR_OP_IMG_STORE      ||
+                      VIR_Inst_GetOpcode(Inst) == VIR_OP_VX_IMG_STORE   ||
                       VIR_Inst_GetOpcode(Inst) == VIR_OP_IMG_STORE_3D);
         }
     }
@@ -1411,7 +1538,7 @@ _VSC_MC_GEN_GenRegisterNo(
 
             if (regNo == VIR_SR_INSTATNCEID)
             {
-                gcmASSERT(!Gen->HwCfg->hwFeatureFlags.vtxInstanceIdAsAttr);
+                gcmASSERT(!Gen->pComCfg->pHwCfg->hwFeatureFlags.vtxInstanceIdAsAttr);
 
                 regNo = 0x00;
             }
@@ -1590,7 +1717,7 @@ _VSC_MC_GEN_GenSrcType(
                     VirNameId == VIR_NAME_SAMPLE_POSITION ||
                     VirNameId == VIR_NAME_SAMPLE_MASK_IN) {
                         return 0x5;
-                } else if (!Gen->HwCfg->hwFeatureFlags.vtxInstanceIdAsAttr) {
+                } else if (!Gen->pComCfg->pHwCfg->hwFeatureFlags.vtxInstanceIdAsAttr) {
                     /* TODO: Need check correct chip and revision to dynamically select when
                     it is clear vertexid/instanceid has been moved into extended type */
                     if (gcvTRUE)
@@ -1844,6 +1971,7 @@ _VSC_MC_GEN_GenSource(
     )
 {
     VIR_OperandKind opndKind = VIR_OPND_NONE;
+    VIR_OpCode      opCode = VIR_Inst_GetOpcode(Inst);
 
     gcmASSERT(Gen->Shader != gcvNULL &&
         Opnd != gcvNULL &&
@@ -1901,10 +2029,30 @@ _VSC_MC_GEN_GenSource(
             gctUINT      index      = _VSC_MC_GEN_GenRegisterNo(Gen, Inst, sym, Opnd) +
                 (VIR_Operand_GetMatrixConstIndex(Opnd) +
                  _VSC_MC_GEN_GenOpndRelIndexing(Gen, Inst, Opnd)) *
-                 VIR_Symbol_GetRegSize(Gen->Shader, Gen->HwCfg, sym);
+                 VIR_Symbol_GetRegSize(Gen->Shader, Gen->pComCfg->pHwCfg, sym);
             gctUINT      swizzle    = _VSC_MC_GEN_GenOpndSwizzle(Gen, Inst, Opnd);
             gctUINT      indexed    = _VSC_MC_GEN_GenIndexed(Opnd);
 
+            /* check if we need 0x4 source type for evis instructions */
+            if (srcKind == 0x2 &&
+                VIR_OPCODE_Use512BitUnifrom(opCode))
+            {
+                gcmASSERT(VIR_Type_GetSize(VIR_Symbol_GetType(sym)) == 64);
+                srcKind = 0x4;
+            }
+            else if (VIR_OPCODE_isVXOnly(opCode) &&
+                     srcKind == 0x0 &&
+                     (opCode == VIR_OP_VX_DP32X1_B ||
+                      opCode == VIR_OP_VX_DP16X2_B ||
+                      opCode == VIR_OP_VX_DP8X4_B  ||
+                      opCode == VIR_OP_VX_DP4X8_B  ||
+                      opCode == VIR_OP_VX_DP2X16_B   )  &&
+                      (VIR_Inst_GetSource(Inst, 0) == Opnd ||
+                       VIR_Inst_GetSource(Inst, 1) == Opnd)   )
+            {
+                /* source is 256 bits test register */
+                srcKind = 0x1;
+            }
             Src->regType            = srcKind;
             Src->u.reg.regNo        = index;
             Src->u.reg.swizzle      = swizzle;
@@ -1944,6 +2092,7 @@ _VSC_MC_GEN_GenDest(
     }
 
     *bWrite = gcvTRUE;
+
     switch(VIR_Operand_GetOpKind(Opnd))
     {
     case VIR_OPND_NONE:
@@ -1953,53 +2102,33 @@ _VSC_MC_GEN_GenDest(
     case VIR_OPND_SYMBOL:
         {
             VIR_Symbol  *sym          = VIR_Operand_GetSymbol(Opnd);
-            gctBOOL      bSat         = _VSC_MC_GEN_GenSat(Opnd);
             gctUINT      dstKind      = _VSC_MC_GEN_GenDstType(Gen, sym);
             gctUINT      index        = _VSC_MC_GEN_GenRegisterNo(Gen, Inst, sym, Opnd) +
                 (VIR_Operand_GetMatrixConstIndex(Opnd) +
                  _VSC_MC_GEN_GenOpndRelIndexing(Gen, Inst, Opnd)) *
-                 VIR_Symbol_GetRegSize(Gen->Shader, Gen->HwCfg, sym);
+                 VIR_Symbol_GetRegSize(Gen->Shader, Gen->pComCfg->pHwCfg, sym);
             gctUINT      enable       = _VSC_MC_GEN_GenOpndEnable(Gen, Inst, Opnd);
             gctUINT      indexed      = _VSC_MC_GEN_GenIndexed(Opnd);
 
             Dst->regType              = dstKind;
             Dst->regNo                = index;
-            Dst->bSaturated           = bSat;
 
             if (VIR_OPCODE_isVXOnly(VIR_Inst_GetOpcode(Inst)))
             {
-                VIR_OpCode opCode      = VIR_Inst_GetOpcode(Inst);
-                if (opCode == VIR_OP_VX_IMG_LOAD    ||
-                    opCode == VIR_OP_VX_IMG_STORE   ||
-                    opCode == VIR_OP_VX_IMG_LOAD_3D ||
-                    opCode == VIR_OP_VX_IMG_STORE_3D)
+                VIR_EVIS_Modifier evisModifier;
+                gctUINT i;
+
+                /* find EvisModifier operand  */
+                for (i = 0; i < VIR_Inst_GetSrcNum(Inst); i ++)
                 {
-                    VIR_Operand * opnd = (opCode == VIR_OP_VX_IMG_LOAD ||
-                                          opCode == VIR_OP_VX_IMG_LOAD_3D) ? VIR_Inst_GetDest(Inst)
-                                                                           : VIR_Inst_GetSource(Inst, 2);
-                    VIR_TypeId srcTyId = VIR_Operand_GetType(opnd);
-
-                    Dst->u.evisDst.startCompIdx  = 0;
-                    Dst->u.evisDst.compIdxRange  = VIR_GetTypeComponents(srcTyId);
-                }
-                else
-                {
-
-                    VIR_EVIS_Modifier evisModifier;
-                    gctUINT i;
-
-                    /* find EvisModifier operand  */
-                    for (i = 0; i < VIR_Inst_GetSrcNum(Inst); i ++)
+                    VIR_Operand * opnd = VIR_Inst_GetSource(Inst, i);
+                    if (opnd && VIR_Operand_GetOpKind(opnd) == VIR_OPND_EVIS_MODIFIER)
                     {
-                        VIR_Operand * opnd = VIR_Inst_GetSource(Inst, i);
-                        if (opnd && VIR_Operand_GetOpKind(opnd) == VIR_OPND_EVIS_MODIFIER)
-                        {
-                            evisModifier.u1 = VIR_Operand_GetEvisModifier(opnd);
+                        evisModifier.u1 = VIR_Operand_GetEvisModifier(opnd);
 
-                            Dst->u.evisDst.startCompIdx  = evisModifier.u0.startBin;
-                            Dst->u.evisDst.compIdxRange  = evisModifier.u0.endBin - evisModifier.u0.startBin + 1;
-                            break;
-                        }
+                        Dst->u.evisDst.startCompIdx  = evisModifier.u0.startBin;
+                        Dst->u.evisDst.compIdxRange  = evisModifier.u0.endBin - evisModifier.u0.startBin + 1;
+                        break;
                     }
                 }
             }
@@ -2034,6 +2163,7 @@ _VSC_MC_GEN_GenGeneralInst(
     )
 {
     gctSIZE_T  i = 0;
+    VIR_OpCode opCode = VIR_Inst_GetOpcode(Inst);
 
     _VSC_MC_GEN_GenOpcode(Gen, Inst, BaseOpcode, ExternOpcode);
     _VSC_MC_GEN_GenInstCtrl(Gen, Inst, McInstCtrl);
@@ -2063,11 +2193,36 @@ _VSC_MC_GEN_GenGeneralInst(
     for(; i < VIR_Inst_GetSrcNum(Inst); ++i)
     {
         gctBOOL bWrite = gcvFALSE;
-
+        VIR_Operand * opnd = VIR_Inst_GetSource(Inst, i);
+        if (VIR_OPCODE_isVXOnly(opCode) && i == 1)
+        {
+            /* skip the hidden temp 256 register lower part */
+            switch (VIR_Inst_GetOpcode(Inst)) {
+            case VIR_OP_VX_DP32X1_B:
+            case VIR_OP_VX_DP16X2_B:
+            case VIR_OP_VX_DP8X4_B:
+            case VIR_OP_VX_DP4X8_B:
+            case VIR_OP_VX_DP2X16_B:
+                /* must be consecutive and start with even temp register */
+                gcmASSERT((VIR_Operand_GetHwRegId(VIR_Inst_GetSource(Inst, 0)) ==
+                           VIR_Operand_GetHwRegId(opnd) - 1) &&
+                          ((VIR_Operand_GetHwRegId(opnd) & 0x01) == 1) );
+                continue;
+            default:
+                break;
+            }
+        }
+        if ((opCode == VIR_OP_IMG_LOAD || opCode == VIR_OP_IMG_LOAD_3D) &&
+            i == (VIR_Inst_GetSrcNum(Inst) -1) )
+        {
+            /* the last operand of img_load/load_3d is sampler info,
+             * it is not in the instruction now. */
+            continue;
+        }
         _VSC_MC_GEN_GenSource(
             Gen,
             Inst,
-            VIR_Inst_GetSource(Inst, i),
+            opnd,
             Src + *srcNum,
             &bWrite);
 
@@ -2147,14 +2302,14 @@ static gctBOOL _NeedGen(gctUINT                baseOpcode,
     gctUINT channel;
 
     /* FB_INSERT_MOV_INPUT: insert MOV Rn, Rn for input to help HW team to debug */
-    if (!gctOPT_hasFeature(FB_INSERT_MOV_INPUT) &&
+    if (!gcmOPT_hasFeature(FB_INSERT_MOV_INPUT) &&
         baseOpcode == 0x09 &&
         pSrc[srcCount - 1].regType == 0x0 &&
         pSrc[srcCount - 1].u.reg.regNo == pDst->regNo &&
         pDst->u.nmlDst.indexingAddr == pSrc[srcCount - 1].u.reg.indexingAddr &&
         !pSrc[srcCount - 1].u.reg.bAbs &&
         !pSrc[srcCount - 1].u.reg.bNegative &&
-        !pDst->bSaturated &&
+        !instCtrl.bResultSat &&
         instCtrl.condOpCode == 0x00 &&
         pSrc[srcCount - 1].regType == pDst->regType)
     {
@@ -2275,7 +2430,7 @@ _VSC_MC_GEN_GenInst(
                 &srcNum);
 
             gcmASSERT(VIR_OpndInfo_Is_Virtual_Reg(&dst));
-            mcDest.bSaturated = gcvTRUE;
+            mcInstCtrl.bResultSat = gcvTRUE;
 
             break;
         }
@@ -2481,22 +2636,6 @@ _VSC_MC_GEN_GenInst(
         break;
     }
 
-    /* Because VIR's src seq is different with HW MC's src seq, so we need adjust
-       it before sending it to mc-codec */
-    if (baseOpcode == 0x7A ||
-        baseOpcode == 0x35 ||
-        baseOpcode == MC_AUXILIARY_OP_CODE_USC_IMG_STORE ||
-        baseOpcode == MC_AUXILIARY_OP_CODE_USC_IMG_STORE_3D)
-    {
-        VSC_MC_CODEC_SRC mcSrcTemp;
-
-        mcSrcTemp = mcSrc[0];
-
-        mcSrc[0] = mcSrc[1];
-        mcSrc[1] = mcSrc[2];
-        mcSrc[2] = mcSrcTemp;
-    }
-
     /* A quick WAR for FPGA verification to convert texld_plain to texld_lod for all
        non-ps shaders because texld_plain will compute LOD but non-ps shader has no
        ability to compute, otherwise, HW will hange.
@@ -2566,33 +2705,43 @@ _VSC_MC_GEN_GenInst(
             Gen->Shader->psHasDiscard = gcvTRUE;
         }
 
-        if (IS_NORMAL_LOAD_STORE_MC_OPCODE(baseOpcode))
+        if (baseOpcode == 0x32)
         {
-            Gen->Shader->hasLoadStore = gcvTRUE;
+            Gen->Shader->memoryAccessFlag |= VIR_MA_FLAG_LOAD;
         }
 
-        if (IS_IMG_LOAD_STORE_MC_OPCODE(baseOpcode))
+        if (IS_NORMAL_STORE_MC_OPCODE(baseOpcode))
         {
-            Gen->Shader->hasImgReadWrite = gcvTRUE;
+            Gen->Shader->memoryAccessFlag |= VIR_MA_FLAG_STORE;
+        }
+
+        if (IS_IMG_LOAD_MC_OPCODE(baseOpcode))
+        {
+            Gen->Shader->memoryAccessFlag |= VIR_MA_FLAG_IMG_READ;
+        }
+
+        if (IS_IMG_STORE_MC_OPCODE(baseOpcode))
+        {
+            Gen->Shader->memoryAccessFlag |= VIR_MA_FLAG_IMG_WRITE;
         }
 
         if (IS_ATOMIC_MC_OPCODE(baseOpcode))
         {
-            Gen->Shader->hasAtomicOp = gcvTRUE;
+            Gen->Shader->memoryAccessFlag |= VIR_MA_FLAG_ATOMIC;
         }
-
-        Gen->Shader->hasMemoryAccess = (Gen->Shader->hasLoadStore    |
-                                        Gen->Shader->hasImgReadWrite |
-                                        Gen->Shader->hasAtomicOp);
 
         if (IS_BARRIER_MC_OPCODE(baseOpcode))
         {
             gcmASSERT(Gen->Shader->shaderKind == VIR_SHADER_CL ||
                       Gen->Shader->shaderKind == VIR_SHADER_COMPUTE);
 
-            Gen->Shader->hasBarrier = gcvTRUE;
+            Gen->Shader->memoryAccessFlag |= VIR_MA_FLAG_BARRIER;
         }
 
+        if (baseOpcode == 0x07)
+        {
+            Gen->Shader->hasDsx = gcvTRUE;
+        }
         if (baseOpcode == 0x08)
         {
             Gen->Shader->hasDsy = gcvTRUE;
@@ -2713,7 +2862,7 @@ _VSC_MC_GEN_PerformOnShader(
 VSC_ErrCode
 VSC_MC_GEN_MachineCodeGen(
     IN  VIR_Shader            *Shader,
-    IN  VSC_HW_CONFIG         *HwCfg,
+    IN  VSC_COMPILER_CONFIG   *pComCfg,
     IN  VSC_OPTN_MCGenOptions *Options,
     IN  VIR_Dumper            *Dumper
     )
@@ -2721,7 +2870,7 @@ VSC_MC_GEN_MachineCodeGen(
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_MCGen   gen;
 
-    _VSC_MC_GEN_Initialize(Shader, HwCfg, Options, Dumper, &gen);
+    _VSC_MC_GEN_Initialize(Shader, pComCfg, Options, Dumper, &gen);
     errCode = _VSC_MC_GEN_PerformOnShader(&gen);
     _VSC_MC_GEN_Finalize(&gen);
 

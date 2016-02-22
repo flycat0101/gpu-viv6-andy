@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -158,7 +158,7 @@ GLvoid __glInitConstantDefault(__GLdeviceConstants *constants)
     /* Specific size limits */
     constants->numberofQueryCounterBits = 32;
     constants->maxTextureSize = 8192;
-    constants->maxNumTextureLevels  = 13;
+    constants->maxNumTextureLevels = 14;
     constants->maxTextureLodBias = 16;
     constants->subpixelBits = 4;
     constants->maxElementsVertices = 32;
@@ -177,7 +177,7 @@ GLvoid __glInitConstantDefault(__GLdeviceConstants *constants)
     constants->maxRenderBufferSize  = 2048;
     constants->maxViewportWidth     = 2048;
     constants->maxViewportHeight    = 2048;
-    constants->shaderCaps.maxDrawBuffers       = 1;
+    constants->shaderCaps.maxDrawBuffers = 1;
     constants->maxSamples           = 4;
     constants->maxSamplesInteger    = 1;
     constants->maxSampleMaskWords   = 1;
@@ -660,15 +660,12 @@ __GLdrawablePrivate* __glGetDrawable(VEGLDrawable eglDrawable)
         }
         else
         {
-            glDrawable->dsFormatInfo = eglConfig->stencilSize ?
-                                               &__glFormatInfoTable[__GL_FMT_Z24S8] : gcvNULL;
+            glDrawable->dsFormatInfo = eglConfig->stencilSize ? &__glFormatInfoTable[__GL_FMT_Z24S8] : gcvNULL;
         }
     }
 
-
     glDrawable->depthHandle = eglDrawable->depthHandle;
     glDrawable->stencilHandle = eglDrawable->stencilHandle;
-
 
     if (0 == (glDrawable->width * glDrawable->height))
     {

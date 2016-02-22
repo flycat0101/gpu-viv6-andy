@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -179,8 +179,6 @@ GL_API void GL_APIENTRY glClear(
 
                     clearArgs.flags = gcvCLEAR_COLOR;
 
-                    clearArgs.flags |= gcvCLEAR_WITH_GPU_ONLY;
-
                     /* Clear color buffer. */
                     if (context->viewportStates.scissorTest)
                     {
@@ -211,7 +209,7 @@ GL_API void GL_APIENTRY glClear(
                     }
 
                     /* Clear the scissor area. */
-                    gcmERR_BREAK(gcoSURF_Clear_v2(&drawView, &clearArgs));
+                    gcmERR_BREAK(gcoSURF_Clear(&drawView, &clearArgs));
                 }
 
                 if (drawView.surf != gcvNULL)
@@ -281,8 +279,6 @@ GL_API void GL_APIENTRY glClear(
 
                     clearArgs.flags = flags;
 
-                    clearArgs.flags |= gcvCLEAR_WITH_GPU_ONLY;
-
                     /* Clear depth buffer. */
                     if (context->viewportStates.scissorTest)
                     {
@@ -313,7 +309,7 @@ GL_API void GL_APIENTRY glClear(
                     }
 
                     /* Clear the scissor area. */
-                    gcmERR_BREAK(gcoSURF_Clear_v2(&dsView , &clearArgs));
+                    gcmERR_BREAK(gcoSURF_Clear(&dsView , &clearArgs));
                 }
 
                 if (dsView.surf != gcvNULL)

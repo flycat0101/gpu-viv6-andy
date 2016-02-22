@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -61,7 +61,7 @@ extern "C" {
         { \
             if (__tls__->hardware2D == gcvNULL) \
             { \
-                gcmONERROR(gcoHARDWARE_Construct(gcPLS.hal, gcvTRUE, &__tls__->hardware2D)); \
+                gcmONERROR(gcoHARDWARE_Construct(gcPLS.hal, gcvTRUE, gcvFALSE, &__tls__->hardware2D)); \
                 gcmTRACE_ZONE( \
                     gcvLEVEL_VERBOSE, gcvZONE_HARDWARE, \
                     "%s(%d): hardware object 0x%08X constructed.\n", \
@@ -81,7 +81,7 @@ extern "C" {
         { \
             if (__tls__->defaultHardware == gcvNULL) \
             { \
-                gcmONERROR(gcoHARDWARE_Construct(gcPLS.hal, gcvTRUE, &__tls__->defaultHardware)); \
+                gcmONERROR(gcoHARDWARE_Construct(gcPLS.hal, gcvTRUE, gcvFALSE, &__tls__->defaultHardware)); \
                 \
                 if (__tls__->currentType != gcvHARDWARE_2D) \
                 { \
@@ -278,7 +278,7 @@ typedef struct _gcsSAMPLER
     /* texture surface tile status state */
     gctBOOL                 hasTileStatus;
     /* only base level surface, only for non-mipmap use-case */
-    gcsSURF_INFO_PTR        baseLevelSurface;
+    gcoSURF                 baseLevelSurf;
     gctINT32                compressedDecFormat;
     gctUINT32               astcSize[30];
     gctUINT32               astcSRGB[30];
@@ -302,7 +302,7 @@ typedef struct _gcsTXDESC_UPDATE_INFO
     gctUINT32               baseLevelHeight;
     gctUINT32               baseLevelDepth;
 
-    gcsSURF_INFO_PTR        baseLevelInfo;
+    gcoSURF                 baseLevelSurf;
     gctUINT32               astcSize[16];
     gctUINT32               astcSRGB[16];
     gctUINT32               lodAddr[16];
@@ -423,7 +423,7 @@ gcoINDEX_GetDynamicIndexRange(
 gceSTATUS
 gco3D_ClearHzTileStatus(
     IN gco3D Engine,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gcsSURF_NODE_PTR TileStatus
     );
 
@@ -441,6 +441,7 @@ gceSTATUS
 gcoHARDWARE_Construct(
     IN gcoHAL Hal,
     IN gctBOOL ThreadDefault,
+    IN gctBOOL Robust,
     OUT gcoHARDWARE * Hardware
     );
 
@@ -584,6 +585,7 @@ gcoHARDWARE_Stall(
     IN gcoHARDWARE Hardware
     );
 
+#if gcdENABLE_3D
 gceSTATUS
 gcoHARDWARE_SetChipEnable(
     IN gcoHARDWARE Hardware,
@@ -614,7 +616,12 @@ gcoHARDWARE_MultiGPUSync(
     OUT gctUINT32_PTR *Memory
 );
 
-#if gcdENABLE_3D
+gceSTATUS
+gcoHARDWARE_QueryReset(
+    IN gcoHARDWARE Hardware,
+    OUT gctBOOL_PTR Innocent
+    );
+
 /* Load the vertex and pixel shaders. */
 gceSTATUS
 gcoHARDWARE_LoadProgram(
@@ -636,20 +643,17 @@ gcoHARDWARE_LoadKernel(
 gceSTATUS
 gcoHARDWARE_ResolveRect(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR SrcInfo,
-    IN gcsSURF_INFO_PTR DestInfo,
-    IN gcsPOINT_PTR SrcOrigin,
-    IN gcsPOINT_PTR DestOrigin,
-    IN gcsPOINT_PTR RectSize,
-    IN gctBOOL      yInverted
+    IN gcsSURF_VIEW *SrcView,
+    IN gcsSURF_VIEW *DstView,
+    IN gcsSURF_RESOLVE_ARGS *Args
     );
 
 gceSTATUS
 gcoHARDWARE_IsHWResolveable(
-    IN gcsSURF_INFO_PTR SrcInfo,
-    IN gcsSURF_INFO_PTR DestInfo,
+    IN gcoSURF      SrcSurf,
+    IN gcoSURF      DstSurf,
     IN gcsPOINT_PTR SrcOrigin,
-    IN gcsPOINT_PTR DestOrigin,
+    IN gcsPOINT_PTR DstOrigin,
     IN gcsPOINT_PTR RectSize
     );
 
@@ -657,12 +661,9 @@ gcoHARDWARE_IsHWResolveable(
 gceSTATUS
 gcoHARDWARE_ResolveDepth(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR SrcInfo,
-    IN gcsSURF_INFO_PTR DestInfo,
-    IN gcsPOINT_PTR SrcOrigin,
-    IN gcsPOINT_PTR DestOrigin,
-    IN gcsPOINT_PTR RectSize,
-    IN gctBOOL yInverted
+    IN gcsSURF_VIEW *SrcView,
+    IN gcsSURF_VIEW *DstView,
+    IN gcsSURF_RESOLVE_ARGS *Args
     );
 
 /* Preserve pixels from source surface. */
@@ -695,7 +696,7 @@ gcoHARDWARE_QueryTileStatus(
     IN gctUINT Width,
     IN gctUINT Height,
     IN gctSIZE_T Bytes,
-    IN gctBOOL edgeAA,
+    IN gctBOOL vMsaa,
     OUT gctSIZE_T_PTR Size,
     OUT gctUINT_PTR Alignment,
     OUT gctUINT32_PTR Filler
@@ -723,7 +724,7 @@ gcoHARDWARE_DisableHardwareTileStatus(
 gceSTATUS
 gcoHARDWARE_EnableTileStatus(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gctUINT32 TileStatusAddress,
     IN gcsSURF_NODE_PTR HzTileStatus,
     IN gctUINT  RtIndex
@@ -742,7 +743,7 @@ gcoHARDWARE_EnableTileStatus(
 gceSTATUS
 gcoHARDWARE_DisableTileStatus(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gctBOOL CpuAccess
     );
 
@@ -757,7 +758,7 @@ gcoHARDWARE_DisableTileStatus(
 gceSTATUS
 gcoHARDWARE_FlushTileStatus(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gctBOOL Decompress
     );
 
@@ -768,13 +769,13 @@ gcoHARDWARE_FlushTileStatus(
 gceSTATUS
 gcoHARDWARE_FillFromTileStatus(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface
+    IN gcoSURF Surface
     );
 
 /* Query resolve alignment requirement to resolve this surface */
 gceSTATUS gcoHARDWARE_GetSurfaceResolveAlignment(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     OUT gctUINT *originX,
     OUT gctUINT *originY,
     OUT gctUINT *sizeX,
@@ -852,14 +853,14 @@ gcoHARDWARE_Get2DTempSurface(
     IN gctUINT Height,
     IN gceSURF_FORMAT Format,
     IN gceSURF_TYPE Hints,
-    OUT gcsSURF_INFO_PTR *SurfInfo
+    OUT gcoSURF *Surface
     );
 
 /* Put back the 2D temporary surface from gcoHARDWARE_Get2DTempSurface. */
 gceSTATUS
 gcoHARDWARE_Put2DTempSurface(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR SurfInfo
+    IN gcoSURF Surface
     );
 
 #if gcdENABLE_3D
@@ -867,14 +868,9 @@ gcoHARDWARE_Put2DTempSurface(
 gceSTATUS
 gcoHARDWARE_CopyPixels(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Source,
-    IN gcsSURF_INFO_PTR Target,
-    IN gctINT SourceX,
-    IN gctINT SourceY,
-    IN gctINT TargetX,
-    IN gctINT TargetY,
-    IN gctINT Width,
-    IN gctINT Height
+    IN gcsSURF_VIEW *SrcView,
+    IN gcsSURF_VIEW *DstView,
+    IN gcsSURF_RESOLVE_ARGS *Args
     );
 
 /* Enable or disable anti-aliasing. */
@@ -962,7 +958,7 @@ gcoHARDWARE_AlignToTileCompatible(
 
 gceSTATUS
 gcoHARDWARE_AlignResolveRect(
-    IN gcsSURF_INFO_PTR SurfInfo,
+    IN gcoSURF Surface,
     IN gcsPOINT_PTR RectOrigin,
     IN gcsPOINT_PTR RectSize,
     OUT gcsPOINT_PTR AlignedOrigin,
@@ -989,7 +985,7 @@ gcoHARDWARE_Is2DAvailable(
 gceSTATUS
 gcoHARDWARE_Query2DSurfaceAllocationInfo(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR SurfInfo,
+    IN gcoSURF Surface,
     IN OUT gctUINT* Bytes,
     IN OUT gctUINT* Alignment
     );
@@ -1017,11 +1013,6 @@ gceSTATUS
 gcoHARDWARE_IsFlatMapped(
     IN gcoHARDWARE Hardware,
     IN gctPHYS_ADDR_T Address
-    );
-
-gceSTATUS
-gcoHARDWARE_DrawOnOneCore(
-    IN gcoHARDWARE Hardware
     );
 
 gceSTATUS
@@ -1257,6 +1248,11 @@ gcoHARDWARE_DrawInstancedPrimitives(
     );
 
 gceSTATUS
+gcoHARDWARE_DrawNullPrimitives(
+    IN gcoHARDWARE Hardware
+    );
+
+gceSTATUS
 gcoHARDWARE_DrawPrimitivesCount(
     IN gcoHARDWARE Hardware,
     IN gcePRIMITIVE Type,
@@ -1358,8 +1354,7 @@ gcoHARDWARE_QueryTextureCaps(
     OUT gctBOOL * NonPowerOfTwo,
     OUT gctUINT * VertexSamplers,
     OUT gctUINT * PixelSamplers,
-    OUT gctUINT * MaxAnisoValue,
-    OUT gctUINT * TexldPerCycle
+    OUT gctUINT * MaxAnisoValue
     );
 
 /* Query the shader support. */
@@ -1430,7 +1425,7 @@ gcoHARDWARE_GetClosestRenderFormat(
 /* Upload data into a texture. */
 gceSTATUS
 gcoHARDWARE_UploadTexture(
-    IN gcsSURF_INFO_PTR TargetInfo,
+    IN gcoSURF DstSurf,
     IN gctUINT32 Offset,
     IN gctUINT X,
     IN gctUINT Y,
@@ -1459,7 +1454,7 @@ gcoHARDWARE_UploadTextureYUV(
 
 gceSTATUS
 gcoHARDWARE_UploadCompressedTexture(
-    IN gcsSURF_INFO_PTR TargetInfo,
+    IN gcoSURF DstSurf,
     IN gctCONST_POINTER Logical,
     IN gctUINT32 Offset,
     IN gctUINT32 XOffset,
@@ -1493,7 +1488,7 @@ gcoHARDWARE_UpdateTextureDesc(
 gceSTATUS
 gcoHARDWARE_QuerySurfaceRenderable(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface
+    IN gcoSURF Surface
     );
 
 #endif /* gcdENABLE_3D */
@@ -1647,10 +1642,10 @@ gceSTATUS
 gcoHARDWARE_SplitFilterBlit(
     IN gcoHARDWARE Hardware,
     IN gcs2D_State_PTR State,
-    IN gcsSURF_INFO_PTR SrcSurface,
-    IN gcsSURF_INFO_PTR DestSurface,
+    IN gcoSURF SrcSurf,
+    IN gcoSURF DstSurf,
     IN gcsRECT_PTR SrcRect,
-    IN gcsRECT_PTR DestRect,
+    IN gcsRECT_PTR DstRect,
     IN gcsRECT_PTR DestSubRect
     );
 
@@ -1659,29 +1654,29 @@ gceSTATUS
 gcoHARDWARE_FilterBlit(
     IN gcoHARDWARE Hardware,
     IN gcs2D_State_PTR State,
-    IN gcsSURF_INFO_PTR SrcSurface,
-    IN gcsSURF_INFO_PTR DestSurface,
+    IN gcoSURF SrcSurf,
+    IN gcoSURF DstSurf,
     IN gcsRECT_PTR SrcRect,
-    IN gcsRECT_PTR DestRect,
-    IN gcsRECT_PTR DestSubRect
+    IN gcsRECT_PTR DstRect,
+    IN gcsRECT_PTR DstSubRect
     );
 
 gceSTATUS gcoHARDWARE_SplitYUVFilterBlit(
     IN gcoHARDWARE Hardware,
     IN gcs2D_State_PTR State,
-    IN gcsSURF_INFO_PTR SrcSurface,
-    IN gcsSURF_INFO_PTR DestSurface,
+    IN gcoSURF SrcSurf,
+    IN gcoSURF DstSurf,
     IN gcsRECT_PTR SrcRect,
-    IN gcsRECT_PTR DestRect,
-    IN gcsRECT_PTR DestSubRect
+    IN gcsRECT_PTR DstRect,
+    IN gcsRECT_PTR DstSubRect
     );
 
 gceSTATUS gcoHARDWARE_MultiPlanarYUVConvert(
     IN gcoHARDWARE Hardware,
     IN gcs2D_State_PTR State,
-    IN gcsSURF_INFO_PTR SrcSurface,
-    IN gcsSURF_INFO_PTR DestSurface,
-    IN gcsRECT_PTR DestRect
+    IN gcoSURF SrcSurf,
+    IN gcoSURF DstSurf,
+    IN gcsRECT_PTR DstRect
     );
 
 /* Monochrome blit. */
@@ -1732,7 +1727,7 @@ gcoHARDWARE_Get2DHardware(
 gceSTATUS
 gcoDECHARDWARE_CheckSurface(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface
+    IN gcoSURF Surface
     );
 
 gceSTATUS
@@ -1752,7 +1747,7 @@ gcoDECHARDWARE_EnableDECCompression(
 gceSTATUS
 gcoDECHARDWARE_SetSrcDECCompression(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gce2D_TILE_STATUS_CONFIG TileStatusConfig,
     IN gctUINT32 ReadId,
     IN gctBOOL FastClear,
@@ -1762,7 +1757,7 @@ gcoDECHARDWARE_SetSrcDECCompression(
 gceSTATUS
 gcoDECHARDWARE_SetDstDECCompression(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gce2D_TILE_STATUS_CONFIG TileStatusConfig,
     IN gctUINT32 ReadId,
     IN gctUINT32 WriteId
@@ -1783,24 +1778,26 @@ gcoDECHARDWARE_FlushDECCompression(
     ( \
         (Surface)->tileStatusConfig == gcv2D_TSC_TPC_COMPRESSED \
      || ((Surface)->tileStatusConfig & gcv2D_TSC_DEC_COMPRESSED) \
+     || ((Surface)->tileStatusConfig & gcv2D_TSC_V4_COMPRESSED) \
     )
 
 #define gcmHASOTHERCOMPRESSIONNO3D(Surface) \
     ( \
         (Surface)->tileStatusConfig == gcv2D_TSC_TPC_COMPRESSED \
      || (((Surface)->tileStatusConfig & gcv2D_TSC_DEC_COMPRESSED) && \
-          !((Surface)->tileStatusConfig & (gcv2D_TSC_ENABLE | gcv2D_TSC_COMPRESSED | gcv2D_TSC_DOWN_SAMPLER))) \
+          !((Surface)->tileStatusConfig & (gcv2D_TSC_ENABLE | gcv2D_TSC_COMPRESSED | gcv2D_TSC_DOWN_SAMPLER | gcv2D_TSC_V4_COMPRESSED))) \
     )
 #else
 #define gcmHASOTHERCOMPRESSION(Surface) \
     ( \
         (Surface)->tileStatusConfig == gcv2D_TSC_TPC_COMPRESSED \
+      || ((Surface)->tileStatusConfig & gcv2D_TSC_V4_COMPRESSED) \
     )
 
 #define gcmHASOTHERCOMPRESSIONNO3D(Surface) \
     ( \
         (Surface)->tileStatusConfig == gcv2D_TSC_TPC_COMPRESSED \
-     || (!((Surface)->tileStatusConfig & (gcv2D_TSC_ENABLE | gcv2D_TSC_COMPRESSED | gcv2D_TSC_DOWN_SAMPLER))) \
+     || (!((Surface)->tileStatusConfig & (gcv2D_TSC_ENABLE | gcv2D_TSC_COMPRESSED | gcv2D_TSC_DOWN_SAMPLER | gcv2D_TSC_V4_COMPRESSED))) \
     )
 #endif
 
@@ -1817,17 +1814,17 @@ gcoDECHARDWARE_FlushDECCompression(
 typedef struct _gcs3DBLIT_INFO * gcs3DBLIT_INFO_PTR;
 typedef struct _gcs3DBLIT_INFO
 {
-    gctUINT32   destAddress;
-    gctUINT32   destTileStatusAddress;
-    gctUINT32   clearValue[2];
-    gctUINT32   fcClearValue[2];
-    gctUINT32   clearMask;
-    gctUINT32   clearMaskUpper;
-    gcsPOINT    *origin;
-    gcsPOINT    *rect;
+    gctUINT32    destAddress;
+    gctUINT32    destTileStatusAddress;
+    gctUINT32    clearValue[2];
+    gctUINT32    fcClearValue[2];
+    gctUINT32    clearBitMask;
+    gctUINT32    clearBitMaskUpper;
+    gcsPOINT_PTR origin;
+    gcsPOINT_PTR rect;
 
-    gcsSURF_INFO_PTR LODs[14];
-    gctUINT32        LODsSliceSize[14];
+    gcoSURF      LODs[14];
+    gctUINT32    LODsSliceSize[14];
 }
 gcs3DBLIT_INFO;
 
@@ -1836,6 +1833,7 @@ gcoHARDWARE_BindIndex(
     IN gcoHARDWARE Hardware,
     IN gctUINT32 HeadAddress,
     IN gctUINT32 TailAddress,
+    IN gctUINT32 EndAddress,
     IN gceINDEX_TYPE IndexType,
     IN gctSIZE_T Bytes
     );
@@ -1880,7 +1878,7 @@ gceSTATUS
 gcoHARDWARE_SetRenderTarget(
     IN gcoHARDWARE Hardware,
     IN gctUINT32 TargetIndex,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gctUINT32 SliceIndex,
     IN gctUINT32 LayerIndex
     );
@@ -1888,7 +1886,7 @@ gcoHARDWARE_SetRenderTarget(
 gceSTATUS
 gcoHARDWARE_SetDepthBuffer(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gctUINT32 SliceIndex
     );
 
@@ -1909,11 +1907,9 @@ gcoHARDWARE_GetAPI(
 gceSTATUS
 gcoHARDWARE_Clear(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
-    IN gctINT Left,
-    IN gctINT Top,
-    IN gctINT Right,
-    IN gctINT Bottom,
+    IN gcsSURF_VIEW *SurfView,
+    IN gctUINT32 LayerIndex,
+    IN gcsRECT_PTR Rect,
     IN gctUINT32 ClearValue,
     IN gctUINT32 ClearValueUpper,
     IN gctUINT8 ClearMask
@@ -1923,11 +1919,9 @@ gcoHARDWARE_Clear(
 gceSTATUS
 gcoHARDWARE_ClearSoftware(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
-    IN gctINT Left,
-    IN gctINT Top,
-    IN gctINT Right,
-    IN gctINT Bottom,
+    IN gcsSURF_VIEW *SurfView,
+    IN gctUINT32 LayerIndex,
+    IN gcsRECT_PTR Rect,
     IN gctUINT32 ClearValue,
     IN gctUINT32 ClearValueUpper,
     IN gctUINT8 ClearMask,
@@ -1938,7 +1932,7 @@ gcoHARDWARE_ClearSoftware(
 gceSTATUS
 gcoHARDWARE_ClearTileStatus(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gctUINT32 Address,
     IN gctSIZE_T Bytes,
     IN gceSURF_TYPE Type,
@@ -1950,7 +1944,7 @@ gcoHARDWARE_ClearTileStatus(
 gceSTATUS
 gcoHARDWARE_ClearTileStatusWindowAligned(
     IN gcoHARDWARE Hardware,
-    gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gceSURF_TYPE Type,
     IN gctUINT32 ClearValue,
     IN gctUINT32 ClearValueUpper,
@@ -2150,9 +2144,7 @@ gcoHARDWARE_SetEarlyDepth(
 gceSTATUS
 gcoHARDWARE_SetAllEarlyDepthModes(
     IN gcoHARDWARE Hardware,
-    IN gctBOOL Disable,
-    IN gctBOOL DisableRAModify,
-    IN gctBOOL DisableRAPassZ
+    IN gctBOOL Disable
     );
 
 gceSTATUS
@@ -2355,7 +2347,6 @@ gcoHARDWARE_QueryUniformBase(
     OUT gctUINT32 * FragmentBase
     );
 
-
 gceSTATUS
 gcoHARDWARE_SetQuery(
     IN gcoHARDWARE Hardware,
@@ -2364,7 +2355,6 @@ gcoHARDWARE_SetQuery(
     IN gceQueryCmd QueryCmd,
     IN gctPOINTER *Memory
     );
-
 
 gceSTATUS
 gcoHARDWARE_GetQueryIndex(
@@ -2477,14 +2467,6 @@ gcoHARDWARE_SetXfbCmd(
     );
 
 gceSTATUS
-gcoHARDWARE_SetXfbCmd(
-    IN gcoHARDWARE Hardware,
-    IN gceXfbCmd Cmd,
-    IN gctPOINTER *Memory
-    );
-
-
-gceSTATUS
 gcoHARDWARE_SetRasterDiscard(
     IN gcoHARDWARE Hardware,
     IN gctBOOL Enable
@@ -2546,6 +2528,12 @@ gcoHARDWARE_SetMultiGPURenderingMode(
     );
 
 gceSTATUS
+gcoHARDWARE_FlushMultiGPURenderingMode(
+    IN gcoHARDWARE Hardware,
+    INOUT gctPOINTER * Memory
+    );
+
+gceSTATUS
 gcoHARDWARE_3DBlitCopy(
     IN gcoHARDWARE Hardware,
     IN gceENGINE Engine,
@@ -2558,29 +2546,25 @@ gceSTATUS
 gcoHARDWARE_3DBlitClear(
     IN gcoHARDWARE Hardware,
     IN gceENGINE Engine,
-    IN gcsSURF_INFO_PTR DestInfo,
+    IN gcoSURF DstSurf,
     IN gcs3DBLIT_INFO_PTR Info,
-    IN gcsPOINT_PTR DestOrigin,
+    IN gcsPOINT_PTR DstOrigin,
     IN gcsPOINT_PTR RectSize
     );
 
 gceSTATUS
 gcoHARDWARE_3DBlitBlt(
     IN gcoHARDWARE Hardware,
-    IN gceENGINE Engine,
-    IN gcsSURF_INFO_PTR SrcInfo,
-    IN gcsSURF_INFO_PTR DestInfo,
-    IN gcsPOINT_PTR SrcOrigin,
-    IN gcsPOINT_PTR DestOrigin,
-    IN gcsPOINT_PTR RectSize,
-    IN gctBOOL yInverted
+    IN gcsSURF_VIEW *SrcView,
+    IN gcsSURF_VIEW *DstView,
+    IN gcsSURF_RESOLVE_ARGS *Args
     );
 
 gceSTATUS
 gcoHARDWARE_3DBlitTileFill(
     IN gcoHARDWARE Hardware,
     IN gceENGINE Engine,
-    IN gcsSURF_INFO_PTR DestInfo
+    IN gcoSURF DstSurf
     );
 
 gceSTATUS
@@ -2596,15 +2580,86 @@ gceSTATUS
 gcoHARDWARE_3DBlit420Tiler(
     IN gcoHARDWARE Hardware,
     IN gceENGINE Engine,
-    IN gcsSURF_INFO_PTR SrcInfo,
-    IN gcsSURF_INFO_PTR DestInfo,
+    IN gcoSURF SrcSurf,
+    IN gcoSURF DstSurf,
     IN gcsPOINT_PTR SrcOrigin,
-    IN gcsPOINT_PTR DestOrigin,
+    IN gcsPOINT_PTR DstOrigin,
     IN gcsPOINT_PTR RectSize
     );
 
-
 #if gcdUSE_VX
+typedef enum _gceVX_KERNEL
+{
+    gcvVX_KERNEL_COLOR_CONVERT,
+    gcvVX_KERNEL_CHANNEL_EXTRACT,
+    gcvVX_KERNEL_CHANNEL_COMBINE,
+    gcvVX_KERNEL_SOBEL_3x3,
+    gcvVX_KERNEL_MAGNITUDE,
+    gcvVX_KERNEL_PHASE,
+    gcvVX_KERNEL_SCALE_IMAGE,
+    gcvVX_KERNEL_TABLE_LOOKUP,
+    gcvVX_KERNEL_HISTOGRAM,
+    gcvVX_KERNEL_EQUALIZE_HISTOGRAM,
+    gcvVX_KERNEL_ABSDIFF,
+    gcvVX_KERNEL_MEAN_STDDEV,
+    gcvVX_KERNEL_THRESHOLD,
+    gcvVX_KERNEL_INTEGRAL_IMAGE,
+    gcvVX_KERNEL_DILATE_3x3,
+    gcvVX_KERNEL_ERODE_3x3,
+    gcvVX_KERNEL_MEDIAN_3x3,
+    gcvVX_KERNEL_BOX_3x3,
+    gcvVX_KERNEL_GAUSSIAN_3x3,
+    gcvVX_KERNEL_CUSTOM_CONVOLUTION,
+    gcvVX_KERNEL_GAUSSIAN_PYRAMID,
+    gcvVX_KERNEL_ACCUMULATE,
+    gcvVX_KERNEL_ACCUMULATE_WEIGHTED,
+    gcvVX_KERNEL_ACCUMULATE_SQUARE,
+    gcvVX_KERNEL_MINMAXLOC,
+    gcvVX_KERNEL_CONVERTDEPTH,
+    gcvVX_KERNEL_CANNY_EDGE_DETECTOR,
+    gcvVX_KERNEL_AND,
+    gcvVX_KERNEL_OR,
+    gcvVX_KERNEL_XOR,
+    gcvVX_KERNEL_NOT,
+    gcvVX_KERNEL_MULTIPLY,
+    gcvVX_KERNEL_ADD,
+    gcvVX_KERNEL_SUBTRACT,
+    gcvVX_KERNEL_WARP_AFFINE,
+    gcvVX_KERNEL_WARP_PERSPECTIVE,
+    gcvVX_KERNEL_HARRIS_CORNERS,
+    gcvVX_KERNEL_FAST_CORNERS,
+    gcvVX_KERNEL_OPTICAL_FLOW_PYR_LK,
+    gcvVX_KERNEL_REMAP,
+    gcvVX_KERNEL_HALFSCALE_GAUSSIAN,
+
+    gcvVX_KERNEL_SCHARR_3x3,
+    gcvVX_KERNEL_ELEMENTWISE_NORM,
+    gcvVX_KERNEL_NONMAXSUPPRESSION,
+    gcvVX_KERNEL_EUCLIDEAN_NONMAXSUPPRESSION,
+    gcvVX_KERNEL_EDGE_TRACE,
+    gcvVX_KERNEL_IMAGE_LISTER,
+    gcvVX_KERNEL_SOBEL_MxN,
+
+    gcvVX_KERNEL_EXAMPLE,
+}
+gceVX_KERNEL;
+
+typedef enum _gceVX_InterPolicy
+{
+    gcvVX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR,
+    gcvVX_INTERPOLATION_TYPE_BILINEAR,
+    gcvVX_INTERPOLATION_TYPE_AREA,
+}
+gceVX_InterPolicy;
+
+typedef enum _gceVX_BorderMode
+{
+    gcvVX_BORDER_MODE_UNDEFINED,
+    gcvVX_BORDER_MODE_CONSTANT,
+    gcvVX_BORDER_MODE_REPLACEMENT,
+}
+gceVX_BorderMode;
+
 typedef struct _gcoVX_Instruction
 {
     gctUINT32 binary[4];
@@ -2616,6 +2671,9 @@ typedef struct _gcoVX_Instructions
     gcoVX_Instruction binarys[1536];
     gctUINT32 count;
     gctUINT32 regs_count;
+#if gcdVX_OPTIMIZER
+    gctUINT32 physical;
+#endif
 }
 gcoVX_Instructions;
 typedef union _gcoVX_Kernel_Context_Reg
@@ -2646,16 +2704,49 @@ typedef struct _gcoVX_Kernel_Context_Uniform
 }
 gcoVX_Kernel_Context_Uniform;
 
+typedef struct _vx_evis_no_inst_struct
+{
+    gctBOOL isSet;
+    gctBOOL noAbsDiff;
+    gctBOOL noBitReplace;
+    gctBOOL noMagPhase;
+    gctBOOL noDp32;
+    gctBOOL noFilter;
+    gctBOOL noIAdd;
+    gctBOOL noSelectAdd;
+    gctBOOL clamp8Output;
+    gctBOOL lerp7Output;
+    gctBOOL accsq8Output;
+}
+vx_evis_no_inst_s;
+
 typedef struct _gcoVX_Hardware_Context
 {
-    gcoVX_Instructions  *instructions;
     gctUINT32           kernel;
 
     gctUINT32           step;
 
+    gctUINT32           xmin;
+    gctUINT32           xmax;
     gctUINT32           xstep;
+    gctUINT32           ymin;
+    gctUINT32           ymax;
     gctUINT32           ystep;
 
+#if gcdVX_OPTIMIZER > 2
+    gctBOOL             tiled;
+    gctUINT32           xstart;
+    gctUINT32           xcount;
+    gctUINT32           xoffset;
+    gctUINT32           ystart;
+    gctUINT32           ycount;
+    gctUINT32           yoffset;
+#endif
+
+    gctUINT32           groupSizeX;
+    gctUINT32           groupSizeY;
+
+    gctUINT32           threadcount;
     gctUINT32           policy;
     gctUINT32           rounding;
     gctFLOAT            scale;
@@ -2664,26 +2755,45 @@ typedef struct _gcoVX_Hardware_Context
     gctUINT32           volume;
     gctUINT32           clamp;
 
-    gctUINT32           col;
-    gctUINT32           row;
+    gctUINT32           inputMultipleWidth;
+    gctUINT32           outputMultipleWidth;
+
+#if gcdVX_OPTIMIZER > 1
+    gctUINT32           order;
+#else
+    gctUINT32           *order;
+#endif
 
     gctUINT32           input_type[10];
     gctUINT32           output_type[10];
+    gctUINT32           input_count;
+    gctUINT32           output_count;
+
+    gctINT16            *matrix;
+    gctINT16            *matrix1;
+    gctUINT32           col;
+    gctUINT32           row;
+
+    gcsSURF_NODE_PTR    node;
 
     gceSURF_FORMAT      inputFormat;
     gceSURF_FORMAT      outputFormat;
 
-    gctUINT32           *order;
+    gctUINT8            isUseInitialEstimate;
+    gctINT32            maxLevel;
+    gctINT32            winSize;
 
-    gctINT16            *matrix;
-    gcoVX_Kernel_Context_Uniform     *uniform;
-    gctUINT32                        *unifor_num;
+    gcoVX_Instructions  *instructions;
 
-    gcsSURF_NODE_PTR    node;
+    gcoVX_Kernel_Context_Uniform    *uniform;
+    gctUINT32                       *unifor_num;
 
-    gctUINT8 isUseInitialEstimate;
-    gctINT32 maxLevel;
-    gctINT32 winSize;
+#if !gcdVX_OPTIMIZER
+    gctUINT32           nodePhysicalAdress;
+#endif
+
+    vx_evis_no_inst_s    evisNoInst;
+
 }
 gcoVX_Hardware_Context;
 
@@ -2697,6 +2807,7 @@ typedef struct _gcoVX_Hardware_Kernel
 gcoVX_Hardware_Kernel;
 
 typedef gcoVX_Hardware_Kernel gcoVX_Hardware_Step;
+
 
 gceSTATUS
 gcoHARDWARE_CommitCmdVX(
@@ -2944,6 +3055,7 @@ struct _gcoHAL
 
     gctINT32                chipCount;
     gceHARDWARE_TYPE        chipTypes[gcdCHIP_COUNT];
+    gctUINT                 chipIDs[gcvCORE_COUNT];
     gctBOOL                 separated2D;
     gctBOOL                 is3DAvailable;
     gctBOOL                 isGpuBenchSmoothTriangle;
@@ -2960,7 +3072,7 @@ struct _gcoHAL
 \******************************************************************************/
 
 typedef void  (* _PFNcalcPixelAddr)(
-    gcsSURF_INFO_PTR surfInfo,
+    gcoSURF surf,
     gctSIZE_T x,
     gctSIZE_T y,
     gctSIZE_T z,
@@ -3055,8 +3167,11 @@ typedef struct _gcsSURF_NODE
 }
 gcsSURF_NODE;
 
-typedef struct _gcsSURF_INFO
+struct _gcoSURF
 {
+    /* Object. */
+    gcsOBJECT               object;
+
     /* Type usage and format of surface. */
     gceSURF_TYPE            type;
     gceSURF_TYPE            hints;
@@ -3111,6 +3226,10 @@ typedef struct _gcsSURF_INFO
     gctUINT                 vOffset;
     gctUINT                 uStride;
     gctUINT                 vStride;
+#if gcdVG_ONLY
+    gctUINT                 aOffset;
+    gctUINT                 aStride;
+#endif
 
     /* Video memory node for surface. */
     gcsSURF_NODE            node;
@@ -3141,9 +3260,11 @@ typedef struct _gcsSURF_INFO
     ** Exclude resample case, which samples.x * samples.y > 1, but isMsaa=false
     */
     gctBOOL                 isMsaa;
-    gctBOOL                 edgeAA;
+    gctBOOL                 vMsaa;
 
 #if gcdENABLE_3D
+    gctBOOL                 resolvable;
+
     /* Tile status. */
     /* FC clear status and its values */
     gctBOOL                 tileStatusDisabled;
@@ -3203,10 +3324,6 @@ typedef struct _gcsSURF_INFO
 
 #endif /* gcdENABLE_3D */
 
-    gctUINT                 offset;
-
-    gceSURF_USAGE           usage;
-
     /* 2D related members. */
     gce2D_TILE_STATUS_CONFIG    tileStatusConfig;
     gceSURF_FORMAT              tileStatusFormat;
@@ -3224,6 +3341,13 @@ typedef struct _gcsSURF_INFO
 
     gceSURF_FLAG                flags;
 
+    /* Reference count of surface. */
+    gctINT32                    refCount;
+
+    /* User pointers for the surface wrapper. */
+    gctPOINTER                  userLogical;
+    gctUINT32                   userPhysical;
+
     /* Timestamp, indicate when surface is changed. */
     gctUINT64                   timeStamp;
 
@@ -3231,8 +3355,7 @@ typedef struct _gcsSURF_INFO
     gctSHBUF                    shBuf;
 
     _PFNcalcPixelAddr           pfGetAddr;
-}
-gcsSURF_INFO;
+};
 
 
 #define gcvSURF_SHARED_INFO_MAGIC     gcmCC('s', 'u', 's', 'i')
@@ -3253,40 +3376,12 @@ typedef struct _gcsSURF_SHARED_INFO
 }
 gcsSURF_SHARED_INFO;
 
-struct _gcoSURF
-{
-    /* Object. */
-    gcsOBJECT               object;
-
-    /* Surface information structure. */
-    struct _gcsSURF_INFO    info;
-
-#if gcdENABLE_3D
-    gctBOOL                 resolvable;
-
-#if defined(ANDROID)
-    /* Used for 3D app - SF sync. */
-    gctSIGNAL               resolveSubmittedSignal;
-#endif
-#endif /* gcdENABLE_3D */
-
-    /* Automatic stride calculation. */
-    gctBOOL                 autoStride;
-
-    /* User pointers for the surface wrapper. */
-    gctPOINTER              logical;
-    gctUINT32               physical;
-
-    /* Reference count of surface. */
-    gctINT32                referenceCount;
-};
-
 typedef void  (* _PFNreadPixel)(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel);
 typedef void  (* _PFNwritePixel)(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMAX_SURF_LAYERS], gctUINT flags);
 
 _PFNreadPixel gcoSURF_GetReadPixelFunc(gcoSURF surf);
 _PFNwritePixel gcoSURF_GetWritePixelFunc(gcoSURF surf);
-_PFNcalcPixelAddr gcoHARDWARE_GetProcCalcPixelAddr(gcoHARDWARE Hardware, gcsSURF_INFO_PTR SurfInfo);
+_PFNcalcPixelAddr gcoHARDWARE_GetProcCalcPixelAddr(gcoHARDWARE Hardware, gcoSURF Surf);
 void gcoSURF_PixelToNonLinear(gcsPIXEL* inPixel);
 void gcoSURF_PixelToLinear(gcsPIXEL* inPixel);
 
@@ -3303,7 +3398,7 @@ void gcoSURF_PixelToLinear(gcsPIXEL* inPixel);
 typedef struct _gcs2D_MULTI_SOURCE
 {
     gce2D_SOURCE srcType;
-    gcsSURF_INFO srcSurface;
+    struct _gcoSURF srcSurface;
     gceSURF_MONOPACK srcMonoPack;
     gctUINT32 srcMonoTransparencyColor;
     gctBOOL   srcColorConvert;
@@ -3397,7 +3492,7 @@ typedef struct _gcs2D_State
     gctUINT32           srcMask;
 
     /* dest info. */
-    gcsSURF_INFO dstSurface;
+    struct _gcoSURF dstSurface;
     gctUINT32    dstColorKeyLow;
     gctUINT32    dstColorKeyHigh;
     gce2D_YUV_COLOR_MODE dstYUVMode;
@@ -3666,7 +3761,7 @@ struct _gcsVERTEXARRAY_BUFOBJ
 {
     gcoBUFOBJ                               stream;
 
-    gctUINT32                               node;
+    gcsSURF_NODE_PTR                        nodePtr;
 
     gctUINT                                 stride;
 
@@ -3902,15 +3997,10 @@ gcoHARDWARE_BindBufferBlock(
 gceSTATUS
 gcoHARDWARE_QueryCompression(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     OUT gctBOOL *Compressed,
     OUT gctINT32 *CompressedFormat,
     OUT gctINT32 *CompressedDecFormat
-    );
-
-gceSTATUS
-gcoHARDWARE_BlitDraw(
-    IN gcsSURF_BLITDRAW_ARGS *args
     );
 
 #endif /* gcdENABLE_3D */
@@ -4086,7 +4176,7 @@ gcsBITMASK_InitAllZero(
     );
 
 void
-gcsBITMASK_InitOR2(
+gcsBITMASK_InitOR(
     gcsBITMASK_PTR BitmaskResult,
     gcsBITMASK_PTR Bitmask1,
     gcsBITMASK_PTR Bitmask2
@@ -4116,7 +4206,7 @@ gcsBITMASK_IsAllZero(
     );
 
 void
-gcsBITMASK_OR(
+gcsBITMASK_Set(
     gcsBITMASK_PTR Bitmask,
     gctUINT32 Loc
     );
@@ -4141,7 +4231,7 @@ gcsBITMASK_MergeBitMaskArray(
     );
 
 void
-gcsBITMASK_OR2(
+gcsBITMASK_OR(
     gcsBITMASK_PTR BitmaskResult,
     gcsBITMASK_PTR Bitmask
     );
@@ -4200,7 +4290,7 @@ typedef struct _gcsVSC_APIS
 
     gceSTATUS (*gcSHADER_Copy)(gcSHADER, gcSHADER);
 
-    gceSTATUS (*gcSHADER_DynamicPatch)(gcSHADER, gcPatchDirective*);
+    gceSTATUS (*gcSHADER_DynamicPatch)(gcSHADER, gcPatchDirective*, gctUINT);
 
     gceSTATUS (*gcCreateOutputConversionDirective)(IN gctINT                  OutputLocation,
                                                    IN gcsSURF_FORMAT_INFO_PTR FormatInfo,
@@ -4259,69 +4349,14 @@ gcoHARDWARE_CanDo3DBlitBlt(
     );
 
 gceSTATUS
-gcoHARDWARE_3DBlitBlt_v2(
-    IN gcoHARDWARE Hardware,
-    IN gcsSURF_VIEW *SrcView,
-    IN gcsSURF_VIEW *DstView,
-    IN gcsSURF_RESOLVE_ARGS *Args
-    );
-
-gceSTATUS
-gcoHARDWARE_ResolveDepth_v2(
-    IN gcoHARDWARE Hardware,
-    IN gcsSURF_VIEW *SrcView,
-    IN gcsSURF_VIEW *DstView,
-    IN gcsSURF_RESOLVE_ARGS *Args
-    );
-
-gceSTATUS
-gcoHARDWARE_ResolveRect_v2(
-    IN gcoHARDWARE Hardware,
-    IN gcsSURF_VIEW *SrcView,
-    IN gcsSURF_VIEW *DstView,
-    IN gcsSURF_RESOLVE_ARGS *Args
-    );
-
-gceSTATUS
-gcoHARDWARE_CopyPixels_v2(
-    IN gcoHARDWARE Hardware,
-    IN gcsSURF_VIEW *SrcView,
-    IN gcsSURF_VIEW *DstView,
-    IN gcsSURF_RESOLVE_ARGS *Args
-    );
-
-gceSTATUS
-gcoHARDWARE_Clear_v2(
-    IN gcoHARDWARE Hardware,
-    IN gcsSURF_VIEW *SurfView,
-    IN gctUINT32 LayerIndex,
-    IN gcsRECT_PTR Rect,
-    IN gctUINT32 ClearValue,
-    IN gctUINT32 ClearValueUpper,
-    IN gctUINT8 ClearMask
-    );
-
-gceSTATUS
-gcoHARDWARE_ClearSoftware_v2(
-    IN gcoHARDWARE Hardware,
-    IN gcsSURF_VIEW *SurfView,
-    IN gctUINT32 LayerIndex,
-    IN gcsRECT_PTR Rect,
-    IN gctUINT32 ClearValue,
-    IN gctUINT32 ClearValueUpper,
-    IN gctUINT8 ClearMask,
-    IN gctUINT8 StencilWriteMask
-    );
-
-gceSTATUS
-gcoHARDWARE_DrawClear_v2(
+gcoHARDWARE_DrawClear(
     IN gcsSURF_VIEW *RtView,
     IN gcsSURF_VIEW *DsView,
     IN gcsSURF_CLEAR_ARGS_PTR args
     );
 
 gceSTATUS
-gcoHARDWARE_DrawBlit_v2(
+gcoHARDWARE_DrawBlit(
     gcsSURF_VIEW *SrcView,
     gcsSURF_VIEW *DstView,
     gscSURF_BLITDRAW_BLIT *args

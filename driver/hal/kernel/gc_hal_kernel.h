@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -66,7 +66,7 @@
 #include "gc_hal_kernel_vg.h"
 #endif
 
-#if gcdSECURITY
+#if gcdSECURITY || gcdENABLE_TRUST_APPLICATION
 #include "gc_hal_security_interface.h"
 #endif
 
@@ -516,8 +516,8 @@ struct _gckDB
     gctPOINTER                  pointerDatabaseMutex;
 };
 
-typedef struct _gckVIRTUAL_COMMAND_BUFFER * gckVIRTUAL_COMMAND_BUFFER_PTR;
-typedef struct _gckVIRTUAL_COMMAND_BUFFER
+typedef struct _gckVIRTUAL_BUFFER * gckVIRTUAL_BUFFER_PTR;
+typedef struct _gckVIRTUAL_BUFFER
 {
     gctPHYS_ADDR                physical;
     gctPOINTER                  userLogical;
@@ -527,12 +527,19 @@ typedef struct _gckVIRTUAL_COMMAND_BUFFER
     gctPOINTER                  pageTable;
     gctUINT32                   gpuAddress;
     gctUINT                     pid;
-    gckVIRTUAL_COMMAND_BUFFER_PTR   next;
-    gckVIRTUAL_COMMAND_BUFFER_PTR   prev;
     gckKERNEL                   kernel;
 #if gcdPROCESS_ADDRESS_SPACE
     gckMMU                      mmu;
 #endif
+}
+gckVIRTUAL_BUFFER;
+
+typedef struct _gckVIRTUAL_COMMAND_BUFFER * gckVIRTUAL_COMMAND_BUFFER_PTR;
+typedef struct _gckVIRTUAL_COMMAND_BUFFER
+{
+    gckVIRTUAL_BUFFER               virtualBuffer;
+    gckVIRTUAL_COMMAND_BUFFER_PTR   next;
+    gckVIRTUAL_COMMAND_BUFFER_PTR   prev;
 }
 gckVIRTUAL_COMMAND_BUFFER;
 
@@ -615,7 +622,7 @@ struct _gckKERNEL
     /* Level of dump information after stuck. */
     gctUINT                     stuckDump;
 
-#if gcdSECURITY
+#if gcdSECURITY || gcdENABLE_TRUST_APPLICATION
     gctUINT32                   securityChannel;
 #endif
 
@@ -638,6 +645,8 @@ struct _gckKERNEL
 
     /* Pointer to gckDEVICE object. */
     gckDEVICE                   device;
+
+    gctUINT                     chipID;
 };
 
 struct _FrequencyHistory
@@ -663,6 +672,9 @@ struct _gckDVFS
 typedef struct _gcsFENCE * gckFENCE;
 typedef struct _gcsFENCE
 {
+    /* Pointer to required object. */
+    gckKERNEL                   kernel;
+
     /* Fence location. */
     gctPHYS_ADDR                physical;
     gctPOINTER                  logical;
@@ -736,6 +748,7 @@ struct _gckCOMMAND
     }
     queues[gcdCOMMAND_QUEUES];
 
+    gctPHYS_ADDR                virtualMemory;
     gctUINT32                   physical;
     gctPOINTER                  logical;
     gctUINT32                   address;
@@ -1022,6 +1035,9 @@ typedef union _gcuVIDMEM_NODE
 
         /* Surface type. */
         gceSURF_TYPE            type;
+
+        /* Secure GPU virtual address. */
+        gctBOOL                 secure;
     }
     Virtual;
 }
@@ -1124,6 +1140,7 @@ typedef struct _gcsCORE_INFO
     gceHARDWARE_TYPE            type;
     gceCORE                     core;
     gckKERNEL                   kernel;
+    gctUINT                     chipID;
 }
 gcsCORE_INFO;
 
@@ -1249,6 +1266,24 @@ gckEVENT_DestroyMmu(
     );
 #endif
 
+typedef struct _gcsADDRESS_AREA * gcsADDRESS_AREA_PTR;
+typedef struct _gcsADDRESS_AREA
+{
+    /* Page table information. */
+    gctSIZE_T                   pageTableSize;
+    gctPHYS_ADDR                pageTablePhysical;
+    gctUINT32_PTR               pageTableLogical;
+    gctUINT32                   pageTableEntries;
+
+    /* Free entries. */
+    gctUINT32                   heapList;
+    gctBOOL                     freeNodes;
+
+    gctUINT32                   dynamicMappingStart;
+    gctUINT32_PTR               mapLogical;
+}
+gcsADDRESS_AREA;
+
 /* gckMMU object. */
 struct _gckMMU
 {
@@ -1264,28 +1299,15 @@ struct _gckMMU
     /* The page table mutex. */
     gctPOINTER                  pageTableMutex;
 
-    /* Page table information. */
-    gctSIZE_T                   pageTableSize;
-    gctPHYS_ADDR                pageTablePhysical;
-    gctUINT32_PTR               pageTableLogical;
-    gctUINT32                   pageTableEntries;
-
     /* Master TLB information. */
     gctSIZE_T                   mtlbSize;
     gctPHYS_ADDR                mtlbPhysical;
     gctUINT32_PTR               mtlbLogical;
     gctUINT32                   mtlbEntries;
 
-    /* Free entries. */
-    gctUINT32                   heapList;
-    gctBOOL                     freeNodes;
-
     gctPOINTER                  staticSTLB;
     gctBOOL                     enabled;
 
-    gctUINT32                   dynamicMappingStart;
-
-    gctUINT32_PTR               mapLogical;
 #if gcdPROCESS_ADDRESS_SPACE
     gctPOINTER                  pageTableDirty[gcdMAX_GPU_COUNT];
     gctPOINTER                  stlbs;
@@ -1303,6 +1325,8 @@ struct _gckMMU
     gcsLISTHEAD                 hardwareList;
 
     struct _gckQUEUE            recentFreedAddresses;
+
+    gcsADDRESS_AREA             area[gcvADDRESS_AREA_COUNT];
 };
 
 typedef struct _gcsASYNC_COMMAND
@@ -1411,11 +1435,28 @@ gckKERNEL_DestroyVirtualCommandBuffer(
     );
 
 gceSTATUS
+gckKERNEL_AllocateVirtualMemory(
+    IN gckKERNEL Kernel,
+    IN gctBOOL NonPaged,
+    IN gctBOOL InUserSpace,
+    IN OUT gctSIZE_T * Bytes,
+    OUT gctPHYS_ADDR * Physical,
+    OUT gctPOINTER * Logical
+    );
+
+gceSTATUS
+gckKERNEL_FreeVirtualMemory(
+    IN gctPHYS_ADDR Physical,
+    IN gctPOINTER Logical,
+    IN gctBOOL NonPaged
+    );
+
+gceSTATUS
 gckKERNEL_GetGPUAddress(
     IN gckKERNEL Kernel,
     IN gctPOINTER Logical,
     IN gctBOOL InUserSpace,
-    IN gckVIRTUAL_COMMAND_BUFFER_PTR Buffer,
+    IN gctPHYS_ADDR Physical,
     OUT gctUINT32 * Address
     );
 
@@ -1478,6 +1519,11 @@ gckHARDWARE_AddressInHardwareFuncions(
     OUT gctPOINTER *Pointer
     );
 
+gceSTATUS
+gckHARDWARE_UpdateContextID(
+    IN gckHARDWARE Hardware
+    );
+
 #if gcdSECURITY
 gceSTATUS
 gckKERNEL_SecurityOpen(
@@ -1535,6 +1581,61 @@ gckKERNEL_SecurityUnmapMemory(
     IN gckKERNEL Kernel,
     IN gctUINT32 GPUAddress,
     IN gctUINT32 PageCount
+    );
+
+#endif
+
+#if gcdENABLE_TRUST_APPLICATION
+gceSTATUS
+gckKERNEL_SecurityOpen(
+    IN gckKERNEL Kernel,
+    IN gctUINT32 GPU,
+    OUT gctUINT32 *Channel
+    );
+
+/*
+** Close a security service channel
+*/
+gceSTATUS
+gckKERNEL_SecurityClose(
+    IN gctUINT32 Channel
+    );
+
+/*
+** Security service interface.
+*/
+gceSTATUS
+gckKERNEL_SecurityCallService(
+    IN gctUINT32 Channel,
+    IN OUT gcsTA_INTERFACE * Interface
+    );
+
+gceSTATUS
+gckKERNEL_SecurityStartCommand(
+    IN gckKERNEL Kernel,
+    IN gctUINT32 Address,
+    IN gctUINT32 Bytes
+    );
+
+gceSTATUS
+gckKERNEL_SecurityMapMemory(
+    IN gckKERNEL Kernel,
+    IN gctUINT32 *PhysicalArray,
+    IN gctPHYS_ADDR_T Physical,
+    IN gctUINT32 PageCount,
+    OUT gctUINT32 * GPUAddress
+    );
+
+gceSTATUS
+gckKERNEL_SecurityUnmapMemory(
+    IN gckKERNEL Kernel,
+    IN gctUINT32 GPUAddress,
+    IN gctUINT32 PageCount
+    );
+
+gceSTATUS
+gckKERNEL_SecurityDumpMMUException(
+    IN gckKERNEL Kernel
     );
 
 #endif
@@ -1778,6 +1879,7 @@ gceSTATUS
 gckDEVICE_AddCore(
     IN gckDEVICE Device,
     IN gceCORE Core,
+    IN gctUINT chipID,
     IN gctPOINTER Context,
     IN gckKERNEL * Kernel
     );
@@ -1815,6 +1917,52 @@ gckDEVICE_QueryGPUAddress(
     IN gctUINT32 GPUAddress,
     OUT gckVIRTUAL_COMMAND_BUFFER_PTR * Buffer
     );
+
+#if gcdENABLE_TRUST_APPLICATION
+gceSTATUS
+gckKERNEL_MapInTrustApplicaiton(
+    IN gckKERNEL Kernel,
+    IN gctPOINTER Logical,
+    IN gctPHYS_ADDR Physical,
+    IN gctUINT32 GPUAddress,
+    IN gctSIZE_T PageCount
+    );
+#endif
+
+#if gcdSECURITY || gcdENABLE_TRUST_APPLICATION
+gceSTATUS
+gckOS_OpenSecurityChannel(
+    IN gckOS Os,
+    IN gceCORE Core,
+    OUT gctUINT32 *Channel
+    );
+
+gceSTATUS
+gckOS_CloseSecurityChannel(
+    IN gctUINT32 Channel
+    );
+
+gceSTATUS
+gckOS_CallSecurityService(
+    IN gctUINT32 Channel,
+    IN gcsTA_INTERFACE * Interface
+    );
+
+gceSTATUS
+gckOS_InitSecurityChannel(
+    OUT gctUINT32 Channel
+    );
+
+gceSTATUS
+gckOS_AllocatePageArray(
+    IN gckOS Os,
+    IN gctPHYS_ADDR Physical,
+    IN gctSIZE_T PageCount,
+    OUT gctPOINTER * PageArrayLogical,
+    OUT gctPHYS_ADDR * PageArrayPhysical
+    );
+#endif
+
 #ifdef __cplusplus
 }
 #endif

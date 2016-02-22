@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -43,9 +43,9 @@
 #define gcd2D_REG_BASE          (0x00134000)
 #define gcd2D_REG_SIZE          (16 << 10)
 
-#define gcdVG_IRQ               (-1)
-#define gcdVG_REG_BASE          (0)
-#define gcdVG_REG_SIZE          (0)
+#define gcdVG_IRQ               (43)
+#define gcdVG_REG_BASE          (0x02204000)
+#define gcdVG_REG_SIZE          (16 << 10)
 
 #define gcdPOWER_MANAGEMENT     (1)
 #define gcdGPUPROFILER          (0)

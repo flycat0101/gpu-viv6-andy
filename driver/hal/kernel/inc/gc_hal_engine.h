@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -74,11 +74,6 @@ typedef struct _gcsSURF_RESOLVE_ARGS
 
     union _gcsSURF_RESOLVE_ARGS_UNION
     {
-        struct _gcsSURF_RESOLVE_ARG_v1
-        {
-            gctBOOL yInverted;
-            gctBOOL directCopy;
-        } v1;
 
         struct _gcsSURF_RESOLVE_ARG_v2
         {
@@ -92,8 +87,11 @@ typedef struct _gcsSURF_RESOLVE_ARGS
             gcsPOINT  rectSize;
             gctUINT   numSlices;
             gceENGINE engine;     /* 3DBlit engine */
+            gctBOOL   gpuOnly;    /* need only try HW path.*/
 
             gctBOOL   dump;       /* need dump for verify */
+            gctBOOL   srcSwizzle;    /* src surface format swizzle infomation */
+            gctBOOL   dstSwizzle;    /* dst surface format swizzle infomation */
         } v2;
     } uArgs;
 }
@@ -147,6 +145,11 @@ typedef enum _gcePROGRAM_STAGE_BIT
 gcePROGRAM_STAGE_BIT;
 
 
+#define gcvPORGRAM_STAGE_GPIPE (gcvPROGRAM_STAGE_VERTEX_BIT | \
+                                gcvPROGRAM_STAGE_TCS_BIT    | \
+                                gcvPROGRAM_STAGE_TES_BIT    | \
+                                gcvPROGRAM_STAGE_GEOMETRY_BIT)
+
 /******************************************************************************\
 ********************************* gcoHAL Object *********************************
 \******************************************************************************/
@@ -196,12 +199,6 @@ gceSTATUS
 gcoHAL_QueryTextureMaxAniso(
     IN gcoHAL Hal,
     OUT gctUINT * MaxAnisoValue
-    );
-
-gceSTATUS
-gcoHAL_QueryTextureTexldPerCycle(
-    IN gcoHAL Hal,
-    OUT gctUINT * TexldPerCycle
     );
 
 gceSTATUS
@@ -359,102 +356,43 @@ gcoSURF_BlitCPU(
     gcsSURF_BLIT_ARGS* args
     );
 
-
+/* Copy a rectangular area with format conversion. */
 gceSTATUS
-gcoSURF_BlitDraw(
-    IN gcsSURF_BLITDRAW_ARGS *args
+gcoSURF_CopyPixels(
+    IN gcsSURF_VIEW *SrcView,
+    IN gcsSURF_VIEW *DstView,
+    IN gcsSURF_RESOLVE_ARGS *Args
     );
-
 
 /* Clear surface function. */
 gceSTATUS
 gcoSURF_Clear(
-    IN gcoSURF Surface,
-    IN gcsSURF_CLEAR_ARGS_PTR  clearArg
+    IN gcsSURF_VIEW *SurfView,
+    IN gcsSURF_CLEAR_ARGS_PTR ClearArgs
     );
 
 /* Preserve pixels from source. */
 gceSTATUS
 gcoSURF_Preserve(
-    IN gcoSURF Source,
-    IN gcoSURF Dest,
+    IN gcoSURF SrcSurf,
+    IN gcoSURF DstSurf,
     IN gcsRECT_PTR MaskRect
     );
-
-
-/* TO BE REMOVED */
-    gceSTATUS
-    depr_gcoSURF_Resolve(
-        IN gcoSURF SrcSurface,
-        IN gcoSURF DestSurface,
-        IN gctUINT32 DestAddress,
-        IN gctPOINTER DestBits,
-        IN gctINT DestStride,
-        IN gceSURF_TYPE DestType,
-        IN gceSURF_FORMAT DestFormat,
-        IN gctUINT DestWidth,
-        IN gctUINT DestHeight
-        );
-
-    gceSTATUS
-    depr_gcoSURF_ResolveRect(
-        IN gcoSURF SrcSurface,
-        IN gcoSURF DestSurface,
-        IN gctUINT32 DestAddress,
-        IN gctPOINTER DestBits,
-        IN gctINT DestStride,
-        IN gceSURF_TYPE DestType,
-        IN gceSURF_FORMAT DestFormat,
-        IN gctUINT DestWidth,
-        IN gctUINT DestHeight,
-        IN gcsPOINT_PTR SrcOrigin,
-        IN gcsPOINT_PTR DestOrigin,
-        IN gcsPOINT_PTR RectSize
-        );
 
 /* Resample surface. */
 gceSTATUS
 gcoSURF_Resample(
-    IN gcoSURF SrcSurface,
-    IN gcoSURF DestSurface
+    IN gcoSURF SrcSurf,
+    IN gcoSURF DstSurf
     );
-
-/* Resolve surface. */
-gceSTATUS
-gcoSURF_Resolve(
-    IN gcoSURF SrcSurface,
-    IN gcoSURF DestSurface
-    );
-
-gceSTATUS
-gcoSURF_ResolveEx(
-    IN gcoSURF SrcSurface,
-    IN gcoSURF DestSurface,
-    IN gcsSURF_RESOLVE_ARGS *args
-    );
-
 
 /* Resolve rectangular area of a surface. */
 gceSTATUS
 gcoSURF_ResolveRect(
-    IN gcoSURF SrcSurface,
-    IN gcoSURF DestSurface,
-    IN gcsPOINT_PTR SrcOrigin,
-    IN gcsPOINT_PTR DestOrigin,
-    IN gcsPOINT_PTR RectSize
+    IN gcsSURF_VIEW *SrcView,
+    IN gcsSURF_VIEW *DstView,
+    IN gcsSURF_RESOLVE_ARGS *Args
     );
-
-/* Resolve rectangular area of a surface. */
-gceSTATUS
-gcoSURF_ResolveRectEx(
-    IN gcoSURF SrcSurface,
-    IN gcoSURF DestSurface,
-    IN gcsPOINT_PTR SrcOrigin,
-    IN gcsPOINT_PTR DestOrigin,
-    IN gcsPOINT_PTR RectSize,
-    IN gcsSURF_RESOLVE_ARGS *args
-    );
-
 
 gceSTATUS
 gcoSURF_GetResolveAlignment(
@@ -467,10 +405,10 @@ gcoSURF_GetResolveAlignment(
 
 gceSTATUS
 gcoSURF_IsHWResolveable(
-    IN gcoSURF SrcSurface,
-    IN gcoSURF DestSurface,
+    IN gcoSURF SrcSurf,
+    IN gcoSURF DstSurf,
     IN gcsPOINT_PTR SrcOrigin,
-    IN gcsPOINT_PTR DestOrigin,
+    IN gcsPOINT_PTR DstOrigin,
     IN gcsPOINT_PTR RectSize
     );
 
@@ -553,21 +491,10 @@ gcoINDEX_SetSharedLock(
     );
 
 gceSTATUS
-gcoSURF_3DBlitClearRect(
-    IN gcoSURF Surface,
-    IN gcsSURF_CLEAR_ARGS_PTR ClearArgs
-    );
-
-
-gceSTATUS
-gcoSURF_3DBlitBltRect(
-    IN gceENGINE Engine,
-    IN gcoSURF SrcSurf,
-    IN gcoSURF DestSurf,
-    IN gcsPOINT_PTR SrcOrigin,
-    IN gcsPOINT_PTR DestOrigin,
-    IN gcsPOINT_PTR RectSize,
-    IN gctBOOL YInverted
+gcoSURF_DrawBlit(
+    gcsSURF_VIEW *SrcView,
+    gcsSURF_VIEW *DstView,
+    gscSURF_BLITDRAW_BLIT *Args
     );
 
 gceSTATUS
@@ -719,6 +646,7 @@ gceBLEND_UNIT;
 gceSTATUS
 gco3D_Construct(
     IN gcoHAL Hal,
+    IN gctBOOL Robust,
     OUT gco3D * Engine
     );
 
@@ -1097,14 +1025,6 @@ gco3D_SetAllEarlyDepthModes(
     IN gctBOOL Disable
     );
 
-/* Enable or disable all early depth operations. */
-gceSTATUS
-gco3D_SetAllEarlyDepthModesEx(
-    IN gco3D Engine,
-    IN gctBOOL Disable,
-    IN gctBOOL DisableModify,
-    IN gctBOOL DisablePassZ
-    );
 
 gceSTATUS
 gco3D_SetEarlyDepthFromAPP(
@@ -1383,6 +1303,11 @@ gco3D_DrawInstancedPrimitives(
     );
 
 gceSTATUS
+gco3D_DrawNullPrimitives(
+    IN gco3D Engine
+    );
+
+gceSTATUS
 gco3D_DrawPrimitivesCount(
     IN gco3D Engine,
     IN gcePRIMITIVE Type,
@@ -1611,6 +1536,12 @@ gco3D_Get3DEngine(
     OUT gco3D * Engine
     );
 
+gceSTATUS
+gco3D_QueryReset(
+    IN gco3D Engine,
+    OUT gctBOOL_PTR Innocent
+    );
+
 /* OCL thread walker information. */
 typedef struct _gcsTHREAD_WALKER_INFO * gcsTHREAD_WALKER_INFO_PTR;
 typedef struct _gcsTHREAD_WALKER_INFO
@@ -1631,6 +1562,10 @@ typedef struct _gcsTHREAD_WALKER_INFO
     gctUINT32   globalOffsetY;
     gctUINT32   globalSizeZ;
     gctUINT32   globalOffsetZ;
+
+    gctUINT32   globalScaleX;
+    gctUINT32   globalScaleY;
+    gctUINT32   globalScaleZ;
 
     gctUINT32   workGroupSizeX;
     gctUINT32   workGroupCountX;
@@ -1699,6 +1634,10 @@ typedef struct _gcsVX_IMAGE_INFO
     gctUINT32       bytes;
 
     gcsSURF_NODE_PTR nodes[3];
+
+#if gcdVX_OPTIMIZER
+    gctUINT32       uniformData[3][4];
+#endif
 }
 gcsVX_IMAGE_INFO;
 typedef struct _gcsVX_DISTRIBUTION_INFO * gcsVX_DISTRIBUTION_INFO_PTR;
@@ -2998,40 +2937,6 @@ gcoBUFOBJ_GPUCacheOperation(
 void
 gcoBUFOBJ_Dump(
     IN gcoBUFOBJ BufObj
-    );
-
-
-gceSTATUS
-gcoSURF_CopyPixels_v2(
-    IN gcsSURF_VIEW *SrcView,
-    IN gcsSURF_VIEW *DstView,
-    IN gcsSURF_RESOLVE_ARGS *Args
-    );
-
-gceSTATUS
-gcoSURF_ResolveRect_v2(
-    IN gcsSURF_VIEW *SrcView,
-    IN gcsSURF_VIEW *DstView,
-    IN gcsSURF_RESOLVE_ARGS *Args
-    );
-
-gceSTATUS
-gcoSURF_Resample_v2(
-    IN gcoSURF SrcSurf,
-    IN gcoSURF DstSurf
-    );
-
-gceSTATUS
-gcoSURF_Clear_v2(
-    IN gcsSURF_VIEW *SurfView,
-    IN gcsSURF_CLEAR_ARGS_PTR ClearArgs
-    );
-
-gceSTATUS
-gcoSURF_DrawBlit_v2(
-    gcsSURF_VIEW *SrcView,
-    gcsSURF_VIEW *DstView,
-    gscSURF_BLITDRAW_BLIT *Args
     );
 
 #endif /* gcdENABLE_3D */

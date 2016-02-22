@@ -1,6 +1,6 @@
 ;#############################################################################
 ;#
-;#   Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+;#   Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 ;#
 ;#   The material in this file is confidential and contains trade secrets
 ;#   of Vivante Corporation. This is proprietary information owned by
@@ -135,6 +135,25 @@ IF _TGTPLAT = qseven_mmp3
     ;"Irq"=dword:83
 
     "PowerManagement"=dword:0
+    "GpuProfiler"=dword:0
+ENDIF
+
+IF _TGTPLAT = GuruCE_iMX6
+    "ContiguousSize"=dword:A000000
+
+    ; GC2000
+    "MemBase"=dword:00130000
+    "Irq"=dword:29
+
+    ; GC320
+    "MemBase2D"=dword:00134000
+    "Irq2D"=dword:2A
+
+    ;GC350
+    "MemBaseVG"=dword:02204000
+    "IrqVG"=dword:2B
+
+    "PowerManagement"=dword:1
     "GpuProfiler"=dword:0
 ENDIF
 

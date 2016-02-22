@@ -1,0 +1,61 @@
+#include "cl_viv_vx_ext.h"
+
+_viv_uniform unsigned int height;
+__kernel void box3x3
+(
+    __read_only image2d_t in_image,
+    __write_only image2d_t out_image
+)
+{
+#if 1
+    int2  coord = (int2)(get_global_id(0), get_global_id(1));
+
+    int2 coord1 = coord + (int2)(-1, -1);
+    vxc_uchar16 v0 = viv_intrinsic_vx_read_imageuc(in_image, coord1);
+
+    int2 coord2 = coord + (int2)(-1, 0);
+    vxc_uchar16 v1 = viv_intrinsic_vx_read_imageuc(in_image, coord2);
+
+    int info = VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0);
+    int infof = VXC_MODIFIER_FILTER(0, 3, 0, VXC_FM_BOX, 0);
+
+    do
+    {
+        int2 coord3 = coord + (int2)(-1, 1);
+        vxc_uchar16 v2 = viv_intrinsic_vx_read_imageuc(in_image, coord3);
+
+        vxc_uchar16 box = viv_intrinsic_vxmc_Filter_uc(v0, v1, v2, infof);
+        viv_intrinsic_vxmc_write_imageuc(out_image, coord, box, info);
+
+        v0 = v1;
+        v1 = v2;
+        coord.y++;
+    }
+    while (coord.y < height) ;
+#else
+    const int pX = get_global_id(0);
+    const int pXPrec = pX - 1;
+    int pY = 0;
+
+    vxc_uchar16 v0 = viv_intrinsic_vx_read_imageuc(in_image, (int2)(pXPrec, -1));
+
+    vxc_uchar16 v1 = viv_intrinsic_vx_read_imageuc(in_image, (int2)(pXPrec, pY));
+
+	int info = VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0);
+	int infof = VXC_MODIFIER_FILTER(0, 3, 0, VXC_FM_BOX, 0);
+
+
+    while (pY < height)
+    {
+        vxc_uchar16 v2 = viv_intrinsic_vx_read_imageuc(in_image, (int2)(pXPrec, pY+1));
+
+        vxc_uchar16 box = viv_intrinsic_vxmc_Filter_uc(v0, v1, v2, infof);
+        viv_intrinsic_vxmc_write_imageuc(out_image, (int2)(pX, pY), box, info);
+
+        v0 = v1;
+        v1 = v2;
+        pY++;
+    }
+#endif
+}
+

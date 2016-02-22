@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -261,6 +261,7 @@ const gceFEATURE FeatureList[]=
 {
     gcvFEATURE_SCALER,
     gcvFEATURE_2D_A8_NO_ALPHA,
+    gcvFEATURE_2D_FILTERBLIT_A8_ALPHA,
     gcvFEATURE_FULL_DIRECTFB,
 };
 

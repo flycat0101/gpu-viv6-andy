@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2764,7 +2764,7 @@ _FreeTemporarySurface(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gcsSURF_INFO_PTR tempBuffer;
+    gcoSURF tempBuffer;
 
     gcmHEADER_ARG("Hardware=0x%08X Synchronized=%d", Hardware, Synchronized);
 
@@ -2780,7 +2780,7 @@ _FreeTemporarySurface(
         gcmONERROR(gcsSURF_NODE_Destroy(&tempBuffer->node));
 
         /* Reset the temporary surface. */
-        gcoOS_ZeroMemory(tempBuffer, sizeof(gcsSURF_INFO));
+        gcoOS_ZeroMemory(tempBuffer, sizeof(struct _gcoSURF));
     }
 
 OnError:
@@ -2799,7 +2799,7 @@ _AllocateTemporarySurface(
     )
 {
     gceSTATUS status;
-    gcsSURF_INFO_PTR tempBuffer;
+    gcoSURF tempBuffer;
     gcsCOMPOSITION_LAYER_PTR tempLayer;
     gcsSURF_FORMAT_INFO_PTR format[2];
 
@@ -3696,7 +3696,7 @@ static gceSTATUS
 _SetCompositionTarget(
     IN gcoHARDWARE Hardware,
     IN gcsiCOMPOSITION_RESOURCES_PTR Resources,
-    IN gcsSURF_INFO_PTR Target
+    IN gcoSURF Target
     )
 {
     static gctUINT32 _tiling[] =
@@ -7439,7 +7439,7 @@ gco3D_ComposeLayer(
     case gcvCOMPOSE_LAYER:
         layer->input.operation = gcvCOMPOSE_LAYER;
 
-        layer->surface  = &Layer->layer->info;
+        layer->surface  = Layer->layer;
         layer->type     = layer->surface->type;
         layer->stride   = layer->surface->stride;
 
@@ -7610,7 +7610,7 @@ gco3D_CompositionEnd(
     */
 
     /* Let's not worry about depth buffers. */
-    if (Target->info.type == gcvSURF_DEPTH)
+    if (Target->type == gcvSURF_DEPTH)
     {
         gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
@@ -7618,13 +7618,13 @@ gco3D_CompositionEnd(
     /* Initialize the target layer. */
     trgLayer.input.operation = gcvCOMPOSE_LAYER;
 
-    trgLayer.surface  = &Target->info;
-    trgLayer.type     =  Target->info.type;
-    trgLayer.stride   =  Target->info.stride;
-    trgLayer.sizeX    =  Target->info.allocedW;
-    trgLayer.sizeY    =  Target->info.allocedH;
-    trgLayer.samplesX =  (gctUINT8)Target->info.sampleInfo.x;
-    trgLayer.samplesY =  (gctUINT8)Target->info.sampleInfo.y;
+    trgLayer.surface  = Target;
+    trgLayer.type     = Target->type;
+    trgLayer.stride   = Target->stride;
+    trgLayer.sizeX    = Target->allocedW;
+    trgLayer.sizeY    = Target->allocedH;
+    trgLayer.samplesX = (gctUINT8)Target->sampleInfo.x;
+    trgLayer.samplesY = (gctUINT8)Target->sampleInfo.y;
 
     trgLayer.input.v0.x           = 0;
     trgLayer.input.v0.y           = 0;
@@ -7644,7 +7644,7 @@ gco3D_CompositionEnd(
     trgLayer.modulateAlpha = gcvFALSE;
 
     gcmONERROR(_TranslateSourceFormat(
-        Target->info.format, &trgLayer.format, &trgLayer.hasAlpha
+        Target->format, &trgLayer.format, &trgLayer.hasAlpha
         ));
 
     /***************************************************************************

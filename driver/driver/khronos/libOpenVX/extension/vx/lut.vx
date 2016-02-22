@@ -1,0 +1,43 @@
+#include "cl_viv_vx_ext.h"
+
+int4 viv_intrinsic_vx_icastD_i(vxc_uchar16 a)  { return 0; }
+vxc_uchar16 viv_intrinsic_vx_icastP_uc(int4 a)  { return 0; }
+vxc_uchar16  viv_intrinsic_vxmc_BitExtract_uc1(vxc_uchar16 a, vxc_uchar16 b, vxc_uchar16 c, VXC_Modifier_t modifier) { return 0; }
+
+__kernel void table_lookup
+(
+    __read_only image2d_t 	in_image,
+    vx_lut_uchar 			in_lut,
+    __write_only image2d_t 	out_image
+)
+{
+	int info = VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0);
+    const int pX = get_global_id(0);
+    const int pY = get_global_id(1);
+	const int4 one = {0x01010101, 0x01010101, 0x01010101, 0x01010101};
+	int4 bitconfig = {0x60402000, 0, 0x08080808, 0};
+	int4 zero = 0, vi;
+	vxc_uchar16 t, t1, v;
+	vxc_uchar16 one_uc;
+    vxc_uchar16 v0 = viv_intrinsic_vx_read_imageuc(in_image, (int2)(pX, pY));
+
+	/* Convert int4 to short8 */
+	_viv_asm(ADD, one_uc, one, zero);
+
+	/* Convert uchar16 to int4 */
+	v = viv_intrinsic_vxmc_MulShift_uc(v0, one_uc, 0, info);
+	vi =  viv_intrinsic_vx_icastD_i(v);
+
+	/* Get data from lut */
+	vi.x = *(in_lut.item + vi.x);
+	vi.y = *(in_lut.item + vi.y);
+	vi.z = *(in_lut.item + vi.z);
+	vi.w = *(in_lut.item + vi.w);
+
+	t =  viv_intrinsic_vx_icastP_uc(bitconfig);
+	t1 =  viv_intrinsic_vx_icastP_uc(vi);
+	t = viv_intrinsic_vxmc_BitExtract_uc1(t1, t1, t, info);
+
+	viv_intrinsic_vxmc_write_imageuc(out_image, (int2)(pX, pY), t, info);
+}
+

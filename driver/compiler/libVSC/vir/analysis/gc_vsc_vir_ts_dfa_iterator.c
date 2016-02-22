@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -19,7 +19,7 @@ void vscVIR_InitializeBaseDFA(VIR_BASE_DFA* pBaseDFA, VIR_CALL_GRAPH* pCg, VIR_D
     pBaseDFA->dfaType = dfaType;
     pBaseDFA->flowSize = flowSize;
     pBaseDFA->cmnDfaFlags.bValid = gcvFALSE;
-    pBaseDFA->cmnDfaFlags.bFlowUpdated = gcvFALSE;
+    pBaseDFA->cmnDfaFlags.bFlowInvalidated = gcvFALSE;
     pBaseDFA->pOwnerCG = pCg;
     pBaseDFA->pMM = pMM;
 }
@@ -29,7 +29,7 @@ void vscVIR_FinalizeBaseDFA(VIR_BASE_DFA* pBaseDFA)
     /* Finalization must mean the dfa becomes invalid now */
     pBaseDFA->cmnDfaFlags.bValid = gcvFALSE;
 
-    pBaseDFA->cmnDfaFlags.bFlowUpdated = gcvFALSE;
+    pBaseDFA->cmnDfaFlags.bFlowInvalidated = gcvFALSE;
 }
 
 void vscVIR_UpdateBaseDFAFlowSize(VIR_BASE_DFA* pBaseDFA, gctINT newFlowSize)
@@ -228,8 +228,21 @@ void vscVIR_FinalizeBaseTsDFA(VIR_BASE_TS_DFA* pBaseTsDFA)
     vscVIR_FinalizeBaseDFA(&pBaseTsDFA->baseDFA);
 }
 
+void vscVIR_UpdateTsFlow(VSC_BIT_VECTOR* pTsFlow, VSC_BIT_VECTOR* pDeltaTsFlow, gctBOOL bClearFlow)
+{
+    if (bClearFlow)
+    {
+        vscBV_Not(pTsFlow, pDeltaTsFlow);
+    }
+    else
+    {
+        vscBV_Or1(pTsFlow, pDeltaTsFlow);
+    }
+}
+
 static VSC_ErrCode _InitializeForwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
                                                            VIR_BASE_TS_DFA* pTsDFA,
+                                                           gctBOOL bIPA,
                                                            VIR_BB_WORKITEM** ppWorkItemArray,
                                                            VIR_BB_WORKLIST* pWorkItemList,
                                                            VIR_BASIC_BLOCK*** pppBasicBlkRPO)
@@ -242,9 +255,7 @@ static VSC_ErrCode _InitializeForwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFunc
     VIR_BB_WORKITEM*             pThisWorkItemArray;
     VIR_BB_WORKLIST*             pThisWorkItemList;
     VIR_TS_FUNC_FLOW*            pFuncFlow = (VIR_TS_FUNC_FLOW*)vscSRARR_GetElement(&pTsDFA->tsFuncFlowArray, pFuncBlk->dgNode.id);
-#if SUPPORT_IPA_DFA
     gctBOOL                      bMainFunc = (CG_GET_MAIN_FUNC(pFuncBlk->pOwnerCG) == pFuncBlk->pVIRFunc);
-#endif
 
     ppWorkItemArray[pFuncBlk->dgNode.id] = gcvNULL;
     BB_WORKLIST_INIT(&pWorkItemList[pFuncBlk->dgNode.id]);
@@ -282,12 +293,8 @@ static VSC_ErrCode _InitializeForwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFunc
 
         /* Initialize each workitem, and add it to workitem list. Note that entry block won't be
            added into workitem list because it won't be changed when iterating */
-        if (
-#if SUPPORT_IPA_DFA
-            bMainFunc &&
-#endif
-            ppBasicBlkRPO[bbIdx]->flowType == VIR_FLOW_TYPE_ENTRY
-           )
+        if (bIPA && bMainFunc &&
+            ppBasicBlkRPO[bbIdx]->flowType == VIR_FLOW_TYPE_ENTRY)
         {
             vscBV_Copy(&pFuncFlow->inFlow, &ppBasicBlkRPO[bbIdx]->pTsWorkDataFlow->inFlow);
         }
@@ -304,6 +311,7 @@ static VSC_ErrCode _InitializeForwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFunc
 
 static VSC_ErrCode _DoForwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
                                                    VIR_BASE_TS_DFA* pTsDFA,
+                                                   gctBOOL bIPA,
                                                    VIR_BB_WORKITEM** ppWorkItemArray,
                                                    VIR_BB_WORKLIST* pWorkItemList,
                                                    VIR_BASIC_BLOCK*** pppBasicBlkRPO)
@@ -320,7 +328,6 @@ static VSC_ErrCode _DoForwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
     VIR_BB_WORKITEM*             pThisWorkItemArray;
     VIR_BB_WORKLIST*             pThisWorkItemList;
     VIR_TS_FUNC_FLOW*            pFuncFlow = (VIR_TS_FUNC_FLOW*)vscSRARR_GetElement(&pTsDFA->tsFuncFlowArray, pFuncBlk->dgNode.id);
-#if SUPPORT_IPA_DFA
     gctBOOL                      bInFlowOfEntryChanged;
     gctUINT                      bbIdx, callerIdx, countOfBasicBlkInCallee;
     VIR_BASIC_BLOCK**            ppCalleeBasicBlkRPO;
@@ -335,7 +342,6 @@ static VSC_ErrCode _DoForwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
     VIR_Instruction*             pCallSiteInst;
     VSC_ADJACENT_LIST_ITERATOR   callerIter;
     VIR_CG_EDGE*                 pCallerEdge;
-#endif
 
     if (countOfBasicBlk == 0)
     {
@@ -350,15 +356,16 @@ static VSC_ErrCode _DoForwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
     do
     {
         pThisBasicBlk = vscBBWKL_RemoveBBFromWorkItemList(pThisWorkItemList);
-
-#if SUPPORT_IPA_DFA
         bInFlowOfEntryChanged = gcvFALSE;
-        if (pThisBasicBlk->flowType == VIR_FLOW_TYPE_ENTRY)
+
+        if (bIPA)
         {
-            bInFlowOfEntryChanged = pTsDFA->tsDfaResolvers.ts_combineFuncFlowFromCallers_resolver(pTsDFA, pFuncFlow);
-            vscBV_Copy(&pThisBasicBlk->pTsWorkDataFlow->inFlow, &pFuncFlow->inFlow);
+            if (pThisBasicBlk->flowType == VIR_FLOW_TYPE_ENTRY)
+            {
+                bInFlowOfEntryChanged = pTsDFA->tsDfaResolvers.ts_combineFuncFlowFromCallers_resolver(pTsDFA, pFuncFlow);
+                vscBV_Copy(&pThisBasicBlk->pTsWorkDataFlow->inFlow, &pFuncFlow->inFlow);
+            }
         }
-#endif
 
         /* Iterative resolve each predecessor */
         VSC_ADJACENT_LIST_ITERATOR_INIT(&predEdgeIter, &pThisBasicBlk->dgNode.predList);
@@ -368,22 +375,19 @@ static VSC_ErrCode _DoForwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
             pPredBasicBlk = CFG_EDGE_GET_TO_BB(pPredEdge);
             pTsDFA->tsDfaResolvers.ts_iterateBlockFlow_resolver(pTsDFA, pPredBasicBlk->pTsWorkDataFlow);
 
-#if SUPPORT_IPA_DFA
-            if (pPredBasicBlk->flowType == VIR_FLOW_TYPE_CALL)
+            if (bIPA)
             {
-                pTsDFA->tsDfaResolvers.ts_combineBlockFlowFromCallee_resolver(pTsDFA, pPredBasicBlk->pTsWorkDataFlow);
+                if (pPredBasicBlk->flowType == VIR_FLOW_TYPE_CALL)
+                {
+                    pTsDFA->tsDfaResolvers.ts_combineBlockFlowFromCallee_resolver(pTsDFA, pPredBasicBlk->pTsWorkDataFlow);
+                }
             }
-#endif
         }
 
         /* Check combination of predecessors to get inFlow of this bb. If there is a change, then add all
            successors that are not in workitem list to workitem list */
-        if (
-#if SUPPORT_IPA_DFA
-            bInFlowOfEntryChanged ||
-#endif
-            pTsDFA->tsDfaResolvers.ts_combineBlockFlow_resolver(pTsDFA, pThisBasicBlk->pTsWorkDataFlow)
-           )
+        if ((bIPA && bInFlowOfEntryChanged) ||
+            pTsDFA->tsDfaResolvers.ts_combineBlockFlow_resolver(pTsDFA, pThisBasicBlk->pTsWorkDataFlow))
         {
             VSC_ADJACENT_LIST_ITERATOR_INIT(&succEdgeIter, &pThisBasicBlk->dgNode.succList);
             pSuccEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&succEdgeIter);
@@ -396,71 +400,73 @@ static VSC_ErrCode _DoForwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
                 }
             }
 
-#if SUPPORT_IPA_DFA
-            if (pThisBasicBlk->flowType == VIR_FLOW_TYPE_CALL)
+            if (bIPA)
             {
-                pCallee = VIR_Inst_GetCallee(pThisBasicBlk->pStartInst)->pFuncBlock;
-                ppCalleeBasicBlkRPO = pppBasicBlkRPO[pCallee->dgNode.id];
-                pCalleeWorkItemArray = ppWorkItemArray[pCallee->dgNode.id];
-                pCalleeWorkItemList = &pWorkItemList[pCallee->dgNode.id];
-                countOfBasicBlkInCallee = vscDG_GetNodeCount(&pCallee->cfg.dgGraph);
-
-                for (bbIdx = 0; bbIdx < countOfBasicBlkInCallee; bbIdx ++)
+                if (pThisBasicBlk->flowType == VIR_FLOW_TYPE_CALL)
                 {
-                    pCalleeBasicBlk = ppCalleeBasicBlkRPO[bbIdx];
+                    pCallee = VIR_Inst_GetCallee(pThisBasicBlk->pStartInst)->pFuncBlock;
+                    ppCalleeBasicBlkRPO = pppBasicBlkRPO[pCallee->dgNode.id];
+                    pCalleeWorkItemArray = ppWorkItemArray[pCallee->dgNode.id];
+                    pCalleeWorkItemList = &pWorkItemList[pCallee->dgNode.id];
+                    countOfBasicBlkInCallee = vscDG_GetNodeCount(&pCallee->cfg.dgGraph);
 
-                    if (!pCalleeBasicBlk->bInWorklist)
+                    for (bbIdx = 0; bbIdx < countOfBasicBlkInCallee; bbIdx ++)
                     {
-                        vscBBWKL_AddBBToWorkItemList(pCalleeWorkItemList, &pCalleeWorkItemArray[pCalleeBasicBlk->dgNode.id], pCalleeBasicBlk);
+                        pCalleeBasicBlk = ppCalleeBasicBlkRPO[bbIdx];
+
+                        if (!pCalleeBasicBlk->bInWorklist)
+                        {
+                            vscBBWKL_AddBBToWorkItemList(pCalleeWorkItemList, &pCalleeWorkItemArray[pCalleeBasicBlk->dgNode.id], pCalleeBasicBlk);
+                        }
                     }
                 }
             }
-#endif
 
             if (pThisBasicBlk->flowType == VIR_FLOW_TYPE_EXIT)
             {
                 vscBV_Copy(&pThisBasicBlk->pTsWorkDataFlow->outFlow, &pThisBasicBlk->pTsWorkDataFlow->inFlow);
                 vscBV_Copy(&pFuncFlow->outFlow, &pThisBasicBlk->pTsWorkDataFlow->outFlow);
 
-#if SUPPORT_IPA_DFA
-                VSC_ADJACENT_LIST_ITERATOR_INIT(&callerIter, &pFuncBlk->dgNode.predList);
-                pCallerEdge = (VIR_CG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&callerIter);
-                for (; pCallerEdge != gcvNULL; pCallerEdge = (VIR_CG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&callerIter))
+                if (bIPA)
                 {
-                    /* Call site info is only stored at successor edge */
-                    pCallerEdge = CG_PRED_EDGE_TO_SUCC_EDGE(pCallerEdge);
-
-                    for (callerIdx = 0; callerIdx < vscSRARR_GetElementCount(&pCallerEdge->callSiteArray); callerIdx ++)
+                    VSC_ADJACENT_LIST_ITERATOR_INIT(&callerIter, &pFuncBlk->dgNode.predList);
+                    pCallerEdge = (VIR_CG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&callerIter);
+                    for (; pCallerEdge != gcvNULL; pCallerEdge = (VIR_CG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&callerIter))
                     {
-                        pCallSiteInst = *(VIR_Instruction**)vscSRARR_GetElement(&pCallerEdge->callSiteArray, callerIdx);
-                        pCallerBasicBlk = VIR_Inst_GetBasicBlock(pCallSiteInst);
+                        /* Call site info is only stored at successor edge */
+                        pCallerEdge = CG_PRED_EDGE_TO_SUCC_EDGE(pCallerEdge);
 
-                        if (pCallerBasicBlk == gcvNULL)
+                        for (callerIdx = 0; callerIdx < vscSRARR_GetElementCount(&pCallerEdge->callSiteArray); callerIdx ++)
                         {
-                            gcmASSERT(gcvFALSE);
-                            continue;
-                        }
-                        else
-                        {
-                            pCaller = pCallerBasicBlk->pOwnerCFG->pOwnerFuncBlk;
-                        }
+                            pCallSiteInst = *(VIR_Instruction**)vscSRARR_GetElement(&pCallerEdge->callSiteArray, callerIdx);
+                            pCallerBasicBlk = VIR_Inst_GetBasicBlock(pCallSiteInst);
 
-                        pCallerWorkItemArray = ppWorkItemArray[pCaller->dgNode.id];
-                        pCallerWorkItemList = &pWorkItemList[pCaller->dgNode.id];
-
-                        VSC_ADJACENT_LIST_ITERATOR_INIT(&succEdgeIter, &pCallerBasicBlk->dgNode.succList);
-                        pSuccEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&succEdgeIter);
-                        for (; pSuccEdge != gcvNULL; pSuccEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&succEdgeIter))
-                        {
-                            pSuccBasicBlk = CFG_EDGE_GET_TO_BB(pSuccEdge);
-                            if (!pSuccBasicBlk->bInWorklist)
+                            if (pCallerBasicBlk == gcvNULL)
                             {
-                                vscBBWKL_AddBBToWorkItemList(pCallerWorkItemList, &pCallerWorkItemArray[pSuccBasicBlk->dgNode.id], pSuccBasicBlk);
+                                gcmASSERT(gcvFALSE);
+                                continue;
+                            }
+                            else
+                            {
+                                pCaller = pCallerBasicBlk->pOwnerCFG->pOwnerFuncBlk;
+                            }
+
+                            pCallerWorkItemArray = ppWorkItemArray[pCaller->dgNode.id];
+                            pCallerWorkItemList = &pWorkItemList[pCaller->dgNode.id];
+
+                            VSC_ADJACENT_LIST_ITERATOR_INIT(&succEdgeIter, &pCallerBasicBlk->dgNode.succList);
+                            pSuccEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&succEdgeIter);
+                            for (; pSuccEdge != gcvNULL; pSuccEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&succEdgeIter))
+                            {
+                                pSuccBasicBlk = CFG_EDGE_GET_TO_BB(pSuccEdge);
+                                if (!pSuccBasicBlk->bInWorklist)
+                                {
+                                    vscBBWKL_AddBBToWorkItemList(pCallerWorkItemList, &pCallerWorkItemArray[pSuccBasicBlk->dgNode.id], pSuccBasicBlk);
+                                }
                             }
                         }
                     }
                 }
-#endif
             }
         }
     }
@@ -492,6 +498,7 @@ static void _FinalizeForwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
 
 static VSC_ErrCode _InitializeBackwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
                                                             VIR_BASE_TS_DFA* pTsDFA,
+                                                            gctBOOL bIPA,
                                                             VIR_BB_WORKITEM** ppWorkItemArray,
                                                             VIR_BB_WORKLIST* pWorkItemList,
                                                             VIR_BASIC_BLOCK*** pppBasicBlkRPO)
@@ -504,9 +511,7 @@ static VSC_ErrCode _InitializeBackwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFun
     VIR_BB_WORKITEM*             pThisWorkItemArray;
     VIR_BB_WORKLIST*             pThisWorkItemList;
     VIR_TS_FUNC_FLOW*            pFuncFlow = (VIR_TS_FUNC_FLOW*)vscSRARR_GetElement(&pTsDFA->tsFuncFlowArray, pFuncBlk->dgNode.id);
-#if SUPPORT_IPA_DFA
     gctBOOL                      bMainFunc = (CG_GET_MAIN_FUNC(pFuncBlk->pOwnerCG) == pFuncBlk->pVIRFunc);
-#endif
 
     ppWorkItemArray[pFuncBlk->dgNode.id] = gcvNULL;
     BB_WORKLIST_INIT(&pWorkItemList[pFuncBlk->dgNode.id]);
@@ -544,12 +549,8 @@ static VSC_ErrCode _InitializeBackwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFun
 
         /* Initialize each workitem, and add it to workitem list. Note that exit block won't be
            added into workitem list because it won't be changed when iterating */
-        if (
-#if SUPPORT_IPA_DFA
-            bMainFunc &&
-#endif
-            ppBasicBlkRPO[bbIdx]->flowType == VIR_FLOW_TYPE_EXIT
-           )
+        if (bIPA && bMainFunc &&
+            ppBasicBlkRPO[bbIdx]->flowType == VIR_FLOW_TYPE_EXIT)
         {
             vscBV_Copy(&pFuncFlow->outFlow, &ppBasicBlkRPO[bbIdx]->pTsWorkDataFlow->outFlow);
         }
@@ -566,6 +567,7 @@ static VSC_ErrCode _InitializeBackwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFun
 
 static VSC_ErrCode _DoBackwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
                                                     VIR_BASE_TS_DFA* pTsDFA,
+                                                    gctBOOL bIPA,
                                                     VIR_BB_WORKITEM** ppWorkItemArray,
                                                     VIR_BB_WORKLIST* pWorkItemList,
                                                     VIR_BASIC_BLOCK*** pppBasicBlkRPO)
@@ -582,7 +584,6 @@ static VSC_ErrCode _DoBackwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
     VIR_BB_WORKITEM*             pThisWorkItemArray;
     VIR_BB_WORKLIST*             pThisWorkItemList;
     VIR_TS_FUNC_FLOW*            pFuncFlow = (VIR_TS_FUNC_FLOW*)vscSRARR_GetElement(&pTsDFA->tsFuncFlowArray, pFuncBlk->dgNode.id);
-#if SUPPORT_IPA_DFA
     gctBOOL                      bOutFlowOfExitChanged;
     gctUINT                      bbIdx, callerIdx, countOfBasicBlkInCallee;
     VIR_BASIC_BLOCK**            ppCalleeBasicBlkRPO;
@@ -597,7 +598,6 @@ static VSC_ErrCode _DoBackwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
     VIR_Instruction*             pCallSiteInst;
     VSC_ADJACENT_LIST_ITERATOR   callerIter;
     VIR_CG_EDGE*                 pCallerEdge;
-#endif
 
     if (countOfBasicBlk == 0)
     {
@@ -612,15 +612,16 @@ static VSC_ErrCode _DoBackwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
     do
     {
         pThisBasicBlk = vscBBWKL_RemoveBBFromWorkItemList(pThisWorkItemList);
-
-#if SUPPORT_IPA_DFA
         bOutFlowOfExitChanged = gcvFALSE;
-        if (pThisBasicBlk->flowType == VIR_FLOW_TYPE_EXIT)
+
+        if (bIPA)
         {
-            bOutFlowOfExitChanged = pTsDFA->tsDfaResolvers.ts_combineFuncFlowFromCallers_resolver(pTsDFA, pFuncFlow);
-            vscBV_Copy(&pThisBasicBlk->pTsWorkDataFlow->outFlow, &pFuncFlow->outFlow);
+            if (pThisBasicBlk->flowType == VIR_FLOW_TYPE_EXIT)
+            {
+                bOutFlowOfExitChanged = pTsDFA->tsDfaResolvers.ts_combineFuncFlowFromCallers_resolver(pTsDFA, pFuncFlow);
+                vscBV_Copy(&pThisBasicBlk->pTsWorkDataFlow->outFlow, &pFuncFlow->outFlow);
+            }
         }
-#endif
 
         /* Iterative resolve each successor */
         VSC_ADJACENT_LIST_ITERATOR_INIT(&succEdgeIter, &pThisBasicBlk->dgNode.succList);
@@ -630,22 +631,19 @@ static VSC_ErrCode _DoBackwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
             pSuccBasicBlk = CFG_EDGE_GET_TO_BB(pSuccEdge);
             pTsDFA->tsDfaResolvers.ts_iterateBlockFlow_resolver(pTsDFA, pSuccBasicBlk->pTsWorkDataFlow);
 
-#if SUPPORT_IPA_DFA
-            if (pSuccBasicBlk->flowType == VIR_FLOW_TYPE_CALL)
+            if (bIPA)
             {
-                pTsDFA->tsDfaResolvers.ts_combineBlockFlowFromCallee_resolver(pTsDFA, pSuccBasicBlk->pTsWorkDataFlow);
+                if (pSuccBasicBlk->flowType == VIR_FLOW_TYPE_CALL)
+                {
+                    pTsDFA->tsDfaResolvers.ts_combineBlockFlowFromCallee_resolver(pTsDFA, pSuccBasicBlk->pTsWorkDataFlow);
+                }
             }
-#endif
         }
 
         /* Check combination of successors to get outFlow of this bb. If there is a change, then add all
            predecessors that are not in workitem list to workitem list */
-        if (
-#if SUPPORT_IPA_DFA
-            bOutFlowOfExitChanged ||
-#endif
-            pTsDFA->tsDfaResolvers.ts_combineBlockFlow_resolver(pTsDFA, pThisBasicBlk->pTsWorkDataFlow)
-           )
+        if ((bIPA && bOutFlowOfExitChanged) ||
+            pTsDFA->tsDfaResolvers.ts_combineBlockFlow_resolver(pTsDFA, pThisBasicBlk->pTsWorkDataFlow))
         {
             VSC_ADJACENT_LIST_ITERATOR_INIT(&predEdgeIter, &pThisBasicBlk->dgNode.predList);
             pPredEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&predEdgeIter);
@@ -658,71 +656,73 @@ static VSC_ErrCode _DoBackwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
                 }
             }
 
-#if SUPPORT_IPA_DFA
-            if (pThisBasicBlk->flowType == VIR_FLOW_TYPE_CALL)
+            if (bIPA)
             {
-                pCallee = VIR_Inst_GetCallee(pThisBasicBlk->pStartInst)->pFuncBlock;
-                ppCalleeBasicBlkRPO = pppBasicBlkRPO[pCallee->dgNode.id];
-                pCalleeWorkItemArray = ppWorkItemArray[pCallee->dgNode.id];
-                pCalleeWorkItemList = &pWorkItemList[pCallee->dgNode.id];
-                countOfBasicBlkInCallee = vscDG_GetNodeCount(&pCallee->cfg.dgGraph);
-
-                for (bbIdx = 0; bbIdx < countOfBasicBlkInCallee; bbIdx ++)
+                if (pThisBasicBlk->flowType == VIR_FLOW_TYPE_CALL)
                 {
-                    pCalleeBasicBlk = ppCalleeBasicBlkRPO[bbIdx];
+                    pCallee = VIR_Inst_GetCallee(pThisBasicBlk->pStartInst)->pFuncBlock;
+                    ppCalleeBasicBlkRPO = pppBasicBlkRPO[pCallee->dgNode.id];
+                    pCalleeWorkItemArray = ppWorkItemArray[pCallee->dgNode.id];
+                    pCalleeWorkItemList = &pWorkItemList[pCallee->dgNode.id];
+                    countOfBasicBlkInCallee = vscDG_GetNodeCount(&pCallee->cfg.dgGraph);
 
-                    if (!pCalleeBasicBlk->bInWorklist)
+                    for (bbIdx = 0; bbIdx < countOfBasicBlkInCallee; bbIdx ++)
                     {
-                        vscBBWKL_AddBBToWorkItemList(pCalleeWorkItemList, &pCalleeWorkItemArray[pCalleeBasicBlk->dgNode.id], pCalleeBasicBlk);
+                        pCalleeBasicBlk = ppCalleeBasicBlkRPO[bbIdx];
+
+                        if (!pCalleeBasicBlk->bInWorklist)
+                        {
+                            vscBBWKL_AddBBToWorkItemList(pCalleeWorkItemList, &pCalleeWorkItemArray[pCalleeBasicBlk->dgNode.id], pCalleeBasicBlk);
+                        }
                     }
                 }
             }
-#endif
 
             if (pThisBasicBlk->flowType == VIR_FLOW_TYPE_ENTRY)
             {
                 vscBV_Copy(&pThisBasicBlk->pTsWorkDataFlow->inFlow, &pThisBasicBlk->pTsWorkDataFlow->outFlow);
                 vscBV_Copy(&pFuncFlow->inFlow, &pThisBasicBlk->pTsWorkDataFlow->inFlow);
 
-#if SUPPORT_IPA_DFA
-                VSC_ADJACENT_LIST_ITERATOR_INIT(&callerIter, &pFuncBlk->dgNode.predList);
-                pCallerEdge = (VIR_CG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&callerIter);
-                for (; pCallerEdge != gcvNULL; pCallerEdge = (VIR_CG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&callerIter))
+                if (bIPA)
                 {
-                    /* Call site info is only stored at successor edge */
-                    pCallerEdge = CG_PRED_EDGE_TO_SUCC_EDGE(pCallerEdge);
-
-                    for (callerIdx = 0; callerIdx < vscSRARR_GetElementCount(&pCallerEdge->callSiteArray); callerIdx ++)
+                    VSC_ADJACENT_LIST_ITERATOR_INIT(&callerIter, &pFuncBlk->dgNode.predList);
+                    pCallerEdge = (VIR_CG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&callerIter);
+                    for (; pCallerEdge != gcvNULL; pCallerEdge = (VIR_CG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&callerIter))
                     {
-                        pCallSiteInst = *(VIR_Instruction**)vscSRARR_GetElement(&pCallerEdge->callSiteArray, callerIdx);
-                        pCallerBasicBlk = VIR_Inst_GetBasicBlock(pCallSiteInst);
+                        /* Call site info is only stored at successor edge */
+                        pCallerEdge = CG_PRED_EDGE_TO_SUCC_EDGE(pCallerEdge);
 
-                        if (pCallerBasicBlk == gcvNULL)
+                        for (callerIdx = 0; callerIdx < vscSRARR_GetElementCount(&pCallerEdge->callSiteArray); callerIdx ++)
                         {
-                            gcmASSERT(gcvFALSE);
-                            continue;
-                        }
-                        else
-                        {
-                            pCaller = pCallerBasicBlk->pOwnerCFG->pOwnerFuncBlk;
-                        }
+                            pCallSiteInst = *(VIR_Instruction**)vscSRARR_GetElement(&pCallerEdge->callSiteArray, callerIdx);
+                            pCallerBasicBlk = VIR_Inst_GetBasicBlock(pCallSiteInst);
 
-                        pCallerWorkItemArray = ppWorkItemArray[pCaller->dgNode.id];
-                        pCallerWorkItemList = &pWorkItemList[pCaller->dgNode.id];
-
-                        VSC_ADJACENT_LIST_ITERATOR_INIT(&predEdgeIter, &pCallerBasicBlk->dgNode.predList);
-                        pPredEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&predEdgeIter);
-                        for (; pPredEdge != gcvNULL; pPredEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&predEdgeIter))
-                        {
-                            pPredBasicBlk = CFG_EDGE_GET_TO_BB(pPredEdge);
-                            if (!pPredBasicBlk->bInWorklist)
+                            if (pCallerBasicBlk == gcvNULL)
                             {
-                                vscBBWKL_AddBBToWorkItemList(pCallerWorkItemList, &pCallerWorkItemArray[pPredBasicBlk->dgNode.id], pPredBasicBlk);
+                                gcmASSERT(gcvFALSE);
+                                continue;
+                            }
+                            else
+                            {
+                                pCaller = pCallerBasicBlk->pOwnerCFG->pOwnerFuncBlk;
+                            }
+
+                            pCallerWorkItemArray = ppWorkItemArray[pCaller->dgNode.id];
+                            pCallerWorkItemList = &pWorkItemList[pCaller->dgNode.id];
+
+                            VSC_ADJACENT_LIST_ITERATOR_INIT(&predEdgeIter, &pCallerBasicBlk->dgNode.predList);
+                            pPredEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&predEdgeIter);
+                            for (; pPredEdge != gcvNULL; pPredEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&predEdgeIter))
+                            {
+                                pPredBasicBlk = CFG_EDGE_GET_TO_BB(pPredEdge);
+                                if (!pPredBasicBlk->bInWorklist)
+                                {
+                                    vscBBWKL_AddBBToWorkItemList(pCallerWorkItemList, &pCallerWorkItemArray[pPredBasicBlk->dgNode.id], pPredBasicBlk);
+                                }
                             }
                         }
                     }
                 }
-#endif
             }
         }
     }
@@ -752,7 +752,7 @@ static void _FinalizeBackwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
     }
 }
 
-VSC_ErrCode vscVIR_DoForwardIterativeTsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_TS_DFA* pTsDFA)
+VSC_ErrCode vscVIR_DoForwardIterativeTsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_TS_DFA* pTsDFA, gctBOOL bIPA)
 {
     VSC_ErrCode             errCode  = VSC_ERR_NONE;
     VIR_FUNC_BLOCK**        ppFuncBlkRPO;
@@ -787,7 +787,7 @@ VSC_ErrCode vscVIR_DoForwardIterativeTsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_TS_DFA*
     /* Initialize DFA per func */
     for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
     {
-        errCode = _InitializeForwardIterativeTsDFAPerFunc(ppFuncBlkRPO[funcIdx], pTsDFA,
+        errCode = _InitializeForwardIterativeTsDFAPerFunc(ppFuncBlkRPO[funcIdx], pTsDFA, bIPA,
                                                           ppWorkItemArray, pWorkItemList,
                                                           pppBasicBlkRPO);
 
@@ -808,7 +808,7 @@ VSC_ErrCode vscVIR_DoForwardIterativeTsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_TS_DFA*
             {
                 bFlowChangedInFunc = gcvTRUE;
 
-                errCode = _DoForwardIterativeTsDFAPerFunc(ppFuncBlkRPO[funcIdx], pTsDFA,
+                errCode = _DoForwardIterativeTsDFAPerFunc(ppFuncBlkRPO[funcIdx], pTsDFA, bIPA,
                                                           ppWorkItemArray, pWorkItemList,
                                                           pppBasicBlkRPO);
 
@@ -838,7 +838,7 @@ On_Error:
     return errCode;
 }
 
-VSC_ErrCode vscVIR_DoBackwardIterativeTsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_TS_DFA* pTsDFA)
+VSC_ErrCode vscVIR_DoBackwardIterativeTsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_TS_DFA* pTsDFA, gctBOOL bIPA)
 {
     VSC_ErrCode             errCode  = VSC_ERR_NONE;
     VIR_FUNC_BLOCK**        ppFuncBlkRPO;
@@ -873,7 +873,7 @@ VSC_ErrCode vscVIR_DoBackwardIterativeTsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_TS_DFA
     /* Initialize DFA per func */
     for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
     {
-        errCode = _InitializeBackwardIterativeTsDFAPerFunc(ppFuncBlkRPO[funcIdx], pTsDFA,
+        errCode = _InitializeBackwardIterativeTsDFAPerFunc(ppFuncBlkRPO[funcIdx], pTsDFA, bIPA,
                                                            ppWorkItemArray, pWorkItemList,
                                                            pppBasicBlkRPO);
 
@@ -894,7 +894,7 @@ VSC_ErrCode vscVIR_DoBackwardIterativeTsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_TS_DFA
             {
                 bFlowChangedInFunc = gcvTRUE;
 
-                errCode = _DoBackwardIterativeTsDFAPerFunc(ppFuncBlkRPO[funcIdx], pTsDFA,
+                errCode = _DoBackwardIterativeTsDFAPerFunc(ppFuncBlkRPO[funcIdx], pTsDFA, bIPA,
                                                            ppWorkItemArray, pWorkItemList,
                                                            pppBasicBlkRPO);
 

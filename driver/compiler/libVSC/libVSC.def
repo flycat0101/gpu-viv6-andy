@@ -1,6 +1,6 @@
 ;#############################################################################
 ;#
-;#   Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+;#   Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 ;#
 ;#   The material in this file is confidential and contains trade secrets
 ;#   of Vivante Corporation. This is proprietary information owned by
@@ -19,8 +19,6 @@ EXPORTS
     gcOpt_Dump
     gcDump_Shader
     dbg_dumpIR
-    dbg_dumpMC
-    dbg_dumpMC16
     dbg_dumpCode
     dbg_dumpOptimizer
     dbg_dumpShader
@@ -87,6 +85,7 @@ EXPORTS
     gcSHADER_AddUniform
     gcSHADER_AddUniformEx
     gcSHADER_AddUniformEx1
+    gcSHADER_AddUniformWithInitializer
     gcSHADER_AddUniformBlock
     gcSHADER_AddStorageBlock
     gcSHADER_AddIoBlock
@@ -258,7 +257,10 @@ EXPORTS
     gcBLOCKTABLE_Destory
     gcGetOptimizerOption
     gcSetOptimizerOption
+    gcGetOptimizerOptionVariable
     gcGetOptionFromEnv
+    gcOPT_SetFeature
+    gcOPT_ResetFeature
     gcvShaderTypeInfo
     gcTYPE_GetTypeInfo
     gcOPT_doVaryingPackingForShader
@@ -269,6 +271,7 @@ EXPORTS
     gcLoadCLPatchLibrary
     gcSHADER_DumpSource
     gcSHADER_DoPatch
+    gcSHADER_GoVIRPass
     gcHINTS_Destroy
     gcGetSBLastVariable
     gcGetSBUnsizedArrayLength
@@ -335,3 +338,75 @@ EXPORTS
 	gcUNIFORM_SetValue_Ex
     gcUNIFORM_SetValueF_Ex
     gcUNIFORM_BLOCK_GetName
+
+	vscPMP_Intialize
+	VIR_Adjust_Imagetypesize
+	VIR_GetSymFromId
+	VIR_Shader_Construct
+	VIR_Shader_AddFunction
+	VIR_Shader_AddString
+	VIR_Shader_AddSymbol
+	VIR_Shader_AddConstant
+	VIR_Shader_AddStructType
+	VIR_Shader_AddArrayType
+	VIR_Shader_AddFieldSymbol
+	VIR_Shader_Dump
+	VIR_Function_AddLabel
+	VIR_Function_AddInstruction
+	VIR_Function_NewLink
+	VIR_Function_AddInstructionAfter
+	VIR_Function_AddInstructionBefore
+	VIR_Operand_SetSymbol
+	VIR_Operand_SetLabel
+	VIR_Operand_SetSwizzle
+	VIR_Operand_SetEnable
+	VIR_Operand_SetPrecision
+	VIR_Operand_GenOffsetByAccessChain
+	VIR_Link_AddLink
+	VIR_Type_AddField
+
+	VIR_NAME_UNKNOWN
+    VIR_NAME_POSITION
+    VIR_NAME_POINT_SIZE
+    VIR_NAME_COLOR
+    VIR_NAME_FRONT_FACING
+    VIR_NAME_POINT_COORD
+    VIR_NAME_POSITION_W
+    VIR_NAME_DEPTH
+    VIR_NAME_FOG_COORD
+    VIR_NAME_VERTEX_ID
+    VIR_NAME_FRONT_COLOR
+    VIR_NAME_BACK_COLOR
+    VIR_NAME_FRONT_SECONDARY_COLOR
+    VIR_NAME_BACK_SECONDARY_COLOR
+    VIR_NAME_TEX_COORD
+    VIR_NAME_INSTANCE_ID
+    VIR_NAME_NUM_GROUPS
+    VIR_NAME_WORKGROUPSIZE
+    VIR_NAME_WORK_GROUP_ID
+    VIR_NAME_LOCAL_INVOCATION_ID
+    VIR_NAME_GLOBAL_INVOCATION_ID
+    VIR_NAME_LOCALINVOCATIONINDEX
+    VIR_NAME_HELPER_INVOCATION
+    VIR_NAME_SUBSAMPLE_DEPTH
+    VIR_NAME_PERVERTEX
+    VIR_NAME_IN
+    VIR_NAME_OUT
+    VIR_NAME_INVOCATION_ID
+    VIR_NAME_PATCH_VERTICES_IN
+    VIR_NAME_PRIMITIVE_ID
+    VIR_NAME_TESS_LEVEL_OUTER
+    VIR_NAME_TESS_LEVEL_INNER
+    VIR_NAME_LAYER
+    VIR_NAME_PS_OUT_LAYER
+    VIR_NAME_PRIMITIVE_ID_IN
+    VIR_NAME_TESS_COORD
+    VIR_NAME_SAMPLE_ID
+    VIR_NAME_SAMPLE_POSITION
+    VIR_NAME_SAMPLE_MASK_IN
+    VIR_NAME_SAMPLE_MASK
+    VIR_NAME_IN_POSITION
+    VIR_NAME_IN_POINT_SIZE
+    VIR_NAME_BOUNDING_BOX
+    VIR_NAME_BUILTIN_LAST
+	VIR_builtinTypes

@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -50,6 +50,17 @@ endif
 endif
 
 ifeq ($(VIVANTE_ENABLE_3D), 1)
+ifeq ($(USE_OPENCL),1)
+VIVANTE_MAKEFILES += \
+    $(LOCAL_PATH)/compiler/libCLC/Android.mk \
+    $(LOCAL_PATH)/driver/khronos/libCL/Android.mk
+
+ifeq ($(BUILD_OPENCL_ICD),1)
+VIVANTE_MAKEFILES += \
+    $(LOCAL_PATH)/driver/khronos/libCL/icdloader12/Android.mk
+
+endif
+endif
 endif
 
 ifeq ($(USE_OPENVX),1)
@@ -61,11 +72,9 @@ ifeq ($(VIVANTE_ENABLE_3D), 1)
 VIVANTE_MAKEFILES += \
     $(LOCAL_PATH)/driver/khronos/libEGL/Android.mk \
     $(LOCAL_PATH)/driver/khronos/libGLESv11/Android.mk \
+    $(LOCAL_PATH)/driver/khronos/libGLESv3/Android.mk \
     $(LOCAL_PATH)/compiler/libVSC/Android.mk \
     $(LOCAL_PATH)/compiler/libGLSLC/Android.mk
-
-VIVANTE_MAKEFILES += \
-    $(LOCAL_PATH)/driver/khronos/libGLESv3/Android.mk
 else
 ifeq ($(VIVANTE_ENABLE_VG), 1)
 VIVANTE_MAKEFILES += \

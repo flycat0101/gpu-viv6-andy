@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,7 +13,6 @@
 
 #include "gc_vsc.h"
 #include "vir/codegen/gc_vsc_vir_ep_back_patch.h"
-#include "chip/gc_vsc_chip_mc_codec.h"
 
 extern SHADER_COMPILE_TIME_CONSTANT* _EnlargeCTCRoom(SHADER_CONSTANT_MAPPING* pCnstMapping, gctUINT enlargeCTCCount);
 
@@ -90,7 +89,10 @@ static VSC_ErrCode _AddAlphaKillPatch(VIR_Shader* pShader, VSC_HW_CONFIG* pHwCfg
     }
 
     /* Begin to generate alpha-kill and color-kill insts */
-    vscMC_BeginCodec(&mcCodec, pHwCfg, pOutSEP->exeHints.derivedHints.globalStates.bExecuteOnDual16);
+    vscMC_BeginCodec(&mcCodec,
+                     pHwCfg,
+                     pOutSEP->exeHints.derivedHints.globalStates.bExecuteOnDual16,
+                     gcvTRUE);
 
     /* dp4 color.w, color.xyzw, 1.0 */
     memset(&codecHelperInst, 0, sizeof(codecHelperInst));

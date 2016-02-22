@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -27,9 +27,7 @@ typedef struct __GLchipDrawableRec
     gcoSURF depthSurface;
     gcoSURF stencilSurface;
 
-#if __GL_CHIP_STENCIL_TEST_OPT
-    __GLchipStencilOpt stencilOpt;
-#endif
+    __GLchipStencilOpt *stencilOpt;
 } __GLchipDrawable;
 
 typedef struct __GLchipXfbHeaderRec

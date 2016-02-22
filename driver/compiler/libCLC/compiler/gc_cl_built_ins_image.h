@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -360,7 +360,8 @@ _GenTextureCode(
         if (gcmIS_ERROR(status)) return status;
     }
 
-    clsLOGICAL_REG_InitializeUniform(reg,
+    clsLOGICAL_REG_InitializeUniform(Compiler,
+                                     reg,
                                      clvQUALIFIER_UNIFORM,
                                      dataType,
                                      SamplerType->imageSampler,
@@ -7828,6 +7829,93 @@ _GenVivWriteImageUICode(
 }
 
 static gceSTATUS
+_GenQueryImageCallCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    cloIR_POLYNARY_EXPR  funcCall = gcvNULL;
+    gctCHAR   nameBuf[64];
+    gctSTRING funcNameString = nameBuf;
+    gctUINT offset = 0;
+    cloIR_UNARY_EXPR nullExpr = gcvNULL;
+    clsDECL decl[1];
+    cltELEMENT_TYPE elementType;
+    clsGEN_CODE_PARAMETERS parameters[1];
+
+    gcmVERIFY_OK(cloCOMPILER_Lock(Compiler));
+    elementType = clmGEN_CODE_elementType_GET(OperandsParameters[0].dataTypes[0].def);
+
+    gcmASSERT(clmIsElementTypeImage(elementType));
+
+    clsGEN_CODE_PARAMETERS_Initialize(parameters,
+                                      gcvFALSE,
+                                      gcvTRUE);
+    gcmVERIFY_OK(gcoOS_PrintStrSafe(funcNameString,
+                                    64,
+                                    &offset,
+                                    "_viv_%s_%s",
+                                    PolynaryExpr->funcSymbol,
+                                    clGetElementTypeName(elementType)));
+    funcCall = clCreateFuncCallByName(Compiler,
+                                      PolynaryExpr->exprBase.base.lineNo,
+                                      PolynaryExpr->exprBase.base.stringNo,
+                                      funcNameString,
+                                      &PolynaryExpr->exprBase);
+    if(!funcCall) {
+      status = gcvSTATUS_INVALID_ARGUMENT;
+      gcmONERROR(status);
+    }
+
+    gcmASSERT(funcCall->operands);
+    gcmONERROR(cloCOMPILER_CreateDecl(Compiler,
+                                      T_UINT8,
+                                      gcvNULL,
+                                      clvQUALIFIER_NONE,
+                                      clvQUALIFIER_NONE,
+                                      decl));
+
+    gcmONERROR(cloIR_NULL_EXPR_Construct(Compiler,
+                                         PolynaryExpr->exprBase.base.lineNo,
+                                         PolynaryExpr->exprBase.base.stringNo,
+                                         decl,
+                                         &nullExpr));
+    gcmVERIFY_OK(cloIR_SET_AddMember(Compiler,
+                                     funcCall->operands,
+                                     &nullExpr->exprBase.base));
+
+    gcmONERROR(cloCOMPILER_BindFuncCall(Compiler,
+                                        funcCall));
+
+    clmGEN_CODE_SetParametersIOperand(Compiler,
+                                      parameters,
+                                      0,
+                                      IOperand,
+                                      IOperand->componentSelection.selection[0]);
+    /* Allocate the function resources */
+    gcmONERROR(clAllocateFuncResources(Compiler,
+                                       CodeGenerator,
+                                       funcCall->funcName));
+
+    gcmONERROR(clGenFuncCallCode(Compiler,
+                                 CodeGenerator,
+                                 funcCall,
+                                 OperandsParameters,
+                                 parameters));
+    gcmONERROR(cloCOMPILER_SetHasImageQuery(Compiler));
+
+OnError:
+   gcmVERIFY_OK(cloCOMPILER_Unlock(Compiler));
+   clsGEN_CODE_PARAMETERS_Finalize(parameters);
+   return status;
+}
+
+static gceSTATUS
 _GenGetImageWidthCode(
     IN cloCOMPILER Compiler,
     IN cloCODE_GENERATOR CodeGenerator,
@@ -7847,6 +7935,16 @@ _GenGetImageWidthCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
+    if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
+        gcmOPT_oclUseImgIntrinsicQuery())
+    {
+        return _GenQueryImageCallCode(Compiler,
+                                      CodeGenerator,
+                                      PolynaryExpr,
+                                      OperandCount,
+                                      OperandsParameters,
+                                      IOperand);
+    }
     clsROPERAND_InitializeIntOrIVecConstant(&constROperand,
                                             clmGenCodeDataType(T_UINT),
                                             (gctUINT) 0);
@@ -7886,6 +7984,16 @@ _GenGetImageHeightCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
+    if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
+        gcmOPT_oclUseImgIntrinsicQuery())
+    {
+        return _GenQueryImageCallCode(Compiler,
+                                      CodeGenerator,
+                                      PolynaryExpr,
+                                      OperandCount,
+                                      OperandsParameters,
+                                      IOperand);
+    }
     clsROPERAND_InitializeIntOrIVecConstant(&constROperand,
                                             clmGenCodeDataType(T_UINT),
                                             (gctUINT) 4);
@@ -7964,6 +8072,16 @@ _GenGetImageChannelDataTypeCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
+    if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
+        gcmOPT_oclUseImgIntrinsicQuery())
+    {
+        return _GenQueryImageCallCode(Compiler,
+                                      CodeGenerator,
+                                      PolynaryExpr,
+                                      OperandCount,
+                                      OperandsParameters,
+                                      IOperand);
+    }
     clsROPERAND_InitializeIntOrIVecConstant(&constROperand,
                                             clmGenCodeDataType(T_UINT),
                                             (gctUINT) 12);
@@ -8003,6 +8121,16 @@ _GenGetImageChannelOrderCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
+    if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
+        gcmOPT_oclUseImgIntrinsicQuery())
+    {
+        return _GenQueryImageCallCode(Compiler,
+                                      CodeGenerator,
+                                      PolynaryExpr,
+                                      OperandCount,
+                                      OperandsParameters,
+                                      IOperand);
+    }
     clsROPERAND_InitializeIntOrIVecConstant(&constROperand,
                                             clmGenCodeDataType(T_UINT),
                                             (gctUINT) 16);
@@ -8042,6 +8170,16 @@ _GenGetImageDimCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
+    if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
+        gcmOPT_oclUseImgIntrinsicQuery())
+    {
+        return _GenQueryImageCallCode(Compiler,
+                                      CodeGenerator,
+                                      PolynaryExpr,
+                                      OperandCount,
+                                      OperandsParameters,
+                                      IOperand);
+    }
     clsROPERAND_InitializeIntOrIVecConstant(&constROperand,
                                             clmGenCodeDataType(T_UINT),
                                             (gctUINT) 0);
@@ -8096,6 +8234,16 @@ _GenGetImageArrayCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
+    if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
+        gcmOPT_oclUseImgIntrinsicQuery())
+    {
+        return _GenQueryImageCallCode(Compiler,
+                                      CodeGenerator,
+                                      PolynaryExpr,
+                                      OperandCount,
+                                      OperandsParameters,
+                                      IOperand);
+    }
     clsROPERAND_InitializeIntOrIVecConstant(&constROperand,
                                             clmGenCodeDataType(T_UINT),
                                             (gctUINT) 32);

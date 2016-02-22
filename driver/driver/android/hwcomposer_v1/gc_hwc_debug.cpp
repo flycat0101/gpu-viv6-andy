@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -30,12 +30,12 @@ _WriteRawData(
 
 static int
 _WriteBitmap(
-    const char * filename,
-    const void * data,
-    unsigned int offset,
-    unsigned int width,
-    unsigned int height,
-    unsigned int stride,
+    const char *filename,
+    const void *pixels,
+    size_t offset,
+    size_t width,
+    size_t height,
+    size_t stride,
     int format
     );
 
@@ -591,10 +591,10 @@ _WriteSurface(
         /* Write surface to bitmap. */
         _WriteBitmap(filename,
                      memory[0],
-                     offset,
-                     alignedWidth,
-                     alignedHeight,
-                     stride,
+                     size_t(offset),
+                     size_t(alignedWidth),
+                     size_t(alignedHeight),
+                     size_t(stride),
                      format);
     }
 
@@ -693,34 +693,37 @@ _WriteRawData(
 
 /******************************************************************************/
 
-
-#ifndef __pixel_format_
-#define __pixel_format_
-
-#include <gc_hal_enum.h>
-
 enum
 {
-                                    /* Bytes: 0 1 2 3 (Low to high)*/
-    RGBA_8888 = gcvSURF_A8B8G8R8,   /*        R G B A */
-    BGRA_8888 = gcvSURF_A8R8G8B8,   /*        B G R A */
-    RGBX_8888 = gcvSURF_X8B8G8R8,   /*        R G B - */
-    BGRX_8888 = gcvSURF_X8R8G8B8,   /*        B G R - */
+    RGBA_8888 = gcvSURF_A8B8G8R8,
+    BGRA_8888 = gcvSURF_A8R8G8B8,
+    RGBX_8888 = gcvSURF_X8B8G8R8,
+    BGRX_8888 = gcvSURF_X8R8G8B8,
 
-                                    /* Bytes: 0 1 2 (Low to high) */
-    RGB_888   = gcvSURF_R8G8B8,     /*        R G B */
-    BGR_888   = gcvSURF_B8G8R8,     /*        B G R */
+    RGB_888   = gcvSURF_B8G8R8,
+    BGR_888   = gcvSURF_R8G8B8,
 
-                                    /* Bits: 15 11 5  0 (MSB to LSB) */
-    RGB_565   = gcvSURF_R5G6B5,     /*         R  G  B */
-    BGR_565   = gcvSURF_B5G6R5,     /*         B  G  R */
+    RGB_565   = gcvSURF_R5G6B5,
+    BGR_565   = gcvSURF_B5G6R5,
 
-                                    /* Bits: 15 14 10 5  0 (MSB to LSB) */
-    ARGB_1555 = gcvSURF_A1R5G5B5    /*        A   R  G  B */
+    RGBA_4444 = gcvSURF_R4G4B4A4,
+    BGRA_4444 = gcvSURF_B4G4R4A4,
+
+    ARGB_1555 = gcvSURF_A1R5G5B5,
+    RGBA_5551 = gcvSURF_R5G5B5A1,
+
+    D16       = gcvSURF_D16,
+
+    D24S8     = gcvSURF_D24S8,
+    D32       = gcvSURF_D32,
+    D24X8     = gcvSURF_D24X8,
+    S8        = gcvSURF_S8,
+
+    L8        = gcvSURF_L8,
 };
-#endif
 
 #   include <stdint.h>
+#   include <sys/stat.h>
 typedef uint8_t         BYTE;
 typedef uint32_t        BOOL;
 typedef uint32_t        DWORD;
@@ -758,7 +761,6 @@ typedef struct tagBITMAPFILEHEADER
 }
 __attribute__((packed)) BITMAPFILEHEADER;
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -767,16 +769,15 @@ __attribute__((packed)) BITMAPFILEHEADER;
 
 static int _big_endian = -1;
 
-static void _check_endian()
+static void check_endian()
 {
-    unsigned long v = 0x01020304;
-    _big_endian = ((unsigned char *) &v)[0] == 0x01;
+    uint32_t v = 0x01020304;
+    _big_endian = ((uint8_t *) &v)[0] == 0x01;
 }
 
-static unsigned short _little16(unsigned short word)
+static uint16_t convert_le16(uint16_t word)
 {
-    if (_big_endian)
-    {
+    if (_big_endian) {
         word = ((word & 0x00ff) << 8) |
                ((word & 0xff00) >> 8);
     }
@@ -784,10 +785,9 @@ static unsigned short _little16(unsigned short word)
     return word;
 }
 
-static unsigned long _little32(unsigned long dword)
+static uint32_t convert_le32(uint32_t dword)
 {
-    if (_big_endian)
-    {
+    if (_big_endian) {
         dword = ((dword & 0x000000ff) << 24) |
                 ((dword & 0x0000ff00) << 8)  |
                 ((dword & 0x00ff0000) >> 8)  |
@@ -797,480 +797,405 @@ static unsigned long _little32(unsigned long dword)
     return dword;
 }
 
-
-static int _fconv(
-    void * dest,
-    int    destformat,
-    const void * source,
-    int    srcformat,
-    int    count
-    )
-{
-    int i;
-
-    /* Get some shortcuts. */
-    const uint8_t  * csource = (const uint8_t  *)  source;
-    const uint16_t * ssource = (const uint16_t *) source;
-    uint8_t  * cdest = (uint8_t  *)  dest;
-    uint16_t * sdest = (uint16_t *) dest;
-
-    /* Check source input. */
-    if (source == NULL)
-    {
-        LOGE("Null source input");
-        return -EINVAL;
-    }
-
-    switch (srcformat)
-    {
-    case RGBA_8888:
-    case BGRA_8888:
-    case RGBX_8888:
-    case BGRX_8888:
-
-    case RGB_888:
-    case BGR_888:
-
-    case RGB_565:
-    case BGR_565:
-
-    case ARGB_1555:
-        break;
-
-    default:
-        LOGE("Invalid source format");
-        return -EINVAL;
-    }
-
-    /* Check dest input. */
-    if (dest == NULL)
-    {
-        LOGE("Null dest input");
-        return -EINVAL;
-    }
-
-    switch (srcformat)
-    {
-    case RGBA_8888:
-    case BGRA_8888:
-    case RGBX_8888:
-    case BGRX_8888:
-
-    case RGB_888:
-    case BGR_888:
-
-    case RGB_565:
-    case BGR_565:
-
-    case ARGB_1555:
-        break;
-
-    default:
-        LOGE("Invalid dest format");
-        return -EINVAL;
-    }
-
-    /* Special case for src format == dest format. */
-    if (srcformat == destformat)
-    {
-        int bypp;
-
-        switch (srcformat)
-        {
-        case RGBA_8888:
-        case BGRA_8888:
-        case RGBX_8888:
-        case BGRX_8888:
-            bypp = 4;
-            break;
-
-        case RGB_888:
-        case BGR_888:
-            bypp = 3;
-            break;
-
-        case RGB_565:
-        case BGR_565:
-        case ARGB_1555:
-        default:
-            bypp = 2;
-            break;
-        }
-
-        memcpy(dest, source, bypp * count);
-        return 0;
-    }
-
-    for (i = 0; i < count; i++)
-    {
-        uint32_t rgba;
-
-        /* Convert to rgba8888. */
-        switch (srcformat)
-        {
-        case RGBA_8888:
-        case RGBX_8888:
-            rgba = ((uint32_t *) source)[i];
-            break;
-
-        case BGRA_8888:
-        case BGRX_8888:
-            ((uint8_t *) &rgba)[0] = csource[i * 4 + 2];
-            ((uint8_t *) &rgba)[1] = csource[i * 4 + 1];
-            ((uint8_t *) &rgba)[2] = csource[i * 4 + 0];
-            ((uint8_t *) &rgba)[3] = csource[i * 4 + 3];
-            break;
-
-        case RGB_888:
-            ((uint8_t *) &rgba)[0] = csource[i * 3 + 0];
-            ((uint8_t *) &rgba)[1] = csource[i * 3 + 1];
-            ((uint8_t *) &rgba)[2] = csource[i * 3 + 2];
-            ((uint8_t *) &rgba)[3] = 0xFF;
-            break;
-
-        case BGR_888:
-            ((uint8_t *) &rgba)[0] = csource[i * 3 + 2];
-            ((uint8_t *) &rgba)[1] = csource[i * 3 + 1];
-            ((uint8_t *) &rgba)[2] = csource[i * 3 + 0];
-            ((uint8_t *) &rgba)[3] = 0xFF;
-            break;
-
-        case RGB_565:
-            /* R: 11111 000000 00000
-             * G: 00000 111111 00000
-             * B: 00000 000000 11111 */
-            ((uint8_t *) &rgba)[0] = (ssource[i] & 0xF800) >> 8;
-            ((uint8_t *) &rgba)[1] = (ssource[i] & 0x07E0) >> 3;
-            ((uint8_t *) &rgba)[2] = (ssource[i] & 0x001F) << 3;
-            ((uint8_t *) &rgba)[3] = 0xFF;
-            break;
-
-        case BGR_565:
-            /* R: 00000 000000 11111
-             * G: 00000 111111 00000
-             * B: 11111 000000 00000 */
-            ((uint8_t *) &rgba)[0] = (ssource[i] & 0x001F) << 3;
-            ((uint8_t *) &rgba)[1] = (ssource[i] & 0x07E0) >> 3;
-            ((uint8_t *) &rgba)[2] = (ssource[i] & 0xF800) >> 8;
-            ((uint8_t *) &rgba)[3] = 0xFF;
-            break;
-
-        case ARGB_1555:
-        default:
-            /* R: 0 11111 00000 00000
-             * G: 0 00000 11111 00000
-             * B: 0 00000 00000 11111
-             * A: 1 00000 00000 00000 */
-            ((uint8_t *) &rgba)[0] = (ssource[i] & 0x7C00) >> 7;
-            ((uint8_t *) &rgba)[1] = (ssource[i] & 0x03E0) >> 2;
-            ((uint8_t *) &rgba)[2] = (ssource[i] & 0x001F) << 3;
-            ((uint8_t *) &rgba)[3] = (ssource[i] & 0x8000) >> 8;
-            break;
-        }
-
-        /* Convert to dest format. */
-        switch (destformat)
-        {
-        case RGBA_8888:
-        case RGBX_8888:
-            ((uint32_t *) dest)[i] = rgba;
-            break;
-
-        case BGRA_8888:
-        case BGRX_8888:
-            cdest[i * 4 + 2] = ((uint8_t *) &rgba)[0];
-            cdest[i * 4 + 1] = ((uint8_t *) &rgba)[1];
-            cdest[i * 4 + 0] = ((uint8_t *) &rgba)[2];
-            cdest[i * 4 + 3] = ((uint8_t *) &rgba)[3];
-            break;
-
-        case RGB_888:
-            cdest[i * 3 + 0] = ((uint8_t *) &rgba)[0];
-            cdest[i * 3 + 1] = ((uint8_t *) &rgba)[1];
-            cdest[i * 3 + 2] = ((uint8_t *) &rgba)[2];
-            break;
-
-        case BGR_888:
-            cdest[i * 3 + 2] = ((uint8_t *) &rgba)[0];
-            cdest[i * 3 + 1] = ((uint8_t *) &rgba)[1];
-            cdest[i * 3 + 0] = ((uint8_t *) &rgba)[2];
-            break;
-
-        case RGB_565:
-            /* R: 11111 000000 00000
-             * G: 00000 111111 00000
-             * B: 00000 000000 11111 */
-            sdest[i] =
-                ((((uint8_t *) &rgba)[0] & 0xF8) << 8) |
-                ((((uint8_t *) &rgba)[1] & 0xFC) << 3) |
-                ((((uint8_t *) &rgba)[2] & 0xF8) >> 3);
-            break;
-
-        case BGR_565:
-            /* R: 00000 000000 11111
-             * G: 00000 111111 00000
-             * B: 11111 000000 00000 */
-            sdest[i] =
-                ((((uint8_t *) &rgba)[0] & 0xF8) >> 3) |
-                ((((uint8_t *) &rgba)[1] & 0xFC) << 3) |
-                ((((uint8_t *) &rgba)[2] & 0xF8) << 8);
-            break;
-
-        case ARGB_1555:
-        default:
-            /* R: 0 11111 00000 00000
-             * G: 0 00000 11111 00000
-             * B: 0 00000 00000 11111
-             * A: 1 00000 00000 00000 */
-            sdest[i] =
-            ((((uint8_t *) &rgba)[0] & 0xF8) << 7) |
-            ((((uint8_t *) &rgba)[1] & 0xF8) << 2) |
-            ((((uint8_t *) &rgba)[2] & 0xF8) >> 3) |
-            ((((uint8_t *) &rgba)[3] & 0x80) << 8);
-            break;
-        }
-    }
-
-    return 0;
-}
-
-
-int _WriteBitmap(
-    const char * filename,
-    const void * data,
-    unsigned int offset,
-    unsigned int width,
-    unsigned int height,
-    unsigned int stride,
+int
+_WriteBitmap(
+    const char *filename,
+    const void *pixels,
+    size_t offset,
+    size_t width,
+    size_t height,
+    size_t stride,
     int format
     )
 {
-    BITMAPFILEHEADER file_header;
-    BITMAPINFOHEADER info_header;
+    BITMAPFILEHEADER bmf;
+    BITMAPINFOHEADER bmi;
 
     FILE * fp = NULL;
-    unsigned int i;
-    unsigned short  bypp;
+    size_t i;
+    int bytes_per_pixel;
     /* Buffer for dest data line. */
     unsigned char * buff = NULL;
     /* Source data line. */
     const unsigned char * line;
     /* Dest stride. */
-    unsigned int    dstride;
-    /* Rows in one write batch. */
-    unsigned int batch;
+    size_t dstride;
+    size_t nmemb;
 
     /* Check endian. */
-    _check_endian();
+    check_endian();
 
     /* Check filename. */
-    if (filename == NULL)
-    {
-        LOGE("filename is NULL.");
+    if (filename == NULL) {
+        ALOGE("%s: filename is NULL.\n", __FUNCTION__);
         return -EINVAL;
     }
 
     /* Check data. */
-    if (data == NULL)
-    {
-        LOGE("Pixels data is empty.");
+    if (pixels == NULL) {
+        ALOGE("%s: pixel data are empty.\n", __FUNCTION__);
         return -EINVAL;
     }
 
     /* Check width and height. */
-    if (width == 0 || height == 0)
-    {
-        LOGE("Width: %d, Height: %d", width, height);
+    if (width <= 0 || height <= 0) {
+        ALOGE("%s: invalid size: width=%zu, height=%zu\n",
+            __FUNCTION__, width, height);
         return -EINVAL;
+    }
+
+    switch (format)
+    {
+    case D16:
+        ALOGI("%s: fake D16 as RGBA_4444\n", __FUNCTION__);
+        format = RGBA_4444;
+        break;
+    case D24S8:
+        ALOGI("%s: fake D24S8 as RGBA_8888\n", __FUNCTION__);
+        format = RGBA_8888;
+        break;
+    case D24X8:
+        ALOGI("%s: fake D24X8 as RGBA_8888\n", __FUNCTION__);
+        format = RGBA_8888;
+        break;
+    case D32:
+        ALOGI("%s: fake D32 as RGBA_8888\n", __FUNCTION__);
+        format = RGBA_8888;
+        break;
+    case S8:
+        ALOGI("%s: fake S8 as L8\n", __FUNCTION__);
+        format = L8;
+        break;
+    default:
+        break;
     }
 
     /* Check source format and get bytes per pixel. */
-    switch (format)
-    {
-    case RGBA_8888:
-    case BGRA_8888:
-    case RGBX_8888:
-    case BGRX_8888:
-        bypp = 4;
-        break;
+    switch (format) {
+        case RGBA_8888:
+        case BGRA_8888:
+        case RGBX_8888:
+        case BGRX_8888:
+            bytes_per_pixel = 4;
+            break;
 
-    case RGB_888:
-    case BGR_888:
-        bypp = 3;
-        break;
+        case RGB_888:
+        case BGR_888:
+            bytes_per_pixel = 3;
+            break;
 
-    case RGB_565:
-    case BGR_565:
-    case ARGB_1555:
-        bypp = 2;
-        break;
+        case RGB_565:
+        case BGR_565:
+        case RGBA_4444:
+        case BGRA_4444:
+        case ARGB_1555:
+        case RGBA_5551:
+            bytes_per_pixel = 2;
+            break;
 
-    default:
-        LOGE("Invalid format: %d", format);
-        return -EINVAL;
+        case L8:
+            bytes_per_pixel = 1;
+            break;
+
+        default:
+            ALOGE("%s: unknown format=%d\n", __FUNCTION__, format);
+            return -EINVAL;
     }
 
     /* Check source stride. */
-    if (stride == 0)
-    {
+    if (stride == 0) {
         /* Source is contiguous. */
-        stride = width * bypp;
-    }
-    else
-    /* Source has stride. */
-    if (stride < width * bypp)
-    {
-        LOGE("Invalid stride: %d", stride);
+        stride = (size_t) width * bytes_per_pixel;
+    } else if (stride < (size_t) width * bytes_per_pixel) {
+        /* Source has stride. */
+        ALOGE("%s: invalid stride=%zu\n", __FUNCTION__, stride);
         return -EINVAL;
     }
 
-    /* Compute dest bypp. */
-    switch (format)
-    {
-    case RGBA_8888:
-    case BGRA_8888:
-        bypp = 4;
-        break;
+    /* Compute dest bytes_per_pixel. */
+    switch (format) {
+        case RGBA_8888:
+        case BGRA_8888:
+            /* Save as BGRA_8888. */
+            bytes_per_pixel = 4;
+            break;
 
-    case ARGB_1555:
-        bypp = 2;
-        break;
+        case RGBA_4444:
+        case BGRA_4444:
+            /* Convert to BGRA 8888. */
+            bytes_per_pixel = 4;
+            break;
 
-    default:
-        /* Convert to BGR 888 for other formats. */
-        bypp = 3;
-        break;
+        case ARGB_1555:
+        case RGBA_5551:
+            /* Save as ARGB_1555. */
+            bytes_per_pixel = 2;
+            break;
+
+        default:
+            /* Convert to BGR 888 for other formats. */
+            bytes_per_pixel = 3;
+            break;
     }
 
     /* Compute number of bytes per dstride in bitmap file: align by 4. */
-    dstride = ((width * bypp) + 3) & ~3;
+    dstride = ((width * bytes_per_pixel) + 3) & ~3;
 
     /* Build file header. */
-    file_header.bfType        = _little16(0x4D42);
-    file_header.bfSize        = _little32(
+    bmf.bfType        = convert_le16(0x4D42);
+    bmf.bfSize        = convert_le32(
         sizeof (BITMAPFILEHEADER) + sizeof (BITMAPINFOHEADER)
             + dstride * height);
-    file_header.bfReserved1   = _little32(0);
-    file_header.bfReserved2   = _little32(0);
-    file_header.bfOffBits     = _little32(
+    bmf.bfReserved1   = convert_le32(0);
+    bmf.bfReserved2   = convert_le32(0);
+    bmf.bfOffBits     = convert_le32(
         sizeof (BITMAPFILEHEADER) + sizeof (BITMAPINFOHEADER));
 
-    /* Build info_header. */
-    memset(&info_header, 0, sizeof (BITMAPINFOHEADER));
-    info_header.biSize        = _little32(sizeof (BITMAPINFOHEADER));
-    info_header.biWidth       = _little32(width);
-    info_header.biHeight      = _little32(height);
-    info_header.biPlanes      = _little16(1);
-    info_header.biBitCount    = _little16(bypp * 8);
-    info_header.biCompression = _little32(BI_RGB);
-    info_header.biSizeImage   = _little32(dstride * height);
+    /* Build bmi. */
+    memset(&bmi, 0, sizeof (BITMAPINFOHEADER));
+    bmi.biSize        = convert_le32(sizeof (BITMAPINFOHEADER));
+    bmi.biWidth       = convert_le32(width);
+    bmi.biHeight      = convert_le32(height);
+    bmi.biPlanes      = convert_le16(1);
+    bmi.biBitCount    = convert_le16(bytes_per_pixel * 8);
+    bmi.biCompression = convert_le32(BI_RGB);
+    bmi.biSizeImage   = convert_le32(dstride * height);
 
     /* Open dest file. */
     fp = fopen(filename, "wb");
-    if (fp == NULL)
-    {
-        LOGE("Can not open %s for write.", filename);
+    if (fp == NULL) {
+        ALOGE("%s: failed to open %s for write -- %s.\n",
+            __FUNCTION__, filename, strerror(errno));
         return -EACCES;
     }
 
     /* Write file header. */
-    if (fwrite(&file_header, 1, sizeof (BITMAPFILEHEADER), fp)
-        != sizeof (BITMAPFILEHEADER))
-    {
-        fclose(fp);
-        LOGE("Can not write file header.");
+    nmemb = fwrite(&bmf, 1, sizeof (BITMAPFILEHEADER), fp);
+
+    if (nmemb != sizeof (BITMAPFILEHEADER)) {
+        ALOGE("%s: failed to write file header.\n", __FUNCTION__);
         return -EACCES;
     }
 
     /* Write info header. */
-    if (fwrite(&info_header, 1, sizeof (BITMAPINFOHEADER), fp)
-        != sizeof (BITMAPINFOHEADER))
-    {
-        fclose(fp);
-        LOGE("Can not write info header.");
+    nmemb = fwrite(&bmi, 1, sizeof (BITMAPINFOHEADER), fp);
+
+    if (nmemb != sizeof (BITMAPINFOHEADER)) {
+        ALOGE("%s: failed to write info header.\n", __FUNCTION__);
         return -EACCES;
     }
 
     /* Malloc memory for single dstride. */
     buff = (unsigned char *) malloc(dstride);
 
-    if (buff == NULL)
-    {
-        fclose(fp);
-        LOGE("Out of memory.");
+    if (buff == NULL) {
+        ALOGE("%s: out of memory.\n", __FUNCTION__);
         return -ENOMEM;
     }
 
-    /* Go to last line.
-     * Bitmap is bottom-top, our date is top-bottom. */
-    if (offset > 0)
-    {
-        batch = height / 2;
-        line = (const unsigned char *) data + offset + stride * (batch - 1);
-    }
-    else
-    {
-        batch = height;
-        line = (const unsigned char *) data + stride * (batch - 1);
+    if (offset == 0) {
+        /* No offset: calculate bottom part start offset. */
+        offset = stride * height / 2;
     }
 
 again:
-    for (i = 0; i < batch; i++)
-    {
+    /* Go to last line.
+     * Bitmap is bottom-top, our date is top-bottom.
+     * bottom half part. */
+    line = (const unsigned char *) pixels + offset + stride * (height / 2 - 1);
+
+    for (i = 0; i < (size_t) height / 2; i++) {
         /* Process each line. */
-        switch (format)
-        {
-        case RGBA_8888:
-            /* Swap RB to BGRA 8888. */
-            _fconv(buff, BGRA_8888, line, RGBA_8888, width);
-            break;
+        switch (format) {
+            case RGBA_8888:
+                /* Swap RB to BGRA 8888. */
+                {
+                    size_t j;
+                    uint32_t *s = (uint32_t *) line;
+                    uint32_t *p = (uint32_t *) buff;
 
-        case BGRA_8888:
-            /* No conversion BGRA 8888. */
-            memcpy(buff, line, width * 4);
-            break;
+                    for (j = 0; j < (size_t) width; j++) {
+                        uint32_t pix = *s++;
+                        *p++ =
+                            ((pix & 0xff0000) >> 16) |
+                            ((pix & 0xff) << 16) |
+                            (pix & 0xff00ff00);
+                    }
+                }
+                break;
 
-        case RGBX_8888:
-            /* Swap RB and skip A to BGR 888. */
-            _fconv(buff, BGR_888, line, RGBX_8888, width);
-            break;
+            case BGRA_8888:
+                /* No conversion BGRA 8888. */
+                memcpy(buff, line, width * 4);
+                break;
 
-        case BGRX_8888:
-            /* Skip A to BGR 888. */
-            _fconv(buff, BGR_888, line, BGRX_8888, width);
-            break;
+            case RGBX_8888:
+                /* Swap RB and skip A to BGR 888. */
+                {
+                    size_t j;
+                    uint32_t *s = (uint32_t *) line;
+                    uint8_t  *p = (uint8_t *) buff;
 
-        case RGB_888:
-            /* Swap RB to BGR 888. */
-            _fconv(buff, BGR_888, line, RGB_888, width);
-            break;
+                    for (j = 0; j < (size_t) width; j++) {
+                        uint32_t pix = *s++;
+                        *p++ = (pix & 0xff0000) >> 16;
+                        *p++ = (pix & 0xff00) >> 8;
+                        *p++ = (pix & 0xff);
+                    }
+                }
+                break;
 
-        case BGR_888:
-            /* No conversion: BGR 888. */
-            _fconv(buff, BGR_888, line, BGR_888, width);
-            break;
+            case BGRX_8888:
+                /* Skip X to BGR 888. */
+                {
+                    size_t j;
+                    uint32_t *s = (uint32_t *) line;
+                    uint8_t  *p = (uint8_t *) buff;
 
-        case RGB_565:
-            /* Convert to BGR 888. */
-            _fconv(buff, BGR_888, line, RGB_565, width);
-            break;
+                    for (j = 0; j < (size_t) width; j++) {
+                        uint32_t pix = *s++;
+                        *p++ = (pix & 0xff);
+                        *p++ = (pix & 0xff00) >> 8;
+                        *p++ = (pix & 0xff0000) >> 16;
+                    }
+                }
+                break;
 
-        case BGR_565:
-            /* Convert to BGR 888. */
-            _fconv(buff, BGR_888, line, BGR_565, width);
-            break;
+            case RGB_888:
+                /* Swap RB to BGR 888. */
+                {
+                    size_t j;
+                    uint8_t *s = (uint8_t *) line;
+                    uint8_t *p = (uint8_t *) buff;
 
-        case ARGB_1555:
-            /* No conversion: ARGB 15555. */
-            memcpy(buff, line, width * 2);
-            break;
+                    for (j = 0; j < (size_t) width; j++) {
+                        *p++ = s[2];
+                        *p++ = s[1];
+                        *p++ = s[0];
+                        s += 3;
+                    }
+                }
+                break;
+
+            case BGR_888:
+                /* No conversion: BGR 888. */
+                memcpy(buff, line, width * 3);
+                break;
+
+            case RGB_565:
+                /* Convert to BGR 888. */
+                {
+                    size_t j;
+                    uint16_t *s = (uint16_t *) line;
+                    uint8_t  *p = (uint8_t *) buff;
+
+                    for (j = 0; j < (size_t) width; j++) {
+                        /* TODO: low bits. */
+                        uint16_t pix = *s++;
+                        *p++ = (pix & 0x001F) << 3;
+                        *p++ = (pix & 0x07E0) >> 3;
+                        *p++ = (pix & 0xF800) >> 8;
+                    }
+                }
+                break;
+
+            case BGR_565:
+                /* Convert to BGR 888. */
+                {
+                    size_t j;
+                    uint16_t *s = (uint16_t *) line;
+                    uint8_t *p  = (uint8_t *) buff;
+
+                    for (j = 0; j < (size_t) width; j++) {
+                        /* TODO: low bits. */
+                        uint16_t pix = *s++;
+                        *p++ = (pix & 0xF800) >> 8;
+                        *p++ = (pix & 0x07E0) >> 3;
+                        *p++ = (pix & 0x001F) << 3;
+                    }
+                }
+                break;
+
+            case RGBA_4444:
+                /* Convert to BGRA 8888. */
+                {
+                    size_t j;
+                    uint16_t *s = (uint16_t *) line;
+                    uint32_t *p = (uint32_t *) buff;
+
+                    for (j = 0; j < (size_t) width; j++) {
+                        /* TODO: low bits. */
+                        uint16_t pix = *s++;
+                        *p++ = ( pix & 0xF0) |
+                               ((pix & 0x0F00) << 4) |
+                               ((pix & 0xF000) << 8) |
+                               ((pix & 0x0F) << 28);
+                    }
+                }
+                break;
+
+            case BGRA_4444:
+                /* Convert to BGRA 8888. */
+                {
+                    size_t j;
+                    uint16_t *s = (uint16_t *) line;
+                    uint32_t *p = (uint32_t *) buff;
+
+                    for (j = 0; j < (size_t) width; j++) {
+                        /* TODO: low bits. */
+                        uint16_t pix = *s++;
+                        *p++ = ((pix & 0xF000) >> 8) |
+                               ((pix & 0x0F00) << 4) |
+                               ((pix & 0xF0) << 16) |
+                               ((pix & 0x0F) << 28);
+                    }
+                }
+                break;
+
+            case L8:
+                /* Convert to BGR 888. */
+                {
+                    size_t j;
+                    uint8_t *s = (uint8_t *) line;
+                    uint8_t *p = (uint8_t *) buff;
+
+                    for (j = 0; j < (size_t) width; j++) {
+                        /* TODO: low bits. */
+                        uint8_t pix = *s++;
+                        *p++ = pix;
+                        *p++ = pix;
+                        *p++ = pix;
+                    }
+                }
+                break;
+
+            case ARGB_1555:
+                /* No conversion: ARGB 1555. */
+                memcpy(buff, line, width * 2);
+                break;
+
+            case RGBA_5551:
+                /* ARGB 1555 -> RGBA 5551. */
+                {
+                    size_t j;
+                    uint16_t *s = (uint16_t *) line;
+                    uint16_t *p = (uint16_t *) buff;
+
+                    for (j = 0; j < (size_t) width; j++) {
+                        /* TODO: low bits. */
+                        uint16_t pix = *s++;
+                        *p++ = ((pix & 0x7FFF) << 1) | ((pix & 0x8000) >> 15);
+                    }
+                }
+                break;
         }
 
         /* Write a line. */
-        if (fwrite(buff, 1, dstride, fp) != dstride)
-        {
-            LOGE("Error: Can not write file");
-            LOGE("Bitmap is incomplete.");
+        nmemb = fwrite(buff, 1, dstride, fp);
+
+        if (nmemb != dstride) {
+            ALOGE("%s: failed to write more pixels\n", __FUNCTION__);
+            ALOGE("%s: bitmap is incomplete.\n", __FUNCTION__);
 
             /* Difficult to recover. */
             free(buff);
@@ -1283,9 +1208,8 @@ again:
         line -= stride;
     }
 
-    if (offset > 0)
-    {
-        line = (const unsigned char *) data + stride * (batch - 1);
+    if (offset != 0) {
+        /* finished bottom half part and work on top half part. */
         offset = 0;
         goto again;
     }
@@ -1296,8 +1220,10 @@ again:
     /* Close file. */
     fclose(fp);
 
+#ifdef __linux__
     /* Change file mode. */
     chmod(filename, 0644);
+#endif
 
     return 0;
 }

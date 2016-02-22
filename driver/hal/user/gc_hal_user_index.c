@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -466,6 +466,8 @@ gcoINDEX_Load(
     gctUINT32 indexSize, bytes;
     gctUINT32 indexBufferSize;
     gctUINT32 address;
+    gctUINT32 endAddress;
+    gctUINT32 bufSize;
 
     gcmHEADER_ARG("Index=0x%x IndexType=%d IndexCount=%u IndexBuffer=0x%x",
                   Index, IndexType, IndexCount, IndexBuffer);
@@ -526,10 +528,15 @@ gcoINDEX_Load(
 
     gcmGETHARDWAREADDRESS(Index->memory, address);
 
+    gcmSAFECASTSIZET(bufSize,Index->memory.size);
+
+    endAddress = address + bufSize - 1;
+
     /* Program index buffer states. */
     gcmONERROR(gcoHARDWARE_BindIndex(gcvNULL,
                                      address,
                                      0,
+                                     endAddress,
                                      IndexType,
                                      Index->bytes));
 
@@ -572,6 +579,8 @@ gcoINDEX_Bind(
 {
     gceSTATUS status;
     gctUINT32 address;
+    gctUINT32 endAddress;
+    gctUINT32 bufSize;
 
     gcmHEADER_ARG("Index=0x%x Type=%d", Index, Type);
 
@@ -584,11 +593,16 @@ gcoINDEX_Bind(
                 + Index->dynamicHead->lastStart;
 
         gcoHARDWARE_SetHWSlot(gcvNULL, gcvENGINE_RENDER, gcvHWSLOT_INDEX, 0, 0);
+        gcmSAFECASTSIZET(bufSize, Index->dynamicHead->memory.size);
+        endAddress = Index->dynamicHead->physical + bufSize - 1;
+
+
     }
     else
     {
         gcmGETHARDWAREADDRESS(Index->memory, address);
-
+        gcmSAFECASTSIZET(bufSize, Index->memory.size);
+        endAddress = address + bufSize -1;
         gcoHARDWARE_SetHWSlot(gcvNULL, gcvENGINE_RENDER, gcvHWSLOT_INDEX, Index->memory.u.normal.node, 0);
     }
 
@@ -596,6 +610,7 @@ gcoINDEX_Bind(
     status = gcoHARDWARE_BindIndex(gcvNULL,
                                    address,
                                    0,
+                                   endAddress,
                                    Type,
                                    Index->bytes);
     gcmFOOTER();
@@ -632,6 +647,8 @@ gcoINDEX_BindOffset(
 {
     gceSTATUS status;
     gctUINT32 address;
+    gctUINT32 endAddress;
+    gctUINT32 bufSize;
 
     gcmHEADER_ARG("Index=0x%x Type=%d Offset=%u", Index, Type, Offset);
 
@@ -639,11 +656,15 @@ gcoINDEX_BindOffset(
     gcmVERIFY_OBJECT(Index, gcvOBJ_INDEX);
 
     gcmGETHARDWAREADDRESS(Index->memory, address);
+    gcmSAFECASTSIZET(bufSize,Index->memory.size);
+
+    endAddress = address + bufSize - 1;
 
     /* Program index buffer states. */
     status = gcoHARDWARE_BindIndex(gcvNULL,
                                    address + Offset,
                                    0,
+                                   endAddress,
                                    Type,
                                    Index->bytes - Offset);
     gcmFOOTER();
@@ -2409,6 +2430,8 @@ gcoINDEX_BindDynamic(
     )
 {
     gceSTATUS status;
+    gctUINT32 endAddress;
+    gctUINT32 bufSize;
 
     gcmHEADER_ARG("Index=0x%x Type=%d", Index, Type);
 
@@ -2421,12 +2444,16 @@ gcoINDEX_BindDynamic(
         gcmONERROR(gcvSTATUS_INVALID_REQUEST);
     }
 
+    gcmSAFECASTSIZET(bufSize, Index->dynamicHead->memory.size);
+    endAddress = Index->dynamicHead->physical + bufSize - 1;
+
     /* Program index buffer states. */
     if( gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_INDEX_FETCH_FIX) == gcvSTATUS_TRUE)
     {
         gcmONERROR(gcoHARDWARE_BindIndex(gcvNULL,
                                          (Index->dynamicHead->physical + Index->dynamicHead->lastStart),
                                          0,
+                                         endAddress,
                                          Type,
                                          (Index->dynamicHead->lastEnd - Index->dynamicHead->lastStart)));
     }
@@ -2435,6 +2462,7 @@ gcoINDEX_BindDynamic(
         gcmONERROR(gcoHARDWARE_BindIndex(gcvNULL,
                                          0,
                                          (Index->dynamicHead->physical + Index->dynamicHead->lastStart),
+                                         endAddress,
                                          Type,
                                          (Index->dynamicHead->lastEnd - Index->dynamicHead->lastStart)));
     }
@@ -2448,6 +2476,7 @@ OnError:
     gcmFOOTER();
     return status;
 }
+
 
 /*******************************************************************************
 **

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -43,39 +43,30 @@ sloCOMPILER_EmptyMemoryPool(
     );
 
 gceSTATUS
-sloCOMPILER_SetUnspecifiedInputLocationExist(
-IN sloCOMPILER Compiler
-);
-
-gceSTATUS
-sloCOMPILER_SetUnspecifiedOutputLocationExist(
-IN sloCOMPILER Compiler
-);
+    sloCOMPILER_SetUnspecifiedOutputLocationExist(
+    IN sloCOMPILER Compiler
+    );
 
 gceSTATUS
 sloCOMPILER_SetInputLocationInUse(
-IN sloCOMPILER Compiler,
-IN gctINT Location,
-IN gctSIZE_T Length,
-OUT gctBOOL *InUseAlready
-);
+    IN sloCOMPILER Compiler,
+    IN gctINT Location,
+    IN gctSIZE_T Length
+    );
 
 gceSTATUS
 sloCOMPILER_SetOutputLocationInUse(
-IN sloCOMPILER Compiler,
-IN gctINT Location,
-IN gctSIZE_T Length,
-OUT gctBOOL *InUseAlready
-);
+    IN sloCOMPILER Compiler,
+    IN gctINT Location,
+    IN gctSIZE_T Length
+    );
 
 gceSTATUS
 sloCOMPILER_SetUniformLocationInUse(
-IN sloCOMPILER Compiler,
-IN gctINT Location,
-IN gctSIZE_T Length,
-IN gctBOOL IsPostDecidedArray,
-OUT gctBOOL *InUseAlready
-);
+    IN sloCOMPILER Compiler,
+    IN gctINT Location,
+    IN gctSIZE_T Length
+    );
 
 /* Scanner State */
 typedef enum _sleSCANNER_STATE
@@ -109,43 +100,37 @@ slsSWITCH_SCOPE;
 
 gceSTATUS
 sloCOMPILER_PushSwitchScope(
-IN sloCOMPILER Compiler,
-IN struct _sloIR_LABEL *Cases
-);
+    IN sloCOMPILER Compiler,
+    IN struct _sloIR_LABEL *Cases
+    );
 
 gceSTATUS
 sloCOMPILER_PopSwitchScope(
-IN sloCOMPILER Compiler
-);
+    IN sloCOMPILER Compiler
+    );
 
 slsSWITCH_SCOPE *
 sloCOMPILER_GetSwitchScope(
-IN sloCOMPILER Compiler
-);
+    IN sloCOMPILER Compiler
+    );
 
 gceSTATUS
 sloCOMPILER_SetSwitchScope(
-IN sloCOMPILER Compiler,
-IN struct _sloIR_LABEL *Cases
-);
+    IN sloCOMPILER Compiler,
+    IN struct _sloIR_LABEL *Cases
+    );
 
 gceSTATUS
 sloCOMPILER_GetSharedVariableList(
-IN sloCOMPILER Compiler,
-OUT slsSLINK_LIST **SharedVariableList
-);
+    IN sloCOMPILER Compiler,
+    OUT slsSLINK_LIST **SharedVariableList
+    );
 
 gceSTATUS
 sloCOMPILER_AddSharedVariable(
-IN sloCOMPILER Compiler,
-IN struct _slsNAME *VariableName
-);
-
-gceSTATUS
-slCreateSharedVariableStorageBlock(
     IN sloCOMPILER Compiler,
-    OUT struct _slsNAME **Block
-);
+    IN struct _slsNAME *VariableName
+    );
 
 typedef struct _slsBINDING_OFFSET_LIST
 {
@@ -288,11 +273,6 @@ sloCOMPILER_LoadingBuiltIns(
 
 gceSTATUS
 sloCOMPILER_MainDefined(
-    IN sloCOMPILER Compiler
-    );
-
-gceSTATUS
-sloCOMPILER_LoadBuiltIns(
     IN sloCOMPILER Compiler
     );
 

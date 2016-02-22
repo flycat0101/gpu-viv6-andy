@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -141,6 +141,19 @@ static GLenum _SetAlphaTestReference(
         }
 
         Context->alphaStates.testFunction = (gleTESTFUNCTIONS) function;
+
+        if (Context->hashAlphaTest)
+        {
+            if (Context->alphaStates.testEnabled)
+            {
+                glmSETHASH_3BITS(hashAlphaFunc, function, 0);
+                Context->fsUniformDirty.uAlphaRefDirty = GL_TRUE;
+            }
+            else
+            {
+                glmSETHASH_3BITS(hashAlphaFunc, glvALWAYS, 0);
+            }
+        }
 
         /* Set with [0..1] clamping. */
         Context->alphaStates.testReference = glmFLOATCLAMP_0_TO_1(Value);
@@ -764,10 +777,27 @@ GLenum glfEnableAlphaTest(
     )
 {
     GLenum result;
+
     gcmHEADER_ARG("Context=0x%x Enable=%d", Context, Enable);
+
     Context->alphaStates.testEnabled = Enable;
+
+    if (Context->hashAlphaTest)
+    {
+        if (Enable)
+        {
+            glmSETHASH_3BITS(hashAlphaFunc, Context->alphaStates.testFunction, 0);
+            Context->fsUniformDirty.uAlphaRefDirty = GL_TRUE;
+        }
+        else
+        {
+            glmSETHASH_3BITS(hashAlphaFunc, glvALWAYS, 0);
+        }
+    }
+
     result = glmTRANSLATEHALSTATUS(gco3D_SetAlphaTest(Context->hw, Enable));
     gcmFOOTER_ARG("return=0x%04x", result);
+
     return result;
 }
 

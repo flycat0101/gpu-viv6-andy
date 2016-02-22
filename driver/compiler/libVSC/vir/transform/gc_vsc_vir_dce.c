@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -45,10 +45,11 @@ _VSC_DCE_GetInstChannelNum(
     case VIR_OP_TEXLDPCFPROJ:
         return 4;
 
-    case VIR_OP_STORE:
-        return 4;
-
     default:
+        if (VIR_OPCODE_isMemSt(opcode))
+        {
+            return 4;
+        }
         return 4;
     }
 }
@@ -232,11 +233,11 @@ _VSC_DCE_Final(
 static void
 _VSC_DCE_MarkAndQueueOutput(
     IN VSC_DCE         *dce,
-    IN VIR_Instruction *inst
+    IN VIR_Instruction *inst,
+    IN VIR_OperandInfo *dest_info
     )
 {
     VIR_Operand        *dest  = VIR_Inst_GetDest(inst);
-    VIR_OperandInfo     dest_info;
     gctUINT8            channel = 0;
     VIR_Enable          enable;
     VIR_Symbol*         sym;
@@ -246,16 +247,15 @@ _VSC_DCE_MarkAndQueueOutput(
         return;
     }
 
-    VIR_Operand_GetOperandInfo(inst, dest, &dest_info);
 
-    if(!VIR_OpndInfo_Is_Virtual_Reg(&dest_info))
+    if(!VIR_OpndInfo_Is_Virtual_Reg(dest_info))
     {
         return;
     }
 
     enable = VIR_Operand_GetEnable(dest);
 
-    if(!dest_info.isOutput)
+    if(!dest_info->isOutput)
     {
         return;
     }
@@ -292,7 +292,7 @@ _VSC_DCE_MarkAndQueueOutput(
             &du_iter,
             VSC_DCE_GetDUInfo(dce),
             inst,
-            dest_info.u1.virRegInfo.virReg,
+            dest_info->u1.virRegInfo.virReg,
             channel,
             gcvFALSE);
 
@@ -322,19 +322,18 @@ _VSC_DCE_MarkAndQueueOutput(
 static void
 _VSC_DCE_MarkInstAll(
     IN     VSC_DCE          *dce,
-    IN     VIR_Instruction  *inst
+    IN     VIR_Instruction  *inst,
+    IN     VIR_OperandInfo  *dest_info
     )
 {
     VIR_Enable enable = VIR_ENABLE_XYZW;
     VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
 
-    if(VIR_Inst_GetDest(inst))
+    if(VIR_Inst_GetDest(inst) &&
+       !VIR_OPCODE_isVXOnly(opcode))
     {
         VIR_Operand        *dest  = VIR_Inst_GetDest(inst);
-        VIR_OperandInfo     dest_info;
-
-        VIR_Operand_GetOperandInfo(inst, dest, &dest_info);
-        if(VIR_OpndInfo_Is_Virtual_Reg(&dest_info))
+        if(VIR_OpndInfo_Is_Virtual_Reg(dest_info))
         {
             enable = VIR_Operand_GetEnable(dest);
         }
@@ -368,38 +367,44 @@ _VSC_DCE_InitDCEOnFunction(
     {
         VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
 
-        if (!VIR_OPCODE_hasDest(opcode))
+        if (VIR_OPCODE_isVXOnly(opcode))
         {
-            _VSC_DCE_MarkInstAll(dce, inst);
+            _VSC_DCE_MarkInstAll(dce, inst, gcvNULL);
         }
-        else if (VIR_OPCODE_MemOp(opcode) &&
-            !VIR_OPCODE_ReadMemOnly(opcode))
+        else if (!VIR_OPCODE_hasDest(opcode))
         {
-            _VSC_DCE_MarkInstAll(dce, inst);
+            _VSC_DCE_MarkInstAll(dce, inst, gcvNULL);
         }
-        else if (VIR_OPCODE_isBranch(opcode))
-        {
-            if (VSC_UTILS_MASK(VSC_OPTN_DCEOptions_GetOPTS(options),
-                VSC_OPTN_DCEOptions_OPTS_CONTROL))
-            {
-                _VSC_DCE_JmpListAdd(dce, inst);
-            }
-            else
-            {
-                _VSC_DCE_MarkInstAll(dce, inst);
-            }
-        }
-        else if (VIR_OPCODE_hasDest(opcode))
+        else
         {
             VIR_Operand        *dest  = VIR_Inst_GetDest(inst);
             VIR_OperandInfo     dest_info;
 
+            gcmASSERT(dest);
+
             VIR_Operand_GetOperandInfo(inst, dest, &dest_info);
 
-            if(VIR_OpndInfo_Is_Virtual_Reg(&dest_info))
+            if (VIR_OPCODE_MemOp(opcode) &&
+                !VIR_OPCODE_ReadMemOnly(opcode))
+            {
+                _VSC_DCE_MarkInstAll(dce, inst, &dest_info);
+            }
+            else if (VIR_OPCODE_isBranch(opcode))
+            {
+                if (VSC_UTILS_MASK(VSC_OPTN_DCEOptions_GetOPTS(options),
+                    VSC_OPTN_DCEOptions_OPTS_CONTROL))
+                {
+                    _VSC_DCE_JmpListAdd(dce, inst);
+                }
+                else
+                {
+                    _VSC_DCE_MarkInstAll(dce, inst, &dest_info);
+                }
+            }
+            else if(VIR_OpndInfo_Is_Virtual_Reg(&dest_info))
             {
                 /* If inst's dest is output, mark it. */
-                _VSC_DCE_MarkAndQueueOutput(dce, inst);
+                _VSC_DCE_MarkAndQueueOutput(dce, inst, &dest_info);
             }
             else if (opcode == VIR_OP_LABEL)
             {
@@ -407,12 +412,8 @@ _VSC_DCE_InitDCEOnFunction(
             }
             else
             {
-                _VSC_DCE_MarkInstAll(dce, inst);
+                _VSC_DCE_MarkInstAll(dce, inst, &dest_info);
             }
-        }
-        else
-        {
-            gcmASSERT(gcvFALSE);
         }
 
         inst = VIR_Inst_GetNext(inst);
@@ -442,7 +443,7 @@ _VSC_DCE_MarkAndQueueAllDefs(
         return errCode;
     }
 
-    vscVIR_InitGeneralUdIterator(&ud_iter, VSC_DCE_GetDUInfo(dce), inst, opnd, gcvFALSE);
+    vscVIR_InitGeneralUdIterator(&ud_iter, VSC_DCE_GetDUInfo(dce), inst, opnd, gcvFALSE, gcvFALSE);
 
     inst_src_swiz = VIR_Operand_GetSwizzle(opnd);
     if(!VIR_OPCODE_isComponentwise(opcode))
@@ -643,6 +644,7 @@ _VSC_DCE_DeleteUsage(
                 VIR_ANY_DEF_INST,
                 inst,
                 inst_src,
+                gcvFALSE,
                 inst_src_info.u1.virRegInfo.virReg,
                 1,
                 delete_src_enable,
@@ -698,7 +700,6 @@ _VSC_DCE_RemoveDeadCodeOnFunction(
 {
     VSC_ErrCode         errCode     = VSC_ERR_NONE;
     VIR_Instruction    *inst        = gcvNULL;
-    VIR_OperandInfo     destInfo    = { 0 };
 
     inst = func->instList.pHead;
 
@@ -708,6 +709,7 @@ _VSC_DCE_RemoveDeadCodeOnFunction(
         VIR_Operand     *inst_dest      = VIR_Inst_GetDest(inst);
         VIR_Enable       inst_enable    = VIR_ENABLE_XYZW;
         VIR_OpCode       opcode         = VIR_Inst_GetOpcode(inst);
+        VIR_OperandInfo  destInfo       = { 0 };
 
         if(flag.isAlive == VIR_ENABLE_XYZW)
         {
@@ -732,6 +734,7 @@ _VSC_DCE_RemoveDeadCodeOnFunction(
             VIR_Inst_GetOpcode(inst) == VIR_OP_NORM_DP3 ||
             VIR_Inst_GetOpcode(inst) == VIR_OP_NORM_DP4 ||
             VIR_Inst_GetOpcode(inst) == VIR_OP_NORM_MUL ||
+            VIR_OPCODE_isVXOnly(VIR_Inst_GetOpcode(inst)) ||
             (VIR_OPCODE_MemOp(VIR_Inst_GetOpcode(inst)) && VIR_OPCODE_ReadMemOnly(VIR_Inst_GetOpcode(inst))))
         {
             if (VSC_DCE_GetMarkByInst(dce, inst).isAlive != 0)
@@ -754,6 +757,7 @@ _VSC_DCE_RemoveDeadCodeOnFunction(
         if (inst_dest == gcvNULL)
         {
             inst = _VSC_DCE_GetNextInst(dce, func, inst, flag);
+            continue;
         }
         else if(VIR_OPCODE_isBranch(opcode))
         {
@@ -768,36 +772,20 @@ _VSC_DCE_RemoveDeadCodeOnFunction(
             VIR_Operand             *opnd        = gcvNULL;
             VIR_SrcOperand_Iterator  opndIter;
 
-            if(curBB == gcvNULL)
-            {
-                gcmASSERT(gcvFALSE);
-                inst = VIR_Inst_GetNext(inst);
-                continue;
-            }
-
+            gcmASSERT(curBB != gcvNULL);
             gcmASSERT(VSC_UTILS_MASK(VSC_OPTN_DCEOptions_GetOPTS(VSC_DCE_GetOptions(dce)),
                 VSC_OPTN_DCEOptions_OPTS_CONTROL));
 
             opcode = VIR_Inst_GetOpcode(inst);
 
             treeNode = curBB->pPostDomTreeNode->treeNode.pParentNode;
+            gcmASSERT(treeNode);
 
-            while(treeNode != gcvNULL &&
-                VSC_DCE_GetBBInfoByBB(dce, ((VIR_DOM_TREE_NODE *)treeNode)->pOwnerBB).calculated == gcvFALSE)
+            while(VSC_DCE_GetBBInfoByBB(dce, ((VIR_DOM_TREE_NODE *)treeNode)->pOwnerBB).calculated == gcvFALSE &&
+                  ((VIR_DOM_TREE_NODE *)treeNode)->pOwnerBB->flowType != VIR_FLOW_TYPE_EXIT)
             {
-                if(((VIR_DOM_TREE_NODE *)treeNode->pParentNode)->pOwnerBB->flowType == VIR_FLOW_TYPE_EXIT)
-                {
-                    break;
-                }
-
                 treeNode = treeNode->pParentNode;
-            }
-
-            if (treeNode == gcvNULL)
-            {
-                gcmASSERT(gcvFALSE);
-                inst = VIR_Inst_GetNext(inst);
-                continue;
+                gcmASSERT(treeNode);
             }
 
             target_bb = ((VIR_DOM_TREE_NODE *)treeNode)->pOwnerBB;
@@ -820,27 +808,60 @@ _VSC_DCE_RemoveDeadCodeOnFunction(
             /* JMP's dest is also the usage of Label. */
             _VSC_DCE_DeleteUsage(dce, inst, inst->dest, coverMask, coverFlag);
 
-            if (VIR_Inst_GetOpcode(target_bb->pStartInst) != VIR_OP_LABEL)
+            if(target_bb->flowType != VIR_FLOW_TYPE_EXIT)
             {
-                VIR_Instruction *label_inst = gcvNULL;
-                VIR_Label       *label      = gcvNULL;
-                VIR_LabelId      label_id;
+                if (VIR_Inst_GetOpcode(target_bb->pStartInst) != VIR_OP_LABEL)
+                {
+                    VIR_Instruction *label_inst = gcvNULL;
+                    VIR_Label       *label      = gcvNULL;
+                    VIR_LabelId      label_id;
 
-                VIR_Function_AddInstructionBefore(func,
-                                                  VIR_OP_LABEL,
-                                                  VIR_TYPE_UNKNOWN,
-                                                  target_bb->pStartInst,
-                                                 &label_inst);
+                    gcmASSERT(target_bb->pStartInst);
+                    VIR_Function_AddInstructionBefore(func,
+                                                      VIR_OP_LABEL,
+                                                      VIR_TYPE_UNKNOWN,
+                                                      target_bb->pStartInst,
+                                                      &label_inst);
 
-                VIR_Function_AddLabel(func, gcvNULL, &label_id);
+                    VIR_Function_AddLabel(func, gcvNULL, &label_id);
 
-                label = VIR_GetLabelFromId(func, label_id);
-                label->defined = label_inst;
+                    label = VIR_GetLabelFromId(func, label_id);
+                    label->defined = label_inst;
 
-                VIR_Operand_SetLabel(VIR_Inst_GetDest(label_inst), label);
+                    VIR_Operand_SetLabel(VIR_Inst_GetDest(label_inst), label);
+                }
+                target_inst = target_bb->pStartInst;
+            }
+            else
+            {
+                VIR_Instruction* lastInst = VIR_Function_GetInstEnd(func);
+                if(lastInst == inst)
+                {
+                    VIR_Function_RemoveInstruction(func, inst);
+                    break;
+                }
+                else if(VIR_Inst_GetOpcode(lastInst) != VIR_OP_LABEL)
+                {
+                    VIR_Instruction *label_inst = gcvNULL;
+                    VIR_Label       *label      = gcvNULL;
+                    VIR_LabelId      label_id;
+
+                    VIR_Function_AddInstructionAfter(func,
+                                                     VIR_OP_LABEL,
+                                                     VIR_TYPE_UNKNOWN,
+                                                     lastInst,
+                                                     &label_inst);
+
+                    VIR_Function_AddLabel(func, gcvNULL, &label_id);
+
+                    label = VIR_GetLabelFromId(func, label_id);
+                    label->defined = label_inst;
+
+                    VIR_Operand_SetLabel(VIR_Inst_GetDest(label_inst), label);
+                }
+                target_inst = VIR_Function_GetInstEnd(func);
             }
 
-            target_inst = target_bb->pStartInst;
             target_dest = VIR_Inst_GetDest(target_inst);
             target_lb   = VIR_Operand_GetLabel(target_dest);
 
@@ -876,20 +897,19 @@ _VSC_DCE_RemoveDeadCodeOnFunction(
             dce->rebuildCFG = gcvTRUE;
 
             inst = VIR_Inst_GetNext(inst);
+            continue;
         }
         else if(VIR_OP_LABEL == opcode)
         {
             inst = VIR_Inst_GetNext(inst);
+            continue;
         }
         else if(VIR_OpndInfo_Is_Virtual_Reg(&destInfo))
         {
-            VIR_OperandInfo          inst_dest_info;
             VIR_Enable               coverMask  = inst_enable;
             gctUINT8                 coverFlag  = flag.isAlive;
             VIR_Operand             *opnd       = gcvNULL;
             VIR_SrcOperand_Iterator  opndIter;
-
-            VIR_Operand_GetOperandInfo(inst, inst_dest, &inst_dest_info);
 
             if (!VIR_OPCODE_isComponentwise(opcode))
             {
@@ -908,7 +928,7 @@ _VSC_DCE_RemoveDeadCodeOnFunction(
             vscVIR_DeleteDef(
                 VSC_DCE_GetDUInfo(dce),
                 inst,
-                inst_dest_info.u1.virRegInfo.virReg,
+                destInfo.u1.virRegInfo.virReg,
                 1,
                 inst_enable & (~flag.isAlive),
                 VIR_HALF_CHANNEL_MASK_FULL,
@@ -936,6 +956,7 @@ _VSC_DCE_RemoveDeadCodeOnFunction(
                 }
             }
             inst = _VSC_DCE_GetNextInst(dce, func, inst, flag);
+            continue;
         }
         else
         {

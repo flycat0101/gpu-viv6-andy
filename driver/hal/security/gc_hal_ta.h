@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -112,6 +112,8 @@ typedef struct _gcTA_HARDWARE {
 
     /*specs.*/
     gctUINT8    pixelPipes;
+
+    gctUINT8    resolvePipes;
 } gcsTA_HARDWARE;
 
 /* Maps state locations within the context buffer. */

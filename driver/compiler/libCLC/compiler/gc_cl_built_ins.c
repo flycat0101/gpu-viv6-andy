@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -181,13 +181,16 @@ clsBUILTIN_DATATYPE_INFO clBuiltinDataTypes[] =
     {T_IU_GENTYPE, T_INT, {clvTYPE_IU_GEN, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, ""},
     {T_SIU_GENTYPE, T_INT, {clvTYPE_SIU_GEN, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, ""},
 
-    {T_SAMPLER_T, T_SAMPLER_T, {clvTYPE_SAMPLER_T, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "11ocl_sampler"},
-    {T_IMAGE1D_T, T_IMAGE1D_T, {clvTYPE_IMAGE1D_T, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "11ocl_image1d"},
-    {T_IMAGE1D_ARRAY_T, T_IMAGE1D_ARRAY_T, {clvTYPE_IMAGE1D_ARRAY_T, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "11ocl_image1d_array"},
-    {T_IMAGE1D_BUFFER_T, T_IMAGE1D_BUFFER_T, {clvTYPE_IMAGE1D_BUFFER_T, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "11ocl_image1d_buffer"},
-    {T_IMAGE2D_T, T_IMAGE2D_T, {clvTYPE_IMAGE2D_T, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "11ocl_image2d"},
-    {T_IMAGE2D_ARRAY_T, T_IMAGE2D_ARRAY_T, {clvTYPE_IMAGE2D_ARRAY_T, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "11ocl_image2d_array"},
-    {T_IMAGE3D_T, T_IMAGE3D_T, {clvTYPE_IMAGE3D_T, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "11ocl_image3d"},
+    {T_GENTYPE_PACKED, T_CHAR, {clvTYPE_GEN_PACKED, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, ""},
+
+    {T_SAMPLER_T, T_SAMPLER_T, {clvTYPE_SAMPLER_T, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "13ocl_sampler_t"},
+    {T_IMAGE1D_T, T_IMAGE1D_T, {clvTYPE_IMAGE1D_T, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "13ocl_image1d_t"},
+    {T_IMAGE1D_ARRAY_T, T_IMAGE1D_ARRAY_T, {clvTYPE_IMAGE1D_ARRAY_T, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "19ocl_image1d_array_t"},
+    {T_IMAGE1D_BUFFER_T, T_IMAGE1D_BUFFER_T, {clvTYPE_IMAGE1D_BUFFER_T, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "20ocl_image1d_buffer_t"},
+    {T_IMAGE2D_T, T_IMAGE2D_T, {clvTYPE_IMAGE2D_T, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "13ocl_image2d_t"},
+    {T_IMAGE2D_ARRAY_T, T_IMAGE2D_ARRAY_T, {clvTYPE_IMAGE2D_ARRAY_T, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "19ocl_image2d_array_t"},
+    {T_IMAGE3D_T, T_IMAGE3D_T, {clvTYPE_IMAGE3D_T, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "13ocl_image3d_t"},
+    {T_IMAGE2D_PTR_T, T_IMAGE2D_PTR_T, {clvTYPE_IMAGE2D_PTR_T, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvTRUE, {{gcvNULL, }, }, "20_viv_image2d_array_t"},
     {T_VOID, 0, {clvTYPE_VOID, {0,0}}, clvPOLYNARY_CONSTRUCT_NONE, gcvFALSE, {{gcvNULL, }, }, "v"}
 };
 
@@ -497,6 +500,7 @@ _LoadBuiltinConstants(IN cloCOMPILER Compiler)
         __BUILD_BUILT_IN(NOP)
 
         __BUILD_BUILT_IN(ASSIGN)
+        {"MOV", clvOPCODE_ASSIGN },  /* allow MOV be used in _viv_asm */
 
         __BUILD_BUILT_IN(CONV)
         __BUILD_BUILT_IN(CONV_RTE)
@@ -1396,7 +1400,7 @@ IN clsNAME *KernelFunc
                                 _cldUnnamedVariableRegs(clvBUILTIN_GLOBAL_SIZE));
 
       tempRegIndex = clNewLocalTempRegs(Compiler, 1);
-      clsIOPERAND_Initialize(iOperand, clmGenCodeDataType(T_INT2), tempRegIndex);
+      clsIOPERAND_Initialize(Compiler, iOperand, clmGenCodeDataType(T_INT2), tempRegIndex);
       clmROPERAND_vectorComponent_GET(rOperand2, globalSizeOperand, clvCOMPONENT_X);
 
       gcmONERROR(clGenArithmeticExprCode(Compiler,
@@ -1465,7 +1469,7 @@ IN clsNAME *KernelFunc
 
           clsROPERAND_InitializeReg(rOperand2,
                                     _cldUnnamedVariableRegs(clvBUILTIN_PRIVATE_ADDRESS_SPACE));
-          clsIOPERAND_Initialize(addressOffset, clmGenCodeDataType(T_UINT), cldPrivateMemoryAddressRegIndex);
+          clsIOPERAND_Initialize(Compiler, addressOffset, clmGenCodeDataType(T_UINT), cldPrivateMemoryAddressRegIndex);
           gcmONERROR(clGenArithmeticExprCode(Compiler,
                                              KernelFunc->lineNo,
                                              KernelFunc->stringNo,
@@ -1508,7 +1512,7 @@ IN clsNAME *KernelFunc
           clsROPERAND_InitializeReg(rOperand1,
                                     _cldUnnamedVariableRegs(clvBUILTIN_PRINTF_ADDRESS));
           clsROPERAND_InitializeUsingIOperand(rOperand2, addressOffset);
-          clsIOPERAND_Initialize(startAddress, clmGenCodeDataType(T_UINT), cldPrintfStartMemoryAddressRegIndex);
+          clsIOPERAND_Initialize(Compiler, startAddress, clmGenCodeDataType(T_UINT), cldPrintfStartMemoryAddressRegIndex);
           gcmONERROR(clGenArithmeticExprCode(Compiler,
                                              KernelFunc->lineNo,
                                              KernelFunc->stringNo,
@@ -1518,7 +1522,7 @@ IN clsNAME *KernelFunc
                                              rOperand2));
 
           clsROPERAND_InitializeUsingIOperand(rOperand1, startAddress);
-          clsIOPERAND_Initialize(endAddress, clmGenCodeDataType(T_UINT), cldPrintfEndMemoryAddressRegIndex);
+          clsIOPERAND_Initialize(Compiler, endAddress, clmGenCodeDataType(T_UINT), cldPrintfEndMemoryAddressRegIndex);
           gcmONERROR(clGenArithmeticExprCode(Compiler,
                                              KernelFunc->lineNo,
                                              KernelFunc->stringNo,
@@ -1590,7 +1594,7 @@ IN clsNAME *KernelFunc
                                 _cldUnnamedVariableRegs(clvBUILTIN_NUM_GROUPS));
 
       tempRegIndex = clNewLocalTempRegs(Compiler, 1);
-      clsIOPERAND_Initialize(iOperand, clmGenCodeDataType(T_INT2), tempRegIndex);
+      clsIOPERAND_Initialize(Compiler, iOperand, clmGenCodeDataType(T_INT2), tempRegIndex);
       clmROPERAND_vectorComponent_GET(rOperand2, numGroupsOperand, clvCOMPONENT_X);
 
       gcmONERROR(clGenArithmeticExprCode(Compiler,
@@ -1618,7 +1622,7 @@ IN clsNAME *KernelFunc
       clsROPERAND_InitializeUsingIOperand(rOperand1, addressOffset);
       clsROPERAND_InitializeUsingIOperand(rOperand2, iOperand);
       clmROPERAND_vectorComponent_GET(rOperand2, rOperand2, clvCOMPONENT_X);
-      clsIOPERAND_Initialize(addressOffset, clmGenCodeDataType(T_UINT), cldLocalMemoryAddressRegIndex);
+      clsIOPERAND_Initialize(Compiler, addressOffset, clmGenCodeDataType(T_UINT), cldLocalMemoryAddressRegIndex);
       gcmONERROR(clGenArithmeticExprCode(Compiler,
                                          KernelFunc->lineNo,
                                          KernelFunc->stringNo,
@@ -1653,7 +1657,8 @@ IN clsNAME *KernelFunc
       gcmONERROR(clsNAME_AllocLogicalRegs(Compiler,
                                           CodeGenerator,
                                           addressSpace));
-      clsLOPERAND_InitializeTempReg(lOperand,
+      clsLOPERAND_InitializeTempReg(Compiler,
+                                    lOperand,
                                     clvQUALIFIER_NONE,
                                     clmGenCodeDataType(T_UINT),
                                     cldConstantMemoryAddressRegIndex);

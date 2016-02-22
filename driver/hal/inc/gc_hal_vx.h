@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -23,14 +23,20 @@ extern "C" {
 ****************************** Object Declarations *****************************
 \******************************************************************************/
 
+#if gcdVX_OPTIMIZER > 1
+#define gcsVX_KERNEL_PARAMETERS     gcoVX_Hardware_Context
+
+typedef gcoVX_Hardware_Context *    gcsVX_KERNEL_PARAMETERS_PTR;
+#else
 /* VX kernel parameters. */
 typedef struct _gcsVX_KERNEL_PARAMETERS * gcsVX_KERNEL_PARAMETERS_PTR;
 
 typedef struct _gcsVX_KERNEL_PARAMETERS
 {
+    gctUINT32           kernel;
+
     gctUINT32           step;
 
-    gctUINT32           kernel;
     gctUINT32           xmin;
     gctUINT32           xmax;
     gctUINT32           xstep;
@@ -50,41 +56,42 @@ typedef struct _gcsVX_KERNEL_PARAMETERS
     gctUINT32           constant_value;
     gctUINT32           volume;
     gctUINT32           clamp;
-    gctUINT32           inputhack;
-    gctUINT32           outputhack;
-
     gctUINT32           inputMultipleWidth;
     gctUINT32           outputMultipleWidth;
 
     gctUINT32           order;
 
-    gctUINT32           itype[10];
-    gctUINT32           otype[10];
+    gctUINT32           input_type[10];
+    gctUINT32           output_type[10];
     gctUINT32           input_count;
     gctUINT32           output_count;
 
-    gcoVX_Instructions  instructions;
-
     gctINT16            *matrix;
+    gctINT16            *matrix1;
     gctUINT32           col;
     gctUINT32           row;
 
-    gcsSURF_NODE_PTR   node;
+    gcsSURF_NODE_PTR    node;
 
     gceSURF_FORMAT      inputFormat;
     gceSURF_FORMAT      outputFormat;
 
-    gctUINT8 isUseInitialEstimate;
-    gctINT32 maxLevel;
-    gctINT32 winSize;
+    gctUINT8            isUseInitialEstimate;
+    gctINT32            maxLevel;
+    gctINT32            winSize;
+
+    gcoVX_Instructions  instructions;
+
+    vx_evis_no_inst_s   evisNoInst;
 }
 gcsVX_KERNEL_PARAMETERS;
+#endif
 
 /******************************************************************************\
 ****************************** API Declarations *****************************
 \******************************************************************************/
 gceSTATUS
-gcoVX_Initialize();
+gcoVX_Initialize(vx_evis_no_inst_s *evisNoInst);
 
 gceSTATUS
 gcoVX_BindImage(
@@ -150,6 +157,55 @@ gcoVX_DestroyNode(
 gceSTATUS
 gcoVX_KernelConstruct(
     IN OUT gcoVX_Hardware_Context   *Context
+    );
+
+gceSTATUS
+gcoVX_LockKernel(
+    IN OUT gcoVX_Hardware_Context   *Context
+    );
+
+gceSTATUS
+gcoVX_BindKernel(
+    IN OUT gcoVX_Hardware_Context   *Context
+    );
+
+gceSTATUS
+gcoVX_LoadKernelShader(
+    IN gctSIZE_T StateBufferSize,
+    IN gctPOINTER StateBuffer,
+    IN gcsHINT_PTR Hints
+    );
+
+gceSTATUS
+gcoVX_InvokeKernelShader(
+    IN gcSHADER            Kernel,
+    IN gctUINT             WorkDim,
+    IN size_t              GlobalWorkOffset[3],
+    IN size_t              GlobalWorkScale[3],
+    IN size_t              GlobalWorkSize[3],
+    IN size_t              LocalWorkSize[3],
+    IN gctUINT             ValueOrder
+    );
+
+gceSTATUS
+gcoVX_Flush(
+    IN gctBOOL      Stall
+    );
+
+gceSTATUS
+gcoVX_AllocateMemoryEx(
+    IN OUT gctUINT *        Bytes,
+    OUT gctPHYS_ADDR *      Physical,
+    OUT gctPOINTER *        Logical,
+    OUT gcsSURF_NODE_PTR *  Node
+    );
+
+gceSTATUS
+gcoVX_FreeMemoryEx(
+    IN gctPHYS_ADDR         Physical,
+    IN gctPOINTER           Logical,
+    IN gctUINT              Bytes,
+    IN gcsSURF_NODE_PTR     Node
     );
 
 #ifdef __cplusplus

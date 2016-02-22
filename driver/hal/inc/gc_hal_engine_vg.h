@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1219,6 +1219,52 @@ gcoVG_EnableDither(
     IN gctBOOL Enable
     );
 
+/* Color Key States. */
+gceSTATUS
+gcoVG_SetColorKey(
+    IN gcoVG        Vg,
+#if gcdGC355_PROFILER
+    IN gcsPROFILERFUNCNODE *DList,
+    IN gctUINT TreeDepth,
+    IN gctUINT saveLayerTreeDepth,
+    IN gctUINT varTreeDepth,
+#endif
+    IN gctUINT32*    Values,
+    IN gctBOOL *    Enables
+);
+
+/* Index Color States. */
+gceSTATUS
+gcoVG_SetColorIndexTable(
+    IN gcoVG        Vg,
+#if gcdGC355_PROFILER
+    IN gcsPROFILERFUNCNODE *DList,
+    IN gctUINT TreeDepth,
+    IN gctUINT saveLayerTreeDepth,
+    IN gctUINT varTreeDepth,
+#endif
+    IN gctUINT32*    Values,
+    IN gctINT32      Count
+);
+
+/* VG RS feature support: YUV format conversion. */
+gceSTATUS
+gcoVG_Resolve(
+    IN gcoVG        Vg,
+    IN gcoSURF      Source,
+    IN gcoSURF      Target,
+    IN gctINT       SX,
+    IN gctINT       SY,
+    IN gctINT       DX,
+    IN gctINT       DY,
+    IN gctINT       Width,
+    IN gctINT       Height,
+    IN gctINT       Src_uv,
+    IN gctINT       Src_standard,
+    IN gctINT       Dst_uv,
+    IN gctINT       Dst_standard,
+    IN gctINT       Dst_alpha
+);
 #ifdef __cplusplus
 }
 #endif

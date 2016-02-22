@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -162,6 +162,9 @@ typedef struct __GLtextureParamStateRec
     /* Depth stencil texture mode */
     GLenum depthStTexMode;
 
+    /* VIV private property */
+    GLboolean contentProtected;
+
 } __GLtextureParamState;
 
 /*
@@ -262,11 +265,16 @@ struct __GLtextureObjectRec
     GLint arrays;
 
     /*
-    ** maxFaces: it's 6 for cubemap, maxArraySize for 2d array and maxArraySize * 6 for cubemap array
+    ** maxFaces:   it's 6 for cubemap, 1 otherwise.
+    ** maxDepths:  3d texture: maxDepthSize;
+    **             2d array  : maxArraySize;
+    **             cube array: 6 * maxArraySize
+    ** maxSlices:  equals to maxFaces if cube, and maxDepths otherwise
     */
     GLuint maxFaces;
-    GLuint maxLevels;
     GLuint maxDepths;
+    GLuint maxSlices;
+    GLuint maxLevels;
 
     /* Below states belong to this object only. Use for texture descriptor only.
     ** It won't compare with the previous object on the same texture unit.
@@ -288,9 +296,9 @@ struct __GLtextureObjectRec
             GLuint baseLevelDirty    : 1;
             GLuint borderColorDirty  : 1;
             GLuint reserved          : 27;
-        }s;
+        } s;
         GLuint objStateDirty;
-    }uObjStateDirty;
+    } uObjStateDirty;
 
     /*
     ** Flag to indicate whether or not the texture is specified with sized internal format.

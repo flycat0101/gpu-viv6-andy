@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -240,6 +240,7 @@ VivModifyPixmapHeader(PixmapPtr pPixmap, int width, int height,
             {
                 CleanSurfaceBySW(&pViv->mGrCtx, pPixmap, vivPixmap);
             }
+
 
 
         }

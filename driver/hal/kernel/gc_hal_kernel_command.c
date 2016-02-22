@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -133,11 +133,12 @@ _NewQueue(
 #endif
 
     /* Update gckCOMMAND object with new command queue. */
-    Command->index    = newIndex;
-    Command->newQueue = gcvTRUE;
-    Command->logical  = Command->queues[newIndex].logical;
-    Command->address  = Command->queues[newIndex].address;
-    Command->offset   = 0;
+    Command->index         = newIndex;
+    Command->newQueue      = gcvTRUE;
+    Command->virtualMemory = Command->queues[newIndex].physical;
+    Command->logical       = Command->queues[newIndex].logical;
+    Command->address       = Command->queues[newIndex].address;
+    Command->offset        = 0;
 
     gcmkONERROR(gckOS_GetPhysicalAddress(
         Command->os,
@@ -354,6 +355,7 @@ OnError:
 }
 #endif
 
+#if !gcdNULL_DRIVER
 static gceSTATUS
 _FlushMMU(
     IN gckCOMMAND Command
@@ -431,6 +433,19 @@ _FlushMMU(
         pointer += eventBytes;
         gcmkONERROR(gckHARDWARE_End(hardware, pointer, &endBytes));
 
+#if USE_KERNEL_VIRTUAL_BUFFERS
+        if (hardware->kernel->virtualCommandBuffer)
+        {
+            gcmkONERROR(gckKERNEL_GetGPUAddress(
+                hardware->kernel,
+                pointer,
+                gcvFALSE,
+                Command->virtualMemory,
+                &hardware->lastEnd
+                ));
+        }
+#endif
+
         gcmkONERROR(gckCOMMAND_Execute(Command, executeBytes));
     }
 
@@ -439,6 +454,7 @@ OnError:
     return status;
 #endif
 }
+#endif
 
 static void
 _DumpBuffer(
@@ -520,6 +536,7 @@ _DumpKernelCommandBuffer(
     }
 }
 
+#if !gcdNULL_DRIVER
 static gceSTATUS
 _HandlePatchList(
     IN gckCOMMAND Command,
@@ -663,6 +680,7 @@ OnError:
     gcmkFOOTER();
     return status;
 }
+#endif
 
 /******************************************************************************\
 ****************************** gckCOMMAND API Code ******************************
@@ -759,24 +777,47 @@ gckCOMMAND_Construct(
     /* Pre-allocate the command queues. */
     for (i = 0; i < gcdCOMMAND_QUEUES; ++i)
     {
-        gcmkONERROR(gckOS_AllocateNonPagedMemory(
-            os,
-            gcvFALSE,
-            &pageSize,
-            &command->queues[i].physical,
-            &command->queues[i].logical
-            ));
+#if USE_KERNEL_VIRTUAL_BUFFERS
+        if (Kernel->virtualCommandBuffer)
+        {
+            gcmkONERROR(gckKERNEL_AllocateVirtualCommandBuffer(
+                Kernel,
+                gcvFALSE,
+                &pageSize,
+                &command->queues[i].physical,
+                &command->queues[i].logical
+                ));
 
-        gcmkONERROR(gckHARDWARE_ConvertLogical(
-            Kernel->hardware,
-            command->queues[i].logical,
-            gcvFALSE,
-            &command->queues[i].address
-            ));
+            gcmkONERROR(gckKERNEL_GetGPUAddress(
+                Kernel,
+                command->queues[i].logical,
+                gcvFALSE,
+                command->queues[i].physical,
+                &command->queues[i].address
+                ));
+        }
+        else
+#endif
+        {
+            gcmkONERROR(gckOS_AllocateNonPagedMemory(
+                os,
+                gcvFALSE,
+                &pageSize,
+                &command->queues[i].physical,
+                &command->queues[i].logical
+                ));
 
-        gcmkONERROR(gckMMU_FillFlatMapping(
-            Kernel->mmu, command->queues[i].address, pageSize
-            ));
+            gcmkONERROR(gckHARDWARE_ConvertLogical(
+                Kernel->hardware,
+                command->queues[i].logical,
+                gcvFALSE,
+                &command->queues[i].address
+                ));
+
+            gcmkONERROR(gckMMU_FillFlatMapping(
+                Kernel->mmu, command->queues[i].address, pageSize
+                ));
+        }
 
         gcmkONERROR(gckOS_CreateSignal(
             os, gcvFALSE, &command->queues[i].signal
@@ -874,12 +915,26 @@ gckCOMMAND_Destroy(
 
         if (Command->queues[i].logical)
         {
-            gcmkVERIFY_OK(gckOS_FreeNonPagedMemory(
-                Command->os,
-                Command->pageSize,
-                Command->queues[i].physical,
-                Command->queues[i].logical
-                ));
+#if USE_KERNEL_VIRTUAL_BUFFERS
+            if (Command->kernel->virtualCommandBuffer)
+            {
+                gcmkVERIFY_OK(gckKERNEL_DestroyVirtualCommandBuffer(
+                    Command->kernel,
+                    Command->pageSize,
+                    Command->queues[i].physical,
+                    Command->queues[i].logical
+                    ));
+            }
+            else
+#endif
+            {
+                gcmkVERIFY_OK(gckOS_FreeNonPagedMemory(
+                    Command->os,
+                    Command->pageSize,
+                    Command->queues[i].physical,
+                    Command->queues[i].logical
+                    ));
+            }
         }
     }
 
@@ -1286,6 +1341,19 @@ gckCOMMAND_Stop(
             hardware, Command->waitLogical, &Command->waitSize
             ));
 
+#if USE_KERNEL_VIRTUAL_BUFFERS
+        if (hardware->kernel->virtualCommandBuffer)
+        {
+            gcmkONERROR(gckKERNEL_GetGPUAddress(
+                hardware->kernel,
+                Command->waitLogical,
+                gcvFALSE,
+                Command->virtualMemory,
+                &hardware->lastEnd
+                ));
+        }
+#endif
+
 #if gcdSECURITY
         gcmkONERROR(gckKERNEL_SecurityExecute(
             Command->kernel, Command->waitLogical, 8
@@ -1429,20 +1497,15 @@ gckCOMMAND_Commit(
     gctPOINTER bufferDumpLogical = gcvNULL;
     gctSIZE_T bufferDumpBytes = 0;
 # endif
-#endif
-
-#if VIVANTE_PROFILER_CONTEXT
-    gctBOOL sequenceAcquired = gcvFALSE;
-#endif
-
-    gctPOINTER pointer = gcvNULL;
-
     gctUINT32 exitLinkLow = 0, exitLinkHigh = 0;
     gctUINT32 entryLinkLow = 0, entryLinkHigh = 0;
     gctUINT32 commandLinkLow = 0, commandLinkHigh = 0;
 
     gckVIRTUAL_COMMAND_BUFFER_PTR virtualCommandBuffer = gcvNULL;
     gctUINT64 asyncCommandStamp = 0;
+#endif
+
+    gctPOINTER pointer = gcvNULL;
 
     gcmkHEADER_ARG(
         "Command=0x%x CommandBuffer=0x%x ProcessID=%d",
@@ -1460,17 +1523,6 @@ gckCOMMAND_Commit(
                                      0,
                                      &oldValue));
 #else
-#endif
-
-#if VIVANTE_PROFILER_CONTEXT
-    if((Command->kernel->hardware->gpuProfiler) && (Command->kernel->profileEnable))
-    {
-        /* Acquire the context sequnence mutex. */
-        gcmkONERROR(gckOS_AcquireMutex(
-            Command->os, Command->mutexContextSeq, gcvINFINITE
-            ));
-        sequenceAcquired = gcvTRUE;
-    }
 #endif
 
     /* Acquire the command queue. */
@@ -1944,7 +1996,7 @@ gckCOMMAND_Commit(
         gcmkONERROR(gckHARDWARE_ChipEnable(
             hardware,
             link,
-            (gceCORE_3D_MASK)(1 << hardware->kernel->core),
+            (gceCORE_3D_MASK)(1 << hardware->kernel->chipID),
             &bytes
             ));
 
@@ -2142,31 +2194,6 @@ gckCOMMAND_Commit(
     gcmkONERROR(gckCOMMAND_ExitCommit(Command, gcvFALSE));
     commitEntered = gcvFALSE;
 
-    if (stall)
-    {
-        gcmkONERROR(gckCOMMAND_Stall(Command, gcvFALSE));
-    }
-
-#if VIVANTE_PROFILER_CONTEXT
-    if(sequenceAcquired)
-    {
-        if (Command->kernel->profileSyncMode)
-        {
-            gcmkONERROR(gckCOMMAND_Stall(Command, gcvTRUE));
-
-            if (Command->currContext)
-            {
-                gcmkONERROR(gckHARDWARE_UpdateContextProfile(
-                    hardware,
-                    Command->currContext));
-            }
-        }
-
-        /* Release the context switching mutex. */
-        gcmkONERROR(gckOS_ReleaseMutex(Command->os, Command->mutexContextSeq));
-        sequenceAcquired = gcvFALSE;
-    }
-#endif
 
     /* Loop while there are records in the queue. */
     while (EventQueue != gcvNULL)
@@ -2213,13 +2240,15 @@ gckCOMMAND_Commit(
         EventQueue = nextEventRecord;
     }
 
-    if (Command->kernel->eventObj->queueHead == gcvNULL
-     && Command->kernel->hardware->powerManagement == gcvTRUE
+    if ((Command->kernel->eventObj->queueHead == gcvNULL
+      && Command->kernel->hardware->powerManagement == gcvTRUE)
+    || (Command->kernel->hardware->gpuProfiler == gcvTRUE
+      && Command->kernel->profileEnable == gcvTRUE)
     )
     {
         /* Commit done event by which work thread knows all jobs done. */
         gcmkVERIFY_OK(
-            gckEVENT_CommitDone(Command->kernel->eventObj, gcvKERNEL_PIXEL));
+            gckEVENT_CommitDone(Command->kernel->eventObj, gcvKERNEL_PIXEL, Command->currContext));
     }
 
     /* Submit events. */
@@ -2291,14 +2320,6 @@ OnError:
         /* Release the command queue mutex. */
         gcmkVERIFY_OK(gckCOMMAND_ExitCommit(Command, gcvFALSE));
     }
-
-#if VIVANTE_PROFILER_CONTEXT
-    if (sequenceAcquired)
-    {
-        /* Release the context sequence mutex. */
-        gcmkVERIFY_OK(gckOS_ReleaseMutex(Command->os, Command->mutexContextSeq));
-    }
-#endif
 
 #ifdef __QNXNTO__
     if (userCommandBufferLogicalMapped)
@@ -2977,9 +2998,9 @@ gckCOMMAND_DumpExecutingBuffer(
         if (kernel->virtualCommandBuffer)
         {
             gcmkVERIFY_OK(gckOS_CreateKernelVirtualMapping(
-                os, buffer->physical, buffer->bytes, &entry, &pageCount));
+                os, buffer->virtualBuffer.physical, buffer->virtualBuffer.bytes, &entry, &pageCount));
 
-            offset = gpuAddress - buffer->gpuAddress;
+            offset = gpuAddress - buffer->virtualBuffer.gpuAddress;
 
             entryDump  = entry;
 
@@ -3013,7 +3034,7 @@ gckCOMMAND_DumpExecutingBuffer(
         if (kernel->virtualCommandBuffer)
         {
             gcmkVERIFY_OK(gckOS_DestroyKernelVirtualMapping(
-                os, buffer->physical, buffer->bytes, entry));
+                os, buffer->virtualBuffer.physical, buffer->virtualBuffer.bytes, entry));
         }
         else
         {
@@ -3080,10 +3101,10 @@ gckCOMMAND_DumpExecutingBuffer(
                 else
                 {
                     /* Get kernel logical for dump. */
-                    if (buffer->kernelLogical)
+                    if (buffer->virtualBuffer.kernelLogical)
                     {
                         /* Get kernel logical directly if it is a context buffer. */
-                        entry = buffer->kernelLogical;
+                        entry = buffer->virtualBuffer.kernelLogical;
                         gcmkPRINT("Context Buffer: %08X, %08X PID:%d %s",
                                   linkData->linkLow, linkData->linkHigh, linkData->pid, processName);
                     }
@@ -3092,27 +3113,27 @@ gckCOMMAND_DumpExecutingBuffer(
                         /* Make it accessiable by kernel if it is a user command buffer. */
                         gcmkVERIFY_OK(
                             gckOS_CreateKernelVirtualMapping(os,
-                                                             buffer->physical,
-                                                             buffer->bytes,
+                                                             buffer->virtualBuffer.physical,
+                                                             buffer->virtualBuffer.bytes,
                                                              &entry,
                                                              &pageCount));
                          gcmkPRINT("User Command Buffer: %08X, %08X PID:%d %s",
                                    linkData->linkLow, linkData->linkHigh, linkData->pid, processName);
                     }
 
-                    offset = gpuAddress - buffer->gpuAddress;
+                    offset = gpuAddress - buffer->virtualBuffer.gpuAddress;
                 }
 
                 /* Dump from the entry. */
                 _DumpBuffer((gctUINT8_PTR)entry + offset, gpuAddress, bytes);
 
                 /* Release kernel logical address if neccessary. */
-                if (buffer && !buffer->kernelLogical)
+                if (buffer && !buffer->virtualBuffer.kernelLogical)
                 {
                     gcmkVERIFY_OK(
                         gckOS_DestroyKernelVirtualMapping(os,
-                                                          buffer->physical,
-                                                          buffer->bytes,
+                                                          buffer->virtualBuffer.physical,
+                                                          buffer->virtualBuffer.bytes,
                                                           entry));
                 }
             }

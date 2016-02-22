@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -477,12 +477,29 @@ typedef struct __GLchipProgramFlagsRec
 {
     gctUINT alphaKill               : 1;
     gctUINT noLTC                   : 1;
-    gctUINT dual16                  : 1;
     gctUINT skipRecompile           : 1;
     gctUINT cube_UserLOD            : 1;
     gctUINT CTSMaxUBOSize           : 1;
 
+    gctUINT disableDual16           : 1;
+    gctUINT disableHP_RCP           : 1;
+    gctUINT disableHP_FRAC          : 1;
+    gctUINT disableHP_IMMED         : 1;
+    gctUINT disableMP_IMMED         : 1;
+    gctUINT disableHP_TEXLD_COORD   : 1;
+    gctUINT enableHP_RCP            : 1;
+    gctUINT enableHP_FRAC           : 1;
+    gctUINT enableHP_IMMED          : 1;
+    gctUINT enableMP_IMMED          : 1;
+    gctUINT enableHP_TEXLD_COORD    : 1;
+
     gctUINT enableNetflix           : 1;
+    gctUINT robustEnabled           : 1;
+    gctUINT msaaOQ                  : 1;
+
+    gctUINT reserved                : 13;
+
+
 } __GLchipProgramFlags;
 
 

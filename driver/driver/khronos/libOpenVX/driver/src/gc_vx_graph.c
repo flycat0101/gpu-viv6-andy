@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1175,7 +1175,7 @@ VX_PRIVATE_API vx_status vxoGraph_CaculateCostFactors(vx_graph graph)
                 case VX_TYPE_PYRAMID:
                     {
                         vx_uint32   l;
-                        vx_uint32    i;
+                        vx_uint32   i;
                         vx_pyramid  pyramid = (vx_pyramid)paramRef;
 
                         for (l = 0; l < pyramid->levelCount; l++)
@@ -1199,6 +1199,248 @@ VX_PRIVATE_API vx_status vxoGraph_CaculateCostFactors(vx_graph graph)
 
     return VX_SUCCESS;
 }
+
+VX_PRIVATE_API void vxCopyNodeIndexTable(
+        vx_uint32 srcNodeIndexTable[VX_MAX_NODE_COUNT], vx_uint32 srcNodeCount,
+        OUT vx_uint32 destNodeIndexTable[VX_MAX_NODE_COUNT], OUT vx_uint32_ptr destNodeCountPtr)
+{
+    vx_uint32 i;
+
+    for (i = 0; i < srcNodeCount; i++)
+    {
+        destNodeIndexTable[i] = srcNodeIndexTable[i];
+    }
+
+    *destNodeCountPtr = srcNodeCount;
+}
+
+#if gcdVX_OPTIMIZER
+VX_PRIVATE_API vx_status vxoGraph_Flatten(vx_graph graph)
+{
+    vx_uint32 lastNodeIndexTable[VX_MAX_NODE_COUNT];
+    vx_uint32 nextNodeIndexTable[VX_MAX_NODE_COUNT];
+    vx_uint32 leftNodeIndexTable[VX_MAX_NODE_COUNT];
+    vx_uint32 lastNodeCount, nextNodeCount, leftNodeCount = 0;
+    vx_uint32 i;
+
+    vxmASSERT(graph && graph->verified);
+
+    /* Flatten and sequentialize nodes in the graph. */
+    vxmASSERT(graph->optimizedNodeCount == 0);
+
+    vxoGraph_ClearAllVisitedFlags(graph);
+    vxoGraph_ClearAllExecutedFlags(graph);
+
+    vxCopyNodeIndexTable(graph->headNodeIndexTable, graph->headNodeCount,
+                         OUT nextNodeIndexTable, OUT &nextNodeCount);
+
+    while (nextNodeCount > 0)
+    {
+        for (i = 0; i < nextNodeCount; i++)
+        {
+            vx_node node = graph->nodeTable[nextNodeIndexTable[i]];
+
+            if (node->executed)
+            {
+                vxError("Node %p in Graph %p was flattened", node, graph);
+                continue;
+            }
+
+            if (node->childGraph)
+            {
+                /* Get nodes from childGraph. */
+                vx_node_ptr nodes = node->childGraph->optimizedNodeTable;
+                vx_uint32 j;
+
+                for (j = 0; j < node->childGraph->optimizedNodeCount; j++)
+                {
+                    graph->optimizedNodeTable[graph->optimizedNodeCount] = nodes[j];
+                    graph->optimizedNodeCount++;
+                }
+            }
+            else
+            {
+                graph->optimizedNodeTable[graph->optimizedNodeCount] = node;
+                graph->optimizedNodeCount++;
+            }
+            node->visited  = vx_true_e;
+            node->executed = vx_true_e;
+        }
+
+        vxCopyNodeIndexTable(nextNodeIndexTable, nextNodeCount, OUT lastNodeIndexTable, OUT &lastNodeCount);
+
+        vxoGraph_GenerateNextNodeTable(graph, lastNodeIndexTable, lastNodeCount,
+                                       OUT nextNodeIndexTable, OUT &nextNodeCount,
+                                       INOUT leftNodeIndexTable, INOUT &leftNodeCount);
+    }
+
+    vxoGraph_ClearAllVisitedFlags(graph);
+    vxoGraph_ClearAllExecutedFlags(graph);
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status vxoGraph_AddNodeBatch(
+    vx_graph graph,
+    vx_uint32 startIndex,
+    vx_uint32 endIndex,
+    vx_bool cpuInvolved,
+    vx_bool endHasCallback
+    )
+{
+    vx_status   status = VX_SUCCESS;
+    vx_node_batch batch;
+    vx_uint32 index;
+#if gcdVX_OPTIMIZER > 2
+    vx_bool tiled = vx_true_e;
+    vx_coordinates2d_t imageSize = { 0, 0 };
+        vx_coordinates2d_t tileSize = { 0, 0 };
+    vx_uint32 imageCount = 0;
+#endif
+
+    vxmASSERT(graph);
+
+    batch = &graph->nodeBatch[graph->nodeBatchCount];
+    batch->startIndex = startIndex;
+    batch->endIndex = endIndex;
+    batch->cpuInvolved = cpuInvolved;
+    batch->endHasCallback = endHasCallback;
+    graph->nodeBatchCount++;
+
+    /* No optimization if cpu is involved. */
+    if (cpuInvolved) return VX_SUCCESS;
+
+
+    /* Generate code and states. */
+    /* Check image size. */
+    for (index = startIndex; index <= endIndex; index++)
+    {
+        vx_node     node = graph->optimizedNodeTable[index];
+        gcoVX_Kernel_Context * kernelContext;
+
+        /* Allocal a local kernelContext for execution. */
+        kernelContext = (gcoVX_Kernel_Context *) vxAllocate(sizeof(gcoVX_Kernel_Context));
+        if (kernelContext == gcvNULL) return VX_ERROR_NO_MEMORY;
+        node->kernelContext = kernelContext;
+
+#if gcdVX_OPTIMIZER > 1
+        kernelContext->codeGenOnly = vx_true_e;
+        status = node->kernel->function(node, (vx_reference *)node->paramTable, node->kernel->signature.paramCount);
+#if gcdVX_OPTIMIZER > 2
+        if (tiled)
+        {
+            /* Get max input/output count and access pattern. */
+            vx_kernel_optimization_attribute_s * kernelAttr = &node->kernel->attributes.optAttributes;
+            vx_node_optimization_attribute_s * nodeAttr = &node->optAttributes;
+            nodeAttr->inputImageCount = kernelAttr->inputImageCount;
+            nodeAttr->outputImageCount = kernelAttr->outputImageCount;
+            if (kernelAttr->inputImageCount + kernelAttr->outputImageCount > imageCount)
+            {
+                imageCount = kernelAttr->inputImageCount + kernelAttr->outputImageCount;
+            }
+
+            /* Check if image size is the same. */
+            if (imageSize.x == 0)
+            {
+                imageSize.x = kernelContext->params.xmax;
+                imageSize.y = kernelContext->params.ymax;
+            }
+            else if (   (imageSize.x != kernelContext->params.xmax)
+                     || (imageSize.y != kernelContext->params.ymax))
+            {
+                tiled = vx_false_e;
+            }
+        }
+#endif
+#endif
+
+        if (status != VX_SUCCESS) return status;
+    }
+
+#if gcdVX_OPTIMIZER > 2
+    batch->tiled = tiled;
+    batch->globalSize = imageSize;
+
+    if (tiled)
+    {
+        /* TODO - Get cache size. */
+        vx_uint32 cacheSize = 65536;
+
+        /* Calculate tile size. */
+        vx_uint32 tileArea = gcmALIGN(cacheSize / imageCount, 256);
+        tileSize.x = gcmALIGN((int) sqrt((float) tileArea), 16);
+        tileSize.y = tileArea / tileSize.x;
+        batch->tileSize.x = tileSize.x;
+        batch->tileSize.y = tileSize.y;
+        batch->tileCount.x = (imageSize.x + tileSize.x - 1) / tileSize.x;
+        batch->tileCount.y = (imageSize.y + tileSize.y - 1) / tileSize.y;
+    }
+#endif
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status vxoGraph_Optimize(vx_graph graph)
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint32 start;
+    vx_uint32 i;
+
+    vxmASSERT(graph && graph->verified);
+
+    /* TODO - Copy nodes for kernel fusion. */
+
+    /* Split nodes into batches at nodes that are process by CPU or have callback function. */
+    graph->nodeBatchCount = 0;
+    start = 0;
+    for (i = 0; i < graph->optimizedNodeCount; i++)
+    {
+        vx_node node = graph->optimizedNodeTable[i];
+
+        if (!node->kernelAttributes.optAttributes.oneKernelModule)
+        {
+            /* Check if there is an unended batch. */
+            if (i > start)
+            {
+                /* End the previous batch. */
+                gcmONERROR(vxoGraph_AddNodeBatch(graph, start, i - 1, vx_false_e, vx_false_e));
+            }
+
+            /* Add a new batch that contains this node only. */
+            gcmONERROR(vxoGraph_AddNodeBatch(graph, i, i, vx_true_e, vx_false_e));
+
+            start = i + 1;
+            continue;
+        }
+        else if (node->completeCallback)
+        {
+            /* End the current batch. */
+            gcmONERROR(vxoGraph_AddNodeBatch(graph, start, i, vx_false_e, vx_true_e));
+            /* Mark batch with callback function. */
+
+            start = i + 1;
+            continue;
+        }
+    }
+
+    /* Check if there is an unended batch. */
+    if (i > start)
+    {
+        /* End the previous batch. */
+        gcmONERROR(vxoGraph_AddNodeBatch(graph, start, i - 1, vx_false_e, vx_false_e));
+    }
+
+    graph->optimized = vx_true_e;
+
+    return VX_SUCCESS;
+
+OnError:
+    /* TODO - Release optimzed nodes. */
+
+    /* Always return VX_SUCCESS. */
+    return VX_SUCCESS;
+}
+#endif
 
 VX_PUBLIC_API vx_status vxVerifyGraph(vx_graph graph)
 {
@@ -1246,6 +1488,16 @@ VX_PUBLIC_API vx_status vxVerifyGraph(vx_graph graph)
 
     graph->verified = vx_true_e;
 
+#if gcdVX_OPTIMIZER
+    vxoGraph_Flatten(graph);
+
+    /* Only top-level graph needs to be optimized. */
+    if (!graph->isSubGraph)
+    {
+        vxoGraph_Optimize(graph);
+    }
+#endif
+
     vxReleaseMutex(graph->base.lock);
 
     if (status != VX_SUCCESS) goto ErrorExit;
@@ -1260,19 +1512,184 @@ ErrorExit:
     return status;
 }
 
-VX_PRIVATE_API void vxCopyNodeIndexTable(
-        vx_uint32 srcNodeIndexTable[VX_MAX_NODE_COUNT], vx_uint32 srcNodeCount,
-        OUT vx_uint32 destNodeIndexTable[VX_MAX_NODE_COUNT], OUT vx_uint32_ptr destNodeCountPtr)
+#if gcdVX_OPTIMIZER
+VX_PRIVATE_API vx_status vxoGraph_ProcessOptimized(vx_graph graph)
 {
+    vx_status status = VX_SUCCESS;
+    vx_action action;
     vx_uint32 i;
 
-    for (i = 0; i < srcNodeCount; i++)
+    vxmASSERT(graph && graph->verified && graph->optimized);
+
+    vxoPerf_Begin(&graph->perf);
+
+Restart:
+
+    action = VX_ACTION_CONTINUE;
+
+    /* Execute all node batches. */
+    for (i = 0; i < graph->nodeBatchCount; i++)
     {
-        destNodeIndexTable[i] = srcNodeIndexTable[i];
+        vx_node_batch batch = &graph->nodeBatch[i];
+        vx_node node = gcvNULL;
+        vx_target target;
+        vx_uint32 j;
+
+        if (batch->cpuInvolved)
+        {
+            node = graph->optimizedNodeTable[batch->startIndex];
+            target = &graph->base.context->targetTable[node->targetIndex];
+
+            vxoNode_EnableVirtualAccessible(node);
+
+            action = target->funcs.processnodes(target, &node, 0, 1);
+
+            vxoNode_DisableVirtualAccessible(node);
+        }
+        else
+        {
+            vx_uint32 ii, jj;
+            vx_uint32 tileCountI = 1, tileCountJ = 1;
+            vx_uint32 tileOffsetI, tileOffsetJ;
+
+#if gcdVX_OPTIMIZER > 1
+            gcoVX_Kernel_Context * kernelContext;
+
+            for (j = batch->startIndex; j <= batch->endIndex; j++)
+            {
+                node = graph->optimizedNodeTable[j];
+                kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
+                kernelContext->codeGenOnly = vx_false_e;
+
+                /* Lock kernel instruction nodes. */
+                status = gcoVX_LockKernel(&kernelContext->params);
+                if (status != VX_SUCCESS)
+                {
+                    action = VX_ACTION_ABANDON;
+                    break;
+                }
+#if gcdVX_OPTIMIZER > 2
+                if (batch->tiled)
+                {
+                    kernelContext->params.tiled   = batch->tiled;
+                    kernelContext->params.xoffset = kernelContext->params.xmin;
+                    kernelContext->params.yoffset = kernelContext->params.ymin;
+                    kernelContext->params.xcount  = batch->tileSize.x;
+                    kernelContext->params.ycount  = batch->tileSize.y;
+                }
+#endif
+            }
+#endif
+
+#if gcdVX_OPTIMIZER > 2
+            if (batch->tiled)
+            {
+                tileCountI = batch->tileCount.x;
+                tileCountJ = batch->tileCount.y;
+            }
+#endif
+
+            /* Loop through each tile. */
+            for (jj = 0, tileOffsetJ = 0; jj < tileCountJ; jj++, tileOffsetJ += batch->tileSize.y)
+            {
+                for (ii = 0, tileOffsetI = 0; ii < tileCountI; ii++, tileOffsetI += batch->tileSize.x)
+                {
+                    /* Execute each nodes. */
+                    for (j = batch->startIndex; j <= batch->endIndex; j++)
+                    {
+                        node = graph->optimizedNodeTable[j];
+
+                        vxoNode_EnableVirtualAccessible(node);
+
+                        vxoPerf_Begin(&node->perf);
+
+#if gcdVX_OPTIMIZER > 1
+                        kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
+
+                        /* Bind objects. */
+                        status = gcfVX_BindObjects(kernelContext);
+                        if (status != VX_SUCCESS)
+                        {
+                            action = VX_ACTION_ABANDON;
+                            break;
+                        }
+
+                        /* Bind kernel. */
+                        status = gcoVX_BindKernel(&kernelContext->params);
+                        if (status != VX_SUCCESS)
+                        {
+                            action = VX_ACTION_ABANDON;
+                            break;
+                        }
+
+                        /* Bind uniforms. */
+                        if (kernelContext->uniform_num > 0)
+                        {
+                            vx_uint32  kk;
+                            for(kk = 0; kk < kernelContext->uniform_num; kk++)
+                            {
+                                gcoVX_BindUniform(GC_VX_UNIFORM_PIXEL, kernelContext->uniforms[kk].index, (gctUINT32*)&kernelContext->uniforms[kk].uniform, kernelContext->uniforms[kk].num);
+                            }
+                        }
+
+                        /*status = gcfVX_Kernel(kernelContext);*/
+#if gcdVX_OPTIMIZER > 2
+                        kernelContext->params.xoffset = tileOffsetI;
+                        kernelContext->params.yoffset = tileOffsetJ;
+#endif
+                        status = gcoVX_InvokeKernel(&kernelContext->params);
+#else
+                        status = node->kernel->function(node, (vx_reference *)node->paramTable, node->kernel->signature.paramCount);
+#endif
+
+                        vxoPerf_End(&node->perf);
+
+                        vxoNode_DisableVirtualAccessible(node);
+
+                        if (status != VX_SUCCESS)
+                        {
+                            action = VX_ACTION_ABANDON;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            /* TODO - Unlock kernels. */
+            /*        Currently unlocked when freeMemory. */
+
+            if (batch->endHasCallback)
+            {
+                action = node->completeCallback(node);
+            }
+        }
+
+        if (action != VX_ACTION_CONTINUE) break;
     }
 
-    *destNodeCountPtr = srcNodeCount;
+    switch (action)
+    {
+        case VX_ACTION_RESTART:
+            goto Restart;
+
+        case VX_ACTION_ABANDON:
+            status = VX_ERROR_GRAPH_ABANDONED;
+            break;
+    }
+
+    if (status == VX_SUCCESS)
+    {
+        gcoVX_Commit(gcvTRUE, gcvTRUE, NULL, NULL);
+        graph->dirty = vx_false_e;
+    }
+
+    vxoPerf_End(&graph->perf);
+
+    vxoPerf_Dump(&graph->perf);
+
+    return status;
 }
+#endif
 
 VX_PRIVATE_API void vxoGraph_BeginProcess(
         vx_graph graph, OUT vx_uint32 nextNodeIndexTable[VX_MAX_NODE_COUNT], OUT vx_uint32 * nextNodeCountPtr)
@@ -1324,6 +1741,15 @@ VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
 
         if (status != VX_SUCCESS) return status;
     }
+
+#if gcdVX_OPTIMIZER
+    if (graph->optimized)
+    {
+        status = vxoGraph_ProcessOptimized(graph);
+    }
+    else
+#endif
+    {
 
 Restart:
 
@@ -1392,6 +1818,7 @@ Restart:
     }
 
     vxoGraph_EndProcess(graph);
+    }
 
     if (status != VX_SUCCESS) return status;
 

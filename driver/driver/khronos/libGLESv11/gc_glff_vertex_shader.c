@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1863,7 +1863,7 @@ static gceSTATUS _Assign_vEyePosition(
         gcSHADER_FLOAT_X1,
         1,
         TempRegister,
-        gcSHADER_PRECISION_DEFAULT
+        gcSHADER_PRECISION_HIGH
         );
     gcmFOOTER();
     return status;
@@ -1895,7 +1895,7 @@ static gceSTATUS _Assign_vColor(
         ShaderControl->i->shader,
         vName[OutputIndex],
         gcSHADER_FLOAT_X4,
-        gcSHADER_PRECISION_DEFAULT,
+        gcSHADER_PRECISION_HIGH,
         gcvFALSE,
         1,
         ShaderControl->vColor[OutputIndex],
@@ -1931,7 +1931,7 @@ static gceSTATUS _Assign_vTexCoord(
         Context->texture.sampler[Sampler].coordType,
         1,
         ShaderControl->vTexCoord[Sampler],
-        gcSHADER_PRECISION_DEFAULT
+        gcSHADER_PRECISION_HIGH
         );
     gcmFOOTER();
     return status;
@@ -1961,7 +1961,7 @@ static gceSTATUS _Assign_vClipPlane(
         gcSHADER_FLOAT_X1,
         1,
         ShaderControl->vClipPlane[ClipPlane],
-        gcSHADER_PRECISION_DEFAULT
+        gcSHADER_PRECISION_HIGH
         );
     gcmFOOTER();
     return status;
@@ -2003,7 +2003,7 @@ static gceSTATUS _Assign_vPointFade(
         gcSHADER_FLOAT_X1,
         1,
         TempRegister,
-        gcSHADER_PRECISION_DEFAULT
+        gcSHADER_PRECISION_HIGH
         );
     gcmFOOTER();
     return status;
@@ -2024,7 +2024,7 @@ static gceSTATUS _Assign_vPointSmooth(
         gcSHADER_FLOAT_X3,
         1,
         TempRegister,
-        gcSHADER_PRECISION_DEFAULT
+        gcSHADER_PRECISION_HIGH
         );
 
     gcmFOOTER();

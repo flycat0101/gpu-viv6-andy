@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1403,7 +1403,7 @@ gcChipValidateAttribGroup1(
 
             if (!chipCtx->chipFeature.hasHwTFB)
             {
-                chipCtx->chipDirty.uDefer.sDefer.depthTest = 1;
+                chipCtx->chipDirty.uDefer.sDefer.viewportScissor = 1;
             }
         }
     }
@@ -1530,12 +1530,15 @@ gcChipValidateShader(
                 gcsHINT_PTR psHints = fsProgram->curPgInstance->programState.hints;
                 gctBOOL psReadZ   = psHints->useFragCoord[2];
                 gctBOOL psReadW   = psHints->useFragCoord[3];
+                gctBOOL hasMemoryAccess = (psHints->memoryAccessFlags[gcvPROGRAM_STAGE_FRAGMENT] & gceMA_FLAG_READ)
+                                          ||
+                                          (psHints->memoryAccessFlags[gcvPROGRAM_STAGE_FRAGMENT] & gceMA_FLAG_WRITE);
 
                 gcmASSERT(fsProgram->curPgInstance->binaries[__GLSL_STAGE_FS]);
 
                 gcmONERROR(gcSHADER_GetEarlyFragTest(fsProgram->curPgInstance->binaries[__GLSL_STAGE_FS], &enableEarlyTest));
                 gcmONERROR(gco3D_SetAllEarlyDepthModes(chipCtx->engine, enableEarlyTest ?
-                                                                        gcvFALSE : psHints->psHasFragDepthOut || psHints->useMemoryAccess[gcvPROGRAM_STAGE_FRAGMENT]));
+                                                                        gcvFALSE : psHints->psHasFragDepthOut || hasMemoryAccess));
 
                 gcmONERROR(gco3D_SetSampleShading(chipCtx->engine, psHints->usedSampleIdOrSamplePosition,
                                                     psHints->psUsedSampleInput,
@@ -1551,7 +1554,7 @@ gcChipValidateShader(
                 if(gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_RA_DEPTH_WRITE))
                 {
                     gcmONERROR(gco3D_SetRADepthWrite(chipCtx->engine, enableEarlyTest ?
-                                                        gcvFALSE : psHints->psHasFragDepthOut || psHints->hasKill || psHints->useMemoryAccess[gcvPROGRAM_STAGE_FRAGMENT],
+                                                        gcvFALSE : psHints->psHasFragDepthOut || psHints->hasKill || hasMemoryAccess,
                                                         psReadZ, (psReadW || (psHints->rtArrayComponent != -1))));
                 }
 
@@ -1646,7 +1649,7 @@ gcChipValidateProgramSamplersCB(
     gcmHEADER_ARG("gc=0x%x progObj=0x%x program=0x%x stage=%d",
                    gc, progObj, program, stage);
 
-    __glBitmaskInitOR2(&samplerDirtyMask, &samplerMapDirty, &samplerStateDirty);
+    __glBitmaskInitOR(&samplerDirtyMask, &samplerMapDirty, &samplerStateDirty);
 
     while (!__glBitmaskIsAllZero(&samplerDirtyMask))
     {
@@ -1672,6 +1675,7 @@ gcChipValidateProgramSamplersCB(
 
         if (program->samplerMap[sampler].uniform != gcvNULL &&
             !isUniformUsedInShader(program->samplerMap[sampler].uniform) &&
+            !isUniformUsedInLTC(program->samplerMap[sampler].uniform) &&
             isUniformSamplerCalculateTexSize(program->samplerMap[sampler].uniform))
         {
             continue;
@@ -1729,7 +1733,7 @@ gcChipValidateProgramSamplersCB(
                 rlvArgs.uArgs.v2.rectSize.x = (gctINT)chipCtx->drawRTWidth;
                 rlvArgs.uArgs.v2.rectSize.y = (gctINT)chipCtx->drawRTHeight;
                 rlvArgs.uArgs.v2.numSlices  = 1;
-                gcmONERROR(gcoSURF_ResolveRect_v2(rtView0, &texView, &rlvArgs));
+                gcmONERROR(gcoSURF_ResolveRect(rtView0, &texView, &rlvArgs));
                 gcmONERROR(gcoTEXTURE_Flush(chipCtx->rtTexture));
                 gcmONERROR(gco3D_Semaphore(chipCtx->engine, gcvWHERE_RASTER, gcvWHERE_PIXEL, gcvHOW_SEMAPHORE));
             }
@@ -2450,19 +2454,27 @@ gcChipSetViewportScissor(
     GLint vpLeft, vpTop, vpRight, vpBottom;
     /* scissor size */
     GLint scLeft, scTop, scRight, scBottom;
+    GLboolean scissorTest = gc->state.enables.scissorTest;
+    __GLscissor *pScissor = &(gc->state.scissor);
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("gc=0x%x", gc);
+
+    if (gc->state.enables.rasterizerDiscard && !chipCtx->chipFeature.hasHwTFB)
+    {
+        static __GLscissor zeroScissor = {0, 0, 0, 0};
+
+        scissorTest = GL_TRUE;
+        pScissor = &zeroScissor;
+    }
 
     vpLeft   = pViewport->x;
     vpTop    = pViewport->y;
     vpRight  = pViewport->x + (GLint)chipCtx->viewportWidth;
     vpBottom = pViewport->y + (GLint)chipCtx->viewportHeight;
 
-    if (gc->state.enables.scissorTest)
+    if (scissorTest)
     {
-        __GLscissor *pScissor = &(gc->state.scissor);
-
         /* Intersect scissor with RT size, HW cannot handle out of range scissor */
         scLeft    = __GL_MIN(__GL_MAX(0, pScissor->scissorX), rtWidth);
         scTop     = __GL_MIN(__GL_MAX(0, pScissor->scissorY), rtHeight);
@@ -3159,7 +3171,7 @@ gcChipRecompileEvaluateKeyStates(
     }
     else
     {
-        __glBitmaskInitOR2(&samplerDirtyMask, &samplerMapDirty, &samplerStateDirty);
+        __glBitmaskInitOR(&samplerDirtyMask, &samplerMapDirty, &samplerStateDirty);
     }
 
     samplerDirtyMaskCopy = samplerDirtyMask;
@@ -3328,9 +3340,9 @@ gcChipRecompileEvaluateKeyStates(
                     gcvTEXTURE_SWIZZLE_R,
                     gcvTEXTURE_SWIZZLE_1
                 };
-                gceTEXTURE_SWIZZLE swizzle;
-                const  gceTEXTURE_SWIZZLE *swizzArray = gcvNULL;
-                __GLSLStage stage = program->samplerMap[sampler].stage;
+                  gceTEXTURE_SWIZZLE swizzle;
+                 const  gceTEXTURE_SWIZZLE *swizzArray = gcvNULL;
+                 __GLSLStage stage = program->samplerMap[sampler].stage;
                 numSamplers[stage] += (txFormatInfo->layers - 1);
                 if (numSamplers[stage] > maxSamplers[stage])
                 {
@@ -3676,7 +3688,7 @@ gcChipRecompileEvaluateKeyStates(
                 progSwitched || chipDirty->uBuffer.sBuffer.rtSurfDirty)
             {
                 gctBOOL sampleMask = gc->state.enables.multisample.sampleMask &&
-                                     (gc->frameBuffer.drawFramebufObj->fbSamples > 0);
+                                     (chipCtx->drawRTSamples > 1);
 
                 if (pgKeyState->staticKey->sampleMask != sampleMask)
                 {
@@ -3689,7 +3701,7 @@ gcChipRecompileEvaluateKeyStates(
                 progSwitched || chipDirty->uBuffer.sBuffer.rtSurfDirty)
             {
                 gctBOOL sampleCov = gc->state.enables.multisample.coverage &&
-                                    (gc->frameBuffer.drawFramebufObj->fbSamples > 0);
+                                    (chipCtx->drawRTSamples > 1);
 
                 if (pgKeyState->staticKey->sampleCoverage != sampleCov)
                 {
@@ -3702,7 +3714,7 @@ gcChipRecompileEvaluateKeyStates(
                 progSwitched || chipDirty->uBuffer.sBuffer.rtSurfDirty)
             {
                 gctBOOL alphaCov = gc->state.enables.multisample.alphaToCoverage &&
-                                   (gc->frameBuffer.drawFramebufObj->fbSamples > 0);
+                                   (chipCtx->drawRTSamples > 1);
 
                 if (pgKeyState->staticKey->alpha2Coverage != alphaCov)
                 {
@@ -4033,7 +4045,6 @@ gcChipValidateProgramImagesCB(
                 gceSURF_FORMAT format;
                 gceTILING tiling;
                 GLint face;
-                GLint zOffset;
                 GLint numLayers;
 
                 /* Invalid access if bound texture is incomplete */
@@ -4069,7 +4080,7 @@ gcChipValidateProgramImagesCB(
                 }
 
                 /* Invalid access if image unit format was incompatible with tex internal format */
-                face =  (__GL_IMAGE_CUBE == imageUnit->type ? imageUnit->actualLayer : 0);
+                face = (__GL_IMAGE_CUBE == imageUnit->type ? imageUnit->actualLayer : 0);
                 if (imageUnit->formatInfo->bitsPerPixel != texObj->faceMipmap[face][imageUnit->level].formatInfo->bitsPerPixel)
                 {
                     break;
@@ -4097,40 +4108,25 @@ gcChipValidateProgramImagesCB(
                     gcmONERROR(gcChipTexSyncFromShadow(gc, unit, texObj));
                 }
 
-                if (texObj->targetIndex == __GL_TEXTURE_3D_INDEX)
+                chipMipmap = &texInfo->mipLevels[imageUnit->level];
+                if (imageUnit->singleLayered)
                 {
-                    GLuint zoffset;
-                    chipMipmap = &texInfo->mipLevel[0][imageUnit->level];
-
-                    for (zoffset = 0; zoffset < texObj->maxDepths; zoffset++)
-                    {
-                        chipMipmap->shadow[zoffset].masterDirty = GL_TRUE;
-                    }
+                    chipMipmap->shadow[imageUnit->actualLayer].masterDirty = GL_TRUE;
                 }
                 else
                 {
-                    if (imageUnit->singleLayered)
+                    GLint slice;
+                    GLint numSlices = (texObj->targetIndex == __GL_TEXTURE_3D_INDEX)
+                                    ? texObj->faceMipmap[face][imageUnit->level].depth
+                                    : texObj->arrays;
+
+                    for (slice = 0; slice < numSlices; ++slice)
                     {
-                        chipMipmap = &texInfo->mipLevel[imageUnit->actualLayer][imageUnit->level];
-                        chipMipmap->shadow[0].masterDirty = GL_TRUE;
-                    }
-                    else
-                    {
-                        GLuint i;
-                        for (i = 0; i < texObj->maxFaces; i++)
-                        {
-                            chipMipmap = &texInfo->mipLevel[i][imageUnit->level];
-                            chipMipmap->shadow[0].masterDirty = GL_TRUE;
-                        }
+                        chipMipmap->shadow[slice].masterDirty = GL_TRUE;
                     }
                 }
 
-                if (texObj->targetIndex == __GL_TEXTURE_3D_INDEX)
-                    zOffset = imageUnit->actualLayer;
-                else
-                    zOffset = 0;
-
-                texView = gcChipGetTextureSurface(chipCtx, texObj, imageUnit->level, imageUnit->actualLayer, zOffset);
+                texView = gcChipGetTextureSurface(chipCtx, texObj, imageUnit->level, imageUnit->actualLayer);
 
                 if (type != __GL_IMAGE_2D)
                 {

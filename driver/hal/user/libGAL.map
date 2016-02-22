@@ -243,7 +243,6 @@
         gcoHAL_QueryTargetCaps;
         gcoHAL_QueryTextureCaps;
         gcoHAL_QueryTextureMaxAniso;
-        gcoHAL_QueryTextureTexldPerCycle;
         gcoHAL_QueryTiled;
         gcoHAL_QueryVideoMemory;
         gcoHAL_ScheduleEvent;
@@ -259,7 +258,7 @@
         gcoHAL_GetVideoMemoryFd;
         gcoHAL_QueryResetTimeStamp;
         gcoHAL_QuerySuperTileMode;
-    	gcoHAL_SetCompilerFuncTable;
+        gcoHAL_SetCompilerFuncTable;
 
         gcoHAL_Flush;
         gcoHAL_AssociateCompletion;
@@ -329,7 +328,6 @@
         gcoSURF_Blend;
         gcoSURF_Blit;
         gcoSURF_BlitCPU;
-        gcoSURF_BlitDraw;
         gcoSURF_Clear;
         gcoSURF_Clear2D;
         gcoSURF_ComputeColorMask;
@@ -372,13 +370,9 @@
         gcoSURF_QueryOrientation;
         gcoSURF_QueryReferenceCount;
         gcoSURF_QueryVidMemNode;
-        gcoSURF_ReadPixel;
         gcoSURF_ReferenceSurface;
         gcoSURF_Resample;
-        gcoSURF_Resolve;
-        gcoSURF_ResolveEx;
         gcoSURF_ResolveRect;
-        gcoSURF_ResolveRectEx;
         gcoSURF_GetResolveAlignment;
         gcoSURF_IsHWResolveable;
         gcoSURF_IsRenderable;
@@ -398,29 +392,18 @@
         gcoSURF_SetAlignment;
         gcoSURF_Unlock;
         gcoSURF_AlignResolveRect;
-        gcoSURF_WritePixel;
-        depr_gcoSURF_Resolve;
-        depr_gcoSURF_ResolveRect;
-        gcoSURF_SetOffset;
         gcoSURF_Swap;
         gcoSURF_ResetSurWH;
         gcoSURF_SetSharedLock;
         gcoSURF_GetFence;
         gcoSURF_WaitFence;
-        gcoSURF_3DBlitClearRect;
-        gcoSURF_3DBlitBltRect;
+        gcoSURF_DrawBlit;
         gcoSURF_3DBlitCopy;
         gcoSURF_LockNode;
         gcoSURF_UnLockNode;
         gcoSURF_WrapSurface;
         gcoSURF_GetInfo;
         gcoSURF_FlushTileStatus;
-
-        gcoSURF_CopyPixels_v2;
-        gcoSURF_ResolveRect_v2;
-        gcoSURF_Resample_v2;
-        gcoSURF_Clear_v2;
-        gcoSURF_DrawBlit_v2;
 
         gcoSURF_Set2DSource;
         gcoSURF_Set2DTarget;
@@ -558,6 +541,7 @@
         gco3D_DrawIndirectPrimitives;
         gco3D_MultiDrawIndirectPrimitives;
         gco3D_DrawInstancedPrimitives;
+        gco3D_DrawNullPrimitives;
         gco3D_DrawPrimitivesCount;
         gco3D_DrawPrimitivesOffset;
         gco3D_DrawPattern;
@@ -572,7 +556,6 @@
         gco3D_SetAALineTexSlot;
         gco3D_SetAALineWidth;
         gco3D_SetAllEarlyDepthModes;
-        gco3D_SetAllEarlyDepthModesEx;
         gco3D_SetEarlyDepthFromAPP;
         gco3D_SetRADepthWrite;
         gco3D_SetAlphaCompare;
@@ -672,12 +655,6 @@
         gco3D_SetWPlaneLimitX;
         gco3D_SetWPlaneLimit;
 
-        gco3D_QueryStreamOut;
-        gco3D_EndStreamOut;
-        gco3D_StartStreamOut;
-        gco3D_ReplayStreamOut;
-        gco3D_StopStreamOut;
-
         gco3D_EnableBlendingIndexed;
         gco3D_SetBlendFunctionIndexed;
         gco3D_SetBlendModeIndexed;
@@ -689,6 +666,8 @@
         gco3D_SetXfbHeader;
         gco3D_SetXfbBuffer;
         gco3D_SetRasterDiscard;
+
+        gco3D_QueryReset;
 
         gcoTEXTURE_AddMipMap;
         gcoTEXTURE_AddMipMapEx;
@@ -740,15 +719,15 @@
 
         gcsBITMASK_InitAllOne;
         gcsBITMASK_InitAllZero;
-        gcsBITMASK_InitOR2;
+        gcsBITMASK_InitOR;
         gcsBITMASK_Test;
         gcsBITMASK_TestAndClear;
         gcsBITMASK_IsAllZero;
-        gcsBITMASK_OR;
+        gcsBITMASK_Set;
         gcsBITMASK_Clear;
         gcsBITMASK_SetAll;
         gcsBITMASK_MergeBitMaskArray;
-        gcsBITMASK_OR2;
+        gcsBITMASK_OR;
 
         gcoBRUSH_CACHE_AddBrush;
         gcoBRUSH_CACHE_Construct;
@@ -860,8 +839,15 @@
         gcoVX_AllocateMemory;
         gcoVX_FreeMemory;
         gcoVX_KernelConstruct;
+        gcoVX_LockKernel;
+        gcoVX_BindKernel;
         gcoVX_BindUniform;
         gcoVX_Replay;
+        gcoVX_LoadKernelShader;
+        gcoVX_InvokeKernelShader;
+        gcoVX_Flush;
+        gcoVX_AllocateMemoryEx;
+        gcoVX_FreeMemoryEx;
 
         gcoPROFILER_Initialize;
         gcoPROFILER_Destroy;
@@ -928,6 +914,9 @@
         gcoVG_SetFillRule;
         gcoVG_EnableDither;
         gcoVG_DrawSurfaceToImage;
+        gcoVG_Resolve;
+        gcoVG_SetColorIndexTable;
+        gcoVG_SetColorKey;
 
         gcfMEM_InitFSMemPool;
         gcfMEM_FreeFSMemPool;

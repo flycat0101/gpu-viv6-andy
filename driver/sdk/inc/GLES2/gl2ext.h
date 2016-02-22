@@ -2903,6 +2903,9 @@ GL_APICALL void GL_APIENTRY glEndTilingQCOM (GLbitfield preserveMask);
 #define GL_VIV_NV21                                             0x8FC4
 #define GL_VIV_I420                                             0x8FC5
 #define GL_VIV_AYUV                                             0x8FC6
+#define GL_VIV_YUV420_10_ST                                     0x8FC7
+#define GL_VIV_YUV420_TILE_ST                                   0x8FC8
+#define GL_VIV_YUV420_TILE_10_ST                                0x8FC9
 
 #ifdef GL_GLEXT_PROTOTYPES
 GL_APICALL void GL_APIENTRY glTexDirectVIVMap(GLenum Target, GLsizei Width, GLsizei Height, GLenum Format, GLvoid ** Logical, const GLuint * Physical);
@@ -2974,6 +2977,11 @@ GL_APICALL void GL_APIENTRY glDeveloperStubsVIV(GLboolean Enable);
 typedef void (GL_APIENTRY PFNGLDEVELOPERTRACEVIVPROC)(const GLchar * Filename);
 typedef void (GL_APIENTRY PFNGLDEVELOPERPROFILEVIVPROC)(GLboolean Enable);
 typedef void (GL_APIENTRY PFNGLDEVELOPERSTUBSVIVPROC)(GLboolean Enable);
+#endif
+
+#ifndef GL_VIV_texture_protected
+#define GL_VIV_texture_protected 1
+#define GL_TEXTURE_PROTECTED_VIV 0x81DA
 #endif
 
 #ifdef __cplusplus

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1137,7 +1137,7 @@ GLvoid __glChipCreateContext(__GLcontext *gc)
             ) == gcvSTATUS_TRUE;
 
         /* Get the 3D engine pointer. */
-        gcmONERROR(gco3D_Construct(chipCtx->hal, &chipCtx->hw));
+        gcmONERROR(gco3D_Construct(chipCtx->hal, gcvFALSE, &chipCtx->hw));
 
         gcmERR_BREAK(gcoHAL_QueryStreamCaps(chipCtx->hal,
                                         (gctUINT32 *)&chipCtx->maxAttributes,

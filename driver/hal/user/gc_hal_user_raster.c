@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -215,6 +215,13 @@ static gceSTATUS _CheckSurface(
     case gcvMINORTILED:
         if (!Engine->minorTiling ||
             gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_ANDROID_ONLY) == gcvTRUE)
+        {
+            return gcvSTATUS_NOT_SUPPORTED;
+        }
+        break;
+
+    case gcvYMAJOR_SUPERTILED:
+        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_MAJOR_SUPER_TILE) != gcvTRUE)
         {
             return gcvSTATUS_NOT_SUPPORTED;
         }
@@ -1458,7 +1465,7 @@ gco2D_SetColorSourceEx(
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
 
 #if gcdENABLE_2D
-    gcsSURF_INFO_PTR surface;
+    gcoSURF surface;
     gcs2D_MULTI_SOURCE_PTR curSrc;
     gctUINT32 n;
 
@@ -1578,7 +1585,7 @@ gco2D_SetColorSourceAdvanced(
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
 
 #if gcdENABLE_2D
-    gcsSURF_INFO_PTR surface;
+    gcoSURF surface;
     gctUINT32 n;
 
     gcmHEADER_ARG("Engine=0x%x Address=%x Stride=%d Format=%d Rotation=%d "
@@ -1775,7 +1782,7 @@ gco2D_SetMaskedSourceEx(
 
 #if gcdENABLE_2D
     gctUINT32 n;
-    gcsSURF_INFO_PTR surface;
+    gcoSURF surface;
     gcs2D_MULTI_SOURCE_PTR curSrc;
 
     gcmHEADER_ARG("Engine=0x%x Address=%x Stride=%d Format=%d CoordRelative=%d "
@@ -2110,7 +2117,7 @@ gco2D_SetTargetEx(
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
 
 #if gcdENABLE_2D
-    gcsSURF_INFO_PTR surface;
+    gcoSURF surface;
 
     gcmHEADER_ARG("Engine=0x%x Address=%x Stride=%d Rotation=%d "
                     "SurfaceWidth=%d SurfaceHeight=%d",
@@ -2168,7 +2175,7 @@ OnError:
 **      gctINT32 SrcSize
 **          Source size for horizontal or vertical direction.
 **
-**      gctINT32 DestSize
+**      gctINT32 DstSize
 **          Destination size for horizontal or vertical direction.
 **
 **  OUTPUT:
@@ -2180,7 +2187,7 @@ gceSTATUS
 gco2D_CalcStretchFactor(
     IN gco2D Engine,
     IN gctINT32 SrcSize,
-    IN gctINT32 DestSize,
+    IN gctINT32 DstSize,
     OUT gctUINT32_PTR Factor
     )
 {
@@ -2189,7 +2196,7 @@ gco2D_CalcStretchFactor(
 #if gcdENABLE_2D
     gctUINT32 factor;
 
-    gcmHEADER_ARG("Engine=0x%x SrcSize=0x%x DestSize=0x%x", Engine, SrcSize, DestSize);
+    gcmHEADER_ARG("Engine=0x%x SrcSize=0x%x DstSize=0x%x", Engine, SrcSize, DstSize);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
@@ -2198,7 +2205,7 @@ gco2D_CalcStretchFactor(
     /* Calculate the stretch factors. */
     factor = gcoHARDWARE_GetStretchFactor(
         Engine->state.multiSrc[Engine->state.currentSrcIndex].enableGDIStretch,
-        SrcSize, DestSize
+        SrcSize, DstSize
         );
 
     if (factor == 0)
@@ -2277,7 +2284,7 @@ gco2D_SetStretchFactors(
 **      gcsRECT_PTR SrcRect
 **          Pointer to a valid source rectangle.
 **
-**      gcsRECT_PTR DestRect
+**      gcsRECT_PTR DstRect
 **          Pointer to a valid destination rectangle.
 **
 **  OUTPUT:
@@ -2288,23 +2295,23 @@ gceSTATUS
 gco2D_SetStretchRectFactors(
     IN gco2D Engine,
     IN gcsRECT_PTR SrcRect,
-    IN gcsRECT_PTR DestRect
+    IN gcsRECT_PTR DstRect
     )
 {
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
 
 #if gcdENABLE_2D
-    gcmHEADER_ARG("Engine=0x%x SrcRect=0x%x DestRect=0x%x", Engine, SrcRect, DestRect);
+    gcmHEADER_ARG("Engine=0x%x SrcRect=0x%x DstRect=0x%x", Engine, SrcRect, DstRect);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
     gcmVERIFY_ARGUMENT(SrcRect != gcvNULL);
-    gcmVERIFY_ARGUMENT(DestRect != gcvNULL);
+    gcmVERIFY_ARGUMENT(DstRect != gcvNULL);
 
     /* Calculate the stretch factors. */
     status = gcoHARDWARE_GetStretchFactors(
         Engine->state.multiSrc[Engine->state.currentSrcIndex].enableGDIStretch,
-        SrcRect, DestRect,
+        SrcRect, DstRect,
         &Engine->state.multiSrc[Engine->state.currentSrcIndex].horFactor,
         &Engine->state.multiSrc[Engine->state.currentSrcIndex].verFactor
         );
@@ -2671,21 +2678,21 @@ gco2D_Clear(
     IN gctUINT32 Color32,
     IN gctUINT8 FgRop,
     IN gctUINT8 BgRop,
-    IN gceSURF_FORMAT DestFormat
+    IN gceSURF_FORMAT DstFormat
     )
 {
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
 
 #if gcdENABLE_2D
     gcmHEADER_ARG("Engine=0x%x RectCount=%d Rect=0x%x Color32=%x "
-                    "FgRop=%x BgRop=%x DestFormat=%d",
+                    "FgRop=%x BgRop=%x DstFormat=%d",
                     Engine, RectCount, Rect, Color32,
-                    FgRop, BgRop, DestFormat);
+                    FgRop, BgRop, DstFormat);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
     gcmVERIFY_ARGUMENT(Rect != gcvNULL);
-    gcmVERIFY_ARGUMENT(DestFormat != gcvSURF_UNKNOWN);
+    gcmVERIFY_ARGUMENT(DstFormat != gcvSURF_UNKNOWN);
 
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_ANDROID_ONLY) == gcvTRUE &&
         (FgRop != BgRop ||
@@ -2700,7 +2707,7 @@ gco2D_Clear(
         Engine->state.multiSrc[Engine->state.currentSrcIndex].bgRop = BgRop;
 
         /* Set the target format. */
-        Engine->state.dstSurface.format = DestFormat;
+        Engine->state.dstSurface.format = DstFormat;
 
         Engine->state.clearColor = Color32;
 
@@ -2748,7 +2755,7 @@ gco2D_Clear(
 **      gctUINT8 BgRop
 **          Background ROP to use with transparent pixels.
 **
-**      gceSURF_FORMAT DestFormat
+**      gceSURF_FORMAT DstFormat
 **          Format of the destination buffer.
 **
 **  OUTPUT:
@@ -2763,7 +2770,7 @@ gco2D_Line(
     IN gcoBRUSH Brush,
     IN gctUINT8 FgRop,
     IN gctUINT8 BgRop,
-    IN gceSURF_FORMAT DestFormat
+    IN gceSURF_FORMAT DstFormat
     )
 {
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
@@ -2773,16 +2780,16 @@ gco2D_Line(
     gctBOOL useSrc = gcvFALSE;
 
     gcmHEADER_ARG("Engine=0x%x LineCount=%d Position=0x%x Brush=0x%x "
-                    "FgRop=%x BgRop=%x DestFormat=%d",
+                    "FgRop=%x BgRop=%x DstFormat=%d",
                     Engine, LineCount, Position, Brush,
-                    FgRop, BgRop, DestFormat);
+                    FgRop, BgRop, DstFormat);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
     gcmVERIFY_ARGUMENT(LineCount > 0);
     gcmVERIFY_ARGUMENT(Position != gcvNULL);
     gcmVERIFY_OBJECT(Brush, gcvOBJ_BRUSH);
-    gcmVERIFY_ARGUMENT(DestFormat != gcvSURF_UNKNOWN);
+    gcmVERIFY_ARGUMENT(DstFormat != gcvSURF_UNKNOWN);
 
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_ANDROID_ONLY) == gcvTRUE)
     {
@@ -2806,7 +2813,7 @@ gco2D_Line(
         state->multiSrc[state->currentSrcIndex].bgRop = BgRop;
 
         /* Set the target format. */
-        Engine->state.dstSurface.format = DestFormat;
+        Engine->state.dstSurface.format = DstFormat;
 
         gcmONERROR(gcoBRUSH_CACHE_FlushBrush(
             Engine->brushCache,
@@ -2863,7 +2870,7 @@ OnError:
 **      gctUINT8 BgRop
 **          Background ROP to use with transparent pixels.
 **
-**      gceSURF_FORMAT DestFormat
+**      gceSURF_FORMAT DstFormat
 **          Format of the destination buffer.
 **
 **  OUTPUT:
@@ -2878,22 +2885,22 @@ gco2D_ColorLine(
     IN gctUINT32 Color32,
     IN gctUINT8 FgRop,
     IN gctUINT8 BgRop,
-    IN gceSURF_FORMAT DestFormat
+    IN gceSURF_FORMAT DstFormat
     )
 {
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
 
 #if gcdENABLE_2D
     gcmHEADER_ARG("Engine=0x%x LineCount=%d Position=0x%x Color32=%x "
-                    "FgRop=%x BgRop=%x DestFormat=%d",
+                    "FgRop=%x BgRop=%x DstFormat=%d",
                     Engine, LineCount, Position, Color32,
-                    FgRop, BgRop, DestFormat);
+                    FgRop, BgRop, DstFormat);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
     gcmVERIFY_ARGUMENT(LineCount > 0);
     gcmVERIFY_ARGUMENT(Position != gcvNULL);
-    gcmVERIFY_ARGUMENT(DestFormat != gcvSURF_UNKNOWN);
+    gcmVERIFY_ARGUMENT(DstFormat != gcvSURF_UNKNOWN);
 
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_ANDROID_ONLY) == gcvTRUE)
     {
@@ -2906,7 +2913,7 @@ gco2D_ColorLine(
         Engine->state.multiSrc[Engine->state.currentSrcIndex].bgRop = BgRop;
 
         /* Set the target format. */
-        Engine->state.dstSurface.format = DestFormat;
+        Engine->state.dstSurface.format = DstFormat;
 
         /* Draw the lines. */
         gcmERR_BREAK(gcoHARDWARE_Line2DEx(
@@ -2952,7 +2959,7 @@ gco2D_ColorLine(
 **      gctUINT8 BgRop
 **          Background ROP to use with transparent pixels.
 **
-**      gceSURF_FORMAT DestFormat
+**      gceSURF_FORMAT DstFormat
 **          Format of the destination buffer.
 **
 **  OUTPUT:
@@ -2966,14 +2973,14 @@ gco2D_Blit(
     IN gcsRECT_PTR Rect,
     IN gctUINT8 FgRop,
     IN gctUINT8 BgRop,
-    IN gceSURF_FORMAT DestFormat
+    IN gceSURF_FORMAT DstFormat
     )
 {
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
 
 #if gcdENABLE_2D
-    gcmHEADER_ARG("Engine=0x%x RectCount=%d Rect=0x%x FgRop=%x BgRop=%x DestFormat=%d",
-                    Engine, RectCount, Rect, FgRop, BgRop, DestFormat);
+    gcmHEADER_ARG("Engine=0x%x RectCount=%d Rect=0x%x FgRop=%x BgRop=%x DstFormat=%d",
+                    Engine, RectCount, Rect, FgRop, BgRop, DstFormat);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
@@ -2987,9 +2994,9 @@ gco2D_Blit(
     }
 
     if ((RectCount == 0) || (Rect == gcvNULL)
-        || (DestFormat == gcvSURF_UNKNOWN)
+        || (DstFormat == gcvSURF_UNKNOWN)
         || ((Engine->state.dstSurface.tileStatusConfig == gcv2D_TSC_2D_COMPRESSED)
-        && (DestFormat != gcvSURF_A8R8G8B8) && (DestFormat != gcvSURF_X8R8G8B8)))
+        && (DstFormat != gcvSURF_A8R8G8B8) && (DstFormat != gcvSURF_X8R8G8B8)))
     {
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
@@ -2997,7 +3004,7 @@ gco2D_Blit(
     Engine->state.multiSrc[Engine->state.currentSrcIndex].fgRop = FgRop;
     Engine->state.multiSrc[Engine->state.currentSrcIndex].bgRop = BgRop;
 
-    Engine->state.dstSurface.format = DestFormat;
+    Engine->state.dstSurface.format = DstFormat;
 
     gcmONERROR(gcoHARDWARE_Blit(
         Engine->hardware,
@@ -3029,13 +3036,13 @@ OnError:
 **
 **      gctUINT32 RectCount
 **          The number of rectangles to draw. The array of rectangle positions
-**          pointed to by SrcRect and DestRect parameters must have at least
+**          pointed to by SrcRect and DstRect parameters must have at least
 **          RectCount positions.
 **
 **      gcsRECT_PTR SrcRect
 **          Points to an array of positions in (x0, y0)-(x1, y1) format.
 **
-**      gcsRECT_PTR DestRect
+**      gcsRECT_PTR DstRect
 **          Points to an array of positions in (x0, y0)-(x1, y1) format.
 **
 **      gctUINT8 FgRop
@@ -3053,25 +3060,25 @@ gco2D_BatchBlit(
     IN gco2D Engine,
     IN gctUINT32 RectCount,
     IN gcsRECT_PTR SrcRect,
-    IN gcsRECT_PTR DestRect,
+    IN gcsRECT_PTR DstRect,
     IN gctUINT8 FgRop,
     IN gctUINT8 BgRop,
-    IN gceSURF_FORMAT DestFormat
+    IN gceSURF_FORMAT DstFormat
     )
 {
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
 #if gcdENABLE_2D
-    gcmHEADER_ARG("Engine=0x%x RectCount=%d SrcRect=0x%x DestRect=0x%x "
-                    "FgRop=%x BgRop=%x DestFormat=%d",
-                    Engine, RectCount, SrcRect, DestRect,
-                    FgRop, BgRop, DestFormat);
+    gcmHEADER_ARG("Engine=0x%x RectCount=%d SrcRect=0x%x DstRect=0x%x "
+                    "FgRop=%x BgRop=%x DstFormat=%d",
+                    Engine, RectCount, SrcRect, DstRect,
+                    FgRop, BgRop, DstFormat);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
     gcmVERIFY_ARGUMENT(RectCount > 0);
     gcmVERIFY_ARGUMENT(SrcRect != gcvNULL);
-    gcmVERIFY_ARGUMENT(DestRect != gcvNULL);
-    gcmVERIFY_ARGUMENT(DestFormat != gcvSURF_UNKNOWN);
+    gcmVERIFY_ARGUMENT(DstRect != gcvNULL);
+    gcmVERIFY_ARGUMENT(DstFormat != gcvSURF_UNKNOWN);
 
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_ANDROID_ONLY) == gcvTRUE &&
         (FgRop != BgRop ||
@@ -3086,7 +3093,7 @@ gco2D_BatchBlit(
         Engine->state.multiSrc[Engine->state.currentSrcIndex].bgRop = BgRop;
 
         /* Set the target format. */
-        Engine->state.dstSurface.format = DestFormat;
+        Engine->state.dstSurface.format = DstFormat;
 
         /* Start the DE engine. */
         gcmERR_BREAK(gcoHARDWARE_Blit(
@@ -3095,7 +3102,7 @@ gco2D_BatchBlit(
              RectCount,
              SrcRect,
              RectCount,
-             DestRect
+             DstRect
              ));
     }
     while (gcvFALSE);
@@ -3133,7 +3140,7 @@ gco2D_BatchBlit(
 **      gctUINT8 BgRop
 **          Background ROP to use with transparent pixels.
 **
-**      gceSURF_FORMAT DestFormat
+**      gceSURF_FORMAT DstFormat
 **          Format of the destination buffer.
 **
 **  OUTPUT:
@@ -3147,7 +3154,7 @@ gco2D_StretchBlit(
     IN gcsRECT_PTR Rect,
     IN gctUINT8 FgRop,
     IN gctUINT8 BgRop,
-    IN gceSURF_FORMAT DestFormat
+    IN gceSURF_FORMAT DstFormat
     )
 {
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
@@ -3155,8 +3162,8 @@ gco2D_StretchBlit(
     gctBOOL isYUV;
     gctUINT32 planes;
 
-    gcmHEADER_ARG("Engine=0x%x RectCount=%d Rect=0x%x FgRop=%x BgRop=%x DestFormat=%d",
-                    Engine, RectCount, Rect, FgRop, BgRop, DestFormat);
+    gcmHEADER_ARG("Engine=0x%x RectCount=%d Rect=0x%x FgRop=%x BgRop=%x DstFormat=%d",
+                    Engine, RectCount, Rect, FgRop, BgRop, DstFormat);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
@@ -3169,7 +3176,7 @@ gco2D_StretchBlit(
         return gcvSTATUS_NOT_SUPPORTED;
     }
 
-    gcmONERROR(_CheckFormat(DestFormat, &planes, gcvNULL, &isYUV));
+    gcmONERROR(_CheckFormat(DstFormat, &planes, gcvNULL, &isYUV));
 
     if ((planes != 1) || isYUV || (RectCount == 0)
         || (Rect == gcvNULL))
@@ -3181,7 +3188,7 @@ gco2D_StretchBlit(
     Engine->state.multiSrc[Engine->state.currentSrcIndex].bgRop = BgRop;
 
     /* Set the target format. */
-    Engine->state.dstSurface.format = DestFormat;
+    Engine->state.dstSurface.format = DstFormat;
 
     /* Set the source. */
     gcmONERROR(gcoHARDWARE_StartDE(
@@ -3226,10 +3233,10 @@ OnError:
 **      gceSURF_MONOPACK SrcStreamPack
 **          Source bitmap packing.
 **
-**      gceSURF_MONOPACK DestStreamPack
+**      gceSURF_MONOPACK DstStreamPack
 **          Packing of the bitmap in the command stream.
 **
-**      gcsRECT_PTR DestRect
+**      gcsRECT_PTR DstRect
 **          Pointer to an array of destination rectangles.
 **
 **      gctUINT32 FgRop
@@ -3238,8 +3245,8 @@ OnError:
 **      gctUINT32 BgRop
 **          Background ROP to use with transparent pixels.
 **
-**      gceSURF_FORMAT DestFormat
-**          Destination surface format.
+**      gceSURF_FORMAT DstFormat
+**          Dstination surface format.
 **
 **  OUTPUT:
 **
@@ -3252,30 +3259,30 @@ gco2D_MonoBlit(
     IN gcsPOINT_PTR StreamSize,
     IN gcsRECT_PTR StreamRect,
     IN gceSURF_MONOPACK SrcStreamPack,
-    IN gceSURF_MONOPACK DestStreamPack,
-    IN gcsRECT_PTR DestRect,
+    IN gceSURF_MONOPACK DstStreamPack,
+    IN gcsRECT_PTR DstRect,
     IN gctUINT32 FgRop,
     IN gctUINT32 BgRop,
-    IN gceSURF_FORMAT DestFormat
+    IN gceSURF_FORMAT DstFormat
     )
 {
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
 
 #if gcdENABLE_2D
     gcmHEADER_ARG("Engine=0x%x StreamBits=0x%x StreamSize=%d StreamRect=0x%x "
-                    "SrcStreamPack=%d DestStreamPack=%d DestRect=0x%x "
-                    "FgRop=%x BgRop=%x DestFormat=%d",
+                    "SrcStreamPack=%d DstStreamPack=%d DstRect=0x%x "
+                    "FgRop=%x BgRop=%x DstFormat=%d",
                     Engine, StreamBits, StreamSize, StreamRect,
-                    SrcStreamPack, DestStreamPack, DestRect,
-                    FgRop, BgRop, DestFormat);
+                    SrcStreamPack, DstStreamPack, DstRect,
+                    FgRop, BgRop, DstFormat);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
     gcmVERIFY_ARGUMENT(StreamBits != gcvNULL);
     gcmVERIFY_ARGUMENT(StreamSize != gcvNULL);
     gcmVERIFY_ARGUMENT(StreamRect != gcvNULL);
-    gcmVERIFY_ARGUMENT(DestRect != gcvNULL);
-    gcmVERIFY_ARGUMENT(DestFormat != gcvSURF_UNKNOWN);
+    gcmVERIFY_ARGUMENT(DstRect != gcvNULL);
+    gcmVERIFY_ARGUMENT(DstFormat != gcvSURF_UNKNOWN);
 
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_ANDROID_ONLY) == gcvTRUE)
     {
@@ -3289,7 +3296,7 @@ gco2D_MonoBlit(
         Engine->state.multiSrc[Engine->state.currentSrcIndex].bgRop = (gctUINT8)BgRop;
 
         /* Set the target format. */
-        Engine->state.dstSurface.format = DestFormat;
+        Engine->state.dstSurface.format = DstFormat;
 
         /* Set the source. */
         gcmERR_BREAK(gcoHARDWARE_MonoBlit(
@@ -3299,8 +3306,8 @@ gco2D_MonoBlit(
             StreamSize,
             StreamRect,
             SrcStreamPack,
-            DestStreamPack,
-            DestRect
+            DstStreamPack,
+            DstRect
             ));
     }
     while (gcvFALSE);
@@ -3646,30 +3653,30 @@ gco2D_FreeFilterBuffer(
 **      gcsRECT_PTR SrcRect
 **          Coordinates of the entire source image.
 **
-**      gctUINT32 DestAddress
+**      gctUINT32 DstAddress
 **          Base address of the destination surface in local memory.
 **
-**      gctUINT DestStride
+**      gctUINT DstStride
 **          Stride of the destination surface in bytes.
 **
-**      gceSURF_FORMAT DestFormat
+**      gceSURF_FORMAT DstFormat
 **          Format of the destination surface.
 **
-**      gceSURF_ROTATION DestRotation
+**      gceSURF_ROTATION DstRotation
 **          Specifies the destination surface rotation angle.
 **
-**      gctUINT32 DestSurfaceWidth
+**      gctUINT32 DstSurfaceWidth
 **          The width in pixels of the destination surface.
 **
-**      gcsRECT_PTR DestRect
+**      gcsRECT_PTR DstRect
 **          Coordinates of the entire destination image.
 **
-**      gcsRECT_PTR DestSubRect
+**      gcsRECT_PTR DstSubRect
 **          Coordinates of a sub area within the destination to render.
-**          If DestSubRect is gcvNULL, the complete image will be rendered
-**          using coordinates set by DestRect.
-**          If DestSubRect is not gcvNULL and DestSubRect and DestRect are
-**          no equal, DestSubRect is assumed to be within DestRect and
+**          If DstSubRect is gcvNULL, the complete image will be rendered
+**          using coordinates set by DstRect.
+**          If DstSubRect is not gcvNULL and DstSubRect and DstRect are
+**          no equal, DstSubRect is assumed to be within DstRect and
 **          will be used to render the sub area only.
 **
 **  OUTPUT:
@@ -3689,13 +3696,13 @@ gco2D_FilterBlit(
     IN gceSURF_ROTATION SrcRotation,
     IN gctUINT32 SrcSurfaceWidth,
     IN gcsRECT_PTR SrcRect,
-    IN gctUINT32 DestAddress,
-    IN gctUINT DestStride,
-    IN gceSURF_FORMAT DestFormat,
-    IN gceSURF_ROTATION DestRotation,
-    IN gctUINT32 DestSurfaceWidth,
-    IN gcsRECT_PTR DestRect,
-    IN gcsRECT_PTR DestSubRect
+    IN gctUINT32 DstAddress,
+    IN gctUINT DstStride,
+    IN gceSURF_FORMAT DstFormat,
+    IN gceSURF_ROTATION DstRotation,
+    IN gctUINT32 DstSurfaceWidth,
+    IN gcsRECT_PTR DstRect,
+    IN gcsRECT_PTR DstSubRect
     )
 {
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
@@ -3704,24 +3711,24 @@ gco2D_FilterBlit(
     gcmHEADER_ARG("Engine=0x%x SrcAddress=%x SrcStride=%d SrcUAddress=%x SrcUStride=%d "
                     "SrcVAddress=%x SrcVStride=%d SrcFormat=%d SrcRotation=%d "
                     "SrcSurfaceWidth=%d SrcRect=0x%x "
-                    "DestAddress=%x DestStride=%d DestFormat=%d DestRotation=%d "
-                    "DestSurfaceWidth=%d DestRect=0x%x DestSubRect=0x%x",
+                    "DstAddress=%x DstStride=%d DstFormat=%d DstRotation=%d "
+                    "DstSurfaceWidth=%d DstRect=0x%x DstSubRect=0x%x",
                     Engine, SrcAddress, SrcStride, SrcUAddress, SrcUStride,
                     SrcVAddress, SrcVStride, SrcFormat, SrcRotation,
                     SrcSurfaceWidth, SrcRect,
-                    DestAddress, DestStride, DestFormat, DestRotation,
-                    DestSurfaceWidth, DestRect, DestSubRect);
+                    DstAddress, DstStride, DstFormat, DstRotation,
+                    DstSurfaceWidth, DstRect, DstSubRect);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
     gcmVERIFY_ARGUMENT(SrcFormat != gcvSURF_UNKNOWN);
     gcmVERIFY_ARGUMENT(SrcRect != gcvNULL);
-    gcmVERIFY_ARGUMENT(DestFormat != gcvSURF_UNKNOWN);
-    gcmVERIFY_ARGUMENT(DestRect != gcvNULL);
+    gcmVERIFY_ARGUMENT(DstFormat != gcvSURF_UNKNOWN);
+    gcmVERIFY_ARGUMENT(DstRect != gcvNULL);
 
     /* This interface does not support full rotations. */
     gcmVERIFY_ARGUMENT((SrcRotation == gcvSURF_0_DEGREE) || (SrcRotation == gcvSURF_90_DEGREE));
-    gcmVERIFY_ARGUMENT((DestRotation == gcvSURF_0_DEGREE) || (DestRotation == gcvSURF_90_DEGREE));
+    gcmVERIFY_ARGUMENT((DstRotation == gcvSURF_0_DEGREE) || (DstRotation == gcvSURF_90_DEGREE));
 
     /* Forward to gco2D_FilterBlitEx with the DstHeight set to 0
         and SrcHeight set to 0. */
@@ -3738,14 +3745,14 @@ gco2D_FilterBlit(
                             SrcSurfaceWidth,
                             0,
                             SrcRect,
-                            DestAddress,
-                            DestStride,
-                            DestFormat,
-                            DestRotation,
-                            DestSurfaceWidth,
+                            DstAddress,
+                            DstStride,
+                            DstFormat,
+                            DstRotation,
+                            DstSurfaceWidth,
                             0,
-                            DestRect,
-                            DestSubRect
+                            DstRect,
+                            DstSubRect
                             );
 
     /* Return status. */
@@ -3799,33 +3806,33 @@ gco2D_FilterBlit(
 **      gcsRECT_PTR SrcRect
 **          Coordinates of the entire source image.
 **
-**      gctUINT32 DestAddress
+**      gctUINT32 DstAddress
 **          Base address of the destination surface in local memory.
 **
-**      gctUINT DestStride
+**      gctUINT DstStride
 **          Stride of the destination surface in bytes.
 **
-**      gceSURF_FORMAT DestFormat
+**      gceSURF_FORMAT DstFormat
 **          Format of the destination surface.
 **
-**      gceSURF_ROTATION DestRotation
+**      gceSURF_ROTATION DstRotation
 **          Specifies the destination surface rotation angle.
 **
-**      gctUINT32 DestSurfaceWidth
+**      gctUINT32 DstSurfaceWidth
 **          The width in pixels of the destination surface.
 **
-**      gctUINT32 DestSurfaceHeight
-**          The height in pixels of the destination surface for the rotaion in PE 2.0.
+**      gctUINT32 DstSurfaceHeight
+**          The height in pixels of the destination surface for the rotation in PE 2.0.
 **
-**      gcsRECT_PTR DestRect
+**      gcsRECT_PTR DstRect
 **          Coordinates of the entire destination image.
 **
-**      gcsRECT_PTR DestSubRect
+**      gcsRECT_PTR DstSubRect
 **          Coordinates of a sub area within the destination to render.
-**          If DestSubRect is gcvNULL, the complete image will be rendered
-**          using coordinates set by DestRect.
-**          If DestSubRect is not gcvNULL and DestSubRect and DestRect are
-**          no equal, DestSubRect is assumed to be within DestRect and
+**          If DstSubRect is gcvNULL, the complete image will be rendered
+**          using coordinates set by DstRect.
+**          If DstSubRect is not gcvNULL and DstSubRect and DstRect are
+**          no equal, DstSubRect is assumed to be within DstRect and
 **          will be used to render the sub area only.
 **
 **  OUTPUT:
@@ -3846,14 +3853,14 @@ gco2D_FilterBlitEx(
     IN gctUINT32 SrcSurfaceWidth,
     IN gctUINT32 SrcSurfaceHeight,
     IN gcsRECT_PTR SrcRect,
-    IN gctUINT32 DestAddress,
-    IN gctUINT DestStride,
-    IN gceSURF_FORMAT DestFormat,
-    IN gceSURF_ROTATION DestRotation,
-    IN gctUINT32 DestSurfaceWidth,
-    IN gctUINT32 DestSurfaceHeight,
-    IN gcsRECT_PTR DestRect,
-    IN gcsRECT_PTR DestSubRect
+    IN gctUINT32 DstAddress,
+    IN gctUINT DstStride,
+    IN gceSURF_FORMAT DstFormat,
+    IN gceSURF_ROTATION DstRotation,
+    IN gctUINT32 DstSurfaceWidth,
+    IN gctUINT32 DstSurfaceHeight,
+    IN gcsRECT_PTR DstRect,
+    IN gcsRECT_PTR DstSubRect
     )
 {
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
@@ -3861,19 +3868,19 @@ gco2D_FilterBlitEx(
 #if gcdENABLE_2D
     gctUINT32 n;
     gctUINT32 addr[3]={0}, stride[3]={0};
-    gcsSURF_INFO_PTR srcSurface;
-    gcsSURF_INFO_PTR destSurface;
+    gcoSURF srcSurface;
+    gcoSURF destSurface;
 
     gcmHEADER_ARG("Engine=0x%x SrcAddress=%x SrcStride=%d SrcUAddress=%x SrcUStride=%d "
                     "SrcVAddress=%x SrcVStride=%d SrcFormat=%d SrcRotation=%d "
                     "SrcSurfaceWidth=%d SrcSurfaceHeight=%d SrcRect=0x%x "
-                    "DestAddress=%x DestStride=%d DestFormat=%d DestRotation=%d "
-                    "DestSurfaceWidth=%d DestSurfaceHeight=%d DestRect=0x%x DestSubRect=0x%x",
+                    "DstAddress=%x DstStride=%d DstFormat=%d DstRotation=%d "
+                    "DstSurfaceWidth=%d DstSurfaceHeight=%d DstRect=0x%x DstSubRect=0x%x",
                     Engine, SrcAddress, SrcStride, SrcUAddress, SrcUStride,
                     SrcVAddress, SrcVStride, SrcFormat, SrcRotation,
                     SrcSurfaceWidth, SrcSurfaceHeight, SrcRect,
-                    DestAddress, DestStride, DestFormat, DestRotation,
-                    DestSurfaceWidth, DestSurfaceHeight, DestRect, DestSubRect);
+                    DstAddress, DstStride, DstFormat, DstRotation,
+                    DstSurfaceWidth, DstSurfaceHeight, DstRect, DstSubRect);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
@@ -3882,11 +3889,11 @@ gco2D_FilterBlitEx(
         && (SrcRect->top < SrcRect->bottom)
         && (SrcRect->right >= 0) && (SrcRect->right < 0x8000)
         && (SrcRect->bottom >= 0) && (SrcRect->bottom < 0x8000));
-    gcmVERIFY_ARGUMENT(DestRect != gcvNULL);
-    gcmVERIFY_ARGUMENT((DestRect->left < DestRect->right)
-        && (DestRect->top < DestRect->bottom)
-        && (DestRect->right >= 0) && (DestRect->right < 0x8000)
-        && (DestRect->bottom >= 0) && (DestRect->bottom < 0x8000));
+    gcmVERIFY_ARGUMENT(DstRect != gcvNULL);
+    gcmVERIFY_ARGUMENT((DstRect->left < DstRect->right)
+        && (DstRect->top < DstRect->bottom)
+        && (DstRect->right >= 0) && (DstRect->right < 0x8000)
+        && (DstRect->bottom >= 0) && (DstRect->bottom < 0x8000));
 
     gcmONERROR(_CheckFormat(SrcFormat, &n, gcvNULL, gcvNULL));
 
@@ -3912,7 +3919,7 @@ gco2D_FilterBlitEx(
     gcmONERROR(_CheckSurface(Engine, gcvTRUE, SrcFormat, addr, stride,
         SrcSurfaceWidth, SrcSurfaceHeight, SrcRotation, gcvLINEAR));
 
-    gcmONERROR(_CheckFormat(DestFormat, &n, gcvNULL, gcvNULL));
+    gcmONERROR(_CheckFormat(DstFormat, &n, gcvNULL, gcvNULL));
 
     if (n != 1
         || gcmHAS2DCOMPRESSION(&Engine->state.dstSurface)
@@ -3921,8 +3928,8 @@ gco2D_FilterBlitEx(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    gcmONERROR(_CheckSurface(Engine, gcvFALSE, DestFormat, &DestAddress, &DestStride,
-        DestSurfaceWidth, DestSurfaceHeight, DestRotation, gcvLINEAR));
+    gcmONERROR(_CheckSurface(Engine, gcvFALSE, DstFormat, &DstAddress, &DstStride,
+        DstSurfaceWidth, DstSurfaceHeight, DstRotation, gcvLINEAR));
 
     /* Fill in the source structure. */
     srcSurface = &Engine->state.multiSrc[Engine->state.currentSrcIndex].srcSurface;
@@ -3944,13 +3951,13 @@ gco2D_FilterBlitEx(
     /* Fill in the target structure. */
     destSurface = &Engine->state.dstSurface;
     destSurface->type          = gcvSURF_BITMAP;
-    destSurface->format        = DestFormat;
-    destSurface->alignedW      = DestSurfaceWidth;
-    destSurface->alignedH      = DestSurfaceHeight;
-    destSurface->rotation      = DestRotation;
-    destSurface->stride        = DestStride;
+    destSurface->format        = DstFormat;
+    destSurface->alignedW      = DstSurfaceWidth;
+    destSurface->alignedH      = DstSurfaceHeight;
+    destSurface->rotation      = DstRotation;
+    destSurface->stride        = DstStride;
 
-    gcsSURF_NODE_SetHardwareAddress(&destSurface->node, DestAddress);
+    gcsSURF_NODE_SetHardwareAddress(&destSurface->node, DstAddress);
 
     destSurface->tiling        = gcvLINEAR;
 
@@ -3960,8 +3967,8 @@ gco2D_FilterBlitEx(
         srcSurface,
         destSurface,
         SrcRect,
-        DestRect,
-        DestSubRect);
+        DstRect,
+        DstSubRect);
 
     if (status != gcvSTATUS_OK)
     {
@@ -3971,8 +3978,8 @@ gco2D_FilterBlitEx(
             srcSurface,
             destSurface,
             SrcRect,
-            DestRect,
-            DestSubRect
+            DstRect,
+            DstSubRect
             );
     }
 
@@ -4031,33 +4038,33 @@ OnError:
 **      gcsRECT_PTR SrcRect
 **          Coordinates of the entire source image.
 **
-**      gctUINT32 DestAddress
+**      gctUINT32 DstAddress
 **          Base address of the destination surface in local memory.
 **
-**      gctUINT DestStride
+**      gctUINT DstStride
 **          Stride of the destination surface in bytes.
 **
-**      gceSURF_FORMAT DestFormat
+**      gceSURF_FORMAT DstFormat
 **          Format of the destination surface.
 **
-**      gceSURF_ROTATION DestRotation
+**      gceSURF_ROTATION DstRotation
 **          Specifies the destination surface rotation angle.
 **
-**      gctUINT32 DestSurfaceWidth
+**      gctUINT32 DstSurfaceWidth
 **          The width in pixels of the destination surface.
 **
-**      gctUINT32 DestSurfaceHeight
+**      gctUINT32 DstSurfaceHeight
 **          The height in pixels of the destination surface for the rotaion in PE 2.0.
 **
-**      gcsRECT_PTR DestRect
+**      gcsRECT_PTR DstRect
 **          Coordinates of the entire destination image.
 **
-**      gcsRECT_PTR DestSubRect
+**      gcsRECT_PTR DstSubRect
 **          Coordinates of a sub area within the destination to render.
-**          If DestSubRect is gcvNULL, the complete image will be rendered
-**          using coordinates set by DestRect.
-**          If DestSubRect is not gcvNULL and DestSubRect and DestRect are
-**          no equal, DestSubRect is assumed to be within DestRect and
+**          If DstSubRect is gcvNULL, the complete image will be rendered
+**          using coordinates set by DstRect.
+**          If DstSubRect is not gcvNULL and DstSubRect and DstRect are
+**          no equal, DstSubRect is assumed to be within DstRect and
 **          will be used to render the sub area only.
 **
 **  OUTPUT:
@@ -4077,22 +4084,22 @@ gco2D_FilterBlitEx2(
     IN gctUINT32            SrcSurfaceWidth,
     IN gctUINT32            SrcSurfaceHeight,
     IN gcsRECT_PTR          SrcRect,
-    IN gctUINT32_PTR        DestAddresses,
-    IN gctUINT32            DestAddressNum,
-    IN gctUINT32_PTR        DestStrides,
-    IN gctUINT32            DestStrideNum,
-    IN gceTILING            DestTiling,
-    IN gceSURF_FORMAT       DestFormat,
-    IN gceSURF_ROTATION     DestRotation,
-    IN gctUINT32            DestSurfaceWidth,
-    IN gctUINT32            DestSurfaceHeight,
-    IN gcsRECT_PTR          DestRect,
-    IN gcsRECT_PTR          DestSubRect
+    IN gctUINT32_PTR        DstAddresses,
+    IN gctUINT32            DstAddressNum,
+    IN gctUINT32_PTR        DstStrides,
+    IN gctUINT32            DstStrideNum,
+    IN gceTILING            DstTiling,
+    IN gceSURF_FORMAT       DstFormat,
+    IN gceSURF_ROTATION     DstRotation,
+    IN gctUINT32            DstSurfaceWidth,
+    IN gctUINT32            DstSurfaceHeight,
+    IN gcsRECT_PTR          DstRect,
+    IN gcsRECT_PTR          DstSubRect
     )
 {
 #if gcdENABLE_2D
-    gcsSURF_INFO_PTR srcSurface;
-    gcsSURF_INFO_PTR destSurface;
+    gcoSURF srcSurface;
+    gcoSURF destSurface;
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT32 n;
     gctBOOL multiYUV = gcvFALSE;
@@ -4100,13 +4107,13 @@ gco2D_FilterBlitEx2(
     gcmHEADER_ARG("Engine=0x%x SrcAddresses=%x SrcStrideNum=%d SrcStride=%x SrcStrideNum=%d "
                     "SrcTiling=%d SrcFormat=%d SrcRotation=%d "
                     "SrcSurfaceWidth=%d SrcSurfaceHeight=%d SrcRect=0x%x "
-                    "DestAddresses=%x DestAddressNum=%d DestStrides=%x DestStrideNum=%d DestTiling=%d DestFormat=%d DestRotation=%d "
-                    "DestSurfaceWidth=%d DestSurfaceHeight=%d DestRect=0x%x DestSubRect=0x%x",
+                    "DstAddresses=%x DstAddressNum=%d DstStrides=%x DstStrideNum=%d DstTiling=%d DstFormat=%d DstRotation=%d "
+                    "DstSurfaceWidth=%d DstSurfaceHeight=%d DstRect=0x%x DstSubRect=0x%x",
                     Engine, SrcAddresses, SrcStrideNum, SrcStrides, SrcStrideNum,
                     SrcTiling, SrcFormat, SrcRotation,
                     SrcSurfaceWidth, SrcSurfaceHeight, SrcRect,
-                    DestAddresses, DestAddressNum, DestStrides, DestStrideNum, DestTiling, DestFormat, DestRotation,
-                    DestSurfaceWidth, DestSurfaceHeight, DestRect, DestSubRect);
+                    DstAddresses, DstAddressNum, DstStrides, DstStrideNum, DstTiling, DstFormat, DstRotation,
+                    DstSurfaceWidth, DstSurfaceHeight, DstRect, DstSubRect);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
@@ -4115,11 +4122,11 @@ gco2D_FilterBlitEx2(
         && (SrcRect->top < SrcRect->bottom)
         && (SrcRect->right >= 0) && (SrcRect->right < 0x8000)
         && (SrcRect->bottom >= 0) && (SrcRect->bottom < 0x8000));
-    gcmVERIFY_ARGUMENT(DestRect != gcvNULL);
-    gcmVERIFY_ARGUMENT((DestRect->left < DestRect->right)
-        && (DestRect->top < DestRect->bottom)
-        && (DestRect->right >= 0) && (DestRect->right < 0x8000)
-        && (DestRect->bottom >= 0) && (DestRect->bottom < 0x8000));
+    gcmVERIFY_ARGUMENT(DstRect != gcvNULL);
+    gcmVERIFY_ARGUMENT((DstRect->left < DstRect->right)
+        && (DstRect->top < DstRect->bottom)
+        && (DstRect->right >= 0) && (DstRect->right < 0x8000)
+        && (DstRect->bottom >= 0) && (DstRect->bottom < 0x8000));
 
     gcmONERROR(_CheckFormat(SrcFormat, &n, gcvNULL, gcvNULL));
 
@@ -4131,19 +4138,19 @@ gco2D_FilterBlitEx2(
     gcmONERROR(_CheckSurface(Engine, gcvTRUE, SrcFormat, SrcAddresses, SrcStrides,
         SrcSurfaceWidth, SrcSurfaceHeight, SrcRotation, SrcTiling));
 
-    gcmONERROR(_CheckFormat(DestFormat, &n, gcvNULL, gcvNULL));
+    gcmONERROR(_CheckFormat(DstFormat, &n, gcvNULL, gcvNULL));
 
-    if ((n > DestAddressNum) || (DestAddressNum > 3) || (DestStrideNum > 3)
+    if ((n > DstAddressNum) || (DstAddressNum > 3) || (DstStrideNum > 3)
         || gcmHAS2DCOMPRESSION(&Engine->state.dstSurface)
         || gcmHAS2DCOMPRESSION(&Engine->state.multiSrc[Engine->state.currentSrcIndex].srcSurface))
     {
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    gcmONERROR(_CheckSurface(Engine, gcvFALSE, DestFormat, DestAddresses, DestStrides,
-        DestSurfaceWidth, DestSurfaceHeight, DestRotation, DestTiling));
+    gcmONERROR(_CheckSurface(Engine, gcvFALSE, DstFormat, DstAddresses, DstStrides,
+        DstSurfaceWidth, DstSurfaceHeight, DstRotation, DstTiling));
 
-    switch (DestFormat)
+    switch (DstFormat)
     {
     case gcvSURF_I420:
     case gcvSURF_YV12:
@@ -4154,18 +4161,18 @@ gco2D_FilterBlitEx2(
         if (((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_MULTI_SOURCE_BLT) != gcvTRUE)
              || ((SrcFormat != gcvSURF_YUY2) && (SrcFormat != gcvSURF_UYVY)
                  && (SrcFormat != gcvSURF_YVYU) && (SrcFormat != gcvSURF_VYUY)))
-            &&(SrcFormat != DestFormat))
+            &&(SrcFormat != DstFormat))
         {
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         }
 
-        if (SrcFormat != DestFormat &&
-            ((SrcRect->right != DestRect->right)
-            || (SrcRect->left !=  DestRect->left)
-            || (SrcRect->bottom != DestRect->bottom)
-            || (SrcRect->top != DestRect->top)
+        if (SrcFormat != DstFormat &&
+            ((SrcRect->right != DstRect->right)
+            || (SrcRect->left !=  DstRect->left)
+            || (SrcRect->bottom != DstRect->bottom)
+            || (SrcRect->top != DstRect->top)
             || (SrcRotation != gcvSURF_0_DEGREE)
-            || (DestRotation != gcvSURF_0_DEGREE)))
+            || (DstRotation != gcvSURF_0_DEGREE)))
         {
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
@@ -4225,42 +4232,42 @@ gco2D_FilterBlitEx2(
     /* Fill in the target structure. */
     destSurface = &Engine->state.dstSurface;
     destSurface->type          = gcvSURF_BITMAP;
-    destSurface->format        = DestFormat;
-    destSurface->tiling        = DestTiling;
-    destSurface->alignedW      = DestSurfaceWidth;
-    destSurface->alignedH      = DestSurfaceHeight;
-    destSurface->rotation      = DestRotation;
+    destSurface->format        = DstFormat;
+    destSurface->tiling        = DstTiling;
+    destSurface->alignedW      = DstSurfaceWidth;
+    destSurface->alignedH      = DstSurfaceHeight;
+    destSurface->rotation      = DstRotation;
 
-    switch (DestAddressNum)
+    switch (DstAddressNum)
     {
         case 3:
-            destSurface->node.physical3 = DestAddresses[2];
+            destSurface->node.physical3 = DstAddresses[2];
             /*fall through*/
 
         case 2:
-            destSurface->node.physical2 = DestAddresses[1];
+            destSurface->node.physical2 = DstAddresses[1];
             /*fall through*/
 
         case 1:
-            gcsSURF_NODE_SetHardwareAddress(&destSurface->node, DestAddresses[0]);
+            gcsSURF_NODE_SetHardwareAddress(&destSurface->node, DstAddresses[0]);
             break;
 
         default:
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    switch (DestStrideNum)
+    switch (DstStrideNum)
     {
         case 3:
-            destSurface->vStride = DestStrides[2];
+            destSurface->vStride = DstStrides[2];
             /*fall through*/
 
         case 2:
-            destSurface->uStride = DestStrides[1];
+            destSurface->uStride = DstStrides[1];
             /*fall through*/
 
         case 1:
-            destSurface->stride = DestStrides[0];
+            destSurface->stride = DstStrides[0];
             break;
 
         default:
@@ -4269,12 +4276,12 @@ gco2D_FilterBlitEx2(
 
     if (multiYUV)
     {
-        if ((SrcFormat == gcvSURF_I420 && DestFormat == gcvSURF_I420) ||
-            (SrcFormat == gcvSURF_YV12 && DestFormat == gcvSURF_YV12) ||
-            (SrcFormat == gcvSURF_NV12 && DestFormat == gcvSURF_NV12) ||
-            (SrcFormat == gcvSURF_NV21 && DestFormat == gcvSURF_NV21) ||
-            (SrcFormat == gcvSURF_NV16 && DestFormat == gcvSURF_NV16) ||
-            (SrcFormat == gcvSURF_NV61 && DestFormat == gcvSURF_NV61))
+        if ((SrcFormat == gcvSURF_I420 && DstFormat == gcvSURF_I420) ||
+            (SrcFormat == gcvSURF_YV12 && DstFormat == gcvSURF_YV12) ||
+            (SrcFormat == gcvSURF_NV12 && DstFormat == gcvSURF_NV12) ||
+            (SrcFormat == gcvSURF_NV21 && DstFormat == gcvSURF_NV21) ||
+            (SrcFormat == gcvSURF_NV16 && DstFormat == gcvSURF_NV16) ||
+            (SrcFormat == gcvSURF_NV61 && DstFormat == gcvSURF_NV61))
         {
             status = gcoHARDWARE_SplitYUVFilterBlit(
                     Engine->hardware,
@@ -4282,8 +4289,8 @@ gco2D_FilterBlitEx2(
                     srcSurface,
                     destSurface,
                     SrcRect,
-                    DestRect,
-                    DestSubRect
+                    DstRect,
+                    DstSubRect
                     );
         }
         else
@@ -4293,7 +4300,7 @@ gco2D_FilterBlitEx2(
                     &Engine->state,
                     srcSurface,
                     destSurface,
-                    DestRect
+                    DstRect
                     );
         }
     }
@@ -4305,8 +4312,8 @@ gco2D_FilterBlitEx2(
             srcSurface,
             destSurface,
             SrcRect,
-            DestRect,
-            DestSubRect);
+            DstRect,
+            DstSubRect);
 
         if (status != gcvSTATUS_OK)
         {
@@ -4316,8 +4323,8 @@ gco2D_FilterBlitEx2(
                 srcSurface,
                 destSurface,
                 SrcRect,
-                DestRect,
-                DestSubRect
+                DstRect,
+                DstSubRect
                 );
         }
     }
@@ -5809,7 +5816,7 @@ gco2D_SetGenericSource(
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
 
 #if gcdENABLE_2D
-    gcsSURF_INFO_PTR surface;
+    gcoSURF surface;
     gctUINT32 n;
 
     gcmHEADER_ARG("Engine=0x%x Addresses=0x%08x AddressNum=%d Strides=%d StrideNum=%d "
@@ -5951,7 +5958,7 @@ gco2D_SetGenericTarget(
 #if gcdENABLE_2D
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT32 n;
-    gcsSURF_INFO_PTR surface;
+    gcoSURF surface;
 
     gcmHEADER_ARG("Engine=0x%x Addresses=0x%08x AddressNum=%d Strides=%d StrideNum=%d "
                     "Tiling=%d Format=%d Rotation=%d "
@@ -6102,7 +6109,7 @@ gceSTATUS
 gco2D_MultiSourceBlit(
     IN gco2D Engine,
     IN gctUINT32 SourceMask,
-    IN gcsRECT_PTR DestRect,
+    IN gcsRECT_PTR DstRect,
     IN gctUINT32 RectCount
     )
 {
@@ -6113,13 +6120,13 @@ gco2D_MultiSourceBlit(
     gctBOOL mpSrc = gcvFALSE;
     gctBOOL supportMinorTile = gcvFALSE;
     gctINT dRectWidth = 0, dRecHeight = 0;
-    gcsSURF_INFO_PTR surf;
+    gcoSURF surf;
     gceSURF_ROTATION rot;
     gctINT w = 32768;
     gctINT h = 32768;
 
-    gcmHEADER_ARG("Engine=0x%x SourceMask=0x%08x DestRect=0x%x RectCount=%d",
-                    Engine, SourceMask, DestRect, RectCount);
+    gcmHEADER_ARG("Engine=0x%x SourceMask=0x%08x DstRect=0x%x RectCount=%d",
+                    Engine, SourceMask, DstRect, RectCount);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
@@ -6137,7 +6144,7 @@ gco2D_MultiSourceBlit(
     {
         gctUINT32 n;
 
-        gcmVERIFY_ARGUMENT(DestRect != gcvNULL);
+        gcmVERIFY_ARGUMENT(DstRect != gcvNULL);
 
         if (gcoHAL_IsFeatureAvailable(gcvNULL,
             gcvFEATURE_2D_MULTI_SRC_BLT_BILINEAR_FILTER) == gcvTRUE)
@@ -6181,10 +6188,10 @@ gco2D_MultiSourceBlit(
 
         for (n = 0; n < RectCount; n++)
         {
-            if ((DestRect[n].right < DestRect[n].left)
-                || (DestRect[n].bottom < DestRect[n].top)
-                || (DestRect[n].right > w)
-                || (DestRect[n].bottom > h))
+            if ((DstRect[n].right < DstRect[n].left)
+                || (DstRect[n].bottom < DstRect[n].top)
+                || (DstRect[n].right > w)
+                || (DstRect[n].bottom > h))
             {
                 gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
             }
@@ -6192,13 +6199,13 @@ gco2D_MultiSourceBlit(
 
         if (Engine->state.unifiedDstRect)
         {
-            dRectWidth = DestRect->right - DestRect->left;
-            dRecHeight = DestRect->bottom - DestRect->top;
+            dRectWidth = DstRect->right - DstRect->left;
+            dRecHeight = DstRect->bottom - DstRect->top;
 
             for (n = 1; n < RectCount; n++)
             {
-                if ((DestRect[n].right - DestRect[n].left != dRectWidth)
-                    || (DestRect[n].bottom - DestRect[n].top != dRecHeight))
+                if ((DstRect[n].right - DstRect[n].left != dRectWidth)
+                    || (DstRect[n].bottom - DstRect[n].top != dRecHeight))
                 {
                     gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
                 }
@@ -6212,7 +6219,7 @@ gco2D_MultiSourceBlit(
         {
             maxSrc = 8;
             supportMinorTile = gcvTRUE;
-            DestRect = gcvNULL;
+            DstRect = gcvNULL;
         }
         else
         {
@@ -6268,7 +6275,15 @@ gco2D_MultiSourceBlit(
                 {
                     break;
                 }
-                /*Fall through*/
+
+            case gcvYMAJOR_SUPERTILED:
+                if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_MAJOR_SUPER_TILE) != gcvTRUE)
+                {
+                    return gcvSTATUS_NOT_SUPPORTED;
+                }
+                break;
+
+            /*Fall through*/
 
             default:
                 gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
@@ -6342,7 +6357,7 @@ gco2D_MultiSourceBlit(
         0,
         gcvNULL,
         RectCount,
-        DestRect
+        DstRect
         ));
 
 OnError:
@@ -6444,7 +6459,7 @@ gco2D_SetSourceTileStatus(
 {
 #if gcdENABLE_2D
     gceSTATUS status = gcvSTATUS_OK;
-    gcsSURF_INFO_PTR surface;
+    gcoSURF surface;
 
     gcmHEADER_ARG("Engine=0x%x TSControl=%x CompressedFormat=%d ClearValue=%d GpuAddress=%d",
                     Engine, TileStatusConfig, CompressedFormat, ClearValue, GpuAddress);
@@ -6495,7 +6510,8 @@ gco2D_SetSourceTileStatus(
         GpuAddress = ~0U;
         CompressedFormat = gcvSURF_UNKNOWN;
     }
-    else if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_FC_SOURCE) != gcvTRUE)
+    else if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_FC_SOURCE) != gcvTRUE &&
+             gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_V4COMPRESSION) != gcvTRUE)
     {
         gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
@@ -6559,7 +6575,7 @@ gco2D_SetTargetTileStatus(
 {
 #if gcdENABLE_2D
     gceSTATUS status = gcvSTATUS_OK;
-    gcsSURF_INFO_PTR surface;
+    gcoSURF surface;
 
     gcmHEADER_ARG("Engine=0x%x TSControl=%x CompressedFormat=%d ClearValue=%d GpuAddress=%d",
                     Engine, TileStatusConfig, CompressedFormat, ClearValue, GpuAddress);
@@ -6567,20 +6583,17 @@ gco2D_SetTargetTileStatus(
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
 
-    if ((TileStatusConfig != gcv2D_TSC_DISABLE)
-        && (TileStatusConfig != gcv2D_TSC_TPC_COMPRESSED)
-        && !(TileStatusConfig & gcv2D_TSC_DEC_COMPRESSED)
-        && ((TileStatusConfig != gcv2D_TSC_2D_COMPRESSED)
-        || ((CompressedFormat != gcvSURF_X8R8G8B8) && (CompressedFormat != gcvSURF_A8R8G8B8))))
+    if (TileStatusConfig == gcv2D_TSC_2D_COMPRESSED)
     {
-        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-    }
+        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_COMPRESSION) != gcvTRUE)
+        {
+            gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+        }
 
-
-    if ((TileStatusConfig == gcv2D_TSC_2D_COMPRESSED)
-        && (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_COMPRESSION) != gcvTRUE))
-    {
-        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+        if ((CompressedFormat != gcvSURF_X8R8G8B8) && (CompressedFormat != gcvSURF_A8R8G8B8))
+        {
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
     }
 #if gcdENABLE_THIRD_PARTY_OPERATION
     else if (TileStatusConfig == gcv2D_TSC_TPC_COMPRESSED)
@@ -6607,6 +6620,17 @@ gco2D_SetTargetTileStatus(
         }
     }
 #endif
+    else if (TileStatusConfig == gcv2D_TSC_DISABLE)
+    {
+        ClearValue = 0;
+        GpuAddress = ~0U;
+        CompressedFormat = gcvSURF_UNKNOWN;
+    }
+    else if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_FC_SOURCE) != gcvTRUE &&
+             gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_V4COMPRESSION) != gcvTRUE)
+    {
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
 
     surface = &Engine->state.dstSurface;
     surface->tileStatusConfig    = TileStatusConfig;
@@ -6965,7 +6989,7 @@ gco2D_SetStateArrayU32(
     case gcv2D_STATE_ARRAY_YUV_SRC_TILE_STATUS_ADDR:
     case gcv2D_STATE_ARRAY_YUV_DST_TILE_STATUS_ADDR:
         {
-            gcsSURF_INFO_PTR surface;
+            gcoSURF surface;
             gctINT i;
 
             if (ArraySize != 1 && ArraySize != 2)
@@ -7146,7 +7170,7 @@ OnError:
 **  NOTE:
 **      1.  If SrcRect equals to gcvNULL, the stream is used as monochrome
 **          source; Else, it is used as the source mask.
-**      2.  The Stream rectangle size is the same with DestRect.
+**      2.  The Stream rectangle size is the same with DstRect.
 **
 **  INPUT:
 **
@@ -7584,7 +7608,7 @@ gco2D_Set2DEngine(
 
      if (Engine->hardware == gcvNULL)
      {
-        gcmONERROR(gcoHARDWARE_Construct(gcPLS.hal, gcvTRUE, &Engine->hardware));
+        gcmONERROR(gcoHARDWARE_Construct(gcPLS.hal, gcvTRUE, gcvFALSE, &Engine->hardware));
      }
 
 OnError:
@@ -7848,8 +7872,8 @@ gco2D_NatureRotateTranslation(
 
                 SrcRect->left = x;
                 SrcRect->top = y;
-                SrcRect->right = x + sh;
-                SrcRect->bottom = y + sw;
+                SrcRect->right = x + sw;
+                SrcRect->bottom = y + sh;
 
                 *SrcRotation = gcvSURF_180_DEGREE;
                 *DstRotation = gcvSURF_0_DEGREE;

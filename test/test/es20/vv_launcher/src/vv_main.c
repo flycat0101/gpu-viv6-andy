@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -261,7 +261,7 @@ int main(
 		return RETURN_ERROR;
 	}
 
-	eglSurface = eglCreateWindowSurface(eglDisplay, configs[0], window, configAttribs);
+        eglSurface = eglCreateWindowSurface(eglDisplay, configs[0], window, NULL);
 	if (eglSurface == EGL_NO_SURFACE)
 	{
 		return RETURN_ERROR;

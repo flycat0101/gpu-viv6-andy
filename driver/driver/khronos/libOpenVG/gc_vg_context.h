@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -275,6 +275,19 @@ typedef struct _vgsCONTEXT
     gctINT32       maxMemImage;
     gctINT32       curMemPath;
     gctINT32       maxMemPath;
+#endif
+
+#if gcdVG_ONLY
+    /* Color Key States. */
+    /* Values in the array indicates: red_high[4], green_high[4], blue_high[4], red_low[4], green_low[4], blue_low[4], alpha_to_set[4]. */
+    gctUINT32   colorKeyValues[4 * 7];
+    gctBOOL     colorKeyEnabled[4];
+    gctBOOL     colorKeyDirty;
+
+    /* Index Color states: LUT. */
+    gctUINT32   colorIndexEntryCount;
+    gctUINT32   colorIndexEntries[256];
+    gctBOOL     colorIndexDirty;
 #endif
 
     /* Debug counters. */

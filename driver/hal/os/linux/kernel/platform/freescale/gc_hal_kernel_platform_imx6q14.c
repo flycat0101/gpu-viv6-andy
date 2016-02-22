@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -103,6 +103,10 @@ extern int unregister_thermal_notifier(struct notifier_block *nb);
 #define REG_THERMAL_NOTIFIER(a) register_thermal_notifier(a);
 #define UNREG_THERMAL_NOTIFIER(a) unregister_thermal_notifier(a);
 #endif
+#endif
+
+#ifndef gcdFSL_CONTIGUOUS_SIZE
+#define gcdFSL_CONTIGUOUS_SIZE (4 << 20)
 #endif
 
 static int initgpu3DMinClock = 1;
@@ -461,7 +465,16 @@ gckPLATFORM_AdjustParam(
         Args->registerSizes[gcvCORE_3D1] = res->end - res->start + 1;
     }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,1,0)
+    res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "contiguous_mem");
+    if (res)
+    {
+        if( Args->contiguousBase == 0 )
+           Args->contiguousBase = res->start;
+        if( Args->contiguousSize == ~0U )
+           Args->contiguousSize = res->end - res->start + 1;
+    }
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
        Args->contiguousBase = 0;
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(3,5,0)
        prop = of_get_property(dn, "contiguousbase", NULL);
@@ -475,8 +488,12 @@ gckPLATFORM_AdjustParam(
        Args->contiguousSize = pdata->reserved_mem_size;
      }
 #endif
-    if (Args->contiguousSize == 0)
+    if (Args->contiguousSize == ~0U)
+    {
        gckOS_Print("Warning: No contiguous memory is reserverd for gpu.!\n ");
+       gckOS_Print("Warning: Will use default value(%d) for the reserved memory!\n ",gcdFSL_CONTIGUOUS_SIZE);
+       Args->contiguousSize = gcdFSL_CONTIGUOUS_SIZE;
+    }
 
     Args->gpu3DMinClock = initgpu3DMinClock;
 

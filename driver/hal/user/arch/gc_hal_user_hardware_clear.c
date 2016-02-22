@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -63,1197 +63,10 @@ static gceSTATUS  _GetClearDestinationFormat(gcoHARDWARE hardware, gcsSURF_FORMA
     return status;
 }
 
-
-static gceSTATUS
-_ClearHardware(
-    IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
-    IN gctINT32 Left,
-    IN gctINT32 Top,
-    IN gctINT32 Right,
-    IN gctINT32 Bottom,
-    IN gctUINT32 ClearValue,
-    IN gctUINT32 ClearValueUpper,
-    IN gctUINT8 ClearMask,
-    IN gctINT32 TileWidth,
-    IN gctINT32 TileHeight
-    )
-{
-    gceSTATUS status;
-    gctUINT32 leftMask, topMask;
-    gctUINT32 stride;
-    gcsPOINT rectSize;
-    gctUINT32 dstFormat;
-    gctUINT32 srcStride = 0;
-    gctPOINTER  *cmdBuffer = gcvNULL;
-    gctINT dstTileMode = 0;
-
-    gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);
-
-    gcmHEADER_ARG("Hardware=0x%x Surface=0x%08x Left=%d Top=%d "
-                  "Right=%d Bottom=%d ClearValue=0x%08x "
-                  "ClearMask=0x%02x TileWidth=%u TileHeight=%u",
-                  Hardware, Surface, Left, Top, Right, Bottom,
-                  ClearValue, ClearMask, TileWidth, TileHeight);
-
-    gcmGETHARDWARE(Hardware);
-
-    /* Verify the arguments. */
-    gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
-
-    /*
-    ** Bail out for 64bpp surface if RS can't support it.
-    */
-    if (!Hardware->features[gcvFEATURE_64BPP_HW_CLEAR_SUPPORT] &&
-        ((Surface->bitsPerPixel/Surface->formatInfo.layers) > 32))
-    {
-        status = gcvSTATUS_NOT_SUPPORTED;
-        goto OnError;
-    }
-
-    /* All sides must be tile aligned. */
-    leftMask = TileWidth - 1;
-    topMask  = TileHeight - 1;
-
-    /* Increase clear region to aligned region. */
-    if (Right == (gctINT)Surface->allocedW)
-    {
-        Right = Surface->alignedW;
-    }
-
-    if (Bottom == (gctINT)Surface->allocedH)
-    {
-        Bottom = Surface->alignedH;
-    }
-
-    rectSize.x = Right  - Left;
-    rectSize.y = Bottom - Top;
-
-    /* For resolve clear, we need to be 4x1 tile aligned. */
-    if (((Left       & leftMask)   == 0)
-    &&  ((Top        & topMask)    == 0)
-    &&  ((rectSize.x & (Hardware->resolveAlignmentX - 1)) == 0)
-    &&  ((rectSize.y & (Hardware->resolveAlignmentY - 1)) == 0)
-    )
-    {
-        gctUINT32 config, control;
-        gctUINT32 dither[2] = { ~0U, ~0U };
-        gctUINT32 offset, address, bitsPerPixel;
-        gctBOOL  halti2Support = Hardware->features[gcvFEATURE_HALTI2];
-        gctUINT32 layers = Surface->formatInfo.layers;
-        gctBOOL multiPipe = (Surface->tiling & gcvTILING_SPLIT_BUFFER) || Hardware->multiPipeResolve;
-
-
-        if (Hardware->features[gcvFEATURE_128BTILE])
-        {
-            if (Surface->isMsaa)
-            {
-                /* Currently we will not clear part of msaa surface with RS-clear,
-                ** as it will disable FC, but we need msaa FC always on.
-                */
-                gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-            }
-            else
-            {
-                srcStride = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 29:29) - (0 ? 29:29) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ?
- 29:29))) | (((gctUINT32) ((gctUINT32) (Surface->cacheMode == gcvCACHE_256) & ((gctUINT32) ((((1 ?
- 29:29) - (0 ? 29:29) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ?
- 29:29)));
-            }
-        }
-        /* Determine Fast MSAA mode. */
-        else if (Hardware->features[gcvFEATURE_FAST_MSAA] ||
-                 Hardware->features[gcvFEATURE_SMALL_MSAA])
-        {
-            if (Surface->isMsaa)
-            {
-                /* Currently we will not clear part of msaa surface with RS-clear,
-                ** as it will disable FC, but we need msaa FC always on.
-                */
-                gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-            }
-            else
-            {
-                srcStride = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 29:29) - (0 ? 29:29) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ?
- 29:29))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 29:29) - (0 ? 29:29) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ? 29:29)));
-            }
-        }
-
-        /*
-        ** Adjust MSAA setting for RS clear. Here Surface must be non-msaa.
-        */
-        gcmONERROR(gcoHARDWARE_AdjustCacheMode(Hardware,Surface));
-
-        /* Set up the starting address of clear rectangle. */
-        gcmONERROR(
-            gcoHARDWARE_ConvertFormat(Surface->format,
-                                      &bitsPerPixel,
-                                      gcvNULL));
-
-        /* Compute the origin offset. */
-        gcmONERROR(
-            gcoHARDWARE_ComputeOffset(Hardware,
-                                      Left, Top,
-                                      Surface->stride,
-                                      (bitsPerPixel / 8)/layers,
-                                      Surface->tiling, &offset));
-
-        /* Determine the starting address. */
-        gcmGETHARDWAREADDRESS(Surface->node, address);
-        address += offset + Surface->offset;
-
-        gcmONERROR(_GetClearDestinationFormat(Hardware, &Surface->formatInfo, &dstFormat, &rectSize));
-
-        /* Build AQRsConfig register. src format is useless for clear
-        ** Only dword size should be correct for destination surface
-        */
-        config = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 4:0) - (0 ? 4:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
- 4:0))) | (((gctUINT32) ((gctUINT32) (dstFormat) & ((gctUINT32) ((((1 ?
- 4:0) - (0 ? 4:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
- 4:0)))
-               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 12:8) - (0 ? 12:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
- 12:8))) | (((gctUINT32) ((gctUINT32) (dstFormat) & ((gctUINT32) ((((1 ?
- 12:8) - (0 ? 12:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
- 12:8)))
-               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 14:14) - (0 ? 14:14) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 14:14) - (0 ? 14:14) + 1))))))) << (0 ?
- 14:14))) | (((gctUINT32) ((gctUINT32) (gcvTRUE) & ((gctUINT32) ((((1 ?
- 14:14) - (0 ? 14:14) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 14:14) - (0 ? 14:14) + 1))))))) << (0 ?
- 14:14)));
-
-        if (halti2Support)
-        {
-            /* Build AQRsClearControl register. */
-            control = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) ((ClearMask | (ClearMask << 4))) & ((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)))
-                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 17:16) - (0 ? 17:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 17:16) - (0 ? 17:16) + 1))))))) << (0 ?
- 17:16))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ? 17:16) - (0 ? 17:16) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 17:16) - (0 ? 17:16) + 1))))))) << (0 ? 17:16)));
-        }
-        else
-        {
-            /* Build AQRsClearControl register. */
-            control = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (ClearMask) & ((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)))
-                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 17:16) - (0 ? 17:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 17:16) - (0 ? 17:16) + 1))))))) << (0 ?
- 17:16))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 17:16) - (0 ? 17:16) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 17:16) - (0 ? 17:16) + 1))))))) << (0 ? 17:16)));
-        }
-
-        if (Hardware->features[gcvFEATURE_128BTILE])
-        {
-            if (Surface->tiling == gcvSUPERTILED)
-            {
-                dstTileMode = 0x1;
-            }
-            else if (Surface->tiling == gcvYMAJOR_SUPERTILED)
-            {
-                dstTileMode = 0x2;
-            }
-            else
-            {
-                dstTileMode = 0x0;
-            }
-        }
-
-        /* Determine the stride. */
-        stride = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 19:0) - (0 ? 19:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:0) - (0 ? 19:0) + 1))))))) << (0 ?
- 19:0))) | (((gctUINT32) ((gctUINT32) ((Surface->stride << 2)) & ((gctUINT32) ((((1 ?
- 19:0) - (0 ? 19:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:0) - (0 ? 19:0) + 1))))))) << (0 ?
- 19:0)))
-               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:31) - (0 ? 31:31) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ?
- 31:31))) | (((gctUINT32) ((gctUINT32) (((Surface->tiling & gcvSUPERTILED) > 0)) & ((gctUINT32) ((((1 ?
- 31:31) - (0 ? 31:31) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ?
- 31:31)))
-               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 30:30) - (0 ? 30:30) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ?
- 30:30))) | (((gctUINT32) ((gctUINT32) (((Surface->tiling & gcvTILING_SPLIT_BUFFER) > 0) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 28:27) - (0 ? 28:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 28:27) - (0 ? 28:27) + 1))))))) << (0 ?
- 28:27))) | (((gctUINT32) ((gctUINT32) (dstTileMode) & ((gctUINT32) ((((1 ?
- 28:27) - (0 ? 28:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 28:27) - (0 ? 28:27) + 1))))))) << (0 ?
- 28:27)))) & ((gctUINT32) ((((1 ? 30:30) - (0 ? 30:30) + 1) == 32) ? ~0 : (~(~0 << ((1 ?
- 30:30) - (0 ? 30:30) + 1))))))) << (0 ? 30:30)));
-
-        gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, cmdBuffer);
-
-        /* Switch to 3D pipe. */
-        gcmONERROR(gcoHARDWARE_SelectPipe(gcvNULL, gcvPIPE_3D, (gctPOINTER *)&memory));
-
-        /* Flush cache. */
-        gcmONERROR(gcoHARDWARE_FlushPipe(Hardware, (gctPOINTER *)&memory));
-
-
-        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x0581) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0581, config);
-    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-
-        {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)2 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (2) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x058C) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-
-
-            gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x058C, dither[0]);
-
-            gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x058C+1, dither[1]);
-
-            gcmSETFILLER_NEW(reserve, memory);
-
-        gcmENDSTATEBATCH_NEW(reserve, memory);
-
-        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x0585) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0585, stride);
-    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-
-        /* cache mode programming */
-        if (Hardware->features[gcvFEATURE_FAST_MSAA] ||
-            Hardware->features[gcvFEATURE_SMALL_MSAA] ||
-            Hardware->features[gcvFEATURE_128BTILE])
-        {
-           {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x0583) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0583, srcStride);
-    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-        }
-
-        if (halti2Support)
-        {
-            {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)2 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (2) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x0590) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-
-
-                gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0590, ClearValue);
-
-                gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0590+1, ClearValueUpper);
-
-                gcmSETFILLER_NEW(reserve, memory);
-
-            gcmENDSTATEBATCH_NEW(reserve, memory);
-        }
-        else
-        {
-            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x0590) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0590, ClearValue);
-    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-        }
-
-        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x058F) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x058F, control);
-    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-
-        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x05A8) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x05A8, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 1:0) - (0 ? 1:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
- 1:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 1:0) - (0 ? 1:0) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ? 1:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 20:20) - (0 ? 20:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 20:20) - (0 ? 20:20) + 1))))))) << (0 ?
- 20:20))) | (((gctUINT32) ((gctUINT32) (!multiPipe) & ((gctUINT32) ((((1 ?
- 20:20) - (0 ? 20:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 20:20) - (0 ? 20:20) + 1))))))) << (0 ?
- 20:20))));    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-
-
-        if (Surface->tiling & gcvTILING_SPLIT_BUFFER)
-        {
-            {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)2 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (2) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x05B8) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-
-
-                gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory,
-                                0x05B8,
-                                address);
-
-                gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory,
-                                0x05B8+1,
-                                address + Surface->bottomBufferOffset);
-
-                gcmSETFILLER_NEW(reserve, memory);
-
-            gcmENDSTATEBATCH_NEW(reserve, memory);
-        }
-        else
-        {
-            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x0584) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0584, address);
-    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-
-            if ((Hardware->config->pixelPipes > 1) ||
-                 Hardware->features[gcvFEATURE_SINGLE_PIPE_HALTI1])
-            {
-                {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x05B8) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x05B8, address);
-    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-            }
-        }
-
-        gcmONERROR(gcoHARDWARE_ProgramResolve(Hardware,
-                                              rectSize,
-                                              multiPipe,
-                                              gcvMSAA_DOWNSAMPLE_AVERAGE,
-                                              (gctPOINTER *)&memory));
-
-        gcmDUMP(gcvNULL, "#[surface 0x%x 0x%x]", gcsSURF_NODE_GetHWAddress(&Surface->node), Surface->node.size);
-
-        stateDelta = stateDelta;
-
-        gcmENDSTATEBUFFER_NEW(Hardware, reserve, memory, cmdBuffer);
-
-    }
-    else
-    {
-        /* Removed 2D clear as it does not work for tiled buffers. */
-        status = gcvSTATUS_NOT_ALIGNED;
-    }
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-static gceSTATUS
-_ClearSoftware(
-    IN gctUINT8_PTR Address1,
-    IN gctUINT8_PTR Address2,
-    IN gctUINT32 Stride,
-    IN gctINT32 Left,
-    IN gctINT32 Top,
-    IN gctINT32 Right,
-    IN gctINT32 Bottom,
-    IN gctUINT32 channelMask[4],
-    IN gctUINT32 ClearValue,
-    IN gctUINT32 ClearValueUpper,
-    IN gctUINT8 ClearMask,
-    IN gctUINT32 bitsPerPixel,
-    IN gctBOOL FastMSAA,
-    IN gceTILING Tiling,
-    IN gceSURF_TYPE Type,
-    IN gctUINT8 BitMask
-    )
-{
-    gctINT32 x, y;
-    gceSTATUS status = gcvSTATUS_OK;
-    gctUINT32 offset, tLeft;
-    gctBOOL MultiPipe = gcvFALSE;
-
-    gcmASSERT(Top < Bottom);
-    gcmASSERT(Left < Right);
-
-    /* Multitiled destination? */
-    MultiPipe = (Tiling & gcvTILING_SPLIT_BUFFER);
-
-    tLeft = (bitsPerPixel == 16) ? gcmALIGN(Left - 1, 2) : Left;
-
-    for (y = Top;  y < Bottom; y++)
-    {
-        for (x = tLeft; x < Right; x++)
-        {
-            gctUINT8_PTR address = gcvNULL;
-
-            if (MultiPipe)
-            {
-                /* Get base source address. */
-                address = (((x >> 3) ^ (y >> 2)) & 0x01) ? Address2 : Address1;
-            }
-            else
-            {
-                address = Address1;
-            }
-
-            /* Compute the origin offset. */
-            gcmONERROR(
-                gcoHARDWARE_ComputeOffset(gcvNULL,
-                                          x, y,
-                                          Stride,
-                                          bitsPerPixel / 8,
-                                          Tiling, &offset));
-
-            address += offset;
-
-            /* Draw only if x,y within clear rectangle. */
-            if (bitsPerPixel == 64)
-            {
-                gctUINT16_PTR addr16 = (gctUINT16_PTR)address;
-                if (ClearMask & 0x1)
-                {
-                    /* Clear byte 0. */
-                    addr16[0] = (gctUINT16) ClearValue;
-                }
-
-                if (ClearMask & 0x2)
-                {
-                    /* Clear byte 1. */
-                    addr16[1] = (gctUINT16) (ClearValue >> 16);
-                }
-
-                if (ClearMask & 0x4)
-                {
-                    /* Clear byte 2. */
-                    addr16[2] = (gctUINT16) (ClearValueUpper);
-                }
-
-                if (ClearMask & 0x8)
-                {
-                    /* Clear byte 3. */
-                    addr16[3] = (gctUINT16) (ClearValueUpper >> 16);
-                }
-            }
-
-            else if (bitsPerPixel == 32)
-            {
-                switch (ClearMask)
-                {
-                case 0x1:
-                    /* Common: Clear stencil only. */
-                    if (Type == gcvSURF_DEPTH)
-                    {
-                        (*address) = (*address) & (~BitMask);
-                        (*address) = (*address) | (ClearValue & BitMask);
-                    }
-                    else
-                        * address = (gctUINT8) ClearValue;
-                    break;
-
-                case 0xE:
-                    /* Common: Clear depth only. */
-                                       address[1] = (gctUINT8)  (ClearValue >> 8);
-                    * (gctUINT16_PTR) &address[2] = (gctUINT16) (ClearValue >> 16);
-                    break;
-
-                case 0xF:
-                    /* Common: Clear everything. */
-                    if (Type == gcvSURF_DEPTH)
-                    {
-                        gctUINT32 mask = 0xffffff00 | BitMask;
-                        (*(gctUINT32_PTR) address) = (*(gctUINT32_PTR) address) & (~mask);
-                        (*(gctUINT32_PTR) address) = (*(gctUINT32_PTR) address) | (ClearValue & mask);
-                    }
-                    else
-                        * (gctUINT32_PTR) address = ClearValue;
-                    break;
-
-                default:
-                    if (ClearMask & 0x1)
-                    {
-                        /* Clear channel 0. */
-                        *(gctUINT32_PTR) address = (*(gctUINT32_PTR) address & ~channelMask[0])
-                                                 | (ClearValue &  channelMask[0]);
-                    }
-
-                    if (ClearMask & 0x2)
-                    {
-                        /* Clear channel 1. */
-                        *(gctUINT32_PTR) address = (*(gctUINT32_PTR) address & ~channelMask[1])
-                                                 | (ClearValue &  channelMask[1]);
-                    }
-
-                    if (ClearMask & 0x4)
-                    {
-                        /* Clear channel 2. */
-                        *(gctUINT32_PTR) address = (*(gctUINT32_PTR) address & ~channelMask[2])
-                                                 | (ClearValue &  channelMask[2]);
-                    }
-
-                    if (ClearMask & 0x8)
-                    {
-                        /* Clear channel 3. */
-                        *(gctUINT32_PTR) address = (*(gctUINT32_PTR) address & ~channelMask[3])
-                                                 | (ClearValue &  channelMask[3]);
-                    }
-                }
-            }
-
-            else if (bitsPerPixel == 16)
-            {
-                if ((x + 1) == Right)
-                {
-                    /* Dont write on Right pixel. */
-                    channelMask[0] = channelMask[0] & 0x0000FFFF;
-                    channelMask[1] = channelMask[1] & 0x0000FFFF;
-                    channelMask[2] = channelMask[2] & 0x0000FFFF;
-                    channelMask[3] = channelMask[3] & 0x0000FFFF;
-                }
-
-                if ((x + 1) == Left)
-                {
-                    /* Dont write on Left pixel. */
-                    channelMask[0] = channelMask[0] & 0xFFFF0000;
-                    channelMask[1] = channelMask[1] & 0xFFFF0000;
-                    channelMask[2] = channelMask[2] & 0xFFFF0000;
-                    channelMask[3] = channelMask[3] & 0xFFFF0000;
-                }
-
-                if (ClearMask & 0x1)
-                {
-                    /* Clear channel 0. */
-                    *(gctUINT32_PTR) address = (*(gctUINT32_PTR) address & ~channelMask[0])
-                                             | (ClearValue &  channelMask[0]);
-                }
-
-                if (ClearMask & 0x2)
-                {
-                    /* Clear channel 1. */
-                    *(gctUINT32_PTR) address = (*(gctUINT32_PTR) address & ~channelMask[1])
-                                             | (ClearValue &  channelMask[1]);
-                }
-
-                if (ClearMask & 0x4)
-                {
-                    /* Clear channel 2. */
-                    *(gctUINT32_PTR) address = (*(gctUINT32_PTR) address & ~channelMask[2])
-                                             | (ClearValue &  channelMask[2]);
-                }
-
-                if (ClearMask & 0x8)
-                {
-                    /* Clear channel 3. */
-                    *(gctUINT32_PTR) address = (*(gctUINT32_PTR) address & ~channelMask[3])
-                                             | (ClearValue &  channelMask[3]);
-                }
-
-                if ((x + 1) == Left)
-                {
-                    /* Restore channel mask. */
-                    channelMask[0] = channelMask[0] | (channelMask[0] >> 16);
-                    channelMask[1] = channelMask[1] | (channelMask[1] >> 16);
-                    channelMask[2] = channelMask[2] | (channelMask[2] >> 16);
-                    channelMask[3] = channelMask[3] | (channelMask[3] >> 16);
-                }
-
-                if ((x + 1) == Right)
-                {
-                    /* Restore channel mask. */
-                    channelMask[0] = channelMask[0] | (channelMask[0] << 16);
-                    channelMask[1] = channelMask[1] | (channelMask[1] << 16);
-                    channelMask[2] = channelMask[2] | (channelMask[2] << 16);
-                    channelMask[3] = channelMask[3] | (channelMask[3] << 16);
-                }
-
-                /* 16bpp pixels clear 1 extra pixel at a time. */
-                x++;
-            }
-
-            else if (bitsPerPixel == 8)
-            {
-                (*address) = (gctUINT8) (((*address) & (~BitMask)) | (ClearValue & BitMask));
-            }
-        }
-    }
-
-OnError:
-    return status;
-}
-
-/*******************************************************************************
-**
-**  gcoHARDWARE_ClearRect
-**
-**  Append a command buffer with a CLEAR command.
-**
-**  INPUT:
-**
-**      gcoHARDWARE Hardware
-**          Pointer to an gcoHARDWARE object.
-**
-**      gctUINT32 Address
-**          Base address of surface to clear.
-**
-**      gctPOINTER Memory
-**          Base address of surface to clear.
-**
-**      gctUINT32 Stride
-**          Stride of surface.
-**
-**      gctINT32 Left
-**          Left coordinate of rectangle to clear.
-**
-**      gctINT32 Top
-**          Top coordinate of rectangle to clear.
-**
-**      gctINT32 Right
-**          Right coordinate of rectangle to clear.
-**
-**      gctINT32 Bottom
-**          Bottom coordinate of rectangle to clear.
-**
-**      gceSURF_FORMAT Format
-**          Format of surface to clear.
-**
-**      gctUINT32 ClearValue
-**          Value to be used for clearing the surface.
-**
-**      gctUINT8 ClearMask
-**          Byte-mask to be used for clearing the surface.
-**
-**  OUTPUT:
-**
-**      Nothing.
-*/
-gceSTATUS
-gcoHARDWARE_Clear(
-    IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
-    IN gctINT32 Left,
-    IN gctINT32 Top,
-    IN gctINT32 Right,
-    IN gctINT32 Bottom,
-    IN gctUINT32 ClearValue,
-    IN gctUINT32 ClearValueUpper,
-    IN gctUINT8 ClearMask
-    )
-{
-    gceSTATUS status;
-    gctINT32 tileWidth = 0, tileHeight = 0;
-
-    gcmHEADER_ARG("Surface=0x%08X Left=%d "
-                  "Top=%d Right=%d Bottom=%d ClearValue=0x%08x "
-                  "ClearMask=0x%02x",
-                  Surface, Left, Top, Right, Bottom,
-                  ClearValue, ClearMask);
-
-    switch (Surface->format)
-    {
-    case gcvSURF_X4R4G4B4:
-    case gcvSURF_X1R5G5B5:
-    case gcvSURF_R5G6B5:
-    case gcvSURF_X4B4G4R4:
-    case gcvSURF_X1B5G5R5:
-        if (ClearMask == 0x7)
-        {
-            /* When the format has no alpha channel, fake the ClearMask to
-            ** include alpha channel clearing.   This will allow us to use
-            ** resolve clear. */
-            ClearMask = 0xF;
-        }
-        break;
-
-    default:
-        break;
-    }
-
-    if ((ClearMask != 0xF)
-    &&  (Surface->format != gcvSURF_X8R8G8B8)
-    &&  (Surface->format != gcvSURF_A8R8G8B8)
-    &&  (Surface->format != gcvSURF_D24S8)
-    &&  (Surface->format != gcvSURF_D24X8)
-    &&  (Surface->format != gcvSURF_D16)
-    &&  (Surface->format != gcvSURF_S8)
-    &&  (Surface->format != gcvSURF_X24S8)
-    )
-    {
-        /* Don't clear with mask when channels are not byte sized. */
-        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-    }
-
-    switch (Surface->tiling)
-    {
-    case gcvTILED:
-        /* Query the tile size. */
-        gcmONERROR(
-            gcoHARDWARE_QueryTileSize(gcvNULL, gcvNULL,
-                                      &tileWidth, &tileHeight,
-                                      gcvNULL));
-        break;
-
-    case gcvMULTI_TILED:
-        /* When multi tile the tile size is 8x4 and the tile is interleaved */
-        /* So it needs 4 8x4 tile aligned. */
-        tileWidth = 16;
-        tileHeight = 8;
-        break;
-
-    case gcvSUPERTILED:
-    case gcvYMAJOR_SUPERTILED:
-        tileWidth = 64;
-        tileHeight = 64;
-        break;
-
-    case gcvMULTI_SUPERTILED:
-        tileWidth = 64;
-        tileHeight = 128;
-        break;
-    default:
-        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-    }
-
-    /* Try hardware clear. */
-    status = _ClearHardware(Hardware,
-                            Surface,
-                            Left,
-                            Top,
-                            Right,
-                            Bottom,
-                            ClearValue,
-                            ClearValueUpper,
-                            ClearMask,
-                            tileWidth,
-                            tileHeight);
-
-    if (gcmIS_ERROR(status))
-    {
-        status = gcvSTATUS_NOT_ALIGNED;
-    }
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-/*******************************************************************************
-**
-**  gcoHARDWARE_ClearSoftware
-**
-**  Clear the buffer with software implementation. Buffer is assumed to be
-**  tiled.
-**
-**  INPUT:
-**
-**      gcoHARDWARE Hardware
-**          Pointer to an gcoHARDWARE object.
-**
-**      gctPOINTER LogicalAddress
-**          Base address of surface to clear.
-**
-**      gctUINT32 Stride
-**          Stride of surface.
-**
-**      gctINT32 Left
-**          Left coordinate of rectangle to clear.
-**
-**      gctINT32 Top
-**          Top coordinate of rectangle to clear.
-**
-**      gctINT32 Right
-**          Right coordinate of rectangle to clear.
-**
-**      gctINT32 Bottom
-**          Bottom coordinate of rectangle to clear.
-**
-**      gceSURF_FORMAT Format
-**          Format of surface to clear.
-**
-**      gctUINT32 ClearValue
-**          Value to be used for clearing the surface.
-**
-**      gctUINT8 ClearMask
-**          Byte-mask to be used for clearing the surface.
-**
-**  OUTPUT:
-**
-**      Nothing.
-*/
-gceSTATUS
-gcoHARDWARE_ClearSoftware(
-    IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
-    IN gctINT32 Left,
-    IN gctINT32 Top,
-    IN gctINT32 Right,
-    IN gctINT32 Bottom,
-    IN gctUINT32 ClearValue,
-    IN gctUINT32 ClearValueUpper,
-    IN gctUINT8 ClearMask,
-    IN gctUINT8 StencilWriteMask
-    )
-{
-    gceSTATUS status;
-    gctUINT32 bitsPerPixel   = 0;
-    gctUINT32 channelMask[4] = {0};
-    static gctBOOL printed   = gcvFALSE;
-    gctBOOL fastMSAA         = gcvFALSE;
-    gceSURF_TYPE type        = gcvSURF_TYPE_UNKNOWN;
-
-    gcmHEADER_ARG("Hardware=0x%x Surface=0x%08X Left=%d "
-                  "Top=%d Right=%d Bottom=%d ClearValue=0x%08x "
-                  "ClearMask=0x%02x",
-                  Hardware, Surface, Left, Top, Right, Bottom,
-                  ClearValue, ClearMask);
-
-    /* For a clear that is not tile aligned, our hardware might not be able to
-       do it.  So here is the software implementation. */
-    gcmGETHARDWARE(Hardware);
-
-    /* Verify the arguments. */
-    gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
-
-    if (!printed)
-    {
-        printed = gcvTRUE;
-
-        gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_HARDWARE,
-                      "%s: Performing a software clear!",
-                      __FUNCTION__);
-    }
-
-    /* Flush the pipe. */
-    gcmONERROR(gcoHARDWARE_FlushPipe(Hardware, gcvNULL));
-
-    /* Commit the command queue. */
-    gcmONERROR(gcoHARDWARE_Commit(Hardware));
-
-    /* Stall the hardware. */
-    gcmONERROR(gcoHARDWARE_Stall(Hardware));
-
-    fastMSAA = (Hardware->features[gcvFEATURE_FAST_MSAA] ||
-                Hardware->features[gcvFEATURE_SMALL_MSAA]);
-
-    /* Query pixel depth. */
-    gcmONERROR(gcoHARDWARE_ConvertFormat(Surface->format,
-                                         &bitsPerPixel,
-                                         gcvNULL));
-
-    switch (Surface->format)
-    {
-    case gcvSURF_X4R4G4B4: /* 12-bit RGB color without alpha channel. */
-        channelMask[0] = 0x000F;
-        channelMask[1] = 0x00F0;
-        channelMask[2] = 0x0F00;
-        channelMask[3] = 0x0;
-        break;
-
-    case gcvSURF_D16:      /* 16-bit Depth. */
-    case gcvSURF_A4R4G4B4: /* 12-bit RGB color with alpha channel. */
-        channelMask[0] = 0x000F;
-        channelMask[1] = 0x00F0;
-        channelMask[2] = 0x0F00;
-        channelMask[3] = 0xF000;
-        break;
-
-    case gcvSURF_X1R5G5B5: /* 15-bit RGB color without alpha channel. */
-        channelMask[0] = 0x001F;
-        channelMask[1] = 0x03E0;
-        channelMask[2] = 0x7C00;
-        channelMask[3] = 0x0;
-        break;
-
-    case gcvSURF_A1R5G5B5: /* 15-bit RGB color with alpha channel. */
-        channelMask[0] = 0x001F;
-        channelMask[1] = 0x03E0;
-        channelMask[2] = 0x7C00;
-        channelMask[3] = 0x8000;
-        break;
-
-    case gcvSURF_R5G6B5: /* 16-bit RGB color without alpha channel. */
-        channelMask[0] = 0x001F;
-        channelMask[1] = 0x07E0;
-        channelMask[2] = 0xF800;
-        channelMask[3] = 0x0;
-        break;
-
-    case gcvSURF_D24S8:    /* 24-bit Depth with 8 bit Stencil. */
-    case gcvSURF_D24X8:    /* 24-bit Depth with 8 bit Stencil. */
-    case gcvSURF_X24S8:    /* 24-bit Depth with 8 bit Stencil. */
-    case gcvSURF_X8R8G8B8: /* 24-bit RGB without alpha channel. */
-    case gcvSURF_A8R8G8B8: /* 24-bit RGB with alpha channel. */
-    case gcvSURF_G8R8:     /* The clear value do not have channel 2 and 3 */
-    case gcvSURF_R8_1_X8R8G8B8:
-    case gcvSURF_G8R8_1_X8R8G8B8:
-        channelMask[0] = 0x000000FF;
-        channelMask[1] = 0x0000FF00;
-        channelMask[2] = 0x00FF0000;
-        channelMask[3] = 0xFF000000;
-        break;
-
-    case gcvSURF_X2B10G10R10:
-        channelMask[0] = 0x000003FF;
-        channelMask[1] = 0x000FFC00;
-        channelMask[2] = 0x3FF00000;
-        channelMask[3] = 0x0;
-        break;
-
-    case gcvSURF_A2B10G10R10:
-        channelMask[0] = 0x000003FF;
-        channelMask[1] = 0x000FFC00;
-        channelMask[2] = 0x3FF00000;
-        channelMask[3] = 0xC0000000;
-        break;
-
-    case gcvSURF_X16B16G16R16:
-    case gcvSURF_A16B16G16R16:
-    case gcvSURF_X16B16G16R16F:
-    case gcvSURF_A16B16G16R16F:
-        break;
-
-    case gcvSURF_S8:
-        break;
-
-    default:
-        status = gcvSTATUS_NOT_SUPPORTED;
-        gcmFOOTER();
-        return status;
-    }
-
-    /* Expand 16-bit mask into 32-bit mask. */
-    if (bitsPerPixel == 16)
-    {
-        channelMask[0] = channelMask[0] | (channelMask[0] << 16);
-        channelMask[1] = channelMask[1] | (channelMask[1] << 16);
-        channelMask[2] = channelMask[2] | (channelMask[2] << 16);
-        channelMask[3] = channelMask[3] | (channelMask[3] << 16);
-    }
-
-    type = gcvSURF_RENDER_TARGET;
-
-    if ((Surface->format == gcvSURF_D16)
-        || (Surface->format == gcvSURF_D24S8)
-        || (Surface->format == gcvSURF_D32)
-        || (Surface->format == gcvSURF_D24X8)
-        || (Surface->format == gcvSURF_X24S8)
-        )
-    {
-        type = gcvSURF_DEPTH;
-    }
-
-    gcmONERROR(gcoSURF_NODE_Cache(&Surface->node,
-                                   Surface->node.logical,
-                                   Surface->size,
-                                   gcvCACHE_INVALIDATE));
-
-    gcmONERROR(
-        _ClearSoftware(Surface->node.logical, Surface->node.logicalBottom,
-                       Surface->stride, Left, Top, Right, Bottom, channelMask,
-                       ClearValue, ClearValueUpper, ClearMask, bitsPerPixel,
-                       fastMSAA, Surface->tiling, type, StencilWriteMask));
-
-    gcmONERROR(gcoSURF_NODE_Cache(&Surface->node,
-                                   Surface->node.logical,
-                                   Surface->size,
-                                   gcvCACHE_CLEAN));
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-
 static gceSTATUS
 _ClearTileStatus(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gctUINT32 Address,
     IN gctSIZE_T Bytes,
     IN gceSURF_TYPE Type,
@@ -1289,7 +102,9 @@ _ClearTileStatus(
         /* Allow ClearMask of 0x7, when Alpha is not needed. */
         if (((ClearMask == 0x7)
             && ((Surface->format == gcvSURF_X8R8G8B8)
-            || (Surface->format == gcvSURF_R5G6B5))))
+             || (Surface->format == gcvSURF_X8B8G8R8)
+             || (Surface->format == gcvSURF_R5G6B5)
+             || (Surface->format == gcvSURF_B5G6R5))))
         {
             bailOut = gcvFALSE;
         }
@@ -1317,7 +132,7 @@ _ClearTileStatus(
                                     Surface->alignedW,
                                     Surface->alignedH,
                                     Surface->size,
-                                    Surface->edgeAA,
+                                    Surface->vMsaa,
                                     &bytes,
                                     gcvNULL,
                                     &fillColor));
@@ -1480,6 +295,17 @@ _ClearTileStatus(
 
     gcmENDSTATEBATCH_NEW(reserve, memory);
 
+#if gcdENABLE_TRUST_APPLICATION
+    if (Hardware->features[gcvFEATURE_SECURITY])
+    {
+        gcoHARDWARE_SetProtectMode(
+            Hardware,
+            (Surface->hints & gcvSURF_PROTECTED_CONTENT),
+            (gctPOINTER *)&memory);
+
+        Hardware->GPUProtecedModeDirty = gcvTRUE;
+    }
+#endif
 
     if (Surface->tiling & gcvTILING_SPLIT_BUFFER)
     {
@@ -1546,8 +372,7 @@ _ClearTileStatus(
 };
 
 
-        if ((Hardware->config->pixelPipes > 1) ||
-             Hardware->features[gcvFEATURE_SINGLE_PIPE_HALTI1])
+        if (Hardware->features[gcvFEATURE_RS_NEW_BASEADDR])
         {
             {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
@@ -1745,7 +570,7 @@ OnError:
 **      gcoHARDWARE Hardware
 **          Pointer to an gcoHARDWARE object.
 **
-**      gcsSURF_INFO_PTR Surface
+**      gcoSURF Surface
 **          Pointer of the surface to clear.
 **
 **      gctUINT32 Address
@@ -1776,7 +601,7 @@ OnError:
 gceSTATUS
 gcoHARDWARE_ClearTileStatus(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gctUINT32 Address,
     IN gctSIZE_T Bytes,
     IN gceSURF_TYPE Type,
@@ -1909,7 +734,7 @@ OnError:
 **      gcoHARDWARE Hardware
 **          Pointer to an gcoHARDWARE object.
 **
-**      gcsSURF_INFO_PTR Surface
+**      gcoSURF Surface
 **          Pointer of the surface to clear.
 **
 **      gceSURF_TYPE Type
@@ -1935,7 +760,7 @@ OnError:
 gceSTATUS
 gcoHARDWARE_ClearTileStatusWindowAligned(
     IN gcoHARDWARE Hardware,
-    gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gceSURF_TYPE Type,
     IN gctUINT32 ClearValue,
     IN gctUINT32 ClearValueUpper,
@@ -1984,7 +809,9 @@ gcoHARDWARE_ClearTileStatusWindowAligned(
         /* Allow ClearMask of 0x7, when Alpha is not needed. */
         if (((ClearMask == 0x7)
             && ((Surface->format == gcvSURF_X8R8G8B8)
-            || (Surface->format == gcvSURF_R5G6B5))))
+             || (Surface->format == gcvSURF_X8B8G8R8)
+             || (Surface->format == gcvSURF_R5G6B5)
+             || (Surface->format == gcvSURF_B5G6R5))))
         {
             bailOut = gcvFALSE;
         }
@@ -2149,6 +976,18 @@ gcoHARDWARE_ClearTileStatusWindowAligned(
 
     /* Reserve space in the command buffer. */
     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, cmdBuffer);
+
+#if gcdENABLE_TRUST_APPLICATION
+    if (Hardware->features[gcvFEATURE_SECURITY])
+    {
+        gcoHARDWARE_SetProtectMode(
+            Hardware,
+            (Surface->hints & gcvSURF_PROTECTED_CONTENT),
+            (gctPOINTER *)&memory);
+
+        Hardware->GPUProtecedModeDirty = gcvTRUE;
+    }
+#endif
 
     /* Program registers. */
     {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
@@ -2431,7 +1270,7 @@ gcoHARDWARE_ClearTileStatusWindowAligned(
 };
 
 
-            if (Hardware->config->pixelPipes > 1)
+            if (Hardware->features[gcvFEATURE_RS_NEW_BASEADDR])
             {
                 {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
@@ -2561,7 +1400,7 @@ gcoHARDWARE_ClearTileStatusWindowAligned(
 };
 
 
-            if (Hardware->config->pixelPipes > 1)
+            if (Hardware->features[gcvFEATURE_RS_NEW_BASEADDR])
             {
                 {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
@@ -2613,37 +1452,33 @@ OnError:
 }
 
 static gceSTATUS
-_ClearHardware_v2(
+_ClearHardware(
     IN gcoHARDWARE Hardware,
     IN gcsSURF_VIEW *SurfView,
     IN gctUINT32 LayerIndex,
     IN gcsRECT_PTR Rect,
     IN gctUINT32 ClearValue,
     IN gctUINT32 ClearValueUpper,
-    IN gctUINT8 ClearMask,
-    IN gctINT32 TileWidth,
-    IN gctINT32 TileHeight
+    IN gctUINT8 ClearMask
     )
 {
     gceSTATUS status;
-    gctUINT32 leftMask, topMask;
+    gctUINT alignX, alignY;
+    gctUINT alignWidth, alignHeight;
     gctUINT32 stride;
     gcsPOINT rectSize;
     gctUINT32 dstFormat;
     gctUINT32 srcStride = 0;
     gctPOINTER  *cmdBuffer = gcvNULL;
-    gctINT dstTileMode = 0;
 
     gcoSURF surf = SurfView->surf;
-    gcsSURF_INFO_PTR surfInfo = &surf->info;
     gcsRECT rect = *Rect;
 
     gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);
 
     gcmHEADER_ARG("Hardware=0x%x SurfView=0x%08x Rect=0x%08x ClearValue=0x%08x "
-                  "ClearValueUpper=0x%08x ClearMask=0x%02x TileWidth=%u TileHeight=%u",
-                  Hardware, SurfView, Rect, ClearValue, ClearValueUpper,ClearMask,
-                  TileWidth, TileHeight);
+                  "ClearValueUpper=0x%08x ClearMask=0x%02x",
+                  Hardware, SurfView, Rect, ClearValue, ClearValueUpper,ClearMask);
 
     gcmGETHARDWARE(Hardware);
 
@@ -2654,48 +1489,56 @@ _ClearHardware_v2(
     ** Bail out for 64bpp surface if RS can't support it.
     */
     if (!Hardware->features[gcvFEATURE_64BPP_HW_CLEAR_SUPPORT] &&
-        ((surfInfo->bitsPerPixel / surfInfo->formatInfo.layers) > 32))
+        ((surf->bitsPerPixel / surf->formatInfo.layers) > 32))
     {
         status = gcvSTATUS_NOT_SUPPORTED;
         goto OnError;
     }
 
-    /* All sides must be tile aligned. */
-    leftMask = TileWidth - 1;
-    topMask  = TileHeight - 1;
+    /* Query the resolve alignemnt requirement to resolve this surface */
+    gcmONERROR(
+        gcoHARDWARE_GetSurfaceResolveAlignment(Hardware,
+                                               surf,
+                                               &alignX,
+                                               &alignY,
+                                               &alignWidth,
+                                               &alignHeight));
 
     /* Increase clear region to aligned region. */
-    if (rect.right == (gctINT)surfInfo->allocedW)
+    if (rect.right == (gctINT)surf->allocedW)
     {
-        rect.right = surfInfo->alignedW;
+        rect.right = surf->alignedW;
     }
 
-    if (rect.bottom == (gctINT)surfInfo->allocedH)
+    if (rect.bottom == (gctINT)surf->allocedH)
     {
-        rect.bottom = surfInfo->alignedH;
+        rect.bottom = surf->alignedH;
     }
 
     rectSize.x = rect.right  - rect.left;
     rectSize.y = rect.bottom - rect.top;
 
     /* For resolve clear, we need to be 4x1 tile aligned. */
-    if (((rect.left  & leftMask) == 0)
-    &&  ((rect.top   & topMask)  == 0)
-    &&  ((rectSize.x & (Hardware->resolveAlignmentX - 1)) == 0)
-    &&  ((rectSize.y & (Hardware->resolveAlignmentY - 1)) == 0)
+    if (((rect.left  & (alignX - 1)) == 0)
+    &&  ((rect.top   & (alignY - 1)) == 0)
+    &&  ((rectSize.x & (alignWidth  - 1)) == 0)
+    &&  ((rectSize.y & (alignHeight - 1)) == 0)
     )
     {
+        gctINT dstTileEnable = 0;
+        gctINT dstTileMode   = 0;
+        gctINT dstStride = 0;
         gctUINT32 config, control;
         gctUINT32 dither[2] = { ~0U, ~0U };
         gctUINT32 offset, address;
         gctBOOL halti2Support = Hardware->features[gcvFEATURE_HALTI2];
-        gctBOOL multiPipe = (surfInfo->tiling & gcvTILING_SPLIT_BUFFER) || Hardware->multiPipeResolve;
+        gctBOOL multiPipe = (surf->tiling & gcvTILING_SPLIT_BUFFER) || Hardware->multiPipeResolve;
 
         gctPOINTER logical[gcdMAX_SURF_LAYERS] = {gcvNULL};
 
         if (Hardware->features[gcvFEATURE_128BTILE])
         {
-            if (surfInfo->isMsaa)
+            if (surf->isMsaa)
             {
                 /* Currently we will not clear part of msaa surface with RS-clear,
                 ** as it will disable FC, but we need msaa FC always on.
@@ -2706,7 +1549,7 @@ _ClearHardware_v2(
             {
                 srcStride = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  29:29) - (0 ? 29:29) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ?
- 29:29))) | (((gctUINT32) ((gctUINT32) (surfInfo->cacheMode == gcvCACHE_256) & ((gctUINT32) ((((1 ?
+ 29:29))) | (((gctUINT32) ((gctUINT32) (surf->cacheMode == gcvCACHE_256) & ((gctUINT32) ((((1 ?
  29:29) - (0 ? 29:29) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:29) - (0 ? 29:29) + 1))))))) << (0 ?
  29:29)));
             }
@@ -2715,7 +1558,7 @@ _ClearHardware_v2(
         else if (Hardware->features[gcvFEATURE_FAST_MSAA] ||
             Hardware->features[gcvFEATURE_SMALL_MSAA])
         {
-            if (surfInfo->isMsaa)
+            if (surf->isMsaa)
             {
                 /* Currently we will not clear part of msaa surface with RS-clear,
                 ** as it will disable FC, but we need msaa FC always on.
@@ -2734,20 +1577,51 @@ _ClearHardware_v2(
         /*
         ** Adjust MSAA setting for RS clear. Here Surface must be non-msaa.
         */
-        gcmONERROR(gcoHARDWARE_AdjustCacheMode(Hardware, surfInfo));
+        gcmONERROR(gcoHARDWARE_AdjustCacheMode(Hardware, surf));
 
-        surfInfo->pfGetAddr(surfInfo, rect.left, rect.top, SurfView->firstSlice, logical);
-        offset = (gctUINT32)((gctUINT8_PTR)logical[LayerIndex] - surfInfo->node.logical);
+        surf->pfGetAddr(surf, rect.left, rect.top, SurfView->firstSlice, logical);
+        offset = (gctUINT32)((gctUINT8_PTR)logical[LayerIndex] - surf->node.logical);
         if (((rect.left >> 3) ^ (rect.top >> 2)) & 0x01)
         {
             /* Move to the top buffer */
-            offset -= surfInfo->bottomBufferOffset;
+            offset -= surf->bottomBufferOffset;
         }
 
         /* Determine the starting address. */
-        gcmGETHARDWAREADDRESS(surfInfo->node, address);
+        gcmGETHARDWAREADDRESS(surf->node, address);
 
-        gcmONERROR(_GetClearDestinationFormat(Hardware, &surfInfo->formatInfo, &dstFormat, &rectSize));
+        gcmONERROR(_GetClearDestinationFormat(Hardware, &surf->formatInfo, &dstFormat, &rectSize));
+
+        if (surf->tiling == gcvLINEAR)
+        {
+            /* Disable 'tileEnable' for linear surface. */
+            dstTileEnable = 0x0;
+            dstTileMode   = 0;
+            dstStride     = surf->stride;
+        }
+        else
+        {
+            dstTileEnable = 0x1;
+
+            if (Hardware->features[gcvFEATURE_128BTILE])
+            {
+                if (surf->tiling == gcvSUPERTILED)
+                {
+                    dstTileMode = 0x1;
+                }
+                else if (surf->tiling == gcvYMAJOR_SUPERTILED)
+                {
+                    dstTileMode = 0x2;
+                }
+                else
+                {
+                    dstTileMode = 0x0;
+                }
+            }
+
+            /* Requires linear stride multiplied by 4 for tile mode. */
+            dstStride = (surf->stride << 2);
+        }
 
         /* Build AQRsConfig register. src format is useless for clear
         ** Only dword size should be correct for destination surface
@@ -2764,7 +1638,7 @@ _ClearHardware_v2(
  12:8)))
                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  14:14) - (0 ? 14:14) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 14:14) - (0 ? 14:14) + 1))))))) << (0 ?
- 14:14))) | (((gctUINT32) ((gctUINT32) (gcvTRUE) & ((gctUINT32) ((((1 ?
+ 14:14))) | (((gctUINT32) ((gctUINT32) (dstTileEnable) & ((gctUINT32) ((((1 ?
  14:14) - (0 ? 14:14) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 14:14) - (0 ? 14:14) + 1))))))) << (0 ?
  14:14)));
 
@@ -2795,36 +1669,20 @@ _ClearHardware_v2(
  ~0 : (~(~0 << ((1 ? 17:16) - (0 ? 17:16) + 1))))))) << (0 ? 17:16)));
         }
 
-        if (Hardware->features[gcvFEATURE_128BTILE])
-        {
-            if (surfInfo->tiling == gcvSUPERTILED)
-            {
-                dstTileMode = 0x1;
-            }
-            else if (surfInfo->tiling == gcvYMAJOR_SUPERTILED)
-            {
-                dstTileMode = 0x2;
-            }
-            else
-            {
-                dstTileMode = 0x0;
-            }
-        }
-
         /* Determine the stride. */
         stride = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  19:0) - (0 ? 19:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:0) - (0 ? 19:0) + 1))))))) << (0 ?
- 19:0))) | (((gctUINT32) ((gctUINT32) ((surfInfo->stride << 2)) & ((gctUINT32) ((((1 ?
+ 19:0))) | (((gctUINT32) ((gctUINT32) (dstStride) & ((gctUINT32) ((((1 ?
  19:0) - (0 ? 19:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:0) - (0 ? 19:0) + 1))))))) << (0 ?
  19:0)))
                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:31) - (0 ? 31:31) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ?
- 31:31))) | (((gctUINT32) ((gctUINT32) (((surfInfo->tiling & gcvSUPERTILED) > 0)) & ((gctUINT32) ((((1 ?
+ 31:31))) | (((gctUINT32) ((gctUINT32) (((surf->tiling & gcvSUPERTILED) > 0)) & ((gctUINT32) ((((1 ?
  31:31) - (0 ? 31:31) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:31) - (0 ? 31:31) + 1))))))) << (0 ?
  31:31)))
                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  30:30) - (0 ? 30:30) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ?
- 30:30))) | (((gctUINT32) ((gctUINT32) (((surfInfo->tiling & gcvTILING_SPLIT_BUFFER) > 0)) & ((gctUINT32) ((((1 ?
+ 30:30))) | (((gctUINT32) ((gctUINT32) (((surf->tiling & gcvTILING_SPLIT_BUFFER) > 0)) & ((gctUINT32) ((((1 ?
  30:30) - (0 ? 30:30) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 30:30) - (0 ? 30:30) + 1))))))) << (0 ?
  30:30)))
                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -2841,6 +1699,17 @@ _ClearHardware_v2(
         /* Flush cache. */
         gcmONERROR(gcoHARDWARE_FlushPipe(Hardware, (gctPOINTER *)&memory));
 
+#if gcdENABLE_TRUST_APPLICATION
+        if (Hardware->features[gcvFEATURE_SECURITY])
+        {
+            gcoHARDWARE_SetProtectMode(
+                Hardware,
+                (surf->hints & gcvSURF_PROTECTED_CONTENT),
+                (gctPOINTER *)&memory);
+
+            Hardware->GPUProtecedModeDirty = gcvTRUE;
+        }
+#endif
 
         {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
@@ -3062,7 +1931,7 @@ _ClearHardware_v2(
 
 
 
-        if (surfInfo->tiling & gcvTILING_SPLIT_BUFFER)
+        if (surf->tiling & gcvTILING_SPLIT_BUFFER)
         {
             {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)2 <= 1024);
@@ -3091,7 +1960,7 @@ _ClearHardware_v2(
 
                 gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory,
                                 0x05B8+1,
-                                address + offset + surfInfo->bottomBufferOffset);
+                                address + offset + surf->bottomBufferOffset);
 
                 gcmSETFILLER_NEW(reserve, memory);
 
@@ -3123,8 +1992,7 @@ _ClearHardware_v2(
 };
 
 
-            if ((Hardware->config->pixelPipes > 1) ||
-                 Hardware->features[gcvFEATURE_SINGLE_PIPE_HALTI1])
+            if (Hardware->features[gcvFEATURE_RS_NEW_BASEADDR])
             {
                 {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
@@ -3158,7 +2026,7 @@ _ClearHardware_v2(
                                               gcvMSAA_DOWNSAMPLE_AVERAGE,
                                               (gctPOINTER *)&memory));
 
-        gcmDUMP(gcvNULL, "#[surface 0x%x 0x%x]", address, surfInfo->node.size);
+        gcmDUMP(gcvNULL, "#[surface 0x%x 0x%x]", address, surf->node.size);
 
         stateDelta = stateDelta;
 
@@ -3178,7 +2046,7 @@ OnError:
 }
 
 static gceSTATUS
-_ClearSoftware_v2(
+_ClearSoftware(
     IN gcoHARDWARE Hardware,
     IN gcsSURF_VIEW *SurfView,
     IN gctUINT32 LayerIndex,
@@ -3193,14 +2061,9 @@ _ClearSoftware_v2(
 {
     gctINT32 x, y;
     gceSTATUS status = gcvSTATUS_OK;
-    gctUINT32 tLeft;
-    gctUINT32 bpp;
-
     gcoSURF surf = SurfView->surf;
-    gcsSURF_INFO_PTR surfInfo = &surf->info;
-
-    bpp = surfInfo->formatInfo.bitsPerPixel;
-    tLeft = (bpp == 16) ? gcmALIGN(Rect->left - 1, 2) : Rect->left;
+    gctUINT32 bpp = surf->formatInfo.bitsPerPixel;
+    gctUINT32 tLeft = (bpp == 16) ? gcmALIGN(Rect->left - 1, 2) : Rect->left;
 
     for (y = Rect->top;  y < Rect->bottom; y++)
     {
@@ -3208,21 +2071,21 @@ _ClearSoftware_v2(
         {
             gctPOINTER address[gcdMAX_SURF_LAYERS] = {gcvNULL};
 
-            surfInfo->pfGetAddr(surfInfo, x, y, SurfView->firstSlice, address);
+            surf->pfGetAddr(surf, x, y, SurfView->firstSlice, address);
 
             /* Draw only if x,y within clear rectangle. */
             if (bpp >= 64)
             {
-                if(surfInfo->formatInfo.format == gcvSURF_G32R32 ||
-                    surfInfo->formatInfo.format == gcvSURF_G32R32F ||
-                    surfInfo->formatInfo.format == gcvSURF_G32R32I ||
-                    surfInfo->formatInfo.format == gcvSURF_G32R32UI ||
-                    surfInfo->formatInfo.format == gcvSURF_X32B32G32R32I_2_G32R32I ||
-                    surfInfo->formatInfo.format == gcvSURF_A32B32G32R32I_2_G32R32I ||
-                    surfInfo->formatInfo.format == gcvSURF_A32B32G32R32I_2_G32R32F ||
-                    surfInfo->formatInfo.format == gcvSURF_X32B32G32R32UI_2_G32R32UI ||
-                    surfInfo->formatInfo.format == gcvSURF_A32B32G32R32UI_2_G32R32UI ||
-                    surfInfo->formatInfo.format == gcvSURF_A32B32G32R32UI_2_G32R32F )
+                if(surf->formatInfo.format == gcvSURF_G32R32 ||
+                    surf->formatInfo.format == gcvSURF_G32R32F ||
+                    surf->formatInfo.format == gcvSURF_G32R32I ||
+                    surf->formatInfo.format == gcvSURF_G32R32UI ||
+                    surf->formatInfo.format == gcvSURF_X32B32G32R32I_2_G32R32I ||
+                    surf->formatInfo.format == gcvSURF_A32B32G32R32I_2_G32R32I ||
+                    surf->formatInfo.format == gcvSURF_A32B32G32R32I_2_G32R32F ||
+                    surf->formatInfo.format == gcvSURF_X32B32G32R32UI_2_G32R32UI ||
+                    surf->formatInfo.format == gcvSURF_A32B32G32R32UI_2_G32R32UI ||
+                    surf->formatInfo.format == gcvSURF_A32B32G32R32UI_2_G32R32F )
                 {
                     gctUINT32_PTR addr32 = (gctUINT32_PTR)address[LayerIndex];
                     if ((ClearMask >> (LayerIndex << 1)) & 0x1)
@@ -3413,7 +2276,7 @@ _ClearSoftware_v2(
 }
 
 gceSTATUS
-gcoHARDWARE_Clear_v2(
+gcoHARDWARE_Clear(
     IN gcoHARDWARE Hardware,
     IN gcsSURF_VIEW *SurfView,
     IN gctUINT32 LayerIndex,
@@ -3424,22 +2287,21 @@ gcoHARDWARE_Clear_v2(
     )
 {
     gceSTATUS status;
-    gctINT32 tileWidth = 0, tileHeight = 0;
 
     gcoSURF surf = SurfView->surf;
-    gcsSURF_INFO_PTR surfInfo = &surf->info;
 
     gcmHEADER_ARG("SurfView=0x%08X LayerIndex=%u Rect=0x%08x ClearValue=0x%08x "
                   "ClearValueUpper=0x%08x ClearMask=0x%02x",
                   SurfView, LayerIndex, Rect, ClearValue, ClearValueUpper, ClearMask);
 
-    switch (surfInfo->format)
+    switch (surf->format)
     {
     case gcvSURF_X4R4G4B4:
     case gcvSURF_X1R5G5B5:
     case gcvSURF_R5G6B5:
     case gcvSURF_X4B4G4R4:
     case gcvSURF_X1B5G5R5:
+    case gcvSURF_B5G6R5:
         if (ClearMask == 0x7)
         {
             /* When the format has no alpha channel, fake the ClearMask to
@@ -3454,60 +2316,29 @@ gcoHARDWARE_Clear_v2(
     }
 
     if ((ClearMask != 0xF)
-    &&  (surfInfo->format != gcvSURF_X8R8G8B8)
-    &&  (surfInfo->format != gcvSURF_A8R8G8B8)
-    &&  (surfInfo->format != gcvSURF_D24S8)
-    &&  (surfInfo->format != gcvSURF_D24X8)
-    &&  (surfInfo->format != gcvSURF_D16)
-    &&  (surfInfo->format != gcvSURF_S8)
-    &&  (surfInfo->format != gcvSURF_X24S8)
+    &&  (surf->format != gcvSURF_X8R8G8B8)
+    &&  (surf->format != gcvSURF_A8R8G8B8)
+    &&  (surf->format != gcvSURF_X8B8G8R8)
+    &&  (surf->format != gcvSURF_A8B8G8R8)
+    &&  (surf->format != gcvSURF_D24S8)
+    &&  (surf->format != gcvSURF_D24X8)
+    &&  (surf->format != gcvSURF_D16)
+    &&  (surf->format != gcvSURF_S8)
+    &&  (surf->format != gcvSURF_X24S8)
     )
     {
         /* Don't clear with mask when channels are not byte sized. */
         gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
 
-    switch (surfInfo->tiling)
-    {
-    case gcvTILED:
-        /* Query the tile size. */
-        gcmONERROR(
-            gcoHARDWARE_QueryTileSize(gcvNULL, gcvNULL,
-                                      &tileWidth, &tileHeight,
-                                      gcvNULL));
-        break;
-
-    case gcvMULTI_TILED:
-        /* When multi tile the tile size is 8x4 and the tile is interleaved
-         * So it needs 4 8x4 tile aligned.
-        */
-        tileWidth = 16;
-        tileHeight = 8;
-        break;
-
-    case gcvSUPERTILED:
-        tileWidth = 64;
-        tileHeight = 64;
-        break;
-
-    case gcvMULTI_SUPERTILED:
-        tileWidth = 64;
-        tileHeight = 128;
-        break;
-    default:
-        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-    }
-
     /* Try hardware clear. */
-    status = _ClearHardware_v2(Hardware,
-                               SurfView,
-                               LayerIndex,
-                               Rect,
-                               ClearValue,
-                               ClearValueUpper,
-                               ClearMask,
-                               tileWidth,
-                               tileHeight);
+    status = _ClearHardware(Hardware,
+                            SurfView,
+                            LayerIndex,
+                            Rect,
+                            ClearValue,
+                            ClearValueUpper,
+                            ClearMask);
 
     if (gcmIS_ERROR(status))
     {
@@ -3521,7 +2352,7 @@ OnError:
 }
 
 gceSTATUS
-gcoHARDWARE_ClearSoftware_v2(
+gcoHARDWARE_ClearSoftware(
     IN gcoHARDWARE Hardware,
     IN gcsSURF_VIEW *SurfView,
     IN gctUINT32 LayerIndex,
@@ -3539,7 +2370,6 @@ gcoHARDWARE_ClearSoftware_v2(
     gceSURF_TYPE type        = gcvSURF_TYPE_UNKNOWN;
 
     gcoSURF surf = SurfView->surf;
-    gcsSURF_INFO_PTR surfInfo = &surf->info;
 
     gcmHEADER_ARG("Hardware=0x%x SurfView=0x%08X LayerIndex=%u Rect=0x%08x "
                   "ClearValue=0x%08x ClearValueUpper=0x%08x ClearMask=0x%02x "
@@ -3574,13 +2404,14 @@ gcoHARDWARE_ClearSoftware_v2(
 
 
     /* Query pixel depth. */
-    gcmONERROR(gcoHARDWARE_ConvertFormat(surfInfo->format,
+    gcmONERROR(gcoHARDWARE_ConvertFormat(surf->format,
                                          &bitsPerPixel,
                                          gcvNULL));
 
-    switch (surfInfo->format)
+    switch (surf->format)
     {
     case gcvSURF_X4R4G4B4: /* 12-bit RGB color without alpha channel. */
+    case gcvSURF_X4B4G4R4: /* Treat as X4R4G4B4, RB channel flipped. */
         channelMask[0] = 0x000F;
         channelMask[1] = 0x00F0;
         channelMask[2] = 0x0F00;
@@ -3589,6 +2420,7 @@ gcoHARDWARE_ClearSoftware_v2(
 
     case gcvSURF_D16:      /* 16-bit Depth. */
     case gcvSURF_A4R4G4B4: /* 12-bit RGB color with alpha channel. */
+    case gcvSURF_A4B4G4R4: /* Treat as A4R4G4B4, RB channel flipped. */
         channelMask[0] = 0x000F;
         channelMask[1] = 0x00F0;
         channelMask[2] = 0x0F00;
@@ -3610,6 +2442,7 @@ gcoHARDWARE_ClearSoftware_v2(
         break;
 
     case gcvSURF_R5G6B5: /* 16-bit RGB color without alpha channel. */
+    case gcvSURF_B5G6R5: /* Treat as R5G6B5, RB channel flipped. */
         channelMask[0] = 0x001F;
         channelMask[1] = 0x07E0;
         channelMask[2] = 0xF800;
@@ -3621,6 +2454,8 @@ gcoHARDWARE_ClearSoftware_v2(
     case gcvSURF_X24S8:    /* 24-bit Depth with 8 bit Stencil. */
     case gcvSURF_X8R8G8B8: /* 24-bit RGB without alpha channel. */
     case gcvSURF_A8R8G8B8: /* 24-bit RGB with alpha channel. */
+    case gcvSURF_X8B8G8R8: /* Treat as X8R8G8B8, RB channel flipped. */
+    case gcvSURF_A8B8G8R8: /* Treat as A8R8G8B8, RB channel flipped. */
     case gcvSURF_G8R8:     /* The clear value do not have channel 2 and 3 */
     case gcvSURF_R8_1_X8R8G8B8:
     case gcvSURF_G8R8_1_X8R8G8B8:
@@ -3691,22 +2526,22 @@ gcoHARDWARE_ClearSoftware_v2(
 
     type = gcvSURF_RENDER_TARGET;
 
-    if ((surfInfo->format == gcvSURF_D16)
-        || (surfInfo->format == gcvSURF_D24S8)
-        || (surfInfo->format == gcvSURF_D32)
-        || (surfInfo->format == gcvSURF_D24X8)
-        || (surfInfo->format == gcvSURF_X24S8)
+    if ((surf->format == gcvSURF_D16)
+        || (surf->format == gcvSURF_D24S8)
+        || (surf->format == gcvSURF_D32)
+        || (surf->format == gcvSURF_D24X8)
+        || (surf->format == gcvSURF_X24S8)
         )
     {
         type = gcvSURF_DEPTH;
     }
 
-    gcmONERROR(gcoSURF_NODE_Cache(&surfInfo->node,
-                                   surfInfo->node.logical,
-                                   surfInfo->size,
+    gcmONERROR(gcoSURF_NODE_Cache(&surf->node,
+                                   surf->node.logical,
+                                   surf->size,
                                    gcvCACHE_INVALIDATE));
 
-    gcmONERROR(_ClearSoftware_v2(
+    gcmONERROR(_ClearSoftware(
         Hardware,
         SurfView,
         LayerIndex,
@@ -3718,9 +2553,9 @@ gcoHARDWARE_ClearSoftware_v2(
         type,
         StencilWriteMask));
 
-    gcmONERROR(gcoSURF_NODE_Cache(&surfInfo->node,
-                                   surfInfo->node.logical,
-                                   surfInfo->size,
+    gcmONERROR(gcoSURF_NODE_Cache(&surf->node,
+                                   surf->node.logical,
+                                   surf->size,
                                    gcvCACHE_CLEAN));
 
 OnError:

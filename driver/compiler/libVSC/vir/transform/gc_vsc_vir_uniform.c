@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -59,7 +59,7 @@ VSC_GlobalUniformItem_Update(
     if(location != -1)
     {
         VSC_GlobalUniformItem_SetLocation(item, location);
-        VSC_GlobalUniformItem_SetRange(item, VIR_Shader_GetTypeLocationRange(shader, uniform_type));
+        VSC_GlobalUniformItem_SetRange(item, VIR_Shader_GetLogicalCount(shader, uniform_type));
     }
     VSC_GlobalUniformItem_SetRegCount(item, VIR_Type_GetVirRegCount(shader, uniform_type));
     VSC_GlobalUniformItem_SetByteSize(item, VIR_Shader_GetTypeByteSize(shader, uniform_type));
@@ -385,12 +385,12 @@ VSC_GlobalUniformTable_FindUniformWithShaderUniform(
     {
         if(!from_head)
         {
-            return VSC_ERR_UNIFORM_LOC_OVERLAP;
+            return VSC_ERR_LOCATION_ALIASED;
         }
 
         if(loc_result != name_result)
         {
-            return VSC_ERR_UNIFORM_LOC_MISMATCH;
+            return VSC_ERR_LOCATION_MISMATCH;
         }
         *item = loc_result;
     }
@@ -400,7 +400,7 @@ VSC_GlobalUniformTable_FindUniformWithShaderUniform(
             && location != -1
             && VSC_GlobalUniformItem_GetLocation(name_result) != location)
         {
-            return VSC_ERR_UNIFORM_LOC_MISMATCH;
+            return VSC_ERR_LOCATION_MISMATCH;
         }
         *item = name_result;
     }
@@ -1302,86 +1302,17 @@ _VSC_UF_AUBO_ConstructDefaultUBO(
         if(count > 0)
         {
             VIR_Shader* shader = VSC_AllShaders_GetShader(all_shaders, i);
-            /* varables used for creating default ubo */
-            VIR_NameId dubo_nameId;
-            VIR_TypeId dubo_typeId;
-            VIR_SymId dubo_symId;
-            VIR_Symbol* dubo_sym;
+            VIR_Symbol* dubo_sym = gcvNULL;
             VIR_UniformBlock* dubo_ub;
-            /* varables used for creating default ubo address */
-            VIR_NameId dubo_addr_nameId;
-            VIR_SymId dubo_addr_symId;
-            VIR_Symbol* dubo_addr_sym;
-            VIR_Uniform* dubo_addr_uniform;
+            VIR_Symbol* dubo_addr_sym = gcvNULL;
 
-            /* create default ubo */
-            {
-                /* default ubo name */
-                virErrCode = VIR_Shader_AddString(shader,
-                                                    "#DefaultUBO",
-                                                    &dubo_nameId);
-                if(virErrCode != VSC_ERR_NONE) return virErrCode;
-
-                /* default ubo type */
-                virErrCode = VIR_Shader_AddStructType(shader,
-                                                        gcvFALSE,
-                                                        dubo_nameId,
-                                                        &dubo_typeId);
-                if(virErrCode != VSC_ERR_NONE) return virErrCode;
-
-                /* default ubo symbol */
-                virErrCode = VIR_Shader_AddSymbol(shader,
-                                                    VIR_SYM_UBO,
-                                                    dubo_nameId,
-                                                    VIR_Shader_GetTypeFromId(shader, dubo_typeId),
-                                                    VIR_STORAGE_UNKNOWN,
-                                                    &dubo_symId);
-                if(virErrCode != VSC_ERR_NONE) return virErrCode;
-
-                dubo_sym = VIR_Shader_GetSymFromId(shader, dubo_symId);
-                VIR_Symbol_SetPrecision(dubo_sym, VIR_PRECISION_DEFAULT);
-                VIR_Symbol_SetAddrSpace(dubo_sym, VIR_AS_CONSTANT);
-                VIR_Symbol_SetTyQualifier(dubo_sym, VIR_TYQUAL_CONST);
-                VIR_Symbol_SetLayoutQualifier(dubo_sym, VIR_LAYQUAL_PACKED);
-                VIR_Symbol_SetFlag(dubo_sym, VIR_SYMFLAG_COMPILER_GEN);
-
-                dubo_ub = VIR_Symbol_GetUBO(dubo_sym);
-                dubo_ub->blockIndex = (gctINT16)VIR_IdList_Count(VIR_Shader_GetUniformBlocks(shader)) - 1;
-                VIR_Shader_SetDefaultUBOIndex(shader, dubo_ub->blockIndex);
-
-                VSC_UF_AUBO_SetDUBO(aubo, i, dubo_symId);
-                dubo_ub->blockSize = VSC_UF_AUBO_GetDUBOByteSize(aubo);
-                dubo_ub->uniforms = (VIR_Uniform **)vscMM_Alloc(&shader->mempool, sizeof(VIR_Uniform*) * count);
-            }
-
-            /* create default ubo address */
-            {
-                virErrCode = VIR_Shader_AddString(shader,
-                                                    "#DefaultUBO",
-                                                    &dubo_addr_nameId);
-                if(virErrCode != VSC_ERR_NONE) return virErrCode;
-
-                /* default ubo symbol */
-                virErrCode = VIR_Shader_AddSymbol(shader,
-                                                    VIR_SYM_UNIFORM,
-                                                    dubo_addr_nameId,
-                                                    VIR_Shader_GetTypeFromId(shader, VIR_TYPE_UINT32),
-                                                    VIR_STORAGE_UNKNOWN,
-                                                    &dubo_addr_symId);
-
-                dubo_addr_sym = VIR_Shader_GetSymFromId(shader, dubo_addr_symId);
-                VIR_Symbol_SetUniformKind(dubo_addr_sym, VIR_UNIFORM_UNIFORM_BLOCK_ADDRESS);
-                VIR_Symbol_SetFlag(dubo_addr_sym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
-                VIR_Symbol_SetFlag(dubo_addr_sym, VIR_SYMFLAG_COMPILER_GEN);
-
-                dubo_addr_uniform = VIR_Symbol_GetUniform(dubo_addr_sym);
-                dubo_addr_uniform->index = shader->uniformCount - 1;
-                dubo_addr_uniform->blockIndex = dubo_ub->blockIndex;
-
-                VSC_UF_AUBO_SetDUBOAddr(aubo, i, dubo_addr_symId);
-            }
-
-            dubo_ub->baseAddr = dubo_addr_symId;
+            VIR_Shader_GetDUBO(shader, &dubo_sym, &dubo_addr_sym);
+            dubo_ub = VIR_Symbol_GetUBO(dubo_sym);
+            VSC_UF_AUBO_SetDUBO(aubo, i, VIR_Symbol_GetIndex(dubo_sym));
+            dubo_ub->blockSize = VSC_UF_AUBO_GetDUBOByteSize(aubo);
+            dubo_ub->uniforms = (VIR_Uniform **)vscMM_Alloc(&shader->mempool, sizeof(VIR_Uniform*) * count);
+            VIR_Symbol_SetFlag(dubo_addr_sym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
+            VSC_UF_AUBO_SetDUBOAddr(aubo, i, VIR_Symbol_GetIndex(dubo_addr_sym));
         }
     }
 
@@ -1486,6 +1417,7 @@ _VSC_UF_AUBO_ConstructConstantUBO(
 
                 cubo_addr_sym = VIR_Shader_GetSymFromId(shader, cubo_addr_symId);
                 VIR_Symbol_SetUniformKind(cubo_addr_sym, VIR_UNIFORM_UNIFORM_BLOCK_ADDRESS);
+                VIR_Symbol_SetPrecision(cubo_addr_sym, VIR_PRECISION_HIGH);
                 VIR_Symbol_SetFlag(cubo_addr_sym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
                 VIR_Symbol_SetFlag(cubo_addr_sym, VIR_SYMFLAG_COMPILER_GEN);
 
@@ -1678,15 +1610,16 @@ _VSC_UF_AUBO_TransformLdarrInstruction(
     gctUINT shader_kind_id = VIR_ShaderKind_Map2KindId(VIR_Shader_GetKind(shader));
     VIR_Instruction *mad_inst, *load_inst;
     VIR_Operand* src0 = VIR_Inst_GetSource(inst, 0);
-    VIR_Operand* src1 = VIR_Inst_GetSource(inst, 1);
+    VIR_Operand* indexing_src = VIR_Inst_GetSource(inst, 1);
     VIR_Symbol* uniform_sym = VIR_Operand_GetSymbol(src);
     VIR_Uniform* uniform = VIR_Symbol_GetUniform(uniform_sym);
     VIR_Type* src_sym_type = VIR_Symbol_GetType(VIR_Operand_GetSymbol(src));
     VIR_TypeId uniform_data_type_id = _VSC_UF_AUBO_GetUniformDataTypeID(shader, src);
     VIR_TypeId base_typeid = VIR_Type_GetBaseTypeId(src_sym_type);
-    VIR_Operand *mad_dest, *mad_src0 = gcvNULL, *mad_src1, *mad_src2, *load_dest, *load_src0, *load_src1;
+    VIR_Operand *mad_dest, *mad_src0, *mad_src1, *mad_src2, *load_dest, *load_src0, *load_src1;
     VIR_VirRegId mad_regid, load_regid;
     VIR_SymId mad_symid, load_symid;
+    VIR_Symbol* mad_sym;
     gctUINT const_offset = 0;
     VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
     VIR_Dumper* dumper = VSC_UF_AUBO_GetDumper(aubo);
@@ -1698,7 +1631,11 @@ _VSC_UF_AUBO_TransformLdarrInstruction(
         if (prevInst &&
             VIR_Inst_GetOpcode(prevInst) == VIR_OP_MOVA)
         {
+            VIR_Symbol* movaSym = VIR_Operand_GetSymbol(VIR_Inst_GetDest(prevInst));
+
             VIR_Inst_SetOpcode(prevInst, VIR_OP_MOV);
+            VIR_Symbol_SetStorageClass(movaSym, VIR_STORAGE_UNKNOWN);
+            indexing_src = VIR_Inst_GetSource(prevInst, 0);
         }
     }
 
@@ -1706,211 +1643,26 @@ _VSC_UF_AUBO_TransformLdarrInstruction(
     virErrCode = VIR_Function_AddInstructionBefore(func, VIR_OP_MAD, VIR_TYPE_UINT32, insert_before, &mad_inst);
     if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
-    /* allocate operands for this MAD instruction */
-    virErrCode = VIR_Function_NewOperand(func, &mad_dest);
-    if(virErrCode != VSC_ERR_NONE) return virErrCode;
+    /* Get operands from this MAD instruction */
+    mad_dest = VIR_Inst_GetDest(mad_inst);
+    mad_src0 = VIR_Inst_GetSource(mad_inst, 0);
+    mad_src1 = VIR_Inst_GetSource(mad_inst, 1);
+    mad_src2 = VIR_Inst_GetSource(mad_inst, 2);
 
     if(VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR)
     {
-        VIR_SymId source_symid = VIR_Symbol_GetIndex(VIR_Operand_GetSymbol(src1));
-        gctBOOL isConvertFormat = gcvFALSE;
-        gctBOOL divRowCount = gcvFALSE;
-        VIR_TypeId type = VIR_Type_isMatrix(base_type) ? VIR_TYPE_UINT16 : VIR_TYPE_UINT32;
-
-        /* when compiling es20 and below shaders, frontend will change the format of integer
-           to float, so here we make corresponding change */
-        if (VIR_Shader_IsESCompiler(shader) &&
-            !VIR_Shader_IsES30Compiler(shader) &&
-            !VIR_Shader_IsES31Compiler(shader)
-           )
-        {
-            switch(VIR_Operand_GetType(src1))
-            {
-                case VIR_TYPE_INT16:
-                    VIR_Operand_SetType(src1, VIR_TYPE_FLOAT16);
-                    break;
-                case VIR_TYPE_INT32:
-                    VIR_Operand_SetType(src1, VIR_TYPE_FLOAT32);
-                    break;
-                case VIR_TYPE_INT64:
-                    VIR_Operand_SetType(src1, VIR_TYPE_FLOAT64);
-                    break;
-                default:
-                    break;
-            }
-        }
-
-        if (VIR_Operand_GetType(src1) == VIR_TYPE_FLOAT16 ||
-            VIR_Operand_GetType(src1) == VIR_TYPE_FLOAT32 ||
-            VIR_Operand_GetType(src1) == VIR_TYPE_FLOAT64
-           )
-        {
-            VIR_Instruction *f2i_inst;
-            VIR_Operand *f2i_dest, *f2i_src0 = gcvNULL;
-            VIR_VirRegId f2i_regid;
-            VIR_SymId f2i_symid;
-
-            virErrCode = VIR_Function_AddInstructionBefore(func, VIR_OP_AQ_F2I, type, mad_inst, &f2i_inst);
-            if(virErrCode != VSC_ERR_NONE) return virErrCode;
-
-            /* allocate dest for F2I. */
-            virErrCode = VIR_Function_NewOperand(func, &f2i_dest);
-            if(virErrCode != VSC_ERR_NONE) return virErrCode;
-            f2i_regid = VIR_Shader_NewVirRegId(shader, 1);
-            virErrCode = VIR_Shader_AddSymbol(shader,
-                                              VIR_SYM_VIRREG,
-                                              f2i_regid,
-                                              VIR_Shader_GetTypeFromId(shader, type),
-                                              VIR_STORAGE_UNKNOWN,
-                                              &f2i_symid);
-            if(virErrCode != VSC_ERR_NONE) return virErrCode;
-
-            VIR_Operand_SetTempRegister(f2i_dest, func, f2i_symid, type);
-            VIR_Operand_SetLvalue(f2i_dest, gcvTRUE);
-            VIR_Operand_SetEnable(f2i_dest, VIR_ENABLE_X);
-
-            /* allocate src0 for F2I. */
-            virErrCode = VIR_Function_NewOperand(func, &f2i_src0);
-            if(virErrCode != VSC_ERR_NONE) return virErrCode;
-            virErrCode = VIR_Function_DupOperand(func, src1, &f2i_src0);
-            if(virErrCode != VSC_ERR_NONE) return virErrCode;
-
-            VIR_Inst_SetDest(f2i_inst, f2i_dest);
-            VIR_Inst_SetSource(f2i_inst, 0, f2i_src0);
-
-            /* Update the symbol ID. */
-            isConvertFormat = gcvTRUE;
-            source_symid = f2i_symid;
-        }
-
-        /*
-        ** If this uniform is a matrix array, the index has been multiplied by the row count,
-        ** we need to divide it.
-        ** HW can't support 32 bit DIV, so we convert it to 16 bit then do the DIV.
-        ** If 16 bit can't descript, then we need to refine this.
-        */
-        if (VIR_Type_isMatrix(base_type) && VIR_Type_isArray(src_sym_type))
-        {
-            VIR_Instruction *div_inst;
-            VIR_Operand *div_dest, *div_src0 = gcvNULL, *div_src1;
-            VIR_VirRegId div_regid;
-            VIR_SymId div_symid;
-            VIR_ScalarConstVal regCount;
-
-            VIR_Instruction *and_inst;
-            VIR_Operand *and_dest, *and_src0 = gcvNULL, *and_src1;
-            VIR_VirRegId and_regid;
-            VIR_SymId and_symid;
-
-            virErrCode = VIR_Function_AddInstructionBefore(func, VIR_OP_DIV, type, mad_inst, &div_inst);
-            if(virErrCode != VSC_ERR_NONE) return virErrCode;
-
-            /* allocate dest for DIV. */
-            virErrCode = VIR_Function_NewOperand(func, &div_dest);
-            if(virErrCode != VSC_ERR_NONE) return virErrCode;
-            div_regid = VIR_Shader_NewVirRegId(shader, 1);
-            virErrCode = VIR_Shader_AddSymbol(shader,
-                                              VIR_SYM_VIRREG,
-                                              div_regid,
-                                              VIR_Shader_GetTypeFromId(shader, type),
-                                              VIR_STORAGE_UNKNOWN,
-                                              &div_symid);
-            if(virErrCode != VSC_ERR_NONE) return virErrCode;
-
-            VIR_Operand_SetTempRegister(div_dest, func, div_symid, type);
-            VIR_Operand_SetLvalue(div_dest, gcvTRUE);
-            VIR_Operand_SetEnable(div_dest, VIR_ENABLE_X);
-
-            /* allocate src0 for DIV. */
-            virErrCode = VIR_Function_NewOperand(func, &div_src0);
-            if(virErrCode != VSC_ERR_NONE) return virErrCode;
-            VIR_Operand_SetTempRegister(div_src0, func, source_symid, type);
-            VIR_Operand_SetSwizzle(div_src0, VIR_SWIZZLE_X);
-
-            /* allocate src1 for DIV. */
-            virErrCode = VIR_Function_NewOperand(func, &div_src1);
-            if(virErrCode != VSC_ERR_NONE) return virErrCode;
-            regCount.iValue = VIR_GetTypeRows(VIR_Type_GetIndex(base_type));
-            VIR_Operand_SetImmediate(div_src1, type, regCount);
-
-            VIR_Inst_SetDest(div_inst, div_dest);
-            VIR_Inst_SetSource(div_inst, 0, div_src0);
-            VIR_Inst_SetSource(div_inst, 1, div_src1);
-
-            /* We need to convert 16bit to 32bit.*/
-            virErrCode = VIR_Function_AddInstructionAfter(func, VIR_OP_AND_BITWISE, VIR_TYPE_UINT32, div_inst, &and_inst);
-            if(virErrCode != VSC_ERR_NONE) return virErrCode;
-
-            /* allocate dest for AND. */
-            virErrCode = VIR_Function_NewOperand(func, &and_dest);
-            if(virErrCode != VSC_ERR_NONE) return virErrCode;
-            and_regid = VIR_Shader_NewVirRegId(shader, 1);
-            virErrCode = VIR_Shader_AddSymbol(shader,
-                                              VIR_SYM_VIRREG,
-                                              and_regid,
-                                              VIR_Shader_GetTypeFromId(shader, VIR_TYPE_UINT32),
-                                              VIR_STORAGE_UNKNOWN,
-                                              &and_symid);
-            if(virErrCode != VSC_ERR_NONE) return virErrCode;
-
-            VIR_Operand_SetTempRegister(and_dest, func, and_symid, VIR_TYPE_UINT32);
-            VIR_Operand_SetLvalue(and_dest, gcvTRUE);
-            VIR_Operand_SetEnable(and_dest, VIR_ENABLE_X);
-
-            /* allocate src0 for AND. */
-            virErrCode = VIR_Function_NewOperand(func, &and_src0);
-            if(virErrCode != VSC_ERR_NONE) return virErrCode;
-            VIR_Operand_SetTempRegister(and_src0, func, div_symid, VIR_TYPE_UINT32);
-            VIR_Operand_SetSwizzle(and_src0, VIR_SWIZZLE_X);
-
-            /* allocate src1 for AND. */
-            virErrCode = VIR_Function_NewOperand(func, &and_src1);
-            if(virErrCode != VSC_ERR_NONE) return virErrCode;
-            regCount.uValue = 0x0000FFFF;
-            VIR_Operand_SetImmediate(and_src1, VIR_TYPE_UINT32, regCount);
-
-            VIR_Inst_SetDest(and_inst, and_dest);
-            VIR_Inst_SetSource(and_inst, 0, and_src0);
-            VIR_Inst_SetSource(and_inst, 1, and_src1);
-
-            /* Update the symbol ID. */
-            divRowCount  = gcvTRUE;
-            source_symid = and_symid;
-        }
-
-        if (isConvertFormat || divRowCount)
-        {
-            virErrCode = VIR_Function_NewOperand(func, &mad_src0);
-            if(virErrCode != VSC_ERR_NONE) return virErrCode;
-            VIR_Operand_SetTempRegister(mad_src0, func, source_symid, VIR_TYPE_UINT32);
-            VIR_Operand_SetSwizzle(mad_src0, VIR_SWIZZLE_X);
-        }
-        else
-        {
             /* set mad_src0 to src1 */
-            virErrCode = VIR_Function_DupOperand(func, src1, &mad_src0);
-        }
+            VIR_Operand_Copy(mad_src0, indexing_src);
     }
     else if(VIR_Operand_GetRelAddrMode(src))
     {
         VIR_SymId index_symid = VIR_Operand_GetRelIndexing(src);
-        virErrCode = VIR_Function_NewOperand(func, &mad_src0);
         VIR_Operand_SetSymbol(mad_src0, func, index_symid);
     }
     else
     {
         gcmASSERT(0);
     }
-
-    if(virErrCode != VSC_ERR_NONE) return virErrCode;
-    virErrCode = VIR_Function_NewOperand(func, &mad_src1);
-    if(virErrCode != VSC_ERR_NONE) return virErrCode;
-    virErrCode = VIR_Function_NewOperand(func, &mad_src2);
-    if(virErrCode != VSC_ERR_NONE) return virErrCode;
-    VIR_Inst_SetDest(mad_inst, mad_dest);
-    VIR_Inst_SetSource(mad_inst, 0, mad_src0);
-    VIR_Inst_SetSource(mad_inst, 1, mad_src1);
-    VIR_Inst_SetSource(mad_inst, 2, mad_src2);
 
     /* allocate a new vir_reg which performs as the dest of MAD */
     mad_regid = VIR_Shader_NewVirRegId(shader, 1);
@@ -1922,31 +1674,54 @@ _VSC_UF_AUBO_TransformLdarrInstruction(
                                       &mad_symid);
     if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
+    mad_sym = VIR_Shader_GetSymFromId(shader, mad_symid);
+    VIR_Symbol_SetPrecision(mad_sym, VIR_PRECISION_HIGH);
     VIR_Operand_SetTempRegister(mad_dest, func, mad_symid, VIR_TYPE_UINT32);
     VIR_Operand_SetLvalue(mad_dest, gcvTRUE);
     VIR_Operand_SetEnable(mad_dest, VIR_ENABLE_X);
 
     /* set mad_src1 to the array stride */
-    VIR_Operand_SetImmediateUint(mad_src1, _VSC_UF_AUBO_GetArrayStride(VIR_Symbol_GetType(uniform_sym)));
+    if (VIR_Type_isMatrix(base_type) && VIR_Type_isArray(src_sym_type))
+    {
+        VIR_Operand_SetImmediateUint(mad_src1, _VSC_UF_AUBO_GetArrayStride(VIR_Symbol_GetType(uniform_sym)) / VIR_GetTypeRows(VIR_Type_GetIndex(base_type)));
+    }
+    else
+    {
+        VIR_Operand_SetImmediateUint(mad_src1, _VSC_UF_AUBO_GetArrayStride(VIR_Symbol_GetType(uniform_sym)));
+    }
 
     /* set mad_src2 to the offset of uniform */
-    if(VIR_Operand_GetIsConstIndexing(src))
+    if(isSymUniformMovedToCUBO(uniform_sym))
     {
-        gctUINT stride;
-
-        if(VIR_Type_isMatrix(base_type))
-        {
-            VIR_TypeId row_typeid = VIR_GetTypeRowType(VIR_Type_GetIndex(base_type));
-            VIR_Type* row_type = VIR_Shader_GetTypeFromId(shader, row_typeid);
-            stride = VIR_Shader_GetTypeByteSize(shader, row_type);
-        }
-        else
-        {
-            stride = _VSC_UF_AUBO_GetArrayStride(VIR_Symbol_GetType(uniform_sym));
-        }
-        const_offset = stride * VIR_Operand_GetMatrixConstIndex(src);
+        VIR_SymId cubo_addr_symid = VSC_UF_AUBO_GetCUBOAddr(aubo, shader_kind_id);
+        VIR_Symbol* cubo_addr_sym = VIR_Shader_GetSymFromId(shader, cubo_addr_symid);
+        VIR_Operand_SetUniform(mad_src2, VIR_Symbol_GetUniform(cubo_addr_sym), shader);
     }
-    VIR_Operand_SetImmediateUint(mad_src2, VIR_Uniform_GetOffset(uniform) + const_offset);
+    else
+    {
+        VIR_SymId dubo_addr_symid;
+        VIR_Symbol* dubo_addr_sym;
+
+        gcmASSERT(isSymUniformMovedToDUBO(uniform_sym));
+
+        dubo_addr_symid = VSC_UF_AUBO_GetDUBOAddr(aubo, shader_kind_id);
+        dubo_addr_sym = VIR_Shader_GetSymFromId(shader, dubo_addr_symid);
+
+        VIR_Operand_SetUniform(mad_src2, VIR_Symbol_GetUniform(dubo_addr_sym), shader);
+    }
+    VIR_Operand_SetSwizzle(mad_src2, VIR_SWIZZLE_X);
+
+    /* update for dual16 */
+    if(VIR_Shader_isDual16Mode(shader))
+    {
+        gctBOOL needRunSingleT = gcvFALSE;
+        gctBOOL dual16NotSupported = gcvFALSE;
+        VIR_Inst_Check4Dual16(mad_inst, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+        if (needRunSingleT)
+        {
+            VIR_Inst_SetThreadMode(mad_inst, VIR_THREAD_D16_DUAL_32);
+        }
+    }
 
     /* add a LOAD instruction to load the uniform data from Default UBO */
     virErrCode = VIR_Function_AddInstructionBefore(func, VIR_OP_LOAD, VIR_TYPE_UINT32, insert_before, &load_inst);
@@ -1978,29 +1753,39 @@ _VSC_UF_AUBO_TransformLdarrInstruction(
     VIR_Operand_SetEnable(load_dest, VIR_Type_Conv2Enable(VIR_Shader_GetTypeFromId(shader, uniform_data_type_id)));
 
     /* set src0 of load to dubo_addr */
-    if(isSymUniformMovedToCUBO(uniform_sym))
-    {
-        VIR_SymId cubo_addr_symid = VSC_UF_AUBO_GetCUBOAddr(aubo, shader_kind_id);
-        VIR_Symbol* cubo_addr_sym = VIR_Shader_GetSymFromId(shader, cubo_addr_symid);
-        VIR_Operand_SetUniform(load_src0, VIR_Symbol_GetUniform(cubo_addr_sym), shader);
-    }
-    else
-    {
-        VIR_SymId dubo_addr_symid;
-        VIR_Symbol* dubo_addr_sym;
-
-        gcmASSERT(isSymUniformMovedToDUBO(uniform_sym));
-
-        dubo_addr_symid = VSC_UF_AUBO_GetDUBOAddr(aubo, shader_kind_id);
-        dubo_addr_sym = VIR_Shader_GetSymFromId(shader, dubo_addr_symid);
-
-        VIR_Operand_SetUniform(load_src0, VIR_Symbol_GetUniform(dubo_addr_sym), shader);
-    }
+    VIR_Operand_SetTempRegister(load_src0, func, mad_symid, VIR_TYPE_UINT32);
     VIR_Operand_SetSwizzle(load_src0, VIR_SWIZZLE_X);
 
     /* set src1 of load to mad_symid */
-    VIR_Operand_SetTempRegister(load_src1, func, mad_symid, VIR_TYPE_UINT32);
-    VIR_Operand_SetSwizzle(load_src1, VIR_SWIZZLE_X);
+    if(VIR_Operand_GetIsConstIndexing(src))
+    {
+        gctUINT stride;
+
+        if(VIR_Type_isMatrix(base_type))
+        {
+            VIR_TypeId row_typeid = VIR_GetTypeRowType(VIR_Type_GetIndex(base_type));
+            VIR_Type* row_type = VIR_Shader_GetTypeFromId(shader, row_typeid);
+            stride = VIR_Shader_GetTypeByteSize(shader, row_type);
+        }
+        else
+        {
+            stride = _VSC_UF_AUBO_GetArrayStride(VIR_Symbol_GetType(uniform_sym));
+        }
+        const_offset = stride * VIR_Operand_GetMatrixConstIndex(src);
+    }
+    VIR_Operand_SetImmediateUint(load_src1, VIR_Uniform_GetOffset(uniform) + const_offset);
+
+    /* update for dual16 */
+    if(VIR_Shader_isDual16Mode(shader))
+    {
+        gctBOOL needRunSingleT = gcvFALSE;
+        gctBOOL dual16NotSupported = gcvFALSE;
+        VIR_Inst_Check4Dual16(load_inst, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+        if (needRunSingleT)
+        {
+            VIR_Inst_SetThreadMode(load_inst, VIR_THREAD_D16_DUAL_32);
+        }
+    }
 
     if(VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR)
     {
@@ -2169,6 +1954,17 @@ _VSC_UF_AUBO_TransformNormalInstruction(
             gcmASSERT(0);
         }
     }
+    /* update for dual16 */
+    if(VIR_Shader_isDual16Mode(shader))
+    {
+        gctBOOL needRunSingleT = gcvFALSE;
+        gctBOOL dual16NotSupported = gcvFALSE;
+        VIR_Inst_Check4Dual16(new_inst, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+        if (needRunSingleT)
+        {
+            VIR_Inst_SetThreadMode(new_inst, VIR_THREAD_D16_DUAL_32);
+        }
+    }
 
     /* The type of src may be different with the type of uniform data. Add
        conv instruction here if needed*/
@@ -2203,6 +1999,17 @@ _VSC_UF_AUBO_TransformNormalInstruction(
 
         VIR_Operand_SetTempRegister(new_src0, func, load_symid, src_data_type_id);
         VIR_Operand_SetSwizzle(new_src0, VIR_Enable_2_Swizzle(new_enable));
+        /* update for dual16 */
+        if(VIR_Shader_isDual16Mode(shader))
+        {
+            gctBOOL needRunSingleT = gcvFALSE;
+            gctBOOL dual16NotSupported = gcvFALSE;
+            VIR_Inst_Check4Dual16(conv_inst, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+            if (needRunSingleT)
+            {
+                VIR_Inst_SetThreadMode(conv_inst, VIR_THREAD_D16_DUAL_32);
+            }
+        }
     }
 
     VIR_Operand_SetTempRegister(src, func, replacing_symid, src_type_id);
@@ -2425,8 +2232,9 @@ VSC_ErrCode VSC_UF_UtilizeAuxUBO(
     /* calculate the size of default uniform block */
     _VSC_UF_AUBO_CalculateDUBRegCount(&aubo);
 
-    /* put indirectly accessed uniforms into workset if needed */
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetHeuristics(options), VSC_OPTN_UF_AUBO_Options_HEUR_INDIRECT_MUST))
+    /* HW may not support dynamic uniform indexing, so put indirectly accessed uniforms into workset if needed */
+    if(all_shaders->hwCfg->hwFeatureFlags.noUniformA0 ||
+       VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetHeuristics(options), VSC_OPTN_UF_AUBO_Options_HEUR_INDIRECT_MUST))
     {
         _VSC_UF_AUBO_CollectIndirectlyAccessedUniforms(&aubo);
     }
@@ -2450,15 +2258,6 @@ VSC_ErrCode VSC_UF_UtilizeAuxUBO(
         _VSC_UF_AUBO_FillAuxiliaryUBOs(&aubo);
         /* transform corresponding MOV into LOAD */
         _VSC_UF_AUBO_TransformInstructions(&aubo);
-
-        for(i = 0; i < VSC_MAX_LINKABLE_SHADER_STAGE_COUNT; i++)
-        {
-            if(VSC_UF_AUBO_GetDUBOItemCount(&aubo, i) || VSC_UF_AUBO_GetCUBOItemCount(&aubo, i))
-            {
-                VIR_Shader* shader = VSC_AllShaders_GetShader(all_shaders, i);
-                VIR_Shader_SetDual16Mode(shader, gcvFALSE);
-            }
-        }
     }
 
     _VSC_UF_AUBO_Finalize(&aubo);

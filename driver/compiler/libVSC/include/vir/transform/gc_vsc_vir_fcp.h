@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -20,10 +20,15 @@ BEGIN_EXTERN_C()
 
 #define VIR_FCP_INVALID_REG          0x3FF
 
-VSC_ErrCode VIR_FCP_PerformOnShader(
+VSC_ErrCode vscVIR_PreCleanup(
     VIR_Shader          *pShader,
     VIR_DEF_USAGE_INFO  *pDuInfo,
-    VSC_OPTN_FCPOptions *pOptions,
+    VIR_Dumper          *pDumper);
+
+
+VSC_ErrCode vscVIR_PostCleanup(
+    VIR_Shader          *pShader,
+    VIR_DEF_USAGE_INFO  *pDuInfo,
     VIR_Dumper          *pDumper);
 
 END_EXTERN_C()

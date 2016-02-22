@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -16,7 +16,7 @@
 
 #define VSC_MAX_ERR_WARNING_MSG_SIZE    512
 
-#define PrintMsg        printf
+#define PrintMsg        gcoOS_Print
 
 void vscERR_ReportError(
     const char* file,
@@ -96,6 +96,8 @@ gceSTATUS vscERR_CastErrCode2GcStatus(VSC_ErrCode errCode)
         return gcvSTATUS_OUT_OF_MEMORY;
     case VSC_ERR_OUT_OF_RESOURCE:
         return gcvSTATUS_OUT_OF_RESOURCES;
+    case VSC_ERR_OUT_OF_SAMPLER:
+        return gcvSTATUS_OUT_OF_SAMPLER;
     case VSC_ERR_VERSION_MISMATCH:
         return gcvSTATUS_VERSION_MISMATCH;
 
@@ -122,9 +124,10 @@ gceSTATUS vscERR_CastErrCode2GcStatus(VSC_ErrCode errCode)
         return gcvSTATUS_TOO_MANY_UNIFORMS;
     case VSC_ERR_UNIFORM_TYPE_MISMATCH:
         return gcvSTATUS_UNIFORM_TYPE_MISMATCH;
-    case VSC_ERR_UNIFORM_LOC_OVERLAP:
-    case VSC_ERR_UNIFORM_LOC_MISMATCH:
+    case VSC_ERR_LOCATION_MISMATCH:
         return gcvSTATUS_INVALID_ARGUMENT;
+    case VSC_ERR_LOCATION_ALIASED:
+        return gcvSTATUS_LOCATION_ALIASED;
 
     default:
         return (gceSTATUS)(-errCode);

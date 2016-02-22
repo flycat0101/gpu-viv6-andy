@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -257,6 +257,225 @@ static gceSTATUS _ImageDestructor(
     return status;
 }
 
+#if gcdVG_ONLY
+/*******************************************************************************
+**
+** _CreateIndexedImage: Index Color states.
+**
+** Create an image object with indexed format (1, 2, 4, 8).
+**
+** INPUT:
+**
+**    Context
+**       Pointer to the context.
+**
+**    DataFormat
+**       Format of the image.
+**
+**    Width, Height
+**       The size of the image.
+**
+**    AllowedQuality
+**       Allowed quality of the image.
+**
+** OUTPUT:
+**
+**    Image
+**       Pointer to the initialized image.
+*/
+static gceSTATUS _CreateIndexedImage(
+    IN vgsCONTEXT_PTR Context,
+    IN VGImageFormat DataFormat,
+    IN gctINT Width,
+    IN gctINT Height,
+    IN VGImageQuality AllowedQuality,
+    IN vgsIMAGE_PTR * Image
+    )
+{
+    gceSTATUS status;
+    gcoSURF surface;
+    gctUINT8_PTR buffer;
+    vgsIMAGE_PTR image;
+    gctBOOL imageAllocated;
+    vgmENTERSUBAPI(_CreateIndexedImage);
+
+    do
+    {
+        gceSURF_COLOR_TYPE colorType;
+        gceSURF_FORMAT  surfFormat;
+        gctINT stride;
+
+        /* Reset surface pointers. */
+        surface = gcvNULL;
+        buffer  = gcvNULL;
+
+        /* Assume image as locally allocated. */
+        imageAllocated = gcvTRUE;
+
+        /* Get the pointer to the image object. */
+        image = * Image;
+
+        /* Not yet allocated? */
+        if (image == gcvNULL)
+        {
+            /* Allocate an image object. */
+            status = vgfReferenceImage(Context, &image);
+
+            if (gcmIS_ERROR(status))
+            {
+                vgmERROR(VG_OUT_OF_MEMORY_ERROR);
+                break;
+            }
+
+            /* Set the image pointer. */
+            * Image = image;
+        }
+        else
+        {
+            /* Initialize the object. */
+            image->object.type           = vgvOBJECTTYPE_IMAGE;
+            image->object.prev           = gcvNULL;
+            image->object.next           = gcvNULL;
+            image->object.referenceCount = 1;
+            image->object.userValid      = VG_FALSE;
+
+            /* Mark image as allocated somewhere else. */
+            imageAllocated = gcvFALSE;
+        }
+
+        /* Get the format information. */
+        switch (DataFormat)
+        {
+        case VG_EXT_INDEX1:
+            surfFormat = gcvSURF_INDEX1;
+            break;
+
+        case VG_EXT_INDEX2:
+            surfFormat = gcvSURF_INDEX2;
+            break;
+
+        case VG_EXT_INDEX4:
+            surfFormat = gcvSURF_INDEX4;
+            break;
+
+        case VG_EXT_INDEX8:
+            surfFormat = gcvSURF_INDEX8;
+            break;
+
+        default:
+            vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
+
+        /* Allocate the surface. */
+        status = gcoSURF_Construct(
+            Context->hal,
+            Width, Height, 1,
+            gcvSURF_BITMAP,
+            surfFormat,
+            gcvPOOL_DEFAULT,
+            &surface
+            );
+
+        if (gcmIS_ERROR(status))
+        {
+            vgmERROR(VG_OUT_OF_MEMORY_ERROR);
+            break;
+        }
+
+        /* Get the logical pointer to the surface. */
+        status = gcoSURF_Lock(
+            surface, gcvNULL, (gctPOINTER *) &buffer
+            );
+
+        if (gcmIS_ERROR(status))
+        {
+            vgmERROR(VG_OUT_OF_MEMORY_ERROR);
+            break;
+        }
+
+        /* Get the surface stride. */
+        status = gcoSURF_GetAlignedSize(
+            surface, gcvNULL, gcvNULL, &stride
+            );
+
+        if (gcmIS_ERROR(status))
+        {
+            vgmERROR(VG_OUT_OF_MEMORY_ERROR);
+            break;
+        }
+
+        /* Set the proper color space. */
+        colorType = gcvSURF_COLOR_UNKNOWN;
+
+        status = gcoSURF_SetColorType(surface, colorType);
+
+        if (gcmIS_ERROR(status))
+        {
+            vgmERROR(VG_OUT_OF_MEMORY_ERROR);
+            break;
+        }
+
+        /* Set image parameters. */
+        image->size.width  = Width;
+        image->size.height = Height;
+        image->origin.x    = 0;
+        image->origin.y    = 0;
+        image->stride      = stride;
+
+        image->allowedQuality = AllowedQuality;
+
+        image->format         = DataFormat;
+        image->upsample       = gcvFALSE;
+        image->wrapperFormat  = gcvNULL;
+        image->surfaceFormat  = gcvNULL;
+        image->orientation    = vgvIMAGE_ORIENTATION;
+        image->surOrientation = vgvIMAGE_ORIENTATION;
+
+        image->glyph        = 0;
+        image->pattern      = 0;
+        image->renderTarget = 0;
+
+        image->parent        = image;
+        image->childrenCount = 0;
+        image->surface       = surface;
+        image->buffer        = buffer;
+
+        image->imageAllocated   = imageAllocated;
+        image->surfaceAllocated = gcvTRUE;
+        image->surfaceLocked    = gcvTRUE;
+        image->imageDirty       = vgvIMAGE_READY;
+        image->imageDirtyPtr    = &image->imageDirty;
+        image->surfArgValid     = gcvTRUE;
+        /* Success. */
+        status = gcvSTATUS_OK;
+        goto ErrorHandler;
+    }
+    while (gcvFALSE);
+
+    /* Roll back. */
+    if (buffer != gcvNULL)
+    {
+        gcmVERIFY_OK(gcoSURF_Unlock(surface, buffer));
+    }
+
+    if (surface != gcvNULL)
+    {
+        gcmVERIFY_OK(gcoSURF_Destroy(surface));
+    }
+
+    if (imageAllocated)
+    {
+        gcmVERIFY_OK(vgfDereferenceObject(Context, (vgsOBJECT_PTR *) &image));
+    }
+
+ErrorHandler:
+    break;
+    vgmLEAVESUBAPI(_CreateIndexedImage);
+    /* Return status. */
+    return status;
+}
+#endif
 
 /******************************************************************************\
 ************************** Individual State Functions **************************
@@ -2702,7 +2921,15 @@ VG_API_CALL VGImage VG_API_ENTRY vgCreateImage(
         surfaceFormat = vgfGetFormatInfo(Context, Format);
 
         /* Validate the format. */
-        if ((surfaceFormat == gcvNULL) || !surfaceFormat->nativeFormat)
+        if (((surfaceFormat == gcvNULL) || !surfaceFormat->nativeFormat)
+#if gcdVG_ONLY
+            &&
+            (Format != VG_EXT_INDEX1) &&    /* Index Color states. */
+            (Format != VG_EXT_INDEX2) &&
+            (Format != VG_EXT_INDEX4) &&
+            (Format != VG_EXT_INDEX8)
+#endif
+           )
         {
             vgmERROR(VG_UNSUPPORTED_IMAGE_FORMAT_ERROR);
             status = gcvSTATUS_NOT_SUPPORTED;
@@ -2720,7 +2947,20 @@ VG_API_CALL VGImage VG_API_ENTRY vgCreateImage(
 
         /* Determine the size of the image in pixels and bytes. */
         pixelCount = Width * Height;
-        byteCount  = pixelCount * surfaceFormat->bitsPerPixel / 8;
+#if gcdVG_ONLY
+        if ((Format == VG_EXT_INDEX1) ||    /* Index Color states. */
+            (Format == VG_EXT_INDEX2) ||
+            (Format == VG_EXT_INDEX4) ||
+            (Format == VG_EXT_INDEX8)
+            )
+        {
+            byteCount = 1;
+        }
+        else
+#endif
+        {
+            byteCount  = pixelCount * surfaceFormat->bitsPerPixel / 8;
+        }
 
         /* Make sure we are within range. */
         if ((pixelCount > Context->maxImagePixels) ||
@@ -2744,25 +2984,44 @@ VG_API_CALL VGImage VG_API_ENTRY vgCreateImage(
         gcoOS_RecordAllocation();
 #endif
 
-        /* Create the image. */
-        gcmERR_BREAK(vgfCreateImage(
-            Context,
-            Format,
-            Width, Height,
-            AllowedQuality,
-            &image,
-            gcvNULL
-            ));
+#if gcdVG_ONLY
+        /* Index Color states. */
+        if ((Format == VG_EXT_INDEX1) ||
+            (Format == VG_EXT_INDEX2) ||
+            (Format == VG_EXT_INDEX4) ||
+            (Format == VG_EXT_INDEX8))
+        {
+            /* Go a different way for Index format since it's totally different from regular RGBA formats. */
+            gcmERR_BREAK(_CreateIndexedImage(
+                Context,
+                Format,
+                Width, Height,
+                AllowedQuality,
+                &image
+                ));
+        }
+        else
+#endif
+        {        /* Create the image. */
+            gcmERR_BREAK(vgfCreateImage(
+                Context,
+                Format,
+                Width, Height,
+                AllowedQuality,
+                &image,
+                gcvNULL
+                ));
 
-        /* Clear the image with the default value. */
-        gcmERR_BREAK(vgfFillColor(
-            Context,
-            image,
-            0, 0, Width, Height,
-            vgvFLOATCOLOR0000,
-            vgvBYTECOLOR0000,
-            gcvFALSE
-            ));
+            /* Clear the image with the default value. */
+            gcmERR_BREAK(vgfFillColor(
+                Context,
+                image,
+                0, 0, Width, Height,
+                vgvFLOATCOLOR0000,
+                vgvBYTECOLOR0000,
+                gcvFALSE
+                ));
+        }
 
 #if gcdGC355_MEM_PRINT
         Context->curMemImage += gcoOS_EndRecordAllocation();
@@ -3090,9 +3349,47 @@ VG_API_CALL void VG_API_ENTRY vgImageSubData(
             break;
         }
 
+        /* Cast the object. */
+        image = (vgsIMAGE_PTR) Image;
+
         /* Get the format information. */
         surfaceFormat = vgfGetFormatInfo(Context, DataFormat);
 
+#if gcdVG_ONLY
+        /* Index Color states: go a special path. */
+        if ((image->format == VG_EXT_INDEX1) ||
+            (image->format == VG_EXT_INDEX2) ||
+            (image->format == VG_EXT_INDEX4) ||
+            (image->format == VG_EXT_INDEX8)
+           )
+        {
+            /* Suppose bpp here is 8. */
+            gctPOINTER memory;
+            gctUINT8    *p, *pData;
+            gctINT stride, y;
+            gcoSURF surface = image->surface;
+            gcoSURF_Lock(surface, gcvNULL, &memory);
+            gcoSURF_GetAlignedSize(surface, gcvNULL, gcvNULL, &stride);
+            p = (gctUINT8*)memory;
+            pData = (gctUINT8*)Data;
+
+            if (DataStride < 0)
+                DataStride = -DataStride;
+
+            p += stride * Y + X * stride / Width;
+            for (y = 0; y < Height; y++)
+            {
+                gcoOS_MemCopy(p, pData, DataStride);
+                p += stride;
+                pData += DataStride;
+            }
+
+            gcoSURF_Unlock(surface, memory);
+            gcoSURF_CPUCacheOperation(surface, gcvCACHE_FLUSH);
+            return;
+        }
+        else
+#endif
         if ((surfaceFormat == gcvNULL) || !surfaceFormat->nativeFormat)
         {
             vgmERROR(VG_UNSUPPORTED_IMAGE_FORMAT_ERROR);
@@ -3117,9 +3414,6 @@ VG_API_CALL void VG_API_ENTRY vgImageSubData(
         gcoSURF_GetFormatInfo(Context->wrapperImage.surface, &info);
         Context->wrapperImage.surfStride = DataStride;
         Context->wrapperImage.size.height= Height;
-
-        /* Cast the object. */
-        image = (vgsIMAGE_PTR) Image;
 
         /* Cannot be the render target. */
         if (vgfIsImageRenderTarget(Context, image))
@@ -4571,3 +4865,351 @@ VG_API_CALL VGImage VG_API_ENTRY vgCreateImageConstVIV(
     return (VGImage) image;
 }
 
+#if gcdVG_ONLY
+static gceSTATUS _CreateYUVImage(
+    vgsCONTEXT_PTR  Context,
+    VGImageFormat   Format,
+    VGint           Width,
+    VGint           Height,
+    vgsIMAGE_PTR   *Image,
+    void           **Address
+    )
+{
+    gceSTATUS status;
+    gcoSURF surface;
+    gctUINT8_PTR buffer;
+    vgsIMAGE_PTR image;
+    gctBOOL imageAllocated;
+    vgmENTERSUBAPI(_CreateYUVImage);
+
+    do
+    {
+        gceSURF_COLOR_TYPE colorType;
+        gceSURF_FORMAT  surfFormat;
+        gctINT stride;
+
+        /* Reset surface pointers. */
+        surface = gcvNULL;
+        buffer  = gcvNULL;
+
+        /* Assume image as locally allocated. */
+        imageAllocated = gcvTRUE;
+
+        /* Get the pointer to the image object. */
+        image = * Image;
+
+        /* Not yet allocated? */
+        if (image == gcvNULL)
+        {
+            /* Allocate an image object. */
+            status = vgfReferenceImage(Context, &image);
+
+            if (gcmIS_ERROR(status))
+            {
+                vgmERROR(VG_OUT_OF_MEMORY_ERROR);
+                break;
+            }
+
+            /* Set the image pointer. */
+            * Image = image;
+        }
+        else
+        {
+            /* Initialize the object. */
+            image->object.type           = vgvOBJECTTYPE_IMAGE;
+            image->object.prev           = gcvNULL;
+            image->object.next           = gcvNULL;
+            image->object.referenceCount = 1;
+            image->object.userValid      = VG_FALSE;
+
+            /* Mark image as allocated somewhere else. */
+            imageAllocated = gcvFALSE;
+        }
+
+        /* Get the format information. */
+        switch (Format)
+        {
+        case VG_EXT_YUY2:
+            surfFormat = gcvSURF_YUY2;
+            break;
+
+        case VG_EXT_NV12:
+            surfFormat = gcvSURF_NV12;
+            break;
+
+        case VG_EXT_NV16:
+            surfFormat = gcvSURF_NV16;
+            break;
+
+        case VG_EXT_AYUY2:
+            surfFormat = gcvSURF_AYUY2;
+            break;
+
+        case VG_EXT_ANV16:
+            surfFormat = gcvSURF_ANV16;
+            break;
+
+        case VG_EXT_ANV12:
+            surfFormat = gcvSURF_ANV12;
+            break;
+
+        default:
+            vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
+
+        /* Allocate the surface. */
+        status = gcoSURF_Construct(
+            Context->hal,
+            Width, Height, 1,
+            gcvSURF_BITMAP,
+            surfFormat,
+            gcvPOOL_DEFAULT,
+            &surface
+            );
+
+        if (gcmIS_ERROR(status))
+        {
+            vgmERROR(VG_OUT_OF_MEMORY_ERROR);
+            break;
+        }
+
+        /* Get the logical pointer to the surface. */
+        buffer = gcvNULL;
+        status = gcoSURF_Lock(
+            surface, gcvNULL, (gctPOINTER *) Address
+            );
+
+        if (gcmIS_ERROR(status))
+        {
+            vgmERROR(VG_OUT_OF_MEMORY_ERROR);
+            break;
+        }
+
+        /* Get the surface stride. */
+        status = gcoSURF_GetAlignedSize(
+            surface, gcvNULL, gcvNULL, &stride
+            );
+
+        if (gcmIS_ERROR(status))
+        {
+            vgmERROR(VG_OUT_OF_MEMORY_ERROR);
+            break;
+        }
+
+        /* Set the proper color space. */
+        colorType = gcvSURF_COLOR_UNKNOWN;
+
+        status = gcoSURF_SetColorType(surface, colorType);
+
+        if (gcmIS_ERROR(status))
+        {
+            vgmERROR(VG_OUT_OF_MEMORY_ERROR);
+            break;
+        }
+
+        /* Set image parameters. */
+        image->size.width  = Width;
+        image->size.height = Height;
+        image->origin.x    = 0;
+        image->origin.y    = 0;
+        image->stride      = stride;
+
+        image->allowedQuality = VG_IMAGE_QUALITY_NONANTIALIASED;
+
+        image->format         = Format;
+        image->upsample       = gcvFALSE;
+        image->wrapperFormat  = gcvNULL;
+        image->surfaceFormat  = gcvNULL;
+        image->orientation    = vgvIMAGE_ORIENTATION;
+        image->surOrientation = vgvIMAGE_ORIENTATION;
+
+        image->glyph        = 0;
+        image->pattern      = 0;
+        image->renderTarget = 0;
+
+        image->parent        = image;
+        image->childrenCount = 0;
+        image->surface       = surface;
+        image->buffer        = buffer;
+
+        image->imageAllocated   = imageAllocated;
+        image->surfaceAllocated = gcvTRUE;
+        image->surfaceLocked    = gcvTRUE;
+        image->imageDirty       = vgvIMAGE_READY;
+        image->imageDirtyPtr    = &image->imageDirty;
+        image->surfArgValid     = gcvTRUE;
+        /* Success. */
+        status = gcvSTATUS_OK;
+        goto ErrorHandler;
+    }
+    while (gcvFALSE);
+
+    /* Roll back. */
+    if (surface != gcvNULL)
+    {
+        gcmVERIFY_OK(gcoSURF_Destroy(surface));
+    }
+
+    if (imageAllocated)
+    {
+        gcmVERIFY_OK(vgfDereferenceObject(Context, (vgsOBJECT_PTR *) &image));
+    }
+
+ErrorHandler:
+    break;
+    vgmLEAVESUBAPI(_CreateYUVImage);
+    /* Return status. */
+    return status;
+}
+
+VG_API_CALL VGImage VG_API_ENTRY vgCreateImageDirectVIV(
+    VGImageFormat Format,
+    VGint Width, VGint Height,
+    VGint *Count, void **Address)
+{
+    vgmENTERAPI(vgCreateImageDirectVIV)
+    {
+        vgsIMAGE_PTR    image = gcvNULL;
+        gceSTATUS       status = gcvSTATUS_OK;
+        gctINT          pixelCount, byteCount;
+
+        if ((Format != VG_EXT_YUY2) &&
+            (Format != VG_EXT_NV12) &&
+            (Format != VG_EXT_NV16) &&
+            (Format != VG_EXT_AYUY2) &&
+            (Format != VG_EXT_ANV12) &&
+            (Format != VG_EXT_ANV16)
+            )
+        {
+            vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+            return VG_INVALID_HANDLE;
+        }
+
+        if ((Width <= 0) || (Height <= 0))
+        {
+            vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+            return VG_INVALID_HANDLE;
+        }
+
+        pixelCount = Width * Height;
+        switch (Format)
+        {
+        case VG_EXT_YUY2:
+        case VG_EXT_NV16:
+            byteCount = 16;
+            break;
+
+        case VG_EXT_NV12:
+            byteCount = 12;
+            break;
+
+        case VG_EXT_AYUY2:
+        case VG_EXT_ANV16:
+            byteCount = 24;
+            break;
+
+        case VG_EXT_ANV12:
+            byteCount = 20;
+            break;
+
+        default:
+            byteCount = 0;
+            break;
+        }
+
+        byteCount = pixelCount * byteCount / 8;
+        if ((pixelCount > Context->maxImagePixels) ||
+            (byteCount > Context->maxImageBytes))
+        {
+            vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+            break;
+        }
+
+        /* Create the vg image object. */
+        gcmERR_BREAK(_CreateYUVImage(
+            Context,
+            Format,
+            Width, Height,
+            &image,
+            Address
+            ));
+
+        if (Count != gcvNULL)
+        {
+            switch (Format)
+            {
+            case VG_EXT_YUY2:
+                *Count = 1;
+                break;
+            case VG_EXT_NV12:
+            case VG_EXT_NV16:
+            case VG_EXT_AYUY2:
+                *Count = 2;
+                break;
+
+            case VG_EXT_ANV12:
+            case VG_EXT_ANV16:
+            default:
+                *Count = 3;
+                break;
+            }
+        }
+        return (VGImage)image;
+    }
+    vgmLEAVEAPI(vgCreateImageDirectVIV);
+
+
+    return VG_INVALID_HANDLE;
+}
+
+/* After App copies yuv data to the surface memory,
+   this API needs to be called to flush the content for GPU to access.
+ */
+VG_API_CALL void VG_API_ENTRY vgInvalidateImageDirectVIV(VGImage Image)
+{
+    vgmENTERAPI(vgInvalidateImageDirectVIV)
+    {
+        vgsIMAGE_PTR image;
+
+        image = (vgsIMAGE_PTR)Image;
+        gcoSURF_CPUCacheOperation(image->surface, gcvCACHE_FLUSH);
+    }
+    vgmLEAVEAPI(vgInvalidateImageDirectVIV);
+}
+
+VG_API_CALL void VG_API_ENTRY vgResolveImageVIV(
+    VGImage Src,
+    VGImage Dst,
+    VGint Src_x, VGint Src_y,
+    VGint Width, VGint Height,
+    VGint Dst_x, VGint Dst_y,
+    VGint Src_uv, VGint Src_standard,
+    VGint Dst_uv, VGint Dst_standard, VGint Dst_alpha)
+{
+    vgmENTERAPI(vgResolveImageVIV)
+    {
+        vgsIMAGE_PTR image_src, image_dst;
+        gceSTATUS status = gcvSTATUS_OK;
+
+        image_src = (vgsIMAGE_PTR) Src;
+        image_dst = (vgsIMAGE_PTR) Dst;
+        gcmERR_BREAK(gcoVG_Resolve(
+            Context->vg,
+            image_src->surface,
+            image_dst->surface,
+            Src_x, Src_y,
+            Dst_x, Dst_y,
+            Width, Height,
+            Src_uv, Src_standard,
+            Dst_uv, Dst_standard, Dst_alpha
+            ));
+
+        *image_src->imageDirtyPtr  = vgvIMAGE_NOT_FINISHED;
+        *image_dst->imageDirtyPtr  = vgvIMAGE_NOT_READY;
+        Context->imageDirty = vgvIMAGE_NOT_READY;
+        vgfFlushImage(Context, image_dst, gcvTRUE);
+    }
+    vgmLEAVEAPI(vgResolveImageVIV);
+}
+#endif

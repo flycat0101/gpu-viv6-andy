@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -251,6 +251,9 @@ struct hwcLayer
     /* Original source rectangle before transformation. */
     gcsRECT                          orgRect;
 
+    /* Source rectangle after rotation only. */
+    gcsRECT                          rotateRect;
+
     /***************************************************************************
     ** Color source from solid color.
     */
@@ -498,6 +501,7 @@ struct hwcContext
 #define DUMP_LAYERS                 0x02
 #define DUMP_OPERATIONS             0x04
 #define DUMP_AVERAGE_FPS            0x08
+#define DUMP_DAMAGE_LAYERS          0x10
 
     gctUINT32                       dumpCompose;
     /*
@@ -643,6 +647,9 @@ struct hwcDisplay
 
     gctUINT32                        identityCount;
     hwcLayerIdentity                 identities[32];
+
+    /* Geometry status of layers. */
+    gctBOOL                          geometryChanged;
 
     /* Splited composition area queue. */
     hwcArea *                        compositionArea;

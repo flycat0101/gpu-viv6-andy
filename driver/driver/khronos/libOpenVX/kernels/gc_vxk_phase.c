@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,32 +13,69 @@
 
 #include <gc_vxk_common.h>
 
-vx_status vxPhase(vx_image grad_x, vx_image grad_y, vx_image output)
+vx_status vxPhase(vx_node node, vx_image grad_x, vx_image grad_y, vx_image output)
 {
     vx_status status = VX_SUCCESS;
     vx_uint32 width = 0, height = 0;
-    gcoVX_Kernel_Context context = {{0}};
+    gcoVX_Kernel_Context * kernelContext = gcvNULL;
+
+#if gcdVX_OPTIMIZER
+    if (node && node->kernelContext)
+    {
+        kernelContext = (gcoVX_Kernel_Context *) node->kernelContext;
+    }
+    else
+#endif
+    {
+        if (node->kernelContext == VX_NULL)
+        {
+            /* Allocate a local copy for old flow. */
+            node->kernelContext = (gcoVX_Kernel_Context *) vxAllocate(sizeof(gcoVX_Kernel_Context));
+        }
+        kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
+        kernelContext->objects_num = 0;
+    }
 
     vxQueryImage(grad_x, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
     vxQueryImage(grad_x, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
 
     /*index = 0*/
-    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, grad_x, GC_VX_INDEX_AUTO);
+    gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, grad_x, GC_VX_INDEX_AUTO);
 
     /*index = 1*/
-    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, grad_y, GC_VX_INDEX_AUTO);
+    gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, grad_y, GC_VX_INDEX_AUTO);
 
     /*index = 2*/
-    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+    gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
 
-    context.params.kernel = gcvVX_KERNEL_PHASE;
-    context.params.xstep = 8;
+    if (node->base.context->evisNoInst.noMagPhase)
+    {
+        vx_uint8 bin[16] = {0, 32, 64, 96, 0, 0, 0, 0, 8, 8, 8, 8, 0, 0, 0, 0};
 
-    context.params.xmax = width;
-    context.params.ymax = height;
+        gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));
+	    kernelContext->uniforms[0].index = 3;
+        kernelContext->uniforms[0].num = sizeof(bin) / sizeof(vx_uint8);
+        kernelContext->uniform_num = 1;
 
-    status = gcfVX_Kernel(&context);
+        kernelContext->params.evisNoInst = node->base.context->evisNoInst;
+    }
+
+    kernelContext->params.kernel = gcvVX_KERNEL_PHASE;
+    kernelContext->params.xstep = 8;
+
+    kernelContext->params.xmax = width;
+    kernelContext->params.ymax = height;
+
+    kernelContext->params.evisNoInst = node->base.context->evisNoInst;
+
+    status = gcfVX_Kernel(kernelContext);
+
+#if gcdVX_OPTIMIZER
+    if (!node || !node->kernelContext)
+    {
+        vxFree(kernelContext);
+    }
+#endif
 
     return status;
 }
-

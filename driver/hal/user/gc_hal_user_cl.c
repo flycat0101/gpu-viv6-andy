@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -132,7 +132,7 @@ gcoCL_Construct(
     gcmONERROR(gcoHAL_SetHardwareType(clObj->hal, gcvHARDWARE_3D));
 
     /* Construct hardware object for this engine */
-    gcmONERROR(gcoHARDWARE_Construct(clObj->hal, gcvFALSE, &clObj->hardware));
+    gcmONERROR(gcoHARDWARE_Construct(clObj->hal, gcvFALSE,  gcvFALSE, &clObj->hardware));
 
     /* Switch to the 3D pipe. */
     gcmONERROR(gcoHARDWARE_SelectPipe(clObj->hardware, gcvPIPE_3D, gcvNULL));
@@ -342,6 +342,7 @@ gcoCL_AllocateMemory(
     gceSTATUS status;
     gctUINT bytes;
     gcsSURF_NODE_PTR node = gcvNULL;
+    gctUINT alignBytes = 64;
 
     gcmHEADER_ARG("*Bytes=%lu", *Bytes);
 
@@ -366,11 +367,13 @@ gcoCL_AllocateMemory(
                               &pointer));
 
     node = pointer;
+    /* for CL FP long16/ulong16 need 128 bytes alignment */
+    alignBytes = ((*Bytes)%128) == 0? 128: 64;
 
     gcmONERROR(gcsSURF_NODE_Construct(
         node,
         bytes,
-        64,
+        alignBytes,
         gcvSURF_INDEX,
         gcvALLOC_FLAG_NONE,
         gcvPOOL_DEFAULT
@@ -793,20 +796,20 @@ gcoCL_FlushSurface(
 
     /*gcmSWITCHHARDWARE();*/
 
-    if (Surface /*&& Surface->info.node.pool == gcvPOOL_VIRTUAL*/)
+    if (Surface /*&& Surface->node.pool == gcvPOOL_VIRTUAL*/)
     {
-        if (Surface->info.node.pool == gcvPOOL_USER)
+        if (Surface->node.pool == gcvPOOL_USER)
         {
             status = gcoOS_CacheFlush(gcvNULL,
                                            0,
-                                           Surface->info.node.logical,
-                                           Surface->info.size);
+                                           Surface->node.logical,
+                                           Surface->size);
         }
         else
         {
-            status = gcoSURF_NODE_Cache(&Surface->info.node,
+            status = gcoSURF_NODE_Cache(&Surface->node,
                                         srcMemory[0],
-                                        Surface->info.size,
+                                        Surface->size,
                                         gcvCACHE_FLUSH);
         }
     }
@@ -981,7 +984,7 @@ gcoCL_CreateTexture(
                                      (gctPOINTER) Memory,
                                      gcvINVALID_ADDRESS));
 
-                 gcmERR_BREAK(gcoSURF_SetImage(surface,
+                gcmERR_BREAK(gcoSURF_SetImage(surface,
                                      0,
                                      0,
                                      Width,
@@ -1022,8 +1025,8 @@ gcoCL_CreateTexture(
                                      gcvPOOL_DEFAULT,
                                      &surface));
 
-        gcmASSERT(surface->info.tiling == gcvLINEAR);
-        gcmASSERT(surface->info.node.logical);
+        gcmASSERT(surface->tiling == gcvLINEAR);
+        gcmASSERT(surface->node.logical);
 
         if (Memory)
         {
@@ -1033,8 +1036,8 @@ gcoCL_CreateTexture(
             gctUINT8_PTR dstSliceBegin;
             gctUINT8_PTR dstLineBegin;
             srcSliceBegin = (gctUINT8_PTR)Memory;
-            dstSliceBegin = surface->info.node.logical;
-            lineBytes     = surface->info.bitsPerPixel / 8 * Width;
+            dstSliceBegin = surface->node.logical;
+            lineBytes     = surface->bitsPerPixel / 8 * Width;
             for (i = 0; i< Depth; ++i)
             {
                 srcLineBegin = srcSliceBegin;
@@ -1046,16 +1049,16 @@ gcoCL_CreateTexture(
                         srcLineBegin,
                         lineBytes);  /*Only copy what needed.*/
                     srcLineBegin += Stride;
-                    dstLineBegin += surface->info.stride;
+                    dstLineBegin += surface->stride;
                 }
                 srcSliceBegin += Slice;
-                dstSliceBegin += surface->info.sliceSize;
+                dstSliceBegin += surface->sliceSize;
             }
 
             gcoCL_FlushMemory(
-                &surface->info.node,
-                surface->info.node.logical,
-                surface->info.stride * Height * Depth);
+                &surface->node,
+                surface->node.logical,
+                surface->stride * Height * Depth);
         }
     }
 
@@ -1066,14 +1069,14 @@ gcoCL_CreateTexture(
     gcmONERROR(gcoTEXTURE_AddMipMapFromClient(texture, 0, surface));
 
     /* Return physical address. */
-    gcmGETHARDWAREADDRESS(surface->info.node, *Physical);
+    gcmGETHARDWAREADDRESS(surface->node, *Physical);
 
     /* Return logical address. */
-    *Logical = surface->info.node.logical;
+    *Logical = surface->node.logical;
 
     /* Return surface stride. */
-    *SurfStride = surface->info.stride;
-    *SurfSliceSize = surface->info.sliceSize;
+    *SurfStride = surface->stride;
+    *SurfSliceSize = surface->sliceSize;
 
     *Texture = texture;
     *Surface = surface;
@@ -1248,6 +1251,11 @@ gcoCL_QueryDeviceInfo(
     gctSIZE_T contiguousSize;
     gctPHYS_ADDR contiguousAddress;
     gctSIZE_T physicalSystemMemSize;
+#if BUILD_OPENCL_FP
+    gceCHIPMODEL  chipModel;
+    gctUINT32 chipRevision;
+    gctBOOL chipEnableFP = gcvFALSE;
+#endif
 
     gcmHEADER();
 
@@ -1366,7 +1374,6 @@ gcoCL_QueryDeviceInfo(
                                      gcvNULL,
                                      gcvNULL,
                                      &DeviceInfo->maxReadImageArgs,
-                                     gcvNULL,
                                      gcvNULL));
 
     DeviceInfo->image2DMaxWidth       = DeviceInfo->image3DMaxWidth;
@@ -1435,7 +1442,10 @@ gcoCL_QueryDeviceInfo(
     }
 
 #if BUILD_OPENCL_FP
-    if(gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) && gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE))
+    gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
+    chipEnableFP = ((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008));
+    if(gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) && gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE)
+        && (chipEnableFP == gcvTRUE))
     {
         DeviceInfo->singleFpConfig |= 0x2; /* CL_FP_INF_NAN */
         DeviceInfo->localMemSize    = 32*1024;
@@ -1443,6 +1453,7 @@ gcoCL_QueryDeviceInfo(
         DeviceInfo->maxReadImageArgs      = 128;
         DeviceInfo->maxParameterSize      = 1024;
         DeviceInfo->maxConstantBufferSize = 64*1024;
+        DeviceInfo->vectorWidthLong       = 4;
     }
 #endif
 
@@ -1461,6 +1472,10 @@ gcoCL_QueryDeviceInfo(
     DeviceInfo->execCapability        = 0x1     /* CL_EXEC_KERNEL */;
 
     DeviceInfo->atomicSupport         = gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC);
+
+    /* VIP core: without graphich core, only compute core */
+    DeviceInfo->computeOnlyGpu        = gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_COMPUTE_ONLY);
+
 
     status = gcvSTATUS_OK;
 
@@ -1913,6 +1928,10 @@ gcoCL_InvokeKernel(
         info.workGroupSizeZ  = LocalWorkSize[2] ? (gctUINT32)LocalWorkSize[2] : 1;
         info.workGroupCountZ = info.globalSizeZ / info.workGroupSizeZ;
     }
+
+    info.globalScaleX     = 1;
+    info.globalScaleY     = 1;
+    info.globalScaleZ     = 1;
 
     /* TODO - Handle GLW order and in-use. */
     info.traverseOrder    = 0;  /* XYZ */

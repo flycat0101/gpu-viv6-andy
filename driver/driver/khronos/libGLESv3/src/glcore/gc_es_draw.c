@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -356,7 +356,7 @@ __GL_INLINE GLvoid __glEvaluateTextureAttrib(__GLcontext* gc, __GLattribute* cs,
             {
                 realEnableDim = enableDim;
                 gc->texture.units[i].currentTexture = texObj;
-                __glBitmaskOR(&gc->texture.currentEnableMask, i);
+                __glBitmaskSet(&gc->texture.currentEnableMask, i);
             }
             else
             {
@@ -483,7 +483,7 @@ __GL_INLINE GLvoid __glEvaluateTextureAttrib(__GLcontext* gc, __GLattribute* cs,
             /* Mark states of the samplers bound to this unit dirty */
             for (index = 0; index < texUnit2Sampler->numSamplers; ++index)
             {
-                __glBitmaskOR(&gc->shaderProgram.samplerStateDirty, texUnit2Sampler->samplers[index]);
+                __glBitmaskSet(&gc->shaderProgram.samplerStateDirty, texUnit2Sampler->samplers[index]);
             }
         }
     }
@@ -634,7 +634,7 @@ __GL_INLINE GLvoid __glEvaluateProgramAttrib(__GLcontext* gc, __GLattribute* cs,
             if (oldSampler2TexUnit[sampler] != newSampler2TexUnit[sampler])
             {
                 /* Program switch depend on the comparison to set samplerMapDirty */
-                __glBitmaskOR(&gc->shaderProgram.samplerMapDirty, sampler);
+                __glBitmaskSet(&gc->shaderProgram.samplerMapDirty, sampler);
                 oldSampler2TexUnit[sampler] = newSampler2TexUnit[sampler];
             }
             else
@@ -911,9 +911,9 @@ static GLboolean __glCheckVBOSize(__GLcontext *gc)
             GLuint instanceCount = vertexArray->instanceCount;
             __GLvertexArrayState *curVertexArray = &gc->vertexArray.boundVAO->vertexArray;
             GLuint attribEnabled = curVertexArray->attribEnabled;
-            __GLprogramObject *vsProgObj = __glGetCurrentStageProgram(gc,__GLSL_STAGE_VS);
+            __GLprogramObject *vsProgObj = __glGetCurrentStageProgram(gc, __GLSL_STAGE_VS);
             GLuint vsInputArrayMask = 0;
-            if(vsProgObj)
+            if (vsProgObj)
             {
                 vsInputArrayMask = vsProgObj->bindingInfo.vsInputArrayMask;
             }

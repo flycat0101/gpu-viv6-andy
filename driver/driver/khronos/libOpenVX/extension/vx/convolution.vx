@@ -1,0 +1,35 @@
+#include "cl_viv_vx_ext.h"
+
+_viv_uniform VXC_512Bits u512_0;
+_viv_uniform VXC_512Bits u512_1;
+
+vxc_uchar16 viv_intrinsic_vx_icastD_uc_2(int4 a)  { return 0; }
+vxc_uchar16 viv_intrinsic_vx_icastP_uc_2(int4 a)  { return 0; }
+int4 viv_intrinsic_vxmc_DP8x2_2(vxc_uchar16 a,  vxc_uchar16 b, VXC_Modifier_t modifier, VXC_512Bits u)  { return 0; }
+
+__kernel void custom_convolution
+(
+    __read_only image2d_t  	in_image,
+    vx_convolution   		in_conv,
+    __write_only image2d_t 	out_image
+)
+{
+    const int pX = get_global_id(0);
+    const int pY = get_global_id(1);
+	const int pXPrec = pX - 1;
+	int info = VXC_MODIFIER(2, 3, 0, VXC_RM_TowardZero, 0);
+    vxc_uchar16 v0 = viv_intrinsic_vx_read_imageuc(in_image,  (int2)(pXPrec, -1));
+    vxc_uchar16 v1 = viv_intrinsic_vx_read_imageuc(in_image,  (int2)(pXPrec, pY));
+    vxc_uchar16 v2 = viv_intrinsic_vx_read_imageuc(in_image,  (int2)(pXPrec, pY + 1));
+	int4 t, t1;
+	vxc_uchar16 vt;
+
+	t = viv_intrinsic_vxmc_DP8x2_2(v0, v1, info, u512_0);
+
+	info = VXC_MODIFIER(0, 1, 0, VXC_RM_TowardZero, 0);
+    vt = viv_intrinsic_vx_icastP_uc_2(t);
+	t1 = viv_intrinsic_vxmc_DP8x2_2(v2, vt, info, u512_1);
+    v2 = viv_intrinsic_vx_icastD_uc_2(t1);
+
+    viv_intrinsic_vxmc_write_imageuc(out_image, (int2)(pX, pY), v2, info);
+}

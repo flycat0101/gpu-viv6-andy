@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -725,6 +725,14 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     gctINT i;
     gctINT argc = runtime->argc;
     gctSTRING *argv = runtime->argv;
+
+    if (!gcoHAL_IsFeatureAvailable(runtime->hal, gcvFEATURE_SCALER) &&
+        !gcoHAL_IsFeatureAvailable(runtime->hal, gcvFEATURE_2D_ONE_PASS_FILTER))
+    {
+        GalOutput(GalOutputType_Result | GalOutputType_Console, "Filterblit is not supported.\n");
+        runtime->notSupport = gcvTRUE;
+        return gcvFALSE;
+    }
 
     memset(t2d, 0, sizeof(Test2D));
 

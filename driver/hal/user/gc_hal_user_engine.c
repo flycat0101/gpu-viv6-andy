@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -75,6 +75,9 @@ OnError:
 **      gcoHAL Hal
 **          Pointer to an gcoHAL object.
 **
+**      gctBOOL Robust
+**          Engine is robust or not.
+**
 **  OUTPUT:
 **
 **      gco3D * Engine
@@ -83,6 +86,7 @@ OnError:
 gceSTATUS
 gco3D_Construct(
     IN gcoHAL Hal,
+    IN gctBOOL Robust,
     OUT gco3D * Engine
     )
 {
@@ -123,7 +127,7 @@ gco3D_Construct(
     gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
 
     /* Construct hardware object for this engine */
-    gcmONERROR(gcoHARDWARE_Construct(Hal, gcvFALSE, &engine->hardware));
+    gcmONERROR(gcoHARDWARE_Construct(Hal, gcvFALSE, Robust, &engine->hardware));
     gcmONERROR(gcoHARDWARE_SelectPipe(engine->hardware, gcvPIPE_3D, gcvNULL));
     gcmONERROR(gcoHARDWARE_InvalidateCache(engine->hardware));
     /* Initialize 3D hardware. */
@@ -412,7 +416,7 @@ gco3D_SetTarget(
     )
 {
     gceSTATUS status;
-	gcoSURF prevRT = gcvNULL;
+    gcoSURF prevRT = gcvNULL;
 
     gcmHEADER_ARG("Engine=0x%x TargetIndex=%d Surface=0x%x SliceIndex=%d LayerIndex=%d",
                    Engine, TargetIndex, Surface, SliceIndex, LayerIndex);
@@ -432,7 +436,7 @@ gco3D_SetTarget(
     {
         /* Verify linear render target. */
         if ((Surface != gcvNULL)
-        &&  (Surface->info.tiling == gcvLINEAR)
+        &&  (Surface->tiling == gcvLINEAR)
         &&  (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_LINEAR_RENDER_TARGET)
                 != gcvSTATUS_TRUE)
         )
@@ -443,7 +447,7 @@ gco3D_SetTarget(
         /* Verify if target is properly aligned. */
         if ((Surface != gcvNULL)
         &&  Surface->resolvable
-        &&  ( (Surface->info.alignedW & 15) || (Surface->info.alignedH & 3))
+        &&  ( (Surface->alignedW & 15) || (Surface->alignedH & 3))
         )
         {
             gcmONERROR(gcvSTATUS_NOT_ALIGNED);
@@ -465,9 +469,6 @@ gco3D_SetTarget(
                                                           gcvTILESTATUS_COLOR,
                                                           TargetIndex));
             }
-            /* Sync between GPUs */
-            gcmONERROR(gcoHARDWARE_MultiGPUSync(gcvNULL, gcvNULL));
-
             /* Unlock the current render target. */
             gcmVERIFY_OK(gcoSURF_Unlock(prevRT, Engine->mRTMemory[TargetIndex]));
 
@@ -504,7 +505,7 @@ gco3D_SetTarget(
             Engine->mRTMemory[TargetIndex] = targetMemory[0];
 
             /* Program render target. */
-            gcmONERROR(gcoHARDWARE_SetRenderTarget(Engine->hardware, TargetIndex, &Surface->info, SliceIndex, LayerIndex));
+            gcmONERROR(gcoHARDWARE_SetRenderTarget(Engine->hardware, TargetIndex, Surface, SliceIndex, LayerIndex));
 
             /* Reference the surface. */
             gcmONERROR(gcoSURF_ReferenceSurface(Surface));
@@ -527,6 +528,9 @@ gco3D_SetTarget(
                  gcmONERROR(gcoSURF_EnableTileStatus(Surface));
              }
          }
+
+         /* Sync between GPUs.*/
+         gcmONERROR(gcoHARDWARE_MultiGPUSync(gcvNULL, gcvNULL));
     }
 
     /* Success. */
@@ -639,7 +643,7 @@ gco3D_SetDepth(
         /* Verify if depth buffer is properly aligned. */
         if ((Surface != gcvNULL)
         &&  Surface->resolvable
-        &&  ((Surface->info.alignedW & 15) || (Surface->info.alignedH & 3) )
+        &&  ((Surface->alignedW & 15) || (Surface->alignedH & 3) )
         )
         {
             gcmONERROR(gcvSTATUS_NOT_ALIGNED);
@@ -689,7 +693,7 @@ gco3D_SetDepth(
             Engine->depthMemory = depthMemory[0];
 
             /* Set depth buffer. */
-            gcmONERROR(gcoHARDWARE_SetDepthBuffer(Engine->hardware, &Surface->info, SliceIndex));
+            gcmONERROR(gcoHARDWARE_SetDepthBuffer(Engine->hardware, Surface, SliceIndex));
 
             /* Enable tile status. */
             gcmONERROR(gcoSURF_EnableTileStatus(Surface));
@@ -2549,60 +2553,14 @@ gco3D_SetAllEarlyDepthModes(
 
     /* Program early depth. */
     /* Disable Early Z and Early Z modify together by default. */
-    status = gcoHARDWARE_SetAllEarlyDepthModes(Engine->hardware, Disable, Disable, gcvTRUE);
+    status = gcoHARDWARE_SetAllEarlyDepthModes(Engine->hardware, Disable);
 
     /* Return the status. */
     gcmFOOTER();
     return status;
 }
 
-/*******************************************************************************
-**
-**  gco3D_SetAllEarlyDepthModesEx.
-**
-**  Enable or disable all early depth operations.
-**
-**  INPUT:
-**
-**      gco3D Engine
-**          Pointer to an gco3D object.
-**
-**      gctBOOL Disable
-**          gcvTRUE to disable early depth operations, gcvFALSE to enable.
-**
-**      gctBOOL DisableModify
-**          gcvTRUE to disable early depth modify operations, gcvFALSE to enable.
-**          Modify operation should be disabled if pixel shader has discard()
-**          Or alpha test is enabled (es1.1).
-**          This field is considered only when EarlyZ is enabled.
-**
-**  OUTPUT:
-**
-**      Nothing.
-*/
-gceSTATUS
-gco3D_SetAllEarlyDepthModesEx(
-    IN gco3D Engine,
-    IN gctBOOL Disable,
-    IN gctBOOL DisableModify,
-    IN gctBOOL DisablePassZ
-    )
-{
-    gceSTATUS status;
 
-    gcmHEADER_ARG("Engine=0x%x Disable=%d DisableModify=%d",
-        Engine, Disable, DisableModify);
-
-    /* Verify the arguments. */
-    gcmVERIFY_OBJECT(Engine, gcvOBJ_3D);
-
-    /* Program early depth. */
-    status = gcoHARDWARE_SetAllEarlyDepthModes(Engine->hardware, Disable, DisableModify, DisablePassZ);
-
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
 
 gceSTATUS
 gco3D_SetEarlyDepthFromAPP(
@@ -3961,6 +3919,43 @@ gco3D_DrawInstancedPrimitives(
 
 /*******************************************************************************
 **
+**  gco3D_DrawNullPrimitives
+**
+**  Draw none of primitives.
+**
+**  INPUT:
+**
+**      gco3D Engine
+**          Pointer to an gco3D object.
+**
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gco3D_DrawNullPrimitives(
+    IN gco3D Engine
+    )
+{
+    gceSTATUS status;
+
+    gcmHEADER_ARG("Engine=0x%x", Engine);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Engine, gcvOBJ_3D);
+
+    /* Call the gcoHARDWARE object. */
+    status = gcoHARDWARE_DrawNullPrimitives(Engine->hardware);
+
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+
+/*******************************************************************************
+**
 **  gco3D_DrawPrimitivesCount
 **
 **  Draw an array of of primitives.
@@ -4464,12 +4459,8 @@ gco3D_SetSamples(
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_3D);
 
-    if (Samples <= 4)
+    if (Samples < 4 || Samples != 3)
     {
-        if (Samples == 2)
-        {
-            Samples = 4;
-        }
         status = gcoHARDWARE_SetSamples(Engine->hardware, g_sampleInfos[Samples]);
     }
     else
@@ -6027,6 +6018,46 @@ OnError:
      return status;
 }
 
+/*****************************************************************************
+**
+**  gco3D_QueryReset
+**
+**  Query if underneath GPU is reseted and if current context is innocent.
+**
+**  INPUT:
+**
+**
+**   gco3D Engine
+**       The gco3D object that needs to be unset.
+**
+**  OUTPUT:
+**   gctBOOL_PTR Innocent
+**       Pointer to bool value to receive innocent flag.
+**
+**   return gcvSTATUS_TRUE means GPU is reseted after last query
+**
+*/
+gceSTATUS
+gco3D_QueryReset(
+    IN gco3D Engine,
+    OUT gctBOOL_PTR Innocent
+    )
+{
+    gceSTATUS status;
+
+    gcmHEADER_ARG("Engine=0x%x Innocent=0x%x", Engine, Innocent);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Engine, gcvOBJ_3D);
+
+    gcmONERROR(gcoHARDWARE_QueryReset(Engine->hardware, Innocent));
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
 #else /* gcdNULL_DRIVER < 2 */
 
 
@@ -6036,6 +6067,7 @@ OnError:
 
 gceSTATUS gco3D_Construct(
     IN gcoHAL Hal,
+    IN gctBOOL Robust,
     OUT gco3D * Engine
     )
 {
@@ -7183,6 +7215,16 @@ gco3D_Get3DEngine(
 {
     return gcvSTATUS_OK;
 }
+
+gceSTATUS
+gco3D_QueryReset(
+    IN gco3D Engine,
+    OUT gctBOOL_PTR Innocent
+    )
+{
+    return gcvSTATUS_FALSE;
+}
+
 
 #endif /* gcdNULL_DRIVER < 2 */
 #endif /* gcdENABLE_3D */

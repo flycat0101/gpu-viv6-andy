@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -297,6 +297,17 @@ __GLchipUniformTypeInfo g_typeInfos[] =
     { gcSHADER_INT16_P16,   GL_NONE,                       0},
     { gcSHADER_INT16_P32,   GL_NONE,                       0},
 
+    { gcSHADER_INTEGER_X8,   GL_NONE,                      0},
+    { gcSHADER_INTEGER_X16,  GL_NONE,                      0},
+    { gcSHADER_UINT_X8,      GL_NONE,                      0},
+    { gcSHADER_UINT_X16,     GL_NONE,                      0},
+    { gcSHADER_FLOAT_X8,     GL_NONE,                      0},
+    { gcSHADER_FLOAT_X16,    GL_NONE,                      0},
+    { gcSHADER_INT64_X8,     GL_NONE,                      0},
+    { gcSHADER_INT64_X16,    GL_NONE,                      0},
+    { gcSHADER_UINT64_X8,    GL_NONE,                      0},
+    { gcSHADER_UINT64_X16,   GL_NONE,                      0},
+
     {gcSHADER_UNKONWN_TYPE,                  GL_NONE,                                            0},
 };
 /* compile-time assertion if the g_typeInfos is not the same length as gcSHADER_TYPE_COUNT */
@@ -454,7 +465,8 @@ __GL_INLINE gceUNIFORMCVT
 gcChipQueryUniformConvert(
     __GLchipSLProgram *program,
     gcSHADER_TYPE      dataType,
-    gctBOOL            userDefUB
+    gctBOOL            userDefUB,
+    gctBOOL            hasIntegerSupport
     )
 {
     gceUNIFORMCVT convert = gcvUNIFORMCVT_NONE;
@@ -476,13 +488,20 @@ gcChipQueryUniformConvert(
         case gcSHADER_BOOLEAN_X2:
         case gcSHADER_BOOLEAN_X3:
         case gcSHADER_BOOLEAN_X4:
-            if (!program->isHalti)
+            if (
+#if TREAT_ES20_INTEGER_AS_FLOAT
+                !program->isHalti ||
+#endif
+                !hasIntegerSupport)
             {
                 convert = gcvUNIFORMCVT_TO_FLOAT;
             }
-            else if (userDefUB)
+            else
             {
-                convert = gcvUNIFORMCVT_TO_BOOL;
+                if (userDefUB)
+                {
+                    convert = gcvUNIFORMCVT_TO_BOOL;
+                }
             }
             break;
 
@@ -493,7 +512,11 @@ gcChipQueryUniformConvert(
         case gcSHADER_SAMPLER_2D:
         case gcSHADER_SAMPLER_3D:
         case gcSHADER_SAMPLER_CUBIC:
-            if (!program->isHalti)
+            if (
+#if TREAT_ES20_INTEGER_AS_FLOAT
+                !program->isHalti ||
+#endif
+                !hasIntegerSupport)
             {
                 convert = gcvUNIFORMCVT_TO_FLOAT;
             }
@@ -1466,6 +1489,14 @@ gcChipProcessUniforms(
                 break;
             }
 
+            gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(pgInstance->programState.hints->vsConstBase,
+                                                              pgInstance->programState.hints->psConstBase,
+                                                              pgInstance->programState.hints->tcsConstBase,
+                                                              pgInstance->programState.hints->tesConstBase,
+                                                              pgInstance->programState.hints->gsConstBase,
+                                                              uniform,
+                                                              &slot->stateAddress[stageIdx]));
+
             /* If in recompile stage, only process private uniforms */
             if (recompiled && usage != __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED)
             {
@@ -1477,14 +1508,6 @@ gcChipProcessUniforms(
             bytes = g_typeInfos[dataType].size * arraySize;
 
             slot->halUniform[stageIdx] = uniform;
-
-            gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(pgInstance->programState.hints->vsConstBase,
-                                                              pgInstance->programState.hints->psConstBase,
-                                                              pgInstance->programState.hints->tcsConstBase,
-                                                              pgInstance->programState.hints->tesConstBase,
-                                                              pgInstance->programState.hints->gsConstBase,
-                                                              uniform,
-                                                              &slot->stateAddress[stageIdx]));
 
             if (!duplicate)
             {
@@ -1654,7 +1677,7 @@ gcChipProcessUniforms(
                             gcSHADER_SAMPLER_CUBE_SHADOW == dataType     ||
                             gcSHADER_SAMPLER_CUBEMAP_ARRAY_SHADOW == dataType     )
                         {
-                            __glBitmaskOR(&program->shadowSamplerMask, samplerIdx);
+                            __glBitmaskSet(&program->shadowSamplerMask, samplerIdx);
                         }
                         ++samplerIdx;
                     }
@@ -1996,6 +2019,14 @@ gcChipProcessUniformBlocks(
             break;
         }
 
+        gcmVERIFY_OK(gcSHADER_ComputeUniformPhysicalAddress(pgInstance->programState.hints->vsConstBase,
+                                                            pgInstance->programState.hints->psConstBase,
+                                                            pgInstance->programState.hints->tcsConstBase,
+                                                            pgInstance->programState.hints->tesConstBase,
+                                                            pgInstance->programState.hints->gsConstBase,
+                                                            ubUniform,
+                                                            &ubSlot->stateAddress[stageIdx]));
+
         /* If in recompile stage, only process private uniforms */
         if (recompiled && ubUsage != __GL_CHIP_UB_USAGE_PRIVATE)
         {
@@ -2162,14 +2193,6 @@ gcChipProcessUniformBlocks(
         ubSlot->refByStage[stageIdx] = HasIBIFlag(GetUBInterfaceBlockInfo(uniformBlock), gceIB_FLAG_STATICALLY_USED);
         ubSlot->mapFlags[stageIdx]   = mapFlags;
         ubSlot->mapFlag             |= mapFlags;
-
-        gcmVERIFY_OK(gcSHADER_ComputeUniformPhysicalAddress(pgInstance->programState.hints->vsConstBase,
-                                                            pgInstance->programState.hints->psConstBase,
-                                                            pgInstance->programState.hints->tcsConstBase,
-                                                            pgInstance->programState.hints->tesConstBase,
-                                                            pgInstance->programState.hints->gsConstBase,
-                                                            ubUniform,
-                                                            &ubSlot->stateAddress[stageIdx]));
 
         if (mapFlags & gcdUB_MAPPED_TO_REG)
         {
@@ -3278,10 +3301,6 @@ gcChipProgramCleanBindingInfo(
 
     gcmHEADER_ARG("gc=0x%x programObject=0x%x", gc, programObject);
 
-    /* Zero existing attribute buffer. */
-    program->inCount = 0;
-    program->inMaxNameLen = 0;
-
 #if __GL_CHIP_PATCH_ENABLED
     program->aLocPosition = -1;
     program->aLocTexCoord = -1;
@@ -3299,6 +3318,10 @@ gcChipProgramCleanBindingInfo(
     {
         gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, program->inputs));
     }
+
+    /* Zero existing attribute buffer. */
+    program->inCount = 0;
+    program->inMaxNameLen = 0;
 
     for (i = 0; i < (GLint)gc->constants.shaderCaps.maxUserVertAttributes; ++i)
     {
@@ -3866,6 +3889,11 @@ gcChipMapLinkError(
             __GLSL_LOG_INFO_SIZE, &logOffset, "LinkShaders: Can't support CL.\n"));
         break;
 
+    case gcvSTATUS_LOCATION_ALIASED:
+        gcmONERROR(gcoOS_PrintStrSafe(logBuffer,
+            __GLSL_LOG_INFO_SIZE, &logOffset, "LinkShaders: Location aliased.\n"));
+        break;
+
     default:
         break;
     }
@@ -4332,7 +4360,7 @@ gcChipProgramBuildBindingInfo(
             newInput->halAttrib = gcvNULL;
             newInput->isBuiltin = gcvTRUE;
             newInput->location = -1;
-            newInput->name = "gl_NumWorkGroups";
+            gcoOS_StrDup(chipCtx->os, "gl_NumWorkGroups", &newInput->name);
             gcoOS_StrLen(newInput->name, (gctSIZE_T*)&newInput->nameLen);
             newInput->precision = gcSHADER_PRECISION_DEFAULT;
             newInput->refByStage[__GLSL_STAGE_CS] = gcvTRUE;
@@ -4730,6 +4758,8 @@ gcChipProgramBuildBindingInfo(
                         output->location   = location;
                         output->startIndex = halOut->arrayIndex;
                     }
+
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, name));
                 }
 
                 if (location != (gctUINT)-1 && location < program->maxOutLoc)
@@ -4747,7 +4777,7 @@ gcChipProgramBuildBindingInfo(
     /***************************************************************************
     ** Buffer Variable and Shader Storage Block management.
     */
-    /* Get the number of uniform blocks for each stage */
+    /* Get the number of storage blocks for each stage */
     combinedResCount = 0;
     for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
     {
@@ -5870,8 +5900,11 @@ gcChipLTCGetUserUniformSourceValue(
 
                 if (SourceValue->elementType == gcSL_FLOAT)
                 {
+                    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+                    __GLchipFeature *chipFeature = &chipCtx->chipFeature;
+
                     /* float value */
-                    if (gcChipQueryUniformConvert(program, GetUniformType(uniform), gcvFALSE) == gcvUNIFORMCVT_TO_FLOAT)
+                    if (gcChipQueryUniformConvert(program, GetUniformType(uniform), gcvFALSE, chipFeature->haltiLevel > __GL_CHIP_HALTI_LEVEL_0) == gcvUNIFORMCVT_TO_FLOAT)
                     {
                         SourceValue->v[i].f32 = (gctFLOAT)((GLint*)data)[index];
                     }
@@ -6542,8 +6575,9 @@ gcChipFlushSingleUniform(
         gctUINT32 columns, rows;
         gctSIZE_T arraySize;
         gctUINT32 matrixStride, arrayStride;
-        gceUNIFORMCVT convert = gcChipQueryUniformConvert(program, uniform->dataType, gcvFALSE);
         __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+        __GLchipFeature *chipFeature = &chipCtx->chipFeature;
+        gceUNIFORMCVT convert = gcChipQueryUniformConvert(program, uniform->dataType, gcvFALSE, chipFeature->haltiLevel > __GL_CHIP_HALTI_LEVEL_0);
 
         gcTYPE_GetTypeInfo(uniform->dataType, &columns, &rows, gcvNULL);
 
@@ -6580,6 +6614,16 @@ gcChipFlushSingleUniform(
                 else
                 {
                     physicalAddress = uniform->stateAddress[stageIdx];
+                }
+
+                /* For es20 and es11 shaders, compiler always uses float in the machine code.
+                ** So driver convert INT data into float before send to HW,
+                ** but for XFB buffer address, it should not do the conversion.
+                ** Compiler will refine it later.
+                */
+                if (uniform->subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_XFB_BUFFER)
+                {
+                    convert = gcvUNIFORMCVT_NONE;
                 }
 
                 gcmONERROR(gcoSHADER_ProgramUniformEx(gcvNULL, physicalAddress + uniform->regOffset,
@@ -6688,8 +6732,7 @@ gcChipIsLTCEnabled(
     gcoHAL_GetPatchID(gcvNULL, &patchId);
 
     /* Disable LTC optimization for real racing */
-    if (patchId == gcvPATCH_REALRACING || patchId == gcvPATCH_NENAMARK
-        || patchId == gcvPATCH_BATCHCOUNT)
+    if (patchId == gcvPATCH_REALRACING || patchId == gcvPATCH_NENAMARK)
     {
         return gcvFALSE;
     }
@@ -6787,30 +6830,13 @@ __glChipCompileShader(
         shaderObject->shaderInfo.hBinary = gcvNULL;
     }
 
-    {
-        gctCONST_STRING shaderSrc  = shaderObject->shaderInfo.source;
-        gctUINT         shaderSize = shaderObject->shaderInfo.sourceSize;
+    gcmONERROR((*chipCtx->pfCompile)(chipCtx->hal,
+                                     shaderType,
+                                     shaderObject->shaderInfo.sourceSize,
+                                     shaderObject->shaderInfo.source,
+                                     (gcSHADER*)&shaderObject->shaderInfo.hBinary,
+                                     (gctSTRING*)&shaderObject->shaderInfo.compiledLog));
 
-#if __GL_CHIP_PATCH_ENABLED
-        if (chipCtx->patchId == gcvPATCH_GTFES30 && shaderType == gcSHADER_TYPE_GEOMETRY)
-        {
-            gcChipPatchCompile(gc, shaderObject, &shaderSrc);
-
-            /* Update shader size if source was replaced */
-            if (shaderSrc != shaderObject->shaderInfo.source)
-            {
-                shaderSize = (gctUINT)gcoOS_StrLen(shaderSrc, gcvNULL);
-            }
-        }
-#endif
-
-        gcmONERROR((*chipCtx->pfCompile)(chipCtx->hal,
-                                         shaderType,
-                                         shaderSize,
-                                         shaderSrc,
-                                         (gcSHADER*)&shaderObject->shaderInfo.hBinary,
-                                         (gctSTRING*)&shaderObject->shaderInfo.compiledLog));
-    }
 
     gcmFOOTER_ARG("return=%d", gcvTRUE);
     return gcvTRUE;
@@ -7173,6 +7199,85 @@ gcChipAddPgInstanceToCache(
     return pgInstanceObj;
 }
 
+__GL_INLINE  gctUINT
+gcChipDetermineDual16PrecisionRule(
+    __GLchipContext     *chipCtx,
+    __GLchipSLProgram   *program
+    )
+{
+    gctUINT dual16PrecisionRule = Dual16_PrecisionRule_DEFAULT;
+
+    switch (chipCtx->patchId)
+    {
+        case gcvPATCH_GLBM21:
+        case gcvPATCH_GLBM25:
+        case gcvPATCH_GLBM27:
+        case gcvPATCH_GFXBENCH:
+        case gcvPATCH_MM07:
+        case gcvPATCH_NENAMARK2:
+        case gcvPATCH_LEANBACK:
+        case gcvPATCH_ANGRYBIRDS:
+        case gcvPATCH_BM21:
+            dual16PrecisionRule = Dual16_PrecisionRule_RCP_HP | Dual16_PrecisionRule_FRAC_HP | Dual16_PrecisionRule_IMMED_MP;
+            break;
+        default:
+            break;
+    }
+
+   /* enable and disable should not be on at the same time */
+    gcmASSERT(!(program->progFlags.disableHP_RCP && program->progFlags.enableHP_RCP));
+    if (program->progFlags.disableHP_RCP)
+    {
+        dual16PrecisionRule &= ~Dual16_PrecisionRule_RCP_HP;
+    }
+    else if (program->progFlags.enableHP_RCP)
+    {
+        dual16PrecisionRule |= Dual16_PrecisionRule_RCP_HP;
+    }
+
+    gcmASSERT(!(program->progFlags.disableHP_FRAC && program->progFlags.enableHP_FRAC));
+    if (program->progFlags.disableHP_FRAC)
+    {
+        dual16PrecisionRule &= ~Dual16_PrecisionRule_FRAC_HP;
+    }
+    else if (program->progFlags.enableHP_FRAC)
+    {
+        dual16PrecisionRule |= Dual16_PrecisionRule_FRAC_HP;
+    }
+
+    gcmASSERT(!(program->progFlags.disableHP_TEXLD_COORD && program->progFlags.enableHP_TEXLD_COORD));
+    if (program->progFlags.disableHP_TEXLD_COORD)
+    {
+        dual16PrecisionRule &= ~Dual16_PrecisionRule_TEXLD_COORD_HP;
+    }
+    else if (program->progFlags.enableHP_TEXLD_COORD)
+    {
+        dual16PrecisionRule |= Dual16_PrecisionRule_TEXLD_COORD_HP;
+    }
+
+    gcmASSERT(!(program->progFlags.disableHP_IMMED && program->progFlags.enableHP_IMMED));
+    if (program->progFlags.disableHP_IMMED)
+    {
+        dual16PrecisionRule &= ~Dual16_PrecisionRule_IMMED_HP;
+    }
+    else if (program->progFlags.enableHP_IMMED)
+    {
+        dual16PrecisionRule |= Dual16_PrecisionRule_IMMED_HP;
+    }
+
+    gcmASSERT(!(program->progFlags.disableMP_IMMED && program->progFlags.enableMP_IMMED));
+    if (program->progFlags.disableMP_IMMED)
+    {
+        dual16PrecisionRule &= ~Dual16_PrecisionRule_IMMED_MP;
+    }
+    else if (program->progFlags.enableMP_IMMED)
+    {
+        dual16PrecisionRule |= Dual16_PrecisionRule_IMMED_MP;
+    }
+
+    return dual16PrecisionRule;
+}
+
 GLboolean
 __glChipLinkProgram(
     __GLcontext *gc,
@@ -7190,6 +7295,7 @@ __glChipLinkProgram(
     gctUINT32  statesSize = 0;
     gctPOINTER states = gcvNULL;
     gceSHADER_FLAGS flags;
+    gceSHADER_SUB_FLAGS subFlags;
     gcSHADER_KIND shaderTypes[] =
     {
         gcSHADER_TYPE_VERTEX,
@@ -7340,8 +7446,8 @@ __glChipLinkProgram(
              gcvSHADER_USE_GL_POINT_COORD     |
              gcvSHADER_USE_GL_POSITION        |
              gcvSHADER_REMOVE_UNUSED_UNIFORMS |
-             gcvSHADER_ONCE_OPTIMIZER);
-
+             gcvSHADER_ONCE_OPTIMIZER         |
+             gcvSHADER_FLUSH_DENORM_TO_ZERO);
 
     if (
 #if __GL_CHIP_PATCH_ENABLED
@@ -7365,15 +7471,15 @@ __glChipLinkProgram(
         flags |= gcvSHADER_SEPERATED_PROGRAM;
     }
 
+    if (program->progFlags.disableDual16)
+    {
+        flags |= gcvSHADER_DISABLE_DUAL16;
+    }
+
     for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
     {
         if (masterPgInstance->binaries[stage])
         {
-            if (program->progFlags.dual16)
-            {
-                masterPgInstance->binaries[stage]->dual16Mode = gcvTRUE;
-            }
-
 #if __GL_CHIP_PATCH_ENABLED && gcdSHADER_SRC_BY_MACHINECODE
             if (replaceIndices[stage] != gcvMACHINECODE_COUNT)
             {
@@ -7383,11 +7489,21 @@ __glChipLinkProgram(
         }
     }
 
+    /* determine the dual16 hp rule based on benchmark and shader detection */
+    subFlags.dual16PrecisionRule = gcChipDetermineDual16PrecisionRule(chipCtx, program);
+
+    if (chipCtx->robust)
+    {
+        flags |= gcvSHADER_NEED_ROBUSTNESS_CHECK;
+        program->progFlags.robustEnabled = gcvTRUE;
+    }
+
     /* Call the HAL backend linker. */
     gcSetGLSLCompiler(chipCtx->pfCompile);
     status = gcLinkProgram(__GLSL_STAGE_LAST,
                              masterPgInstance->binaries,
                              flags,
+                             &subFlags,
                              &statesSize,
                              &states,
                              &masterPgInstance->programState.hints);
@@ -7632,6 +7748,7 @@ gcChipProgramBinary_V0(
     __GLchipUtilsObject* pgInstanceObj = gcvNULL;
     __GLchipProgramStateKey *pgStateKey = gcvNULL;
     gceSHADER_FLAGS flags;
+    gceSHADER_SUB_FLAGS subFlags;
     __GLSLStage stage;
     gctUINT key;
     gcSHADER_KIND shaderTypes[] =
@@ -7714,7 +7831,8 @@ gcChipProgramBinary_V0(
              gcvSHADER_USE_GL_POINT_COORD   |
              gcvSHADER_USE_GL_POSITION      |
              gcvSHADER_ONCE_OPTIMIZER       |
-             gcvSHADER_REMOVE_UNUSED_UNIFORMS);
+             gcvSHADER_REMOVE_UNUSED_UNIFORMS |
+             gcvSHADER_FLUSH_DENORM_TO_ZERO);
 
     if (
 #if __GL_CHIP_PATCH_ENABLED
@@ -7733,9 +7851,23 @@ gcChipProgramBinary_V0(
     }
 #endif
 
+    if (program->progFlags.disableDual16)
+    {
+        flags |= gcvSHADER_DISABLE_DUAL16;
+    }
+    /* determine the dual16 hp rule based on benchmark and shader detection */
+    subFlags.dual16PrecisionRule = gcChipDetermineDual16PrecisionRule(chipCtx, program);
+
+    if (chipCtx->robust)
+    {
+        flags |= gcvSHADER_NEED_ROBUSTNESS_CHECK;
+        program->progFlags.robustEnabled = gcvTRUE;
+    }
+
     status = gcLinkProgram(__GLSL_STAGE_LAST,
                            masterPgInstance->binaries,
                            flags,
+                           &subFlags,
                            &masterPgInstance->programState.stateBufferSize,
                            &masterPgInstance->programState.stateBuffer,
                            &masterPgInstance->programState.hints);
@@ -8827,7 +8959,7 @@ __glChipUniformBlockBinding(
     if (program->uniformBlocks[uniformBlockIndex].binding != uniformBlockBinding)
     {
         program->uniformBlocks[uniformBlockIndex].binding = uniformBlockBinding;
-        __glBitmaskOR(&gc->bufferObject.bindingDirties[__GL_UNIFORM_BUFFER_INDEX], uniformBlockBinding);
+        __glBitmaskSet(&gc->bufferObject.bindingDirties[__GL_UNIFORM_BUFFER_INDEX], uniformBlockBinding);
     }
 
     gcmFOOTER_NO();
@@ -9095,7 +9227,7 @@ __glChipBuildTexEnableDim(
             }
             else if (texUnitState[unit].enableDim != enableDim)
             {
-                __glBitmaskOR(&gc->texture.texConflict, unit);
+                __glBitmaskSet(&gc->texture.texConflict, unit);
             }
 
             /* Record the all the samplers bound to this unit */
@@ -9370,6 +9502,26 @@ gcChipFlushUniformBlock(
                                                  offset,
                                                  size,
                                                  GetUniformShaderKind(ubUniform)));
+
+            if (program->progFlags.robustEnabled)
+            {
+                gctUINT32 addressLimit[2];
+                gctSIZE_T size;
+                gctUINT32 bufSize;
+
+                gcoBUFOBJ_GetSize(bufObj, &size);
+                gcmSAFECASTSIZET(bufSize, size);
+
+                addressLimit[0] = physical;
+                addressLimit[1] = physical + bufSize - 1;
+
+                gcmONERROR(gcoSHADER_ProgramUniformEx(
+                    gcvNULL, (physicalAddress + 4),
+                    2, 1, 1, gcvFALSE,
+                    1,
+                    4,
+                    addressLimit, gcvFALSE, GetUniformShaderKind(ubUniform)));
+            }
         }
 
         /* If any part of the UB was mapped to state buffer */
@@ -9413,8 +9565,11 @@ gcChipFlushUniformBlock(
                     gctUINT32    numCols = 0, numRows = 0;
                     gctBOOL      isRowMajor = (GetUniformMatrixStride(uniform) != 0 && GetUniformIsRowMajor(uniform));
                     gctUINT8_PTR pData = logical + offset + GetUniformOffset(uniform);
+                    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+                    __GLchipFeature *chipFeature = &chipCtx->chipFeature;
                     gceUNIFORMCVT convert = gcChipQueryUniformConvert(program, GetUniformType(uniform),
-                                                                           ub->usage == __GL_CHIP_UB_USAGE_USER_DEFINED);
+                                                                           ub->usage == __GL_CHIP_UB_USAGE_USER_DEFINED,
+                                                                           chipFeature->haltiLevel > __GL_CHIP_HALTI_LEVEL_0);
                     gctUINT32 physicalAddress = 0;
 
                     gcmONERROR(gcSHADER_ComputeUniformPhysicalAddress(chipCtx->activeProgState->hints->vsConstBase,
@@ -9753,7 +9908,7 @@ gcChipPreparePrivateUniform(
                 {
                     gctINT32 sliceSlize;
                     __GLtextureObject *texObj = imageState->texObj;
-                    gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, imageState->level, imageState->actualLayer, 0);
+                    gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, imageState->level, imageState->actualLayer);
                     gcmVERIFY_OK(gcoSURF_GetInfo(texView.surf, gcvSURF_INFO_SLICESIZE, &sliceSlize));
                     iValues[3] = sliceSlize;
                 }
@@ -10125,10 +10280,9 @@ gcChipFlushUserDefUBs(
         }
 #endif
 
-
-
         gcmONERROR(gcChipFlushUniformBlock(gc, program, ub, bufInfo->bufObj, gcvNULL,
                                            pBindingPoint->bufOffset, requiredSize));
+
     }
 OnError:
     gcmFOOTER();
@@ -10303,6 +10457,26 @@ gcChipFlushAtomicCounterBuffers(
                                                               pBindingPoint->bufOffset,
                                                               requiredSize,
                                                               __glChipGLShaderStageToShaderKind[stageIdx]));
+
+                        if (program->progFlags.robustEnabled)
+                        {
+                            gctUINT32 addressLimit[2];
+                            gctSIZE_T size;
+                            gctUINT32 bufSize;
+
+                            gcoBUFOBJ_GetSize(bufInfo->bufObj, &size);
+                            gcmSAFECASTSIZET(bufSize, size);
+
+                            addressLimit[0] = physical;
+                            addressLimit[1] = physical + bufSize - 1;
+
+                            gcmONERROR(gcoSHADER_ProgramUniformEx(
+                                gcvNULL, (physicalAddr + 4),
+                                1, 1, 2, gcvFALSE,
+                                1,
+                                4,
+                                addressLimit, gcvFALSE, __glChipGLShaderStageToShaderKind[stageIdx]));
+                        }
                     }
                 }
             } while (gcvFALSE);
@@ -10401,7 +10575,7 @@ gcChipFlushUserDefSSBs(
             for (stageIdx = __GLSL_STAGE_VS; stageIdx < __GLSL_STAGE_LAST; ++stageIdx)
             {
                 gcUNIFORM sbUniform = sb->halUniform[stageIdx];
-                gctUINT32 unsizedArrayLength;
+                gctUINT32 unsizedArrayLength = 0;
                 gctUINT32 physicalAddress = 0;
 
                 if (!(sbUniform && isUniformUsedInShader(sbUniform)))
@@ -10445,9 +10619,33 @@ gcChipFlushUserDefSSBs(
                                                      requiredSize,
                                                      GetUniformShaderKind(sbUniform)));
 
-                gcmONERROR(gcoSHADER_ProgramUniformEx(gcvNULL, physicalAddress + 4,
-                                                      1, 1, 1, gcvFALSE, 1,
-                                                      1, &unsizedArrayLength, gcvFALSE, GetUniformShaderKind(sbUniform)));
+                if (program->progFlags.robustEnabled)
+                {
+                    gctUINT32 addressLimit[3];
+                    gctSIZE_T size;
+                    gctUINT32 bufSize;
+
+                    gcoBUFOBJ_GetSize(bufInfo->bufObj, &size);
+                    gcmSAFECASTSIZET(bufSize, size);
+
+                    addressLimit[0] = physical;               /* low limit */
+                    addressLimit[1] = physical + bufSize - 1; /* upper limit */
+                    addressLimit[2] = unsizedArrayLength;     /* size */
+
+                    gcmONERROR(gcoSHADER_ProgramUniformEx(
+                        gcvNULL, (physicalAddress + 4),
+                        3, 1, 1, gcvFALSE,
+                        1,
+                        4,
+                        addressLimit, gcvFALSE, GetUniformShaderKind(sbUniform)));
+                }
+                else
+                {
+                    gcmONERROR(gcoSHADER_ProgramUniformEx(
+                        gcvNULL, physicalAddress + 4,
+                        1, 1, 1, gcvFALSE, 1,
+                        1, &unsizedArrayLength, gcvFALSE, GetUniformShaderKind(sbUniform)));
+                }
             }
 
         } while (gcvFALSE);
@@ -10559,6 +10757,27 @@ gcChipFlushPrivateSSBs(
                                                      0,
                                                      dataSize,
                                                      GetUniformShaderKind(sbUniform)));
+                if (program->progFlags.robustEnabled)
+                {
+                    gctUINT32 addressLimit[2];
+                    gctSIZE_T size;
+                    gctUINT32 bufSize;
+
+                    gcoBUFOBJ_GetSize(sb->halBufObj, &size);
+                    gcmSAFECASTSIZET(bufSize, size);
+
+                    addressLimit[0] = physical;               /* low limit */
+                    addressLimit[1] = physical + bufSize - 1; /* upper limit */
+
+                    gcmONERROR(gcoSHADER_ProgramUniformEx(
+                        gcvNULL, (physicalAddress + 4),
+                        1, 1, 2, gcvFALSE,
+                        1,
+                        4,
+                        addressLimit, gcvFALSE, GetUniformShaderKind(sbUniform)));
+                }
+
+
             }
         } while (gcvFALSE);
 
@@ -10629,6 +10848,7 @@ gcChipDynamicPatchProgram(
     gctPOINTER                 states            = gcvNULL;
     gcPatchDirective           *dynamicPatchInfo = recompilePatchDirectivePtr;
     gceSHADER_FLAGS            flags;
+    gceSHADER_SUB_FLAGS        subFlags;
     gceSTATUS                  status            = gcvSTATUS_OK;
     __GLSLStage                transformFeedbackStage = __GLSL_STAGE_VS;
 
@@ -10658,11 +10878,11 @@ gcChipDynamicPatchProgram(
                 gcmONERROR(gcSHADER_Construct(chipCtx->hal, shaderTypes[stage], &pgInstance->binaries[stage]));
                 gcmONERROR(gcSHADER_Copy(pgInstance->binaries[stage], masterPgInstance->binaries[stage]));
                 if (stage == __GLSL_STAGE_FS &&
-                    masterPgInstance->binaries[stage]->dual16Mode)
+                    masterPgInstance->binaries[stage]->isDual16Shader)
                 {
-                    pgInstance->binaries[stage]->masterDual16Mode = gcvTRUE;
+                    pgInstance->binaries[stage]->isMasterDual16Shader = gcvTRUE;
                 }
-                gcmONERROR(gcSHADER_DynamicPatch(pgInstance->binaries[stage], dynamicPatchInfo));
+                gcmONERROR(gcSHADER_DynamicPatch(pgInstance->binaries[stage], dynamicPatchInfo, 0));
             }
         }
     }
@@ -10693,7 +10913,8 @@ gcChipDynamicPatchProgram(
              gcvSHADER_USE_GL_Z             |
              gcvSHADER_USE_GL_POINT_COORD   |
              gcvSHADER_USE_GL_POSITION      |
-             gcvSHADER_REMOVE_UNUSED_UNIFORMS);
+             gcvSHADER_REMOVE_UNUSED_UNIFORMS |
+             gcvSHADER_FLUSH_DENORM_TO_ZERO);
 
 
 #if gcdALPHA_KILL_IN_SHADER && __GL_CHIP_PATCH_ENABLED
@@ -10710,10 +10931,24 @@ gcChipDynamicPatchProgram(
         flags |= gcvSHADER_SEPERATED_PROGRAM;
     }
 
+    if (program->progFlags.disableDual16)
+    {
+        flags |= gcvSHADER_DISABLE_DUAL16;
+    }
+
+    /* determine the dual16 hp rule based on benchmark and shader detection */
+    subFlags.dual16PrecisionRule = gcChipDetermineDual16PrecisionRule(chipCtx, program);
+
+    if (program->progFlags.robustEnabled)
+    {
+        flags |= gcvSHADER_NEED_ROBUSTNESS_CHECK;
+    }
+
     /* Call the HAL backend linker. */
     status = gcLinkProgram(__GLSL_STAGE_LAST,
                            pgInstance->binaries,
                            flags,
+                           &subFlags,
                            &statesSize ,
                            &states,
                            &pgInstance->programState.hints);

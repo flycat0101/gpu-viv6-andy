@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -77,7 +77,6 @@ SOURCES = \
     ..\src\glcore\gc_es_fragop.c        \
     ..\src\glcore\gc_es_misc.c          \
     ..\src\glcore\gc_es_names.c         \
-    ..\src\glcore\gc_es_object_inline.c \
     ..\src\glcore\gc_es_pixelop.c       \
     ..\src\glcore\gc_es_query.c         \
     ..\src\glcore\gc_es_raster.c        \

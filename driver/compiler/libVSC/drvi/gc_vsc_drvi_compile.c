@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -204,7 +204,7 @@ gceSTATUS vscFinalizeCTC(SHADER_COMPILE_TIME_CONSTANT* pCompileTimeConstant)
 
 static VSC_ErrCode _PreprocessShader(VSC_PASS_MANAGER* pPassMnger)
 {
-    VIR_Shader*         pShader = pPassMnger->pCompilerParam->pShader;
+    VIR_Shader*         pShader = pPassMnger->passWorker.pCompilerParam->pShader;
 
     return vscVIR_RemoveNop(pShader);
 }
@@ -213,13 +213,13 @@ static VSC_ErrCode _PostprocessShader(VSC_PASS_MANAGER*          pPassMnger,
                                       SHADER_EXECUTABLE_PROFILE* pOutSEP)
 {
     VSC_ErrCode             errCode = VSC_ERR_NONE;
-    VIR_Shader*             pShader = pPassMnger->pCompilerParam->pShader;
-    VSC_OPTN_SEPGenOptions* sepgen_options = VSC_OPTN_Options_GetSEPGenOptions(pPassMnger->options);
+    VIR_Shader*             pShader = pPassMnger->passWorker.pCompilerParam->pShader;
+    VSC_OPTN_SEPGenOptions* sepgen_options = VSC_OPTN_Options_GetSEPGenOptions(pPassMnger->passWorker.pOptions);
 
     if (pOutSEP && vscIsValidSEP(pOutSEP))
     {
         errCode = vscVIR_PerformSEPBackPatch(pShader,
-                                             pPassMnger->pCompilerParam->cfg.pHwCfg,
+                                             pPassMnger->passWorker.pCompilerParam->cfg.pHwCfg,
                                              pOutSEP,
                                              VSC_OPTN_SEPGenOptions_GetTrace(sepgen_options));
         ON_ERROR(errCode, "Perform SEP back patch");
@@ -232,7 +232,7 @@ OnError:
 static VSC_ErrCode _CompileShaderAtHighLevel(VSC_PASS_MANAGER* pPassMnger)
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
-    VIR_Shader*         pShader = pPassMnger->pCompilerParam->pShader;
+    VIR_Shader*         pShader = pPassMnger->passWorker.pCompilerParam->pShader;
 
     gcmASSERT(VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Pre_High);
 
@@ -246,7 +246,7 @@ static VSC_ErrCode _CompileShaderAtHighLevel(VSC_PASS_MANAGER* pPassMnger)
 static VSC_ErrCode _CompileShaderAtMedLevel(VSC_PASS_MANAGER* pPassMnger)
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
-    VIR_Shader*         pShader = pPassMnger->pCompilerParam->pShader;
+    VIR_Shader*         pShader = pPassMnger->passWorker.pCompilerParam->pShader;
 
     gcmASSERT(VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Pre_Medium ||
               VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Post_High);
@@ -267,7 +267,7 @@ static VSC_ErrCode _CompileShaderAtMedLevel(VSC_PASS_MANAGER* pPassMnger)
 static VSC_ErrCode _CompileShaderAtLowLevel(VSC_PASS_MANAGER* pPassMnger)
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
-    VIR_Shader*         pShader = pPassMnger->pCompilerParam->pShader;
+    VIR_Shader*         pShader = pPassMnger->passWorker.pCompilerParam->pShader;
     VIR_Dumper*         dumper = pShader->dumper;
 
     gcmASSERT(VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Pre_Low ||
@@ -276,10 +276,20 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_PASS_MANAGER* pPassMnger)
     /* if RA enable set the shader to be VIR_Shader_isRAEnabled,
        this flag is used in the lowering */
     {
-        VSC_OPTN_RAOptions* ra_options = VSC_OPTN_Options_GetRAOptions(pPassMnger->options);
+        VSC_OPTN_RAOptions* ra_options = VSC_OPTN_Options_GetRAOptions(pPassMnger->passWorker.pOptions);
         if (VSC_OPTN_RAOptions_GetSwitchOn(ra_options))
         {
             VIR_Shader_SetRAEnabled(pShader, gcvTRUE);
+        }
+    }
+
+    /* Convert integer to float, if hardware doesn't support integer */
+    {
+        if(!pPassMnger->passWorker.pCompilerParam->cfg.pHwCfg->hwFeatureFlags.hasHalti0)        /* hardware has no integer support */
+        {
+            vscVIR_ConvertIntegerToFloat(pShader,
+                                         pPassMnger->passWorker.pCompilerParam->cfg.pHwCfg->hwFeatureFlags.supportInteger,
+                                         pPassMnger->passWorker.pCompilerParam->cfg.pHwCfg->hwFeatureFlags. hasSignFloorCeil);
         }
     }
 
@@ -287,10 +297,10 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_PASS_MANAGER* pPassMnger)
     {
         /* Do lowering from mid level to low level */
         {
-            VSC_OPTN_LowerM2LOptions* lowerM2L_options = VSC_OPTN_Options_GetLowerM2LOptions(pPassMnger->options);
+            VSC_OPTN_LowerM2LOptions* lowerM2L_options = VSC_OPTN_Options_GetLowerM2LOptions(pPassMnger->passWorker.pOptions);
             if (VSC_OPTN_LowerM2LOptions_GetSwitchOn(lowerM2L_options))
             {
-                errCode = VIR_Lower_MiddleLevel_To_LowLevel(pShader, pPassMnger->pCompilerParam->cfg.pHwCfg);
+                errCode = VIR_Lower_MiddleLevel_To_LowLevel(pShader, pPassMnger->passWorker.pCompilerParam->cfg.pHwCfg);
             }
         }
     }
@@ -302,11 +312,11 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_PASS_MANAGER* pPassMnger)
 
     /* Do Inline */
     {
-        VSC_OPTN_ILOptions* inliner_options = VSC_OPTN_Options_GetInlinerOptions(pPassMnger->options);
+        VSC_OPTN_ILOptions* inliner_options = VSC_OPTN_Options_GetInlinerOptions(pPassMnger->passWorker.pOptions);
         if (VSC_OPTN_ILOptions_GetSwitchOn(inliner_options))
         {
             VIR_Inliner inliner;
-            VSC_IL_Init(&inliner, pShader, pPassMnger->pCompilerParam->cfg.pHwCfg,
+            VSC_IL_Init(&inliner, pShader, pPassMnger->passWorker.pCompilerParam->cfg.pHwCfg,
                 inliner_options, dumper, &pPassMnger->callGraph);
             errCode = VSC_IL_PerformOnShader(&inliner);
             VSC_IL_Final(&inliner);
@@ -321,9 +331,18 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_PASS_MANAGER* pPassMnger)
     /* Create CFG */
     vscVIR_BuildCFG(pShader);
 
+    /* Update Precision */
+    {
+        VSC_OPTN_PUOptions* pu_options = VSC_OPTN_Options_GetPUOptions(pPassMnger->passWorker.pOptions);
+        if (VSC_OPTN_PUOptions_GetSwitchOn(pu_options))
+        {
+            vscVIR_PrecisionUpdate(pShader, pu_options, dumper);
+        }
+    }
+
     /* Do constant propagation and folding before du is built */
     {
-        VSC_OPTN_CPFOptions* cpf_options = VSC_OPTN_Options_GetCPFOptions(pPassMnger->options);
+        VSC_OPTN_CPFOptions* cpf_options = VSC_OPTN_Options_GetCPFOptions(pPassMnger->passWorker.pOptions);
         if (VSC_OPTN_CPFOptions_GetSwitchOn(cpf_options))
         {
             errCode = VSC_CPF_PerformOnShader(pShader, cpf_options, dumper);
@@ -332,7 +351,7 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_PASS_MANAGER* pPassMnger)
 
     /* Do simplification */
     {
-        VSC_OPTN_SIMPOptions* simp_options = VSC_OPTN_Options_GetSIMPOptions(pPassMnger->options);
+        VSC_OPTN_SIMPOptions* simp_options = VSC_OPTN_Options_GetSIMPOptions(pPassMnger->passWorker.pOptions);
         if (VSC_OPTN_SIMPOptions_GetSwitchOn(simp_options))
         {
             errCode = VSC_SIMP_Simplification_PerformOnShader(pShader, simp_options, dumper);
@@ -341,7 +360,7 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_PASS_MANAGER* pPassMnger)
 
     /* Do local common subexpression elimination before du is built */
     {
-        VSC_OPTN_LCSEOptions* cse_options = VSC_OPTN_Options_GetLCSEOptions(pPassMnger->options);
+        VSC_OPTN_LCSEOptions* cse_options = VSC_OPTN_Options_GetLCSEOptions(pPassMnger->passWorker.pOptions);
         if (VSC_OPTN_LCSEOptions_GetSwitchOn(cse_options))
         {
             errCode = VSC_LCSE_PerformOnShader(pShader, cse_options, dumper);
@@ -351,13 +370,13 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_PASS_MANAGER* pPassMnger)
     /* Do D-U analysis */
     vscVIR_BuildDefUsageInfo(&pPassMnger->callGraph, &pPassMnger->duInfo, gcvFALSE);
 
-    /* Do copy propagation opt*/
+    /* Do global copy propagation opt*/
     {
-        VSC_OPTN_CPPOptions* cpp_options = VSC_OPTN_Options_GetCPPOptions(pPassMnger->options);
+        VSC_OPTN_CPPOptions* cpp_options = VSC_OPTN_Options_GetCPPOptions(pPassMnger->passWorker.pOptions);
         if (VSC_OPTN_CPPOptions_GetSwitchOn(cpp_options))
         {
             VSC_CPP_CopyPropagation cpp;
-            VSC_CPP_Init(&cpp, pShader, &pPassMnger->duInfo, cpp_options, dumper);
+            VSC_CPP_Init(&cpp, pShader, &pPassMnger->duInfo, cpp_options, dumper, gcvTRUE);
             errCode = VSC_CPP_PerformOnShader(&cpp);
             VSC_CPP_Final(&cpp);
         }
@@ -365,7 +384,7 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_PASS_MANAGER* pPassMnger)
 
     /* Do scalarization */
     {
-        VSC_OPTN_SCLOptions* scl_options = VSC_OPTN_Options_GetSCLOptions(pPassMnger->options);
+        VSC_OPTN_SCLOptions* scl_options = VSC_OPTN_Options_GetSCLOptions(pPassMnger->passWorker.pOptions);
         if (VSC_OPTN_SCLOptions_GetSwitchOn(scl_options))
         {
             VSC_SCL_Scalarization scl;
@@ -377,11 +396,12 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_PASS_MANAGER* pPassMnger)
 
     /* Do peephole opt*/
     {
-        VSC_OPTN_PHOptions* ph_options = VSC_OPTN_Options_GetPHOptions(pPassMnger->options);
+        VSC_OPTN_PHOptions* ph_options = VSC_OPTN_Options_GetPHOptions(pPassMnger->passWorker.pOptions);
         if (VSC_OPTN_PHOptions_GetSwitchOn(ph_options))
         {
             VSC_PH_Peephole ph;
-            VSC_PH_Peephole_Init(&ph, pShader, &pPassMnger->duInfo, ph_options, dumper);
+            VSC_PH_Peephole_Init(&ph, pShader, &pPassMnger->duInfo, pPassMnger->passWorker.pCompilerParam->cfg.pHwCfg,
+                                 ph_options, dumper);
             errCode = VSC_PH_Peephole_PerformOnShader(&ph);
             if (VSC_PH_Peephole_GetCfgChanged(&ph))
             {
@@ -399,14 +419,9 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_PASS_MANAGER* pPassMnger)
         }
     }
 
-    if (ENABLE_FULL_NEW_LINKER)
-    {
-        errCode = vscVIR_DoLocalVectorization(pShader, &pPassMnger->duInfo);
-    }
-
     /* Do dead code elimination */
     {
-        VSC_OPTN_DCEOptions* dce_options = VSC_OPTN_Options_GetDCEOptions(pPassMnger->options);
+        VSC_OPTN_DCEOptions* dce_options = VSC_OPTN_Options_GetDCEOptions(pPassMnger->passWorker.pOptions);
         gctBOOL              rebuildCFG = gcvFALSE;
         if (VSC_OPTN_DCEOptions_GetSwitchOn(dce_options))
         {
@@ -424,9 +439,19 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_PASS_MANAGER* pPassMnger)
         }
     }
 
+    if (ENABLE_FULL_NEW_LINKER)
+    {
+        errCode = vscVIR_DoLocalVectorization(pShader, &pPassMnger->duInfo);
+    }
+
+    if (pPassMnger->passWorker.pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_NEED_OOB_CHECK)
+    {
+        errCode = vscVIR_AddOutOfBoundCheckSupport(pShader, &pPassMnger->duInfo, pPassMnger->passWorker.pCompilerParam->cfg.pHwCfg);
+    }
+
     /* adjust the precision for dual16 purpose */
     {
-        errCode = vscVIR_AdjustPrecision(pShader, &pPassMnger->duInfo, pPassMnger->pCompilerParam->cfg.pHwCfg);
+        errCode = vscVIR_AdjustPrecision(pShader, &pPassMnger->duInfo, pPassMnger->passWorker.pCompilerParam->cfg.pHwCfg);
     }
 
     if (ENABLE_FULL_NEW_LINKER)
@@ -435,7 +460,7 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_PASS_MANAGER* pPassMnger)
         vscVIR_DestroyDefUsageInfo(&pPassMnger->duInfo);
 
         /* Destroy CG/CFG */
-        vscVIR_DestroyCFG(pPassMnger->pCompilerParam->pShader);
+        vscVIR_DestroyCFG(pPassMnger->passWorker.pCompilerParam->pShader);
         vscVIR_DestroyCallGraph(&pPassMnger->callGraph);
     }
 
@@ -445,10 +470,11 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_PASS_MANAGER* pPassMnger)
     return errCode;
 }
 
-static VSC_ErrCode _CompileShaderAtMCLevel(VSC_PASS_MANAGER*          pPassMnger)
+static VSC_ErrCode _CompileShaderAtMCLevel(VSC_PASS_MANAGER* pPassMnger)
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
-    VIR_Shader*         pShader = pPassMnger->pCompilerParam->pShader;
+    VIR_Shader*         pShader = pPassMnger->passWorker.pCompilerParam->pShader;
+    VIR_Dumper*         dumper = pShader->dumper;
 
     gcmASSERT(VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Pre_Machine ||
               VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Post_Low);
@@ -457,7 +483,7 @@ static VSC_ErrCode _CompileShaderAtMCLevel(VSC_PASS_MANAGER*          pPassMnger
     {
         if (ENABLE_FULL_NEW_LINKER)
         {
-            errCode = VIR_Lower_LowLevel_To_MachineCodeLevel(pShader, pPassMnger->pCompilerParam->cfg.pHwCfg);
+            errCode = VIR_Lower_LowLevel_To_MachineCodeLevel(pShader, pPassMnger->passWorker.pCompilerParam->cfg.pHwCfg);
             ON_ERROR(errCode, "ll2mc lower");
         }
         else
@@ -474,7 +500,8 @@ static VSC_ErrCode _CompileShaderAtMCLevel(VSC_PASS_MANAGER*          pPassMnger
 
         /* Check if the shader can run on dual16 mode, should before vscVIR_PutImmValueToUniform,
            since vscVIR_PutImmValueToUniform will use dual16 flag */
-        if (VIR_Shader_IsDual16able(pShader, pPassMnger->pCompilerParam->cfg.pHwCfg))
+        if (VIR_Shader_IsDual16able(pShader, &pPassMnger->passWorker.pCompilerParam->cfg,
+                                    VSC_OPTN_Options_GetDUAL16Options(pPassMnger->passWorker.pOptions), dumper))
         {
             VIR_Shader_SetDual16Mode(pShader, gcvTRUE);
         }
@@ -483,8 +510,51 @@ static VSC_ErrCode _CompileShaderAtMCLevel(VSC_PASS_MANAGER*          pPassMnger
             VIR_Shader_SetDual16Mode(pShader, gcvFALSE);
         }
 
-        errCode = vscVIR_PutImmValueToUniform(pShader, pPassMnger->pCompilerParam->cfg.pHwCfg);
+        errCode = vscVIR_PutImmValueToUniform(pShader, pPassMnger->passWorker.pCompilerParam->cfg.pHwCfg);
         ON_ERROR(errCode, "Put imm value to uniform");
+
+        /* A temp solution to check whether we need build CG/CFG/DU */
+        if (pPassMnger->callGraph.pOwnerShader == gcvNULL)
+        {
+            /* Create Call Graph */
+            vscVIR_BuildCallGraph(pShader, &pPassMnger->callGraph);
+
+            /* Create CFG */
+            vscVIR_BuildCFG(pShader);
+
+            /* Do D-U analysis */
+            vscVIR_BuildDefUsageInfo(&pPassMnger->callGraph, &pPassMnger->duInfo, gcvFALSE);
+        }
+
+        /* Do local copy propagation opt*/
+        {
+            VSC_OPTN_CPPOptions* cpp_options = VSC_OPTN_Options_GetCPPOptions(pPassMnger->passWorker.pOptions);
+            if (VSC_OPTN_CPPOptions_GetSwitchOn(cpp_options))
+            {
+                VSC_CPP_CopyPropagation cpp;
+                VSC_CPP_Init(&cpp, pShader, &pPassMnger->duInfo, cpp_options, dumper, gcvFALSE);
+                errCode = VSC_CPP_PerformOnShader(&cpp);
+                VSC_CPP_Final(&cpp);
+            }
+        }
+
+        /* Do dead code elimination */
+        {
+            VSC_OPTN_DCEOptions* dce_options = VSC_OPTN_Options_GetDCEOptions(pPassMnger->passWorker.pOptions);
+            gctBOOL              rebuildCFG = gcvFALSE;
+            if (VSC_OPTN_DCEOptions_GetSwitchOn(dce_options))
+            {
+                errCode = VSC_DCE_Perform(pShader, &pPassMnger->duInfo, dce_options, dumper, &rebuildCFG);
+                /* no need to rebuild du, since it will be destroyed*/
+            }
+        }
+
+        /* Destroy D-U analysis */
+        vscVIR_DestroyDefUsageInfo(&pPassMnger->duInfo);
+
+        /* Destroy CG/CFG */
+        vscVIR_DestroyCFG(pPassMnger->passWorker.pCompilerParam->pShader);
+        vscVIR_DestroyCallGraph(&pPassMnger->callGraph);
     }
 
     /* We are at end of MC level of VIR, so set this correct level */
@@ -498,20 +568,20 @@ static VSC_ErrCode _PerformCodegen(VSC_PASS_MANAGER*          pPassMnger,
                                    SHADER_EXECUTABLE_PROFILE* pOutSEP)
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
-    VIR_Shader*         pShader = pPassMnger->pCompilerParam->pShader;
+    VIR_Shader*         pShader = pPassMnger->passWorker.pCompilerParam->pShader;
     VIR_Dumper*         dumper = pShader->dumper;
     gctBOOL             bRAed = gcvFALSE, bMCGened = gcvFALSE;
 
     /* Uniform allocation */
     {
-        VSC_OPTN_RAOptions* ra_options = VSC_OPTN_Options_GetRAOptions(pPassMnger->options);
+        VSC_OPTN_RAOptions* ra_options = VSC_OPTN_Options_GetRAOptions(pPassMnger->passWorker.pOptions);
         if (VSC_OPTN_RAOptions_GetSwitchOn(ra_options))
         {
-            errCode = VIR_RA_LS_PerformUniformAlloc(pShader, pPassMnger->pCompilerParam->cfg.pHwCfg,
+            errCode = VIR_RA_LS_PerformUniformAlloc(pShader, pPassMnger->passWorker.pCompilerParam->cfg.pHwCfg,
                                                     ra_options, dumper);
             ON_ERROR(errCode, "Uniform RA");
 
-            errCode = vscVIR_CheckCstRegFileReadPortLimitation(pShader, pPassMnger->pCompilerParam->cfg.pHwCfg);
+            errCode = vscVIR_CheckCstRegFileReadPortLimitation(pShader, pPassMnger->passWorker.pCompilerParam->cfg.pHwCfg);
             ON_ERROR(errCode, "Check constant register file read port limitation");
         }
     }
@@ -530,10 +600,13 @@ static VSC_ErrCode _PerformCodegen(VSC_PASS_MANAGER*          pPassMnger,
         vscVIR_BuildDefUsageInfo(&pPassMnger->callGraph, &pPassMnger->duInfo, gcvFALSE);
     }
 
-    /* patch dual16 shader */
+    errCode = vscVIR_CheckPosAndDepthConflict(pShader, &pPassMnger->duInfo);
+    ON_ERROR(errCode, "Check position and depth conflict");
+
+    /* Do pre-cg clean up phase */
     {
-        errCode = vscVIR_PatchDual16Shader(pShader, &pPassMnger->duInfo);
-        ON_ERROR(errCode, "Patch dual16 shader");
+        errCode = vscVIR_PreCleanup(pShader, &pPassMnger->duInfo, dumper);
+        ON_ERROR(errCode, "pre-pass clean up ");
     }
 
     /* Try to build web if it is not built yet */
@@ -548,10 +621,10 @@ static VSC_ErrCode _PerformCodegen(VSC_PASS_MANAGER*          pPassMnger,
 
     /* Do instruction scheduling before temp-reg RA*/
     {
-        VSC_OPTN_ISOptions* is_options = VSC_OPTN_Options_GetPreRAISOptions(pPassMnger->options);
+        VSC_OPTN_ISOptions* is_options = VSC_OPTN_Options_GetPreRAISOptions(pPassMnger->passWorker.pOptions);
         if (VSC_OPTN_ISOptions_GetSwitchOn(is_options))
         {
-            errCode = VSC_IS_InstSched_PerformOnShader(pShader, pPassMnger->pCompilerParam->cfg.pHwCfg,
+            errCode = VSC_IS_InstSched_PerformOnShader(pShader, pPassMnger->passWorker.pCompilerParam->cfg.pHwCfg,
                                                        &pPassMnger->duInfo, &pPassMnger->lvInfo,
                                                        is_options, dumper);
             ON_ERROR(errCode, "Pre-pass inst sked");
@@ -560,10 +633,10 @@ static VSC_ErrCode _PerformCodegen(VSC_PASS_MANAGER*          pPassMnger,
 
     /* Do temp-register allocation */
     {
-        VSC_OPTN_RAOptions* ra_options = VSC_OPTN_Options_GetRAOptions(pPassMnger->options);
+        VSC_OPTN_RAOptions* ra_options = VSC_OPTN_Options_GetRAOptions(pPassMnger->passWorker.pOptions);
         if (VSC_OPTN_RAOptions_GetSwitchOn(ra_options))
         {
-            errCode = VIR_RA_LS_PerformTempRegAlloc(pShader, pPassMnger->pCompilerParam->cfg.pHwCfg,
+            errCode = VIR_RA_LS_PerformTempRegAlloc(pShader, pPassMnger->passWorker.pCompilerParam->cfg.pHwCfg,
                                                     &pPassMnger->lvInfo, ra_options, dumper,
                                                     &pPassMnger->callGraph);
             ON_ERROR(errCode, "Temp-reg RA");
@@ -574,10 +647,10 @@ static VSC_ErrCode _PerformCodegen(VSC_PASS_MANAGER*          pPassMnger,
 
     /* Do instruction scheduling after temp-reg RA*/
     {
-        VSC_OPTN_ISOptions* is_options = VSC_OPTN_Options_GetPostRAISOptions(pPassMnger->options);
+        VSC_OPTN_ISOptions* is_options = VSC_OPTN_Options_GetPostRAISOptions(pPassMnger->passWorker.pOptions);
         if (VSC_OPTN_ISOptions_GetSwitchOn(is_options))
         {
-            errCode = VSC_IS_InstSched_PerformOnShader(pShader, pPassMnger->pCompilerParam->cfg.pHwCfg,
+            errCode = VSC_IS_InstSched_PerformOnShader(pShader, pPassMnger->passWorker.pCompilerParam->cfg.pHwCfg,
                                                        &pPassMnger->duInfo, &pPassMnger->lvInfo,
                                                        is_options, dumper);
 
@@ -587,21 +660,16 @@ static VSC_ErrCode _PerformCodegen(VSC_PASS_MANAGER*          pPassMnger,
 
     /* Do final cleanup phase */
     {
-        /* this phase is to replace/remove ldarr. when RA is enabled, we don't need this phase */
-        VSC_OPTN_FCPOptions* fcp_options = VSC_OPTN_Options_GetFCPOptions(pPassMnger->options);
-        if (VSC_OPTN_FCPOptions_GetSwitchOn(fcp_options))
-        {
-            errCode = VIR_FCP_PerformOnShader(pShader, &pPassMnger->duInfo, fcp_options, dumper);
-            ON_ERROR(errCode, "Final Cleanup Phase");
-        }
+        errCode = vscVIR_PostCleanup(pShader, &pPassMnger->duInfo, dumper);
+        ON_ERROR(errCode, "Post-pass Cleanup Phase");
     }
 
     /* Do machine code generation */
     {
-        VSC_OPTN_MCGenOptions* mcgen_options = VSC_OPTN_Options_GetMCGenOptions(pPassMnger->options);
+        VSC_OPTN_MCGenOptions* mcgen_options = VSC_OPTN_Options_GetMCGenOptions(pPassMnger->passWorker.pOptions);
         if (VSC_OPTN_MCGenOptions_GetSwitchOn(mcgen_options))
         {
-            errCode = VSC_MC_GEN_MachineCodeGen(pShader, pPassMnger->pCompilerParam->cfg.pHwCfg,
+            errCode = VSC_MC_GEN_MachineCodeGen(pShader, &pPassMnger->passWorker.pCompilerParam->cfg,
                                                 mcgen_options, dumper);
             ON_ERROR(errCode, "MC codegen");
 
@@ -613,7 +681,7 @@ static VSC_ErrCode _PerformCodegen(VSC_PASS_MANAGER*          pPassMnger,
     {
         if (bRAed && bMCGened)
         {
-            errCode = vscVIR_GenerateSEP(pShader, pPassMnger->pCompilerParam->cfg.pHwCfg, gcvFALSE, pOutSEP);
+            errCode = vscVIR_GenerateSEP(pShader, pPassMnger->passWorker.pCompilerParam->cfg.pHwCfg, gcvFALSE, pOutSEP);
         }
         else
         {
@@ -680,8 +748,8 @@ VSC_ErrCode _CompileShaderInternal(VSC_PASS_MANAGER*          pPassMnger,
                                    SHADER_EXECUTABLE_PROFILE* pOutSEP)
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
-    VIR_Shader*         pShader = pPassMnger->pCompilerParam->pShader;
-    VIR_ShLevel         expectedLastLevel = _GetExpectedLastLevel(pPassMnger->pCompilerParam);
+    VIR_Shader*         pShader = pPassMnger->passWorker.pCompilerParam->pShader;
+    VIR_ShLevel         expectedLastLevel = _GetExpectedLastLevel(pPassMnger->passWorker.pCompilerParam);
 
     errCode = _PreprocessShader(pPassMnger);
     ON_ERROR(errCode, "Preprocess shader");
@@ -715,7 +783,7 @@ VSC_ErrCode _CompileShaderInternal(VSC_PASS_MANAGER*          pPassMnger,
     }
 
     /* Perform codegen */
-    if (CAN_PERFORM_CODE_GEN(pPassMnger->pCompilerParam))
+    if (CAN_PERFORM_CODE_GEN(pPassMnger->passWorker.pCompilerParam))
     {
         errCode = _PerformCodegen(pPassMnger, pOutSEP);
         ON_ERROR(errCode, "Perform codegen");

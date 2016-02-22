@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -18,16 +18,24 @@
  *    Call graph related code
  */
 
+#define _HFUNC_PassThroughGlobalBbId _HFUNC_PassThroughNodeId
+#define GLOBAL_BB_HASH_TABLE_SIZE    GNODE_HASH_TABLE_SIZE
+#define INVALID_GLOBAL_BB_ID         INVALID_GNODE_ID
+
 static void _IntializeCallGraph(VIR_CALL_GRAPH* pCg, VIR_Shader* pShader)
 {
     vscPMP_Intialize(&pCg->pmp, gcvNULL, 20*(sizeof(VIR_FUNC_BLOCK)+4*sizeof(VIR_CG_EDGE)), sizeof(void*), gcvTRUE);
     vscDG_Initialize(&pCg->dgGraph, &pCg->pmp.mmWrapper, 2, 4, sizeof(VIR_CG_EDGE));
     pCg->pOwnerShader = pShader;
+    pCg->nextGlobalBbId = 0;
+    vscHTBL_Initialize(&pCg->globalBbHashTable, &pCg->pmp.mmWrapper, _HFUNC_PassThroughGlobalBbId,
+                       gcvNULL, GLOBAL_BB_HASH_TABLE_SIZE);
 }
 
 static void _FinalizeCallGraph(VIR_CALL_GRAPH* pCg)
 {
     vscDG_Finalize(&pCg->dgGraph);
+    vscHTBL_Finalize(&pCg->globalBbHashTable);
     vscPMP_Finalize(&pCg->pmp);
 }
 
@@ -348,6 +356,11 @@ static void _FinalizeCFG(VIR_CONTROL_FLOW_GRAPH* pCfg)
     vscTREE_Finalize(&pCfg->postDomTree.tree);
 
     vscPMP_Finalize(&pCfg->pmp);
+
+    pCfg->domTree.pOwnerCFG = gcvNULL;
+    pCfg->postDomTree.pOwnerCFG = gcvNULL;
+
+    pCfg->pOwnerFuncBlk = gcvNULL;
 }
 
 static VIR_FLOW_TYPE _GetFlowType(VIR_OpCode opcode)
@@ -369,6 +382,22 @@ static VIR_FLOW_TYPE _GetFlowType(VIR_OpCode opcode)
     }
 }
 
+static void _InitializeBbReachRelation(VIR_BB_REACH_RELATION* pBbReachRelation, VSC_MM* pMM, gctINT totalBbCount)
+{
+    vscBV_Initialize(&pBbReachRelation->fwdReachInBBSet, pMM, totalBbCount);
+    vscBV_Initialize(&pBbReachRelation->fwdReachOutBBSet, pMM, totalBbCount);
+    vscBV_Initialize(&pBbReachRelation->bwdReachInBBSet, pMM, totalBbCount);
+    vscBV_Initialize(&pBbReachRelation->bwdReachOutBBSet, pMM, totalBbCount);
+}
+
+static void _FinalizeBbReachRelation(VIR_BB_REACH_RELATION* pBbReachRelation)
+{
+    vscBV_Finalize(&pBbReachRelation->fwdReachInBBSet);
+    vscBV_Finalize(&pBbReachRelation->fwdReachOutBBSet);
+    vscBV_Finalize(&pBbReachRelation->bwdReachInBBSet);
+    vscBV_Finalize(&pBbReachRelation->bwdReachOutBBSet);
+}
+
 static VIR_BASIC_BLOCK* _AddBasicBlockToCFG(VIR_CONTROL_FLOW_GRAPH* pCfg)
 {
     VIR_BASIC_BLOCK* pBasicBlock = gcvNULL;
@@ -387,11 +416,17 @@ static VIR_BASIC_BLOCK* _AddBasicBlockToCFG(VIR_CONTROL_FLOW_GRAPH* pCfg)
     pBasicBlock->pDomTreeNode = gcvNULL;
     pBasicBlock->pPostDomTreeNode = gcvNULL;
     pBasicBlock->flags = 0;
+    pBasicBlock->globalBbId = pCfg->pOwnerFuncBlk->pOwnerCG->nextGlobalBbId ++;
+    vscHTBL_DirectSet(&pCfg->pOwnerFuncBlk->pOwnerCG->globalBbHashTable,
+                      (void*)(gctUINTPTR_T)pBasicBlock->globalBbId, pBasicBlock);
 
     vscBV_Initialize(&pBasicBlock->domSet, gcvNULL, 0);
     vscBV_Initialize(&pBasicBlock->postDomSet, gcvNULL, 0);
     vscBV_Initialize(&pBasicBlock->dfSet, gcvNULL, 0);
     vscBV_Initialize(&pBasicBlock->cdSet, gcvNULL, 0);
+
+    _InitializeBbReachRelation(&pBasicBlock->globalReachSet, gcvNULL, 0);
+    _InitializeBbReachRelation(&pBasicBlock->localReachSet, gcvNULL, 0);
 
     vscDG_AddNode(&pCfg->dgGraph, &pBasicBlock->dgNode);
 
@@ -433,10 +468,10 @@ static void _AddBasicBlocksToCFG(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_Function* pFu
         /* End current basic block and start a new basic block */
         if ((pPrevInst != gcvNULL) &&
             (
-#if SUPPORT_IPA_DFA
+            /* Call is regarded as an individual BB for potential IPA */
             VIR_OPCODE_isCall(VIR_Inst_GetOpcode(pPrevInst))   ||
             VIR_OPCODE_isCall(VIR_Inst_GetOpcode(pThisInst))   ||
-#endif
+            /* Branch will end a bb, while branch-target will start a bb */
             VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(pPrevInst)) ||
             (VIR_Inst_GetOpcode(pThisInst) == VIR_OP_LABEL)
             ))
@@ -513,7 +548,8 @@ static void _AddEdgesForCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
             {
                 /* Add a TRUE edge to next */
                 _AddEdgeForCFG(pCFG, pThisBlock,
-                               (VIR_BASIC_BLOCK*)DGND_GET_NEXT_NODE(&pThisBlock->dgNode),
+                               DGND_GET_NEXT_NODE(&pThisBlock->dgNode) ?
+                               (VIR_BASIC_BLOCK*)DGND_GET_NEXT_NODE(&pThisBlock->dgNode) : pExitBlock,
                                VIR_CFG_EDGE_TYPE_TRUE);
 
                 /* Add a FALSE edge to its branch target */
@@ -577,8 +613,7 @@ static gctBOOL _RootBasicBlkHandlerDFSPost(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_BAS
     return gcvTRUE;
 }
 
-/* remove basic block from CFG. If deletedInst is set,
-   remove the instrunctions inside BB*/
+/* Remove basic block from CFG. */
 static void _RemoveBasicBlockFromCFG(
     VIR_CONTROL_FLOW_GRAPH* pCFG,
     VIR_BASIC_BLOCK* pBasicBlk,
@@ -595,6 +630,13 @@ static void _RemoveBasicBlockFromCFG(
     vscBV_Finalize(&pBasicBlk->postDomSet);
     vscBV_Finalize(&pBasicBlk->dfSet);
     vscBV_Finalize(&pBasicBlk->cdSet);
+
+    _FinalizeBbReachRelation(&pBasicBlk->globalReachSet);
+    _FinalizeBbReachRelation(&pBasicBlk->localReachSet);
+
+    vscHTBL_DirectRemove(&pCFG->pOwnerFuncBlk->pOwnerCG->globalBbHashTable,
+                         (void*)(gctUINTPTR_T)pBasicBlk->globalBbId);
+    pBasicBlk->globalBbId = INVALID_GLOBAL_BB_ID;
 
     while (pInst)
     {
@@ -736,7 +778,7 @@ VSC_ErrCode vscVIR_BuildCFG(VIR_Shader* pShader)
         }
     }
 
-    return errCode;
+    return vscVIR_BuildBbReachRelation(pShader);
 }
 
 VSC_ErrCode vscVIR_DestroyCFG(VIR_Shader* pShader)
@@ -745,6 +787,12 @@ VSC_ErrCode vscVIR_DestroyCFG(VIR_Shader* pShader)
     VIR_Function*          pFunc;
     VIR_FunctionNode*      pFuncNode;
     VIR_FuncIterator       funcIter;
+
+    errCode = vscVIR_DestroyBbReachRelation(pShader);
+    if (errCode != VSC_ERR_NONE)
+    {
+        return errCode;
+    }
 
     VIR_FuncIterator_Init(&funcIter, &pShader->functions);
     pFuncNode = VIR_FuncIterator_First(&funcIter);
@@ -1701,4 +1749,309 @@ VSC_ErrCode vscVIR_DestroyDomFrontier(VIR_Shader* pShader)
 
     return errCode;
 }
+
+/*
+ * BB reach-relation functions
+ */
+
+static void _BbReach_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow)
+{
+    vscBV_SetBit(&pTsBlockFlow->genFlow, pTsBlockFlow->pOwnerBB->globalBbId);
+}
+
+static void _BbReach_Init_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow)
+{
+    /* Nothing needs to do */
+}
+
+static gctBOOL _BbReach_Iterate_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow)
+{
+    VSC_BIT_VECTOR*        pInFlow = &pTsBlockFlow->inFlow;
+    VSC_BIT_VECTOR*        pOutFlow = &pTsBlockFlow->outFlow;
+    VSC_BIT_VECTOR*        pGenFlow = &pTsBlockFlow->genFlow;
+    VSC_BIT_VECTOR*        pKillFlow = &pTsBlockFlow->killFlow;
+    VSC_BIT_VECTOR         tmpFlow;
+    gctBOOL                bChanged = gcvFALSE;
+
+    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
+
+    /* Out = Gen U (In - Kill) */
+    vscBV_Minus2(&tmpFlow, pInFlow, pKillFlow);
+    vscBV_Or1(&tmpFlow, pGenFlow);
+
+    bChanged = !vscBV_Equal(&tmpFlow, pOutFlow);
+    if (bChanged)
+    {
+        vscBV_Copy(pOutFlow, &tmpFlow);
+    }
+
+    vscBV_Finalize(&tmpFlow);
+
+    return bChanged;
+}
+
+static gctBOOL _BbReach_Combine_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pTsBlockFlow)
+{
+    VIR_BASIC_BLOCK*             pPredBasicBlk;
+    VSC_ADJACENT_LIST_ITERATOR   predEdgeIter;
+    VIR_CFG_EDGE*                pPredEdge;
+    VIR_BASIC_BLOCK*             pBasicBlock = pTsBlockFlow->pOwnerBB;
+    VSC_BIT_VECTOR*              pInFlow = &pTsBlockFlow->inFlow;
+    VSC_BIT_VECTOR               tmpFlow;
+    gctBOOL                      bChanged = gcvFALSE;
+
+    /* If there is no predecessors, then just reture FALSE */
+    if (DGND_GET_IN_DEGREE(&pBasicBlock->dgNode) == 0)
+    {
+        return gcvFALSE;
+    }
+
+    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
+
+    /* In = U all-pred-Outs */
+    VSC_ADJACENT_LIST_ITERATOR_INIT(&predEdgeIter, &pBasicBlock->dgNode.predList);
+    pPredEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&predEdgeIter);
+    for (; pPredEdge != gcvNULL; pPredEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&predEdgeIter))
+    {
+        pPredBasicBlk = CFG_EDGE_GET_TO_BB(pPredEdge);
+        vscBV_Or1(&tmpFlow, &pPredBasicBlk->pTsWorkDataFlow->outFlow);
+    }
+
+    bChanged = !vscBV_Equal(&tmpFlow, pInFlow);
+    if (bChanged)
+    {
+        vscBV_Copy(pInFlow, &tmpFlow);
+    }
+
+    vscBV_Finalize(&tmpFlow);
+
+    return bChanged;
+}
+
+static gctBOOL _BbReach_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_BLOCK_FLOW* pCallerTsBlockFlow)
+{
+    VIR_BASIC_BLOCK*       pBasicBlock = pCallerTsBlockFlow->pOwnerBB;
+    VSC_BIT_VECTOR*        pOutFlow = &pCallerTsBlockFlow->outFlow;
+    VSC_BIT_VECTOR*        pInFlow = &pCallerTsBlockFlow->inFlow;
+    VIR_FUNC_BLOCK*        pCallee = VIR_Inst_GetCallee(pBasicBlock->pStartInst)->pFuncBlock;
+    VIR_TS_FUNC_FLOW*      pCalleeFuncFlow = (VIR_TS_FUNC_FLOW*)vscSRARR_GetElement(&pBaseTsDFA->tsFuncFlowArray, pCallee->dgNode.id);
+    VSC_BIT_VECTOR         tmpFlow;
+    gctBOOL                bChanged = gcvFALSE;
+
+    gcmASSERT(pBasicBlock->flowType == VIR_FLOW_TYPE_CALL);
+
+    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
+
+    /* Out = In U (out flow of callee) */
+    vscBV_Or2(&tmpFlow, pInFlow, &pCalleeFuncFlow->outFlow);
+
+    bChanged = !vscBV_Equal(pOutFlow, &tmpFlow);
+    if (bChanged)
+    {
+        vscBV_Copy(pOutFlow, &tmpFlow);
+    }
+
+    vscBV_Finalize(&tmpFlow);
+
+    return bChanged;
+}
+
+static gctBOOL _BbReach_Func_Flow_Combine_From_Callers_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS_FUNC_FLOW* pCalleeTsFuncFlow)
+{
+    gctUINT                      callerIdx;
+    VIR_BASIC_BLOCK*             pCallerBasicBlk;
+    VIR_Instruction*             pCallSiteInst;
+    VIR_FUNC_BLOCK*              pCalleeFuncBlock = pCalleeTsFuncFlow->pOwnerFB;
+    VSC_BIT_VECTOR*              pInFlow = &pCalleeTsFuncFlow->inFlow;
+    VSC_ADJACENT_LIST_ITERATOR   callerIter;
+    VIR_CG_EDGE*                 pCallerEdge;
+    VSC_BIT_VECTOR               tmpFlow;
+    gctBOOL                      bChanged = gcvFALSE;
+
+    vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
+
+    /* U all in flow of caller at every call site */
+    VSC_ADJACENT_LIST_ITERATOR_INIT(&callerIter, &pCalleeFuncBlock->dgNode.predList);
+    pCallerEdge = (VIR_CG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&callerIter);
+    for (; pCallerEdge != gcvNULL; pCallerEdge = (VIR_CG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&callerIter))
+    {
+        /* Call site info is only stored at successor edge */
+        pCallerEdge = CG_PRED_EDGE_TO_SUCC_EDGE(pCallerEdge);
+
+        for (callerIdx = 0; callerIdx < vscSRARR_GetElementCount(&pCallerEdge->callSiteArray); callerIdx ++)
+        {
+            pCallSiteInst = *(VIR_Instruction**)vscSRARR_GetElement(&pCallerEdge->callSiteArray, callerIdx);
+            pCallerBasicBlk = VIR_Inst_GetBasicBlock(pCallSiteInst);
+
+            if (pCallerBasicBlk == gcvNULL)
+            {
+                gcmASSERT(gcvFALSE);
+                continue;
+            }
+
+            vscBV_Or1(&tmpFlow, &pCallerBasicBlk->pTsWorkDataFlow->inFlow);
+        }
+    }
+
+    bChanged = !vscBV_Equal(&tmpFlow, pInFlow);
+    if (bChanged)
+    {
+        vscBV_Copy(pInFlow, &tmpFlow);
+    }
+
+    vscBV_Finalize(&tmpFlow);
+
+    return bChanged;
+}
+
+VSC_ErrCode vscVIR_BuildBbReachRelation(VIR_Shader* pShader)
+{
+    VSC_ErrCode             errCode  = VSC_ERR_NONE;
+    VIR_CALL_GRAPH*         pCg = gcvNULL;
+    gctUINT                 globalBbCount, globalFromBbIdx;
+    CG_ITERATOR             funcBlkIter;
+    VIR_FUNC_BLOCK*         pFuncBlk;
+    CFG_ITERATOR            basicBlkIter;
+    VIR_BASIC_BLOCK*        pThisBlock;
+    VIR_BASIC_BLOCK*        pFromBlock;
+    VIR_BASE_TS_DFA         baseTsDFA;
+    VIR_CONTROL_FLOW_GRAPH* pCFG;
+    VSC_BIT_VECTOR*         pInFlow;
+    VIR_TS_DFA_RESOLVERS    tsDfaResolvers = {
+                                              _BbReach_Local_GenKill_Resolver,
+                                              _BbReach_Init_Resolver,
+                                              _BbReach_Iterate_Resolver,
+                                              _BbReach_Combine_Resolver,
+                                              _BbReach_Block_Flow_Combine_From_Callee_Resolver,
+                                              _BbReach_Func_Flow_Combine_From_Callers_Resolver
+                                             };
+
+    if (pShader->mainFunction->pFuncBlock == gcvNULL)
+    {
+        return VSC_ERR_CG_NOT_BUILT;
+    }
+
+    /* We try to borrow iterative DFA solution to build bb reach relation. For this special
+       flow, each object of flow is basic-block (identified by globalBbId which is also a
+       flow index in flow). */
+
+    pCg = pShader->mainFunction->pFuncBlock->pOwnerCG;
+    globalBbCount = CG_GET_HIST_GLOBAL_BB_COUNT(pCg);
+
+    /* 1. We firstly get raw global BB reach relation by using DFA solution */
+
+    vscVIR_InitializeBaseTsDFA(&baseTsDFA,
+                               pCg,
+                               VIR_DFA_TYPE_HELPER,
+                               globalBbCount,
+                               &pCg->pmp.mmWrapper,
+                               &tsDfaResolvers);
+
+    errCode = vscVIR_DoForwardIterativeTsDFA(pCg, &baseTsDFA, gcvTRUE);
+    ON_ERROR(errCode, "Build raw bb reach relation");
+
+    /* 2. We now can generate our own global and local BB reach relation based on raw info.
+          Note based on the fact because A can reach to B forwardly, then B must reach to A
+          backwardly, we will directly generate bwd reach relation with raw info got by fwd
+          iterative */
+    CG_ITERATOR_INIT(&funcBlkIter, pCg);
+    pFuncBlk = (VIR_FUNC_BLOCK *)CG_ITERATOR_FIRST(&funcBlkIter);
+    for (; pFuncBlk != gcvNULL; pFuncBlk = (VIR_FUNC_BLOCK *)CG_ITERATOR_NEXT(&funcBlkIter))
+    {
+        pCFG = &pFuncBlk->cfg;
+        CFG_ITERATOR_INIT(&basicBlkIter, pCFG);
+        pThisBlock = (VIR_BASIC_BLOCK *)CFG_ITERATOR_FIRST(&basicBlkIter);
+        for (; pThisBlock != gcvNULL; pThisBlock = (VIR_BASIC_BLOCK *)CFG_ITERATOR_NEXT(&basicBlkIter))
+        {
+            if (!BV_IS_VALID(&pThisBlock->globalReachSet.bwdReachInBBSet))
+            {
+                _InitializeBbReachRelation(&pThisBlock->globalReachSet,
+                                           &pCFG->pmp.mmWrapper,
+                                           globalBbCount);
+                _InitializeBbReachRelation(&pThisBlock->localReachSet,
+                                           &pCFG->pmp.mmWrapper,
+                                           vscDG_GetHistNodeCount(&pCFG->dgGraph));
+            }
+
+            /* Note we only use inFlow of BB to get reach-relation because outFlow make all BB
+               self-reached which is wrong. Only body of loop or other similiar back-edge cfg
+               have bb self-reached. */
+            pInFlow = &pThisBlock->pTsWorkDataFlow->inFlow;
+
+            globalFromBbIdx = 0;
+            while ((globalFromBbIdx = vscBV_FindSetBitForward(pInFlow, globalFromBbIdx)) != (gctUINT)INVALID_BIT_LOC)
+            {
+                pFromBlock = CG_GET_BB_BY_GLOBAL_ID(pCg, globalFromBbIdx);
+                gcmASSERT(pFromBlock->globalBbId == globalFromBbIdx);
+
+                if (!BV_IS_VALID(&pFromBlock->globalReachSet.bwdReachInBBSet))
+                {
+                    _InitializeBbReachRelation(&pFromBlock->globalReachSet,
+                                               &pFromBlock->pOwnerCFG->pmp.mmWrapper,
+                                               globalBbCount);
+                    _InitializeBbReachRelation(&pFromBlock->localReachSet,
+                                               &pFromBlock->pOwnerCFG->pmp.mmWrapper,
+                                               vscDG_GetHistNodeCount(&pFromBlock->pOwnerCFG->dgGraph));
+                }
+
+                /* Fwd */
+                vscBV_SetBit(&pThisBlock->globalReachSet.fwdReachInBBSet, globalFromBbIdx);
+                vscBV_SetBit(&pFromBlock->globalReachSet.fwdReachOutBBSet, pThisBlock->globalBbId);
+                if (pFromBlock->pOwnerCFG == pThisBlock->pOwnerCFG)
+                {
+                    vscBV_SetBit(&pThisBlock->localReachSet.fwdReachInBBSet, pFromBlock->dgNode.id);
+                    vscBV_SetBit(&pFromBlock->localReachSet.fwdReachOutBBSet, pThisBlock->dgNode.id);
+                }
+
+                /* Bwd */
+                vscBV_SetBit(&pFromBlock->globalReachSet.bwdReachInBBSet, pThisBlock->globalBbId);
+                vscBV_SetBit(&pThisBlock->globalReachSet.bwdReachOutBBSet, globalFromBbIdx);
+                if (pFromBlock->pOwnerCFG == pThisBlock->pOwnerCFG)
+                {
+                    vscBV_SetBit(&pFromBlock->localReachSet.bwdReachInBBSet, pThisBlock->dgNode.id);
+                    vscBV_SetBit(&pThisBlock->localReachSet.bwdReachOutBBSet, pFromBlock->dgNode.id);
+                }
+
+                globalFromBbIdx ++;
+            }
+        }
+    }
+
+OnError:
+    vscVIR_FinalizeBaseTsDFA(&baseTsDFA);
+    return errCode;
+}
+
+VSC_ErrCode vscVIR_DestroyBbReachRelation(VIR_Shader* pShader)
+{
+    VSC_ErrCode            errCode  = VSC_ERR_NONE;
+    VIR_CALL_GRAPH*        pCg = gcvNULL;
+    CG_ITERATOR            funcBlkIter;
+    VIR_FUNC_BLOCK*        pFuncBlk;
+    CFG_ITERATOR           basicBlkIter;
+    VIR_BASIC_BLOCK*       pThisBlock;
+
+    if (pShader->mainFunction->pFuncBlock == gcvNULL)
+    {
+        return VSC_ERR_CG_NOT_BUILT;
+    }
+
+    pCg = pShader->mainFunction->pFuncBlock->pOwnerCG;
+
+    CG_ITERATOR_INIT(&funcBlkIter, pCg);
+    pFuncBlk = (VIR_FUNC_BLOCK *)CG_ITERATOR_FIRST(&funcBlkIter);
+    for (; pFuncBlk != gcvNULL; pFuncBlk = (VIR_FUNC_BLOCK *)CG_ITERATOR_NEXT(&funcBlkIter))
+    {
+        CFG_ITERATOR_INIT(&basicBlkIter, &pFuncBlk->cfg);
+        pThisBlock = (VIR_BASIC_BLOCK *)CFG_ITERATOR_FIRST(&basicBlkIter);
+        for (; pThisBlock != gcvNULL; pThisBlock = (VIR_BASIC_BLOCK *)CFG_ITERATOR_NEXT(&basicBlkIter))
+        {
+            _FinalizeBbReachRelation(&pThisBlock->globalReachSet);
+            _FinalizeBbReachRelation(&pThisBlock->localReachSet);
+        }
+    }
+
+    return errCode;
+}
+
 

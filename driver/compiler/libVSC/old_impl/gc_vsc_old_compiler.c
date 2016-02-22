@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -74,7 +74,7 @@ const gcSL_OPCODE_ATTR gcvOpcodeAttr[] =
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_FLOOR, 0x16 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_CEIL, 0x17 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_CROSS, 0x18 */
-    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID }, /* gcSL_TEXLDPROJ, 0x19 */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_TEXLDPROJ, 0x19 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID }, /* gcSL_TEXBIAS, 0x1A */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID }, /* gcSL_TEXGRAD, 0x1B */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID }, /* gcSL_TEXLOD, 0x1C */
@@ -88,7 +88,7 @@ const gcSL_OPCODE_ATTR gcvOpcodeAttr[] =
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_ACOS, 0x24 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_ASIN, 0x25 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_ATAN, 0x26 */
-    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_LP      }, /* gcSL_SET, 0x27 */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HIA     }, /* gcSL_SET, 0x27 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_DSX, 0x28 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_DSY, 0x29 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_FWIDTH, 0x2A */
@@ -97,7 +97,7 @@ const gcSL_OPCODE_ATTR gcvOpcodeAttr[] =
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HIA     }, /* gcSL_AND_BITWISE, 0x2D */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HIA     }, /* gcSL_OR_BITWISE, 0x2E */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HIA     }, /* gcSL_XOR_BITWISE, 0x2F */
-    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HIA     }, /* gcSL_NOT_BITWISE, 0x30 */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_NOT_BITWISE, 0x30 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_LSHIFT, 0x31 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_RSHIFT, 0x32 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_ROTATE, 0x33 */
@@ -157,9 +157,9 @@ const gcSL_OPCODE_ATTR gcvOpcodeAttr[] =
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HIA     }, /* gcSL_NORM_DP4, 0x69  VIRCG only */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HIA     }, /* gcSL_PRE_DIV, 0x6A  VIRCG only */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HIA     }, /* gcSL_PRE_LOG2, 0x6B  VIRCG only */
-    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_TEXGATHER, 0x6C  ES31 */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID }, /* gcSL_TEXGATHER, 0x6C  ES31 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_TEXFETCH_MS, 0x6D  ES31 */
-    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HIA     }, /* gcSL_POPCOUNT, 0x6E  ES31(OCL1.2)*/
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_LP      }, /* gcSL_POPCOUNT, 0x6E  ES31(OCL1.2)*/
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_BIT_REVERSAL, 0x6F  ES31 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_BYTE_REVERSAL, 0x70  ES31 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_TEXPCF, 0x71  ES31 */
@@ -170,7 +170,7 @@ const gcSL_OPCODE_ATTR gcvOpcodeAttr[] =
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID }, /* gcSL_TEXU_LOD, 0x74  paired with gcSL_TEXLD to implement HW texld_u_lod */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID }, /* gcSL_MEM_BARRIER, 0x75  Memory Barrier. */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID }, /* gcSL_SAMPLER_ASSIGN, 0x76  Sampler assignment as a parameter, only exist on FE. */
-    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_LP      }, /* gcSL_GET_SAMPLER_IDX,0x77  Get Image/Sampler index */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_GET_SAMPLER_IDX,0x77  Get Image/Sampler index */
 
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_IMAGE_RD_3D, 0x78 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_IMAGE_WR_3D, 0x79 */
@@ -181,8 +181,8 @@ const gcSL_OPCODE_ATTR gcvOpcodeAttr[] =
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID }, /* gcSL_ATTR_LD, 0x7E ATTR_LD dest, attribute(0+temp(1).x), InvocationIndex */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID }, /* gcSL_EMIT_VERTEX, 0x7F For function "EmitVertex" */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID }, /* gcSL_END_PRIMITIVE, 0x80 For function "EndPrimitive" */
-    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_MP      }, /* gcSL_ARCTRIG0, 0x81 For triangle functions */
-    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_MP      }, /* gcSL_ARCTRIG1, 0x82 For triangle functions */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HP      }, /* gcSL_ARCTRIG0, 0x81 For triangle functions */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HP      }, /* gcSL_ARCTRIG1, 0x82 For triangle functions */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HIA     }, /* gcSL_MUL_Z, 0x83 special mul, resulting in 0 from inf * 0 */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_NEG, 0x84 neg(a) is similar to (0 - (a)) */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_LONGLO, 0x85 get the lower 4 bytes of a long/ulong integer */
@@ -190,15 +190,18 @@ const gcSL_OPCODE_ATTR gcvOpcodeAttr[] =
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_MOV_LONG, 0x87 mov two 4 byte integers to the lower/upper 4 bytes of a long/ulong integer */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HIA     }, /* gcSL_MADSAT, 0x88 mad with saturation for integer only */
     {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_COPY, 0x89 copy register contents */
-    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HP      }, /* gcSL_IMAGE_ADDR_3D, 0x8A  ES31 */
-    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_MP      }, /* gcSL_GET_SAMPLER_LMM,0x8B Get sampler's lodminmax */
-    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_MP      }, /* gcSL_GET_SAMPLER_LBS,0x8C Get sampler's levelbasesize */
-    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_TEXLD_U, 0x8D */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HP      }, /* gcSL_LOAD_L, 0x8A  ES31 */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HP      }, /* gcSL_STORE_L, 0x8B  ES31 */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_HP      }, /* gcSL_IMAGE_ADDR_3D, 0x8C  ES31 */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_MP      }, /* gcSL_GET_SAMPLER_LMM,0x8D Get sampler's lodminmax */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_MP      }, /* gcSL_GET_SAMPLER_LBS,0x8E Get sampler's levelbasesize */
+    {_gcSL_OPCODE_ATTR_RESULT_PRECISION_AF      }, /* gcSL_TEXLD_U, 0x8F */
 };
 char _checkOpAttr_size[sizeof(gcvOpcodeAttr)/sizeof(gcvOpcodeAttr[0]) == gcSL_MAXOPCODE];
 
 const gcSHADER_TYPEINFO gcvShaderTypeInfo[] =
 {
+    /*  type        components  rows  rowType          componentType          kind           name  */
     {gcSHADER_FLOAT_X1, 1, 1, gcSHADER_FLOAT_X1, gcSHADER_FLOAT_X1, gceTK_FLOAT, "float"},
     {gcSHADER_FLOAT_X2, 2, 1, gcSHADER_FLOAT_X2, gcSHADER_FLOAT_X1, gceTK_FLOAT, "float2"},
     {gcSHADER_FLOAT_X3, 3, 1, gcSHADER_FLOAT_X3, gcSHADER_FLOAT_X1, gceTK_FLOAT, "float3"},
@@ -307,33 +310,33 @@ const gcSHADER_TYPEINFO gcvShaderTypeInfo[] =
     { gcSHADER_FLOAT16_X2, 2, 1, gcSHADER_FLOAT16_X2, gcSHADER_FLOAT16_X1, gceTK_FLOAT16, "half2"},
     { gcSHADER_FLOAT16_X3, 3, 1, gcSHADER_FLOAT16_X3, gcSHADER_FLOAT16_X1, gceTK_FLOAT16, "half3"},
     { gcSHADER_FLOAT16_X4, 4, 1, gcSHADER_FLOAT16_X4, gcSHADER_FLOAT16_X1, gceTK_FLOAT16, "half4"},
-    { gcSHADER_FLOAT16_X8, 8, 1, gcSHADER_FLOAT16_X8, gcSHADER_FLOAT16_X1, gceTK_FLOAT16, "half8"},
-    { gcSHADER_FLOAT16_X16, 16, 1, gcSHADER_FLOAT16_X16, gcSHADER_FLOAT16_X1, gceTK_FLOAT16, "half16"},
-    { gcSHADER_FLOAT16_X32, 32, 1, gcSHADER_FLOAT16_X32, gcSHADER_FLOAT16_X1, gceTK_FLOAT16, "half32"},
+    { gcSHADER_FLOAT16_X8, 4, 2, gcSHADER_FLOAT16_X8, gcSHADER_FLOAT16_X1, gceTK_FLOAT16, "half8"},
+    { gcSHADER_FLOAT16_X16, 4, 4, gcSHADER_FLOAT16_X16, gcSHADER_FLOAT16_X1, gceTK_FLOAT16, "half16"},
+    { gcSHADER_FLOAT16_X32, 4, 8, gcSHADER_FLOAT16_X32, gcSHADER_FLOAT16_X1, gceTK_FLOAT16, "half32"},
 
     /*  boolean  */
 
-    { gcSHADER_BOOLEAN_X8, 8, 1, gcSHADER_BOOLEAN_X8, gcSHADER_BOOLEAN_X1, gceTK_BOOL, "bool8"},
-    { gcSHADER_BOOLEAN_X16, 16, 1, gcSHADER_BOOLEAN_X16, gcSHADER_BOOLEAN_X1, gceTK_BOOL, "bool16"},
-    { gcSHADER_BOOLEAN_X32, 32, 1, gcSHADER_BOOLEAN_X16, gcSHADER_BOOLEAN_X1, gceTK_BOOL, "bool32"},
+    { gcSHADER_BOOLEAN_X8, 4, 2, gcSHADER_BOOLEAN_X8, gcSHADER_BOOLEAN_X1, gceTK_BOOL, "bool8"},
+    { gcSHADER_BOOLEAN_X16, 4, 4, gcSHADER_BOOLEAN_X16, gcSHADER_BOOLEAN_X1, gceTK_BOOL, "bool16"},
+    { gcSHADER_BOOLEAN_X32, 4, 8, gcSHADER_BOOLEAN_X16, gcSHADER_BOOLEAN_X1, gceTK_BOOL, "bool32"},
 
     /* uchar vectors  */
     { gcSHADER_UINT8_X1, 1, 1, gcSHADER_UINT8_X1, gcSHADER_UINT8_X1, gceTK_UCHAR, "uchar"},
     { gcSHADER_UINT8_X2, 2, 1, gcSHADER_UINT8_X2, gcSHADER_UINT8_X1, gceTK_UCHAR, "uchar2"},
     { gcSHADER_UINT8_X3, 3, 1, gcSHADER_UINT8_X3, gcSHADER_UINT8_X1, gceTK_UCHAR, "uchar3"},
     { gcSHADER_UINT8_X4, 4, 1, gcSHADER_UINT8_X4, gcSHADER_UINT8_X1, gceTK_UCHAR, "uchar4"},
-    { gcSHADER_UINT8_X8, 8, 1, gcSHADER_UINT8_X8, gcSHADER_UINT8_X1, gceTK_UCHAR, "uchar8"},
-    { gcSHADER_UINT8_X16, 16, 1, gcSHADER_UINT8_X16, gcSHADER_UINT8_X1, gceTK_UCHAR, "uchar16"},
-    { gcSHADER_UINT8_X32, 32, 1, gcSHADER_UINT8_X32, gcSHADER_UINT8_X1, gceTK_UCHAR, "uchar32"},
+    { gcSHADER_UINT8_X8, 4, 2, gcSHADER_UINT8_X8, gcSHADER_UINT8_X1, gceTK_UCHAR, "uchar8"},
+    { gcSHADER_UINT8_X16, 4, 4, gcSHADER_UINT8_X16, gcSHADER_UINT8_X1, gceTK_UCHAR, "uchar16"},
+    { gcSHADER_UINT8_X32, 4, 8, gcSHADER_UINT8_X32, gcSHADER_UINT8_X1, gceTK_UCHAR, "uchar32"},
 
     /* char vectors  */
     { gcSHADER_INT8_X1, 1, 1, gcSHADER_INT8_X1, gcSHADER_INT8_X1, gceTK_CHAR, "char"},
     { gcSHADER_INT8_X2, 2, 1, gcSHADER_INT8_X2, gcSHADER_INT8_X1, gceTK_CHAR, "char2"},
     { gcSHADER_INT8_X3, 3, 1, gcSHADER_INT8_X3, gcSHADER_INT8_X1, gceTK_CHAR, "char3"},
     { gcSHADER_INT8_X4, 4, 1, gcSHADER_INT8_X4, gcSHADER_INT8_X1, gceTK_CHAR, "char4"},
-    { gcSHADER_INT8_X8, 8, 1, gcSHADER_INT8_X8, gcSHADER_INT8_X1, gceTK_CHAR, "char8"},
-    { gcSHADER_INT8_X16, 16, 1, gcSHADER_INT8_X16, gcSHADER_INT8_X1, gceTK_CHAR, "char16"},
-    { gcSHADER_INT8_X32, 32, 1, gcSHADER_INT8_X32, gcSHADER_INT8_X1, gceTK_CHAR, "char32"},
+    { gcSHADER_INT8_X8, 4, 2, gcSHADER_INT8_X8, gcSHADER_INT8_X1, gceTK_CHAR, "char8"},
+    { gcSHADER_INT8_X16, 4, 4, gcSHADER_INT8_X16, gcSHADER_INT8_X1, gceTK_CHAR, "char16"},
+    { gcSHADER_INT8_X32, 4, 8, gcSHADER_INT8_X32, gcSHADER_INT8_X1, gceTK_CHAR, "char32"},
 
 
     /* ushort vectors */
@@ -341,18 +344,18 @@ const gcSHADER_TYPEINFO gcvShaderTypeInfo[] =
     { gcSHADER_UINT16_X2, 2, 1, gcSHADER_UINT16_X2, gcSHADER_UINT16_X1, gceTK_USHORT, "ushort2"},
     { gcSHADER_UINT16_X3, 3, 1, gcSHADER_UINT16_X3, gcSHADER_UINT16_X1, gceTK_USHORT, "ushort3"},
     { gcSHADER_UINT16_X4, 4, 1, gcSHADER_UINT16_X4, gcSHADER_UINT16_X1, gceTK_USHORT, "ushort4"},
-    { gcSHADER_UINT16_X8, 8, 1, gcSHADER_UINT16_X8, gcSHADER_UINT16_X1, gceTK_USHORT, "ushort8"},
-    { gcSHADER_UINT16_X16, 16, 1, gcSHADER_UINT16_X16, gcSHADER_UINT16_X1, gceTK_USHORT, "ushort16"},
-    { gcSHADER_UINT16_X32, 32, 1, gcSHADER_UINT16_X32, gcSHADER_UINT16_X1, gceTK_USHORT, "ushort32"},
+    { gcSHADER_UINT16_X8, 4, 2, gcSHADER_UINT16_X8, gcSHADER_UINT16_X1, gceTK_USHORT, "ushort8"},
+    { gcSHADER_UINT16_X16, 4, 4, gcSHADER_UINT16_X16, gcSHADER_UINT16_X1, gceTK_USHORT, "ushort16"},
+    { gcSHADER_UINT16_X32, 4, 8, gcSHADER_UINT16_X32, gcSHADER_UINT16_X1, gceTK_USHORT, "ushort32"},
 
     /* short vectors */
     { gcSHADER_INT16_X1, 1, 1, gcSHADER_INT16_X1, gcSHADER_INT16_X1, gceTK_SHORT, "short"},
     { gcSHADER_INT16_X2, 2, 1, gcSHADER_INT16_X2, gcSHADER_INT16_X1, gceTK_SHORT, "short2"},
     { gcSHADER_INT16_X3, 3, 1, gcSHADER_INT16_X3, gcSHADER_INT16_X1, gceTK_SHORT, "short3"},
     { gcSHADER_INT16_X4, 4, 1, gcSHADER_INT16_X4, gcSHADER_INT16_X1, gceTK_SHORT, "short4"},
-    { gcSHADER_INT16_X8, 8, 1, gcSHADER_INT16_X8, gcSHADER_INT16_X1, gceTK_SHORT, "short8"},
-    { gcSHADER_INT16_X16, 16, 1, gcSHADER_INT16_X16, gcSHADER_INT16_X1, gceTK_SHORT, "short16"},
-    { gcSHADER_INT16_X32, 32, 1, gcSHADER_INT16_X32, gcSHADER_INT16_X1, gceTK_SHORT, "short32"},
+    { gcSHADER_INT16_X8, 4, 2, gcSHADER_INT16_X8, gcSHADER_INT16_X1, gceTK_SHORT, "short8"},
+    { gcSHADER_INT16_X16, 4, 4, gcSHADER_INT16_X16, gcSHADER_INT16_X1, gceTK_SHORT, "short16"},
+    { gcSHADER_INT16_X32, 4, 8, gcSHADER_INT16_X32, gcSHADER_INT16_X1, gceTK_SHORT, "short32"},
 
 
     /* packed data type */
@@ -361,8 +364,8 @@ const gcSHADER_TYPEINFO gcvShaderTypeInfo[] =
     { gcSHADER_FLOAT16_P3, 3, 1, gcSHADER_FLOAT16_P3, gcSHADER_FLOAT16_X1, gceTK_FLOAT16, "half3_packed"},
     { gcSHADER_FLOAT16_P4, 4, 1, gcSHADER_FLOAT16_P4, gcSHADER_FLOAT16_X1, gceTK_FLOAT16, "half4_packed"},
     { gcSHADER_FLOAT16_P8, 8, 1, gcSHADER_FLOAT16_P8, gcSHADER_FLOAT16_X1, gceTK_FLOAT16, "half8_packed"},
-    { gcSHADER_FLOAT16_P16, 16, 1, gcSHADER_FLOAT16_P16, gcSHADER_FLOAT16_X1, gceTK_FLOAT16, "half16_packed"},
-    { gcSHADER_FLOAT16_P32, 32, 1, gcSHADER_FLOAT16_P32, gcSHADER_FLOAT16_X1, gceTK_FLOAT16, "half32_packed"},
+    { gcSHADER_FLOAT16_P16, 8, 2, gcSHADER_FLOAT16_P16, gcSHADER_FLOAT16_X1, gceTK_FLOAT16, "half16_packed"},
+    { gcSHADER_FLOAT16_P32, 8, 4, gcSHADER_FLOAT16_P32, gcSHADER_FLOAT16_X1, gceTK_FLOAT16, "half32_packed"},
 
     /* packed boolean (1 byte per element) */
     { gcSHADER_BOOLEAN_P2, 2, 1, gcSHADER_BOOLEAN_P2, gcSHADER_BOOLEAN_X1, gceTK_BOOL, "bool8_packed"},
@@ -370,7 +373,7 @@ const gcSHADER_TYPEINFO gcvShaderTypeInfo[] =
     { gcSHADER_BOOLEAN_P4, 4, 1, gcSHADER_BOOLEAN_P4, gcSHADER_BOOLEAN_X1, gceTK_BOOL, "bool32_packed"},
     { gcSHADER_BOOLEAN_P8, 8, 1, gcSHADER_BOOLEAN_P8, gcSHADER_BOOLEAN_X1, gceTK_BOOL, "bool8_packed"},
     { gcSHADER_BOOLEAN_P16, 16, 1, gcSHADER_BOOLEAN_P16, gcSHADER_BOOLEAN_X1, gceTK_BOOL, "bool16_packed"},
-    { gcSHADER_BOOLEAN_P32, 32, 1, gcSHADER_BOOLEAN_P16, gcSHADER_BOOLEAN_X1, gceTK_BOOL, "bool32_packed"},
+    { gcSHADER_BOOLEAN_P32, 16, 2, gcSHADER_BOOLEAN_P16, gcSHADER_BOOLEAN_X1, gceTK_BOOL, "bool32_packed"},
 
     /* uchar vectors (1 byte per element) */
     { gcSHADER_UINT8_P2, 2, 1, gcSHADER_UINT8_P2, gcSHADER_UINT8_X1, gceTK_UCHAR, "uchar2_packed"},
@@ -378,7 +381,7 @@ const gcSHADER_TYPEINFO gcvShaderTypeInfo[] =
     { gcSHADER_UINT8_P4, 4, 1, gcSHADER_UINT8_P4, gcSHADER_UINT8_X1, gceTK_UCHAR, "uchar4_packed"},
     { gcSHADER_UINT8_P8, 8, 1, gcSHADER_UINT8_P8, gcSHADER_UINT8_X1, gceTK_UCHAR, "uchar8_packed"},
     { gcSHADER_UINT8_P16, 16, 1, gcSHADER_UINT8_P16, gcSHADER_UINT8_X1, gceTK_UCHAR, "uchar16_packed"},
-    { gcSHADER_UINT8_P32, 32, 1, gcSHADER_UINT8_P32, gcSHADER_UINT8_X1, gceTK_UCHAR, "uchar32_packed"},
+    { gcSHADER_UINT8_P32, 16, 2, gcSHADER_UINT8_P32, gcSHADER_UINT8_X1, gceTK_UCHAR, "uchar32_packed"},
 
     /* char vectors (1 byte per element) */
     { gcSHADER_INT8_P2, 2, 1, gcSHADER_INT8_P2, gcSHADER_INT8_X1, gceTK_CHAR, "char2_packed"},
@@ -386,23 +389,34 @@ const gcSHADER_TYPEINFO gcvShaderTypeInfo[] =
     { gcSHADER_INT8_P4, 4, 1, gcSHADER_INT8_P4, gcSHADER_INT8_X1, gceTK_CHAR, "char4_packed"},
     { gcSHADER_INT8_P8, 8, 1, gcSHADER_INT8_P8, gcSHADER_INT8_X1, gceTK_CHAR, "char8_packed"},
     { gcSHADER_INT8_P16, 16, 1, gcSHADER_INT8_P16, gcSHADER_INT8_X1, gceTK_CHAR, "char16_packed"},
-    { gcSHADER_INT8_P32, 32, 1, gcSHADER_INT8_P32, gcSHADER_INT8_X1, gceTK_CHAR, "char32_packed"},
+    { gcSHADER_INT8_P32, 16, 2, gcSHADER_INT8_P32, gcSHADER_INT8_X1, gceTK_CHAR, "char32_packed"},
 
     /* ushort vectors (2 bytes per element) */
     { gcSHADER_UINT16_P2, 2, 1, gcSHADER_UINT16_P2, gcSHADER_UINT16_X1, gceTK_USHORT, "ushort2_packed"},
     { gcSHADER_UINT16_P3, 3, 1, gcSHADER_UINT16_P3, gcSHADER_UINT16_X1, gceTK_USHORT, "ushort3_packed"},
     { gcSHADER_UINT16_P4, 4, 1, gcSHADER_UINT16_P4, gcSHADER_UINT16_X1, gceTK_USHORT, "ushort4_packed"},
     { gcSHADER_UINT16_P8, 8, 1, gcSHADER_UINT16_P8, gcSHADER_UINT16_X1, gceTK_USHORT, "ushort8_packed"},
-    { gcSHADER_UINT16_P16, 16, 1, gcSHADER_UINT16_P16, gcSHADER_UINT16_X1, gceTK_USHORT, "ushort16_packed"},
-    { gcSHADER_UINT16_P32, 32, 1, gcSHADER_UINT16_P32, gcSHADER_UINT16_X1, gceTK_USHORT, "ushort32_packed"},
+    { gcSHADER_UINT16_P16, 8, 2, gcSHADER_UINT16_P16, gcSHADER_UINT16_X1, gceTK_USHORT, "ushort16_packed"},
+    { gcSHADER_UINT16_P32, 8, 4, gcSHADER_UINT16_P32, gcSHADER_UINT16_X1, gceTK_USHORT, "ushort32_packed"},
 
     /* short vectors (2 bytes per element) */
     { gcSHADER_INT16_P2, 2, 1, gcSHADER_INT16_P2, gcSHADER_INT16_X1, gceTK_SHORT, "short2_packed"},
     { gcSHADER_INT16_P3, 3, 1, gcSHADER_INT16_P3, gcSHADER_INT16_X1, gceTK_SHORT, "short3_packed"},
     { gcSHADER_INT16_P4, 4, 1, gcSHADER_INT16_P4, gcSHADER_INT16_X1, gceTK_SHORT, "short4_packed"},
     { gcSHADER_INT16_P8, 8, 1, gcSHADER_INT16_P8, gcSHADER_INT16_X1, gceTK_SHORT, "short8_packed"},
-    { gcSHADER_INT16_P16, 16, 1, gcSHADER_INT16_P16, gcSHADER_INT16_X1, gceTK_SHORT, "short16_packed"},
-    { gcSHADER_INT16_P32, 32, 1, gcSHADER_INT16_P32, gcSHADER_INT16_X1, gceTK_SHORT, "short32_packed"},
+    { gcSHADER_INT16_P16, 8, 2, gcSHADER_INT16_P16, gcSHADER_INT16_X1, gceTK_SHORT, "short16_packed"},
+    { gcSHADER_INT16_P32, 8, 4, gcSHADER_INT16_P32, gcSHADER_INT16_X1, gceTK_SHORT, "short32_packed"},
+
+    { gcSHADER_INTEGER_X8, 4, 2, gcSHADER_INTEGER_X8, gcSHADER_INTEGER_X1, gceTK_INT, "int8"},
+    { gcSHADER_INTEGER_X16, 4, 4, gcSHADER_INTEGER_X16, gcSHADER_INTEGER_X1, gceTK_INT, "int16"},
+    { gcSHADER_UINT_X8, 4, 2, gcSHADER_UINT_X8, gcSHADER_UINT_X1, gceTK_UINT, "uint8"},
+    { gcSHADER_UINT_X16, 4, 4, gcSHADER_UINT_X16, gcSHADER_UINT_X1, gceTK_UINT, "uint16"},
+    { gcSHADER_FLOAT_X8, 4, 2, gcSHADER_FLOAT_X8, gcSHADER_FLOAT_X1, gceTK_FLOAT, "float8"},
+    { gcSHADER_FLOAT_X16, 4, 4, gcSHADER_FLOAT_X16, gcSHADER_FLOAT_X1, gceTK_FLOAT, "float16"},
+    { gcSHADER_INT64_X8, 4, 4, gcSHADER_INT64_X8, gcSHADER_INT64_X1, gceTK_INT64, "long8"},
+    { gcSHADER_INT64_X16, 4, 8, gcSHADER_INT64_X16, gcSHADER_INT64_X1, gceTK_INT64, "long16"},
+    { gcSHADER_UINT64_X8, 4, 4, gcSHADER_UINT64_X8, gcSHADER_UINT64_X1, gceTK_UINT64, "ulong8"},
+    { gcSHADER_UINT64_X16, 4, 8, gcSHADER_UINT64_X16, gcSHADER_UINT64_X1, gceTK_UINT64, "ulong16"},
 
     {gcSHADER_UNKONWN_TYPE, 0, 0, gcSHADER_UNKONWN_TYPE, gcSHADER_UNKONWN_TYPE, gceTK_UNKOWN, "UNKONWN_TYPE"},
 };
@@ -1699,12 +1713,12 @@ _AllowUpdateTempRegCount(
     {
         return gcvTRUE;
     }
-#if VSC_BUILD
+
     if(RegNum < VIR_SR_Begin)
     {
         return gcvTRUE;
     }
-#endif
+
     return gcvFALSE;
 }
 
@@ -1901,7 +1915,7 @@ gcSHADER_Construct(
 #if gcdSHADER_SRC_BY_MACHINECODE
     shader->replaceIndex            = gcvMACHINECODE_COUNT;
 #endif
-    shader->dual16Mode              = gcvFALSE;
+    shader->isDual16Shader              = gcvFALSE;
 
     shader->RAHighestPriority                  = 0;
 
@@ -2524,7 +2538,7 @@ gcSHADER_IsHaltiCompiler(
     gcmHEADER_ARG("Shader=0x%x", Shader);
 
     haltiCompiler = ((Shader->compilerVersion[0] & 0xFFFF) == _SHADER_GL_LANGUAGE_TYPE &&
-                     (Shader->compilerVersion[1] == _SHADER_HALTI_VERSION || Shader->compilerVersion[1] == _SHADER_ES31_VERSION))
+                     (Shader->compilerVersion[1] == _SHADER_HALTI_VERSION || Shader->compilerVersion[1] == _SHADER_ES31_VERSION || Shader->compilerVersion[1] == _SHADER_ES32_VERSION))
                     || ((Shader->compilerVersion[0] & 0xFFFF) == _SHADER_DX_LANGUAGE_TYPE);
 
     gcmFOOTER_ARG("haltiCompiler=%d", haltiCompiler);
@@ -2545,6 +2559,22 @@ gcSHADER_IsES31Compiler(
 
     gcmFOOTER_ARG("isES31Compiler=%d", isES31Compiler);
     return isES31Compiler;
+}
+
+gctBOOL
+gcSHADER_IsES32Compiler(
+    IN gcSHADER Shader
+    )
+{
+    gctBOOL isES32Compiler;
+
+    gcmHEADER_ARG("Shader=0x%x", Shader);
+
+    isES32Compiler = ((Shader->compilerVersion[0] & 0xFFFF) == _SHADER_GL_LANGUAGE_TYPE &&
+                    Shader->compilerVersion[1] == _SHADER_ES32_VERSION);
+
+    gcmFOOTER_ARG("isES32Compiler=%d", isES32Compiler);
+    return isES32Compiler;
 }
 
 /** SHADER binary file header format: -
@@ -3568,6 +3598,9 @@ gcSHADER_LoadHeader(
     switch(Shader->type) {
     case gcSHADER_TYPE_VERTEX:
     case gcSHADER_TYPE_FRAGMENT:
+#if DX_SHADER
+    case gcSHADER_TYPE_LIBRARY:
+#endif
         if (bytePtr[0] != 'E' || bytePtr[1] != 'S')
         {
             gcoOS_DebugFatal("gcSHADER_LoadHeader: Invalid compiler type \"%c%c\"", bytePtr[0], bytePtr[1]);
@@ -3914,6 +3947,7 @@ _AdjustInstTempRegs(
     IN gcSHADER Shader,
     IN gctUINT *IndexMap,
     IN gctBOOL *InstInKernelFuncPrep,
+    IN gctBOOL HasMemoryAddr,
     IN gctUINT CodeStart
     )
 {
@@ -3931,16 +3965,18 @@ _AdjustInstTempRegs(
         {
             gcSL_OPCODE opcode = gcmSL_OPCODE_GET(code->opcode, Opcode);
 
-            if(opcode != gcSL_STORE1 && opcode != gcSL_STORE)
+            if (opcode != gcSL_STORE1 && opcode != gcSL_STORE)
             {
-                if(!InstInKernelFuncPrep || !InstInKernelFuncPrep[instIdx] ||
-                   code->tempIndex >= _gcdOCL_NumMemoryAddressRegs)
+                if (!HasMemoryAddr ||
+                    !InstInKernelFuncPrep || !InstInKernelFuncPrep[instIdx] ||
+                    code->tempIndex >= _gcdOCL_NumMemoryAddressRegs)
                 {
                     code->tempIndex = (gctUINT16) IndexMap[code->tempIndex];
                 }
 
                 if (gcmSL_TARGET_GET(code->temp, Indexed) != gcSL_NOT_INDEXED &&
-                    (!InstInKernelFuncPrep || !InstInKernelFuncPrep[instIdx] ||
+                    (!HasMemoryAddr ||
+                     !InstInKernelFuncPrep || !InstInKernelFuncPrep[instIdx] ||
                      code->tempIndexed >= _gcdOCL_NumMemoryAddressRegs))
                 {
                     code->tempIndexed = (gctUINT16) IndexMap[code->tempIndexed];
@@ -3955,15 +3991,17 @@ _AdjustInstTempRegs(
 
             if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
             {
-                if(i == 0)
+                if (i == 0)
                 {
-                    if(!InstInKernelFuncPrep || !InstInKernelFuncPrep[instIdx] ||
-                       code->source0Index >= _gcdOCL_NumMemoryAddressRegs)
+                    if (!HasMemoryAddr ||
+                        !InstInKernelFuncPrep || !InstInKernelFuncPrep[instIdx] ||
+                        code->source0Index >= _gcdOCL_NumMemoryAddressRegs)
                     {
                         code->source0Index = (gctUINT16) IndexMap[code->source0Index];
                     }
                     if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED &&
-                        (!InstInKernelFuncPrep || !InstInKernelFuncPrep[instIdx] ||
+                        (!HasMemoryAddr ||
+                         !InstInKernelFuncPrep || !InstInKernelFuncPrep[instIdx] ||
                          code->source0Indexed >= _gcdOCL_NumMemoryAddressRegs))
                     {
                         code->source0Indexed = (gctUINT16) IndexMap[code->source0Indexed];
@@ -3971,14 +4009,16 @@ _AdjustInstTempRegs(
                 }
                 else
                 {
-                    if(!InstInKernelFuncPrep || !InstInKernelFuncPrep[instIdx] ||
-                       code->source1Index >= _gcdOCL_NumMemoryAddressRegs)
+                    if (!HasMemoryAddr ||
+                        !InstInKernelFuncPrep || !InstInKernelFuncPrep[instIdx] ||
+                        code->source1Index >= _gcdOCL_NumMemoryAddressRegs)
                     {
                         code->source1Index = (gctUINT16) IndexMap[code->source1Index];
                     }
                     if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED &&
-                        (!InstInKernelFuncPrep || !InstInKernelFuncPrep[instIdx] ||
-                        code->source1Indexed >= _gcdOCL_NumMemoryAddressRegs))
+                        (!HasMemoryAddr ||
+                         !InstInKernelFuncPrep || !InstInKernelFuncPrep[instIdx] ||
+                         code->source1Indexed >= _gcdOCL_NumMemoryAddressRegs))
                     {
                         code->source1Indexed = (gctUINT16) IndexMap[code->source1Indexed];
                     }
@@ -4654,14 +4694,13 @@ _MergeOneKernel(
     /************************************************************************/
     /*                          kernel functions                            */
     /************************************************************************/
-
-    /* Get the max kernel function args. */
-    if(From->kernelFunctionCount)
+    if (From->kernelFunctionCount)
     {
         gcKERNEL_FUNCTION fromKernelFunction;
         gcSHADER_LABEL label;
         gctUINT labelIndex;
         gctUINT16 labelId;
+        gcSL_INSTRUCTION code;
 
         /* Check array count. */
         gcmASSERT(To->kernelFunctionArraySize >= (To->kernelFunctionCount + From->kernelFunctionCount));
@@ -4670,9 +4709,9 @@ _MergeOneKernel(
         for (i = 0; i < From->kernelFunctionCount; i++)
         {
             fromKernelFunction = From->kernelFunctions[i];
-            if(fromKernelFunction == gcvNULL) continue;
+            if (fromKernelFunction == gcvNULL) continue;
             BuiltinIndex->currentFunctionCount++;
-            if(GetFunctionFlags(fromKernelFunction) & gcvFUNC_EXTERN)
+            if (GetFunctionFlags(fromKernelFunction) & gcvFUNC_EXTERN)
             {
                 gcsFUNCTION_ARGUMENT_PTR arguments;
 
@@ -4710,13 +4749,19 @@ _MergeOneKernel(
             kernelFunction->codeStart         += oldCodeCount;
             kernelFunction->codeEnd           += oldCodeCount;
 
+            /* Update the kernel function call. */
+            code = &To->code[kernelFunction->codeStart + kernelFunction->codeCount - 1];
+            gcmASSERT((gcSL_OPCODE)gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_CALL);
+            code->tempIndex = (gctUINT16)kernelFunction->codeStart;
+
+            /* Update the labels. */
             labelIndex = (gctUINT16)~0 - fromKernelFunction->label + currentFunctionCount;
             labelId = (gctUINT16)BuiltinIndex->labelMap[labelIndex].newLabel;
             kernelFunction->label = labelId;
             labelIndex = (gctUINT16)~0 - labelId;
             label = BuiltinIndex->labelMap[labelIndex].labelDesc;
 
-            if(!label)
+            if (!label)
             {
                 gcmONERROR(gcoOS_Allocate(gcvNULL,
                                           gcmSIZEOF(struct _gcSHADER_LABEL),
@@ -4733,15 +4778,15 @@ _MergeOneKernel(
 
             kernelFunction->name[kernelFunction->nameLength] = '\0';
 
-            for(j = kernelFunction->codeEnd;
-                j < kernelFunction->codeStart + kernelFunction->codeCount; j++)
+            for (j = kernelFunction->codeEnd;
+                 j < kernelFunction->codeStart + kernelFunction->codeCount; j++)
             {
                 BuiltinIndex->instInKernelFuncPrep[j] = gcvTRUE;
             }
 
-
             /* Kernel function arguments */
-            if (kernelFunction->argumentCount > 0) {
+            if (kernelFunction->argumentCount > 0)
+            {
                 bytes = kernelFunction->argumentCount * sizeof(gcsFUNCTION_ARGUMENT);
 
                 /* Allocate the array of gcsFUNCTION_ARGUMENT structures. */
@@ -4750,7 +4795,8 @@ _MergeOneKernel(
                                           &pointer));
                 kernelFunction->arguments = pointer;
 
-                for (j = 0; j < kernelFunction->argumentCount; j++) {
+                for (j = 0; j < kernelFunction->argumentCount; j++)
+                {
                     gcoOS_MemCopy(&kernelFunction->arguments[j],
                                   &fromKernelFunction->arguments[j],
                                   sizeof(gcsFUNCTION_ARGUMENT));
@@ -4759,7 +4805,8 @@ _MergeOneKernel(
             }
 
             /* Kernel function uniform arguments */
-            if (kernelFunction->uniformArgumentCount > 0) {
+            if (kernelFunction->uniformArgumentCount > 0)
+            {
                 /* Allocate the array of gcUNIFORM structure pointers. */
                 gcmONERROR(gcoOS_Allocate(gcvNULL,
                                           kernelFunction->uniformArgumentCount * sizeof(gcUNIFORM),
@@ -4788,7 +4835,8 @@ _MergeOneKernel(
             }
 
             /* Kernel function image samplers */
-            if (kernelFunction->imageSamplerCount > 0) {
+            if (kernelFunction->imageSamplerCount > 0)
+            {
                 /* Allocate the array of gcsIMAGE_SAMPLER_PTR structures. */
                 gcmONERROR(gcoOS_Allocate(gcvNULL,
                                           kernelFunction->imageSamplerCount * sizeof(struct _gcsIMAGE_SAMPLER),
@@ -4803,7 +4851,8 @@ _MergeOneKernel(
             }
 
             /* Kernel function local variables */
-            if (kernelFunction->localVariableCount > 0) {
+            if (kernelFunction->localVariableCount > 0)
+            {
 
                 /* Allocate the array of gcVARIABLE structure pointers. */
                 gcmONERROR(gcoOS_Allocate(gcvNULL,
@@ -4845,7 +4894,8 @@ _MergeOneKernel(
             }
 
             /* Kernel function properties */
-            if (kernelFunction->propertyCount > 0) {
+            if (kernelFunction->propertyCount > 0)
+            {
                 /* Allocate the array of gcsKERNEL_FUNCTION_PROPERTY_PTR structures. */
                 bytes = kernelFunction->propertyCount * sizeof(gcsKERNEL_FUNCTION_PROPERTY);
                 gcmONERROR(gcoOS_Allocate(gcvNULL,
@@ -4859,7 +4909,8 @@ _MergeOneKernel(
             }
 
             /* Kernel function properties */
-            if (kernelFunction->propertyValueCount > 0) {
+            if (kernelFunction->propertyValueCount > 0)
+            {
                 /* Allocate the array of property values */
                 bytes = kernelFunction->propertyValueCount * sizeof(gctINT32);
                 gcmONERROR(gcoOS_Allocate(gcvNULL,
@@ -5013,6 +5064,7 @@ _MergeOneKernel(
     _AdjustInstTempRegs(To,
                         tempIndexMap,
                         BuiltinIndex->instInKernelFuncPrep,
+                        gcShaderHasBaseMemoryAddr(From),
                         oldCodeCount);
     gcmONERROR(gcoOS_Free(gcvNULL,
                           tempIndexMap));
@@ -5943,6 +5995,7 @@ gcSHADER_MergeKernel(
                 _AdjustInstTempRegs(mergedKernel,
                                     indexMap,
                                     gcvNULL,
+                                    gcvTRUE,
                                     0);
 
                 gcmONERROR(gcoOS_Free(gcvNULL,
@@ -6651,6 +6704,7 @@ gcSHADER_Load(
             Shader->uniforms[i]       = uniform;
             uniform->object.type      = gcvOBJ_UNIFORM;
             uniform->index            = (gctUINT16) i;
+            uniform->samplerPhysical  = -1;
 
             if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_STRUCT_SYMBOL_FILE_VERSION)
             {
@@ -6696,10 +6750,6 @@ gcSHADER_Load(
                 uniform->matrixStride = -1;
                 uniform->isRowMajor = gcvFALSE;
                 uniform->offset = -1;
-                uniform->initializer.f32_v4[0] =
-                uniform->initializer.f32_v4[1] =
-                uniform->initializer.f32_v4[2] =
-                uniform->initializer.f32_v4[3] = 0.0;
             }
             else
             {
@@ -6712,7 +6762,7 @@ gcSHADER_Load(
                 gcoOS_MemCopy((gctPOINTER)&uniform->offset,
                               binaryUniform->offset,
                               sizeof(gctINT32));
-                gcoOS_MemCopy((gctPOINTER)uniform->initializer.f32_v4,
+                gcoOS_MemCopy((gctPOINTER)uniform->initializer.f32_v16,
                               binaryUniform->initializer,
                               sizeof(gcsValue));
             }
@@ -10251,9 +10301,11 @@ gcSHADER_LoadEx(
             uniform = pointer;
 
             /* Copy uniform to the gcSHADER object. */
-            Shader->uniforms[i]   = uniform;
-            uniform->object.type  = gcvOBJ_UNIFORM;
-            uniform->index        = binaryUniform->index;
+            Shader->uniforms[i]         = uniform;
+            uniform->object.type        = gcvOBJ_UNIFORM;
+            uniform->index              = binaryUniform->index;
+            uniform->samplerPhysical    = -1;
+
             if (shaderVersion <= gcdSL_SHADER_BINARY_BEFORE_OPENCL_IMAGE_SAMPLER_BY_TEXLD_FILE_VERSION)
             {
                 uniform->imageSamplerIndex = 0;
@@ -14271,7 +14323,8 @@ gcSHADER_GetBuiltinNameKind(
     {
         kind = gcSL_BACK_SECONDARY_COLOR;
     }
-    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "group_id")))
+    else if (gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "group_id")) ||
+             gcmIS_SUCCESS(gcoOS_StrCmp(ptr, "WorkGroupID")))
     {
         kind = gcSL_WORK_GROUP_ID;
     }
@@ -15481,6 +15534,7 @@ gcSHADER_AddUniform(
     uniform->isPointer    = gcvFALSE;
     uniform->nameLength   = nameLength;
     uniform->physical     = -1;
+    uniform->samplerPhysical = -1;
     uniform->address      = ~0U;
     uniform->RAPriority       = 0;
 
@@ -15505,10 +15559,6 @@ gcSHADER_AddUniform(
         uniform->physical = Shader->samplerIndex;
         Shader->samplerIndex += Length > 1 ? Length : 1;
     }
-
-    /* Set initializer to 0 */
-    uniform->initializer.f32_v4[0] = uniform->initializer.f32_v4[1] =
-    uniform->initializer.f32_v4[2] = uniform->initializer.f32_v4[3] = 0.0;
 
     /* Copy the uniform name. */
     gcoOS_MemCopy(uniform->name, Name, nameLength + 1);
@@ -15649,6 +15699,7 @@ gcSHADER_AddUniformEx(
     uniform->isPointer    = gcvFALSE;
     uniform->nameLength   = nameLength;
     uniform->physical     = -1;
+    uniform->samplerPhysical = -1;
     uniform->address      = ~0U;
     uniform->RAPriority       = 0;
     SetUniformFlags(uniform, 0);
@@ -15674,10 +15725,6 @@ gcSHADER_AddUniformEx(
         uniform->physical = Shader->samplerIndex;
         Shader->samplerIndex += Length > 1 ? Length : 1;
     }
-
-    /* Set initializer to 0 */
-    uniform->initializer.f32_v4[0] = uniform->initializer.f32_v4[1] =
-    uniform->initializer.f32_v4[2] = uniform->initializer.f32_v4[3] = 0.0;
 
     /* Copy the uniform name. */
     gcoOS_MemCopy(uniform->name, Name, nameLength + 1);
@@ -15810,13 +15857,18 @@ gcSHADER_AddUniformEx1(
                 {
                     /*gcmPRINT("Shader vertex uniforms of matrix array exceed the hardware limitations and is truncated !");*/
                     gcePATCH_ID patchId = gcvPATCH_INVALID;
-
-                    length = vertexUniforms / 5;
                     gcoHAL_GetPatchID(gcvNULL, &patchId);
                     if (patchId == gcvPATCH_RIPTIDEGP2)
                     {
+                        length = vertexUniforms / 5;
                         length += 3;
                     }
+
+                    if(patchId == gcvPATCH_NBA2013)
+                    {
+                         length = vertexUniforms / 5;
+                    }
+
                 }
             }
             if (Type == gcSHADER_FLOAT_X4)
@@ -15824,7 +15876,12 @@ gcSHADER_AddUniformEx1(
                 if (length > vertexUniforms)
                 {
                     /*gcmPRINT("Shader vertex uniforms of vec4 exceed the hardware limitations and is truncated !");*/
-                    length = vertexUniforms / 2;
+                     gcePATCH_ID patchId = gcvPATCH_INVALID;
+                     gcoHAL_GetPatchID(gcvNULL, &patchId);
+                     if(patchId == gcvPATCH_NBA2013)
+                     {
+                         length = vertexUniforms / 2;
+                     }
                 }
             }
         }
@@ -15835,7 +15892,12 @@ gcSHADER_AddUniformEx1(
                 if(length * 4 > fragmentUniforms)
                 {
                     /*gcmPRINT("Shader fragment uniforms of matrix array exceed the hardware limitations and is truncated !");*/
-                    length = fragmentUniforms / 5;
+                     gcePATCH_ID patchId = gcvPATCH_INVALID;
+                     gcoHAL_GetPatchID(gcvNULL, &patchId);
+                     if(patchId == gcvPATCH_NBA2013)
+                     {
+                        length = fragmentUniforms / 5;
+                     }
                 }
             }
         }
@@ -15971,6 +16033,7 @@ gcSHADER_AddUniformEx1(
     uniform->isPointer    = gcvFALSE;
     uniform->nameLength   = nameLength;
     uniform->physical     = -1;
+    uniform->samplerPhysical = -1;
     uniform->address      = ~0U;
     uniform->RAPriority       = 0;
     uniform->blockIndex   = -1;
@@ -15998,15 +16061,11 @@ gcSHADER_AddUniformEx1(
     }
 #endif
 
-    if(gcmType_Kind(Type) == gceTK_SAMPLER)
+    if (gcmType_Kind(Type) == gceTK_SAMPLER)
     {
         uniform->physical = Shader->samplerIndex;
         Shader->samplerIndex += uniform->arraySize > 1 ? uniform->arraySize : 1;
     }
-
-    /* Set initializer to 0 */
-    uniform->initializer.f32_v4[0] = uniform->initializer.f32_v4[1] =
-    uniform->initializer.f32_v4[2] = uniform->initializer.f32_v4[3] = 0.0;
 
     /* Copy the uniform name. */
     gcoOS_MemCopy(uniform->name, Name, nameLength + 1);
@@ -16052,6 +16111,33 @@ gcSHADER_CreateConstantUniform(
               gcmType_Rows(uniform->u.type) == 1);
     SetUniformFlag(uniform, gcvUNIFORM_FLAG_COMPILETIME_INITIALIZED);
     SetUniformFlag(uniform, gcvUNIFORM_FLAG_COMPILER_GEN);
+    uniform->initializer = *Value;
+
+    *Uniform = uniform;
+
+OnError:
+    return status;
+}
+
+/* add uniform with compile-time initializer */
+gceSTATUS
+gcSHADER_AddUniformWithInitializer(
+    IN gcSHADER                  Shader,
+    IN gctCONST_STRING           Name,
+    IN gcSHADER_TYPE             Type,
+    IN gctUINT32                 Length,
+    IN gcSHADER_PRECISION        Precision,
+    IN gcsValue *                Value,
+    OUT gcUNIFORM *              Uniform
+    )
+{
+    gceSTATUS      status   = gcvSTATUS_OK;
+    gcUNIFORM      uniform;
+
+    gcmONERROR(gcSHADER_AddUniform(Shader, Name, Type, 1, Precision, &uniform));
+
+    gcmASSERT(isUniformNormal(uniform));
+    SetUniformFlag(uniform, gcvUNIFORM_FLAG_COMPILETIME_INITIALIZED);
     uniform->initializer = *Value;
 
     *Uniform = uniform;
@@ -19397,7 +19483,7 @@ gcSHADER_AddOutputEx(
         }
 
         /* set default location */
-        output->location = Shader->outputCount;
+        output->location = ENABLE_FULL_NEW_LINKER ? -1: Shader->outputCount;
         /* set default field index */
         output->fieldIndex = FieldIndex;
         /* Set new gcOUTPUT object pointer. */
@@ -21711,7 +21797,7 @@ gcSHADER_FindFunctionByLabel(
     gcmDEBUG_VERIFY_ARGUMENT(Function != gcvNULL);
 
     /* Walk all defines shader labels to find the requested label. */
-    for (i = 0; i  <= Shader->functionCount; i++)
+    for (i = 0; i  < Shader->functionCount; i++)
     {
         func = Shader->functions[i];
         if (func->codeStart == Label)
@@ -22306,7 +22392,6 @@ gcSHADER_NewTempRegs(
     tempIndex = Shader->_tempRegCount;
     Shader->_tempRegCount += RegCount;
 
-#if VSC_BUILD
     if(Shader->flags & gcSHADER_FLAG_HWREG_ALLOCATED)
     {
         gctUINT32 endTempIndex = tempIndex + RegCount -1;
@@ -22318,7 +22403,6 @@ gcSHADER_NewTempRegs(
             Shader->_tempRegCount += RegCount;
         }
     }
-#endif
 
     if (Shader->currentFunction != gcvNULL)
     {
@@ -24344,10 +24428,28 @@ gcSHADER_ConvertSamplerAssignForParameter(
     {
         gcSL_INSTRUCTION code = &Shader->code[i];
 
-        if (gcmSL_OPCODE_GET(code->opcode, Opcode) != gcSL_SAMPLER_ASSIGN)
-            continue;
+        if (gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_SAMPLER_ASSIGN)
+        {
+            code->opcode = gcmSL_OPCODE_SET(code->opcode, Opcode, gcSL_MOV);
+        }
+        else if (gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_GET_SAMPLER_IDX)
+        {
+            if (gcmSL_SOURCE_GET(code->source0, Type) == gcSL_UNIFORM)
+            {
+                gcUNIFORM uniform = gcvNULL;
 
-        code->opcode = gcmSL_OPCODE_SET(code->opcode, Opcode, gcSL_MOV);
+                gcSHADER_GetUniform(Shader, gcmSL_INDEX_GET(code->source0Index, Index), &uniform);
+
+                if (isUniformBuffer(uniform))
+                {
+                    code->opcode = gcmSL_OPCODE_SET(code->opcode, Opcode, gcSL_MOV);
+                }
+            }
+        }
+        else
+        {
+            continue;
+        }
     }
 
     return gcvSTATUS_OK;
@@ -24371,48 +24473,103 @@ _locateFunctionRange(
 static gctUINT
 _locateFunction(
     IN gcSHADER Shader,
-    IN gctUINT codeID)
+    IN gctUINT codeID,
+    OUT gctBOOL *IsKernelFunc
+    )
 {
     gctUINT i;
 
-    for (i = 0; i < Shader->functionCount; ++i)
+    for (i = 0; i < Shader->functionCount; i++)
     {
         if (codeID == Shader->functions[i]->codeStart ||
-            (codeID == Shader->functions[i]->label))
+            codeID == Shader->functions[i]->label)
+        {
+            if (IsKernelFunc)
+            {
+                *IsKernelFunc = gcvFALSE;
+            }
             return i;
+        }
     }
+
+    for (i = 0; i < Shader->kernelFunctionCount; i++)
+    {
+        if (codeID == Shader->kernelFunctions[i]->codeStart ||
+            codeID == Shader->kernelFunctions[i]->label)
+        {
+            if (IsKernelFunc)
+            {
+                *IsKernelFunc = gcvTRUE;
+            }
+            return i;
+        }
+    }
+
     return (gctUINT)-1;
 }
 
-static gceSTATUS
+static gctBOOL
 _AnalyzeFunctions(
     IN gcSHADER Shader,
     IN gctBOOL * List,
-    IN gctUINT Index
+    IN gctUINT ListIndex,
+    IN gctBOOL IsKernelFunc,
+    IN gctUINT FuncIndex
     )
 {
-    gceSTATUS status = gcvSTATUS_OK;
-    gctUINT i, j, funcID;
+    gctBOOL isCallerFuncKernelFunc = gcvFALSE;
+    gctUINT i, j, codeStart, codeEnd;
+    gctUINT callerFuncIndex, callerFuncListIndex;
     gcSL_OPCODE opcode;
+    gcKERNEL_FUNCTION kernelFunction = gcvNULL;
+    gcFUNCTION nonKernelFunction = gcvNULL;
     gcsFUNCTION_ARGUMENT argument;
 
-    for (i = Shader->functions[Index]->codeStart; i < Shader->functions[Index]->codeStart + Shader->functions[Index]->codeCount; ++i)
+    if (IsKernelFunc)
+    {
+        kernelFunction = Shader->kernelFunctions[FuncIndex];
+        codeStart = kernelFunction->codeStart;
+        codeEnd = kernelFunction->codeEnd;
+    }
+    else
+    {
+        nonKernelFunction = Shader->functions[FuncIndex];
+        codeStart = nonKernelFunction->codeStart;
+        codeEnd = nonKernelFunction->codeStart + nonKernelFunction->codeCount;
+    }
+
+    for (i = codeStart; i < codeEnd; ++i)
     {
         opcode = (gcSL_OPCODE)gcmSL_OPCODE_GET(Shader->code[i].opcode, Opcode);
 
+        /* Check some function flags. */
         if (gcSL_isOpcodeImageRelated(opcode) &&
             gcmSL_SOURCE_GET(Shader->code[i].source0, Type) == gcSL_TEMP)
         {
-            for (j = 0; j < Shader->functions[Index]->argumentCount; j++)
+            if (IsKernelFunc)
             {
-                argument = Shader->functions[Index]->arguments[j];
-
-                if (argument.index == Shader->code[i].source0Index)
+                for (j = 0; j < kernelFunction->argumentCount; j++)
                 {
-                    SetFunctionParamAsImgSource0(Shader->functions[Index]);
+                    argument = kernelFunction->arguments[j];
+
+                    if (argument.index == Shader->code[i].source0Index)
+                    {
+                        SetFunctionParamAsImgSource0(kernelFunction);
+                    }
                 }
             }
+            else
+            {
+                for (j = 0; j < nonKernelFunction->argumentCount; j++)
+                {
+                    argument = nonKernelFunction->arguments[j];
 
+                    if (argument.index == Shader->code[i].source0Index)
+                    {
+                        SetFunctionParamAsImgSource0(nonKernelFunction);
+                    }
+                }
+            }
             continue;
         }
 
@@ -24421,39 +24578,73 @@ _AnalyzeFunctions(
             continue;
         }
 
-        funcID = _locateFunction(Shader, Shader->code[i].tempIndex);
+        /* Analyze the caller function now. */
+        callerFuncIndex = _locateFunction(Shader, Shader->code[i].tempIndex, &isCallerFuncKernelFunc);
 
-        gcmASSERT(funcID < Shader->functionCount);
+        gcmASSERT((isCallerFuncKernelFunc && callerFuncIndex < Shader->kernelFunctionCount) ||
+                  (!isCallerFuncKernelFunc && callerFuncIndex < Shader->functionCount));
 
-        if (IsFunctionHasSamplerIndexing(Shader->functions[funcID]))
+        /* Save the inheritable function flags from the caller function. */
+        if (isCallerFuncKernelFunc)
         {
-            SetFunctionHasSamplerIndexing(Shader->functions[Index]);
+            if (IsFunctionHasSamplerIndexing(Shader->kernelFunctions[callerFuncIndex]))
+            {
+                SetFunctionHasSamplerIndexing(kernelFunction);
+            }
+
+            if (IsFunctionParamAsImgSource0(Shader->kernelFunctions[callerFuncIndex]))
+            {
+                SetFunctionParamAsImgSource0(kernelFunction);
+            }
         }
-
-        if (IsFunctionParamAsImgSource0(Shader->functions[funcID]))
+        else
         {
-            SetFunctionParamAsImgSource0(Shader->functions[Index]);
+            if (IsFunctionHasSamplerIndexing(Shader->functions[callerFuncIndex]))
+            {
+                SetFunctionHasSamplerIndexing(nonKernelFunction);
+            }
+
+            if (IsFunctionParamAsImgSource0(Shader->functions[callerFuncIndex]))
+            {
+                SetFunctionParamAsImgSource0(nonKernelFunction);
+            }
         }
 
         /* If the caller is a recursive function, then the callee itself is also a recursive function */
-        if (Shader->functions[funcID]->isRecursion == gcvTRUE)
-            return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+        if (isCallerFuncKernelFunc)
+        {
+            if (Shader->kernelFunctions[callerFuncIndex]->isRecursion == gcvTRUE)
+                return gcvTRUE;
+        }
+        else
+        {
+            if (Shader->functions[callerFuncIndex]->isRecursion == gcvTRUE)
+                return gcvTRUE;
+        }
+
+
+        if (isCallerFuncKernelFunc)
+        {
+            callerFuncListIndex = callerFuncIndex + Shader->functionCount;
+        }
+        else
+        {
+            callerFuncListIndex = callerFuncIndex;
+        }
 
         /* If the function called itself, it is a recursive function */
-        if (List[funcID] == gcvTRUE)
-            return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+        if (List[callerFuncListIndex] == gcvTRUE)
+            return gcvTRUE;
 
         /* continue to check the caller function*/
-        List[funcID] = gcvTRUE;
+        List[callerFuncListIndex] = gcvTRUE;
 
-        status = _AnalyzeFunctions(Shader, List, funcID);
+        if (_AnalyzeFunctions(Shader, List, callerFuncListIndex, isCallerFuncKernelFunc, callerFuncIndex))
+            return gcvTRUE;
 
-        if (status != gcvSTATUS_OK)
-            return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
-
-        List[funcID] = gcvFALSE;
+        List[callerFuncListIndex] = gcvFALSE;
     }
-    return status;
+    return gcvFALSE;
 }
 
 
@@ -24476,67 +24667,98 @@ _AnalyzeFunctions(
 gceSTATUS
 gcSHADER_AnalyzeFunctions(
     IN gcSHADER Shader,
-    IN gctBOOL InFE
+    IN gctBOOL NeedToCheckRecursive
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gctBOOL* list = gcvNULL;
+    gctBOOL* funcList = gcvNULL;
     gctPOINTER pointer = gcvNULL;
-    gctUINT i,j;
+    gctBOOL isKernelFunc = gcvFALSE;
+    gctBOOL detectRecursiveFunc = gcvFALSE;
+    gctUINT nonKernelFuncCount = Shader->functionCount;
+    gctUINT kernelFuncCount = (GetShaderType(Shader) == gcSHADER_TYPE_CL) ? Shader->kernelFunctionCount : 0;
+    gctUINT funcCount = nonKernelFuncCount + kernelFuncCount;
+    gctUINT i, j, funcIndex;
 
     gcmHEADER_ARG("Shader=0x%x", Shader);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Shader, gcvOBJ_SHADER);
 
-    if (Shader->functionCount == 0 ||
-        /* TODO: we need to add support for kernel function check. */
-        GetShaderType(Shader) == gcSHADER_TYPE_CL)
+    if (funcCount == 0)
     {
         gcmFOOTER_NO();
         return status;
     }
 
-    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctBOOL) * Shader->functionCount, &pointer)))
+    /* Init function list. */
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctBOOL) * funcCount, &pointer)))
     {
         gcmFATAL("gcSHADER_AnalyzeFunctions: gcoOS_Allocate failed");
         gcmFOOTER_ARG("status=%d", gcvSTATUS_COMPILER_FE_PARSER_ERROR);
         return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
     }
 
-    list = pointer;
-
-    for (i = 0; i < Shader->functionCount; ++i)
+    funcList = (gctBOOL *)pointer;
+    for (i = 0; i < funcCount; ++i)
     {
-        list[i] = gcvFALSE;
+        funcList[i] = gcvFALSE;
     }
 
-    for (i = 0; i < Shader->functionCount; ++i)
+    /* Check all functions, including kernel functions and non-kernel functions,
+    ** and we put the non-kernel in the top of func list array.
+    */
+    for (i = 0; i < funcCount; i++)
     {
-        /* Skip the recursive function */
-        if (Shader->functions[i]->isRecursion)
-            continue;
-
-        list[i] = gcvTRUE;
-        status = _AnalyzeFunctions(Shader, list, i);
-
-        for (j =0; j < Shader->functionCount; ++j)
+        /* This is a kernel function. */
+        if (i >= nonKernelFuncCount)
         {
-            if (list[j])
+            funcIndex = i - nonKernelFuncCount;
+            isKernelFunc = gcvTRUE;
+        }
+        /* This is a non-kernel function. */
+        else
+        {
+            funcIndex = i;
+            isKernelFunc = gcvFALSE;
+        }
+
+        /* Skip the recursive function */
+        if ((isKernelFunc && Shader->kernelFunctions[funcIndex]->isRecursion) ||
+            (!isKernelFunc && Shader->functions[funcIndex]->isRecursion))
+        {
+            continue;
+        }
+
+        funcList[i] = gcvTRUE;
+        detectRecursiveFunc = _AnalyzeFunctions(Shader, funcList, i, isKernelFunc, funcIndex);
+
+        /* Set recursive for all function calls. */
+        for (j = 0; j < funcCount; j++)
+        {
+            if (funcList[j])
             {
-                if (status != gcvSTATUS_OK)
+                if (detectRecursiveFunc)
                 {
-                    Shader->functions[j]->isRecursion = gcvTRUE;
+                    if (isKernelFunc)
+                    {
+                        Shader->kernelFunctions[funcIndex]->isRecursion = gcvTRUE;
+                    }
+                    else
+                    {
+                        Shader->functions[funcIndex]->isRecursion = gcvTRUE;
+                    }
                 }
-                list[j] = gcvFALSE;
+                funcList[j] = gcvFALSE;
             }
         }
     }
 
-    status = gcvSTATUS_OK;
-
-    if (!InFE)
+    /* We don't need to check if there is any recursive function for a OCL shader now. */
+    if (!NeedToCheckRecursive || (GetShaderType(Shader) == gcSHADER_TYPE_CL))
     {
+        gcmOS_SAFE_FREE(gcvNULL, funcList);
+
         gcmFOOTER_NO();
         return status;
     }
@@ -24553,7 +24775,7 @@ gcSHADER_AnalyzeFunctions(
         j = _locateFunctionRange(Shader, i);
         if (j != (gctUINT)-1)
             continue;
-        j = _locateFunction(Shader, Shader->code[i].tempIndex);
+        j = _locateFunction(Shader, Shader->code[i].tempIndex, &isKernelFunc);
         if (j != (gctUINT)-1 && Shader->functions[j]->isRecursion)
         {
             status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
@@ -24561,7 +24783,7 @@ gcSHADER_AnalyzeFunctions(
         }
     }
 
-    gcmOS_SAFE_FREE(gcvNULL, list);
+    gcmOS_SAFE_FREE(gcvNULL, funcList);
 
     if (gcmIS_ERROR(status))
     {
@@ -24573,7 +24795,6 @@ gcSHADER_AnalyzeFunctions(
     gcmFOOTER_NO();
     return status;
 }
-
 
 static gctBOOL
 ReadSource(
@@ -25511,6 +25732,33 @@ gcGetOptionFromEnv(
                 }
             }
 
+            /* dual 16 highp rule
+            *
+            *    VC_OPTION=-HPDUAL16:[0-x]
+            *       0: no dual16 highp rules applied
+            *       1: Dual16_PrecisionRule_TEXLD_COORD_HP
+            *       2: Dual16_PrecisionRule_RCP_HP
+            *       4: Dual16_PrecisionRule_FRAC_HP
+            *       8: Dual16_PrecisionRule_IMMED_HP
+            *       default is Dual16_PrecisionRule_FULL
+            *           (which is Dual16_PrecisionRule_TEXLD_COORD_HP |
+            *                     Dual16_PrecisionRule_RCP_HP         |
+            *                     Dual16_PrecisionRule_FRAC_HP        |
+            *                     Dual16_PrecisionRule_IMMED_HP)
+            */
+            gcoOS_StrStr(p, "-HPDUAL16:", &pos);
+            if (pos)
+            {
+                gctINT dual16PrecisionRule=-1;
+                pos += sizeof("-HPDUAL16:") -1;
+                gcoOS_StrToInt(pos, &dual16PrecisionRule);
+                if (dual16PrecisionRule >= 0)
+                {
+                    Option->dual16PrecisionRule = (gctUINT)dual16PrecisionRule;
+                    Option->dual16PrecisionRuleFromEnv = gcvTRUE;
+                }
+            }
+
              /* Upload Uniform Block to state buffer if there are space available
               * Doing this may potentially improve the performance as the load
               * instruction for uniform block member can be removed.
@@ -25628,6 +25876,54 @@ gcGetOptionFromEnv(
                 {
                     /* turn on ocl to use NEG opcode */
                     Option->oclUseNeg = gcvTRUE;
+                }
+            }
+
+            /*  USE image intrinsic query function
+             *
+             *   VC_OPTION=-OCLUSEIMG_INTRINSIC_QUERY
+             *
+             */
+            gcoOS_StrStr(p, "-OCLUSEIMG_INTRINSIC_QUERY:", &pos);
+            if (pos)
+            {
+                gctINT value=-1;
+                pos += sizeof("-OCLUSEIMG_INTRINSIC_QUERY:") -1;
+                gcoOS_StrToInt(pos, &value);
+
+                if (value == 0)
+                {
+                    /* turn off ocl to use image intrinsic query function */
+                    Option->oclUseImgIntrinsicQuery = gcvFALSE;
+                }
+                else if (value == 1)
+                {
+                    /* turn on ocl to use image intrinsic query function */
+                    Option->oclUseImgIntrinsicQuery = gcvTRUE;
+                }
+            }
+
+            /*  Pass kernel struct arguments by value in OCL
+             *
+             *   VC_OPTION=-OCLPASS_KERNEL_STRUCT_ARG_BY_VALUE:0|1
+             *
+             */
+            gcoOS_StrStr(p, "-OCLPASS_KERNEL_STRUCT_ARG_BY_VALUE:", &pos);
+            if (pos)
+            {
+                gctINT value=-1;
+                pos += sizeof("-OCLPASS_KERNEL_STRUCT_ARG_BY_VALUE:") -1;
+                gcoOS_StrToInt(pos, &value);
+
+                if (value == 0)
+                {
+                    /* turn off ocl to pass kernel struct argument by value */
+                    Option->oclPassKernelStructArgByValue = gcvFALSE;
+                }
+                else if (value == 1)
+                {
+                    /* turn on ocl to pass kernel struct argument by value */
+                    Option->oclPassKernelStructArgByValue = gcvTRUE;
                 }
             }
 
@@ -25945,6 +26241,15 @@ gcGetOptionFromEnv(
     return;
 } /* gcGetOptionFromEnv */
 
+void gcOPT_SetFeature(gctUINT FBit)
+{
+    gcmOPT_SetFeature(FBit);
+}
+
+void gcOPT_ResetFeature(gctUINT FBit)
+{
+    gcmOPT_ResetFeature(FBit);
+}
 
 /* convert the compiler flag to optimizer option:
  *  the ES1.1 driver calls gcLinkShader() without setting
@@ -26451,6 +26756,7 @@ _PredefinedName(
         {
             return "gl_PerVertex.gl_PointSize";
         }
+
     case gcSL_BOUNDING_BOX:
         return "gl_BoundingBox";
     }
@@ -27176,7 +27482,14 @@ gcUNIFORM_GetSampler(
     if (Sampler != gcvNULL)
     {
         /* Return physical sampler. */
-        *Sampler = Uniform->physical;
+        if (GetUniformSamplerPhysical(Uniform) != -1)
+        {
+            *Sampler = GetUniformSamplerPhysical(Uniform);
+        }
+        else
+        {
+            *Sampler = GetUniformPhysical(Uniform);
+        }
     }
 
     gcmFOOTER_ARG("*Sampler=%d", gcmOPT_VALUE(Sampler));
@@ -28177,7 +28490,6 @@ gceSTATUS
 gcSHADER_AddKernelFunction(
     IN gcSHADER Shader,
     IN gctCONST_STRING Name,
-
     OUT gcKERNEL_FUNCTION * KernelFunction
     )
 {
@@ -31000,40 +31312,16 @@ _CheckCodeUniformUsage(
         }
         else if (gcmSL_SOURCE_GET(source, Type) == gcSL_SAMPLER)
         {
-            gctBOOL usedInTexgather = HasTexgatherModifier && (i == 0) &&
-                        gcSL_isOpcodeTexld(gcmSL_OPCODE_GET(Code->opcode, Opcode));
-
-            if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED)
+            if (gcmSL_SOURCE_GET(source, Indexed) == gcSL_NOT_INDEXED)
             {
-                /* mark all sampler as used by texgather if it is indexed */
-                for (j = 0; j < (gctINT)Shader->uniformCount; j++)
-                {
-                    gcUNIFORM uniform = Shader->uniforms[j];
-
-                    if (isUniformSampler(uniform))
-                    {
-                        if (usedInTexgather)
-                        {
-                            SetUniformFlag(uniform, gcvUNIFORM_FLAG_USED_AS_TEXGATHER_SAMPLER);
-                        }
-                        if (InLTC)
-                        {
-                            SetUniformUsedInLTC(uniform);
-                        }
-                        else
-                        {
-                            SetUniformUsedInShader(uniform);
-                        }
-                    }
-                }
-            }
-            else /* otherwise find the corresponding uniform and mark it */
-            {
-                gcUNIFORM uniform;
-                gctINT16  indexVal = (i == 0) ? Code->source0Index
+                gctBOOL     usedInTexgather = HasTexgatherModifier &&
+                                              (i == 0) &&
+                                              gcSL_isOpcodeTexld(gcmSL_OPCODE_GET(Code->opcode, Opcode));
+                gcUNIFORM   uniform;
+                gctINT16    indexVal = (i == 0) ? Code->source0Index
                                                 : Code->source1Index;
-                gctINT    index    = gcmSL_INDEX_GET(indexVal, Index);
-                gctBOOL   isMLSampler = gcvFALSE;
+                gctINT      index    = gcmSL_INDEX_GET(indexVal, Index);
+                gctBOOL     isMLSampler = gcvFALSE;
 
                 /* sampler is used as source0, mark it as be used in texgather */
                 uniform = gcSHADER_GetUniformBySamplerIndex(Shader, index, gcvNULL);
@@ -33041,7 +33329,10 @@ gcSHADER_InsertNOP2BeforeCode(
         if (Shader->kernelFunctions[i]->codeStart <= CodeIndex &&
             Shader->kernelFunctions[i]->codeEnd >= CodeIndex &&
             Shader->kernelFunctions[i]->codeCount > 0)
+        {
             Shader->kernelFunctions[i]->codeCount += AddCodeCount;
+            Shader->kernelFunctions[i]->codeEnd += AddCodeCount;
+        }
 
         if (Shader->kernelFunctions[i]->codeStart > CodeIndex &&
             Shader->kernelFunctions[i]->codeCount > 0)
@@ -33906,114 +34197,6 @@ gcSHADER_Has64BitOperation(
     }
 
     gcmFOOTER();
-    return status;
-}
-
-gceSTATUS
-gcSHADER_FindMainFunction(
-    IN   gcSHADER           Shader,
-    OUT  gctINT *           StartCode,
-    OUT  gctINT *           EndCode
-    )
-{
-    gceSTATUS    status    = gcvSTATUS_OK;
-    gctPOINTER * codeOwner = gcvNULL;
-    gctSIZE_T    size      = gcmSIZEOF(gctINT *) * Shader->codeCount;
-    gctUINT      i, f;
-    gctINT       mainStart = -1;
-    gctINT       mainEnd   = -1;
-    gctPOINTER  pointer = gcvNULL;
-
-    if (Shader->lastInstruction == 0)
-    {
-        *StartCode  = 0;
-        *EndCode    = 0;
-        return status;
-    }
-
-    gcmONERROR(gcoOS_Allocate(gcvNULL, size, &pointer));
-    codeOwner = (gctPOINTER *) pointer;
-
-    /* Zero the memory. */
-    gcoOS_ZeroMemory(pointer, size);
-
-    /* Walk through functions to mark the code owner */
-
-    /* Determine ownership of the code for functions. */
-    for (f = 0; f < Shader->functionCount; ++f)
-    {
-        gcFUNCTION function = Shader->functions[f];
-        gctUINT    codeEnd  = function->codeStart + function->codeCount;
-
-        gcmASSERT(function != gcvNULL &&
-                  codeEnd <= Shader->codeCount );
-        for (i = function->codeStart; i < codeEnd; i++)
-        {
-            gcmASSERT(codeOwner[i] == gcvNULL);
-            codeOwner[i] = function;
-        }
-    }
-
-    /* Determine ownership of the code for kernel functions. */
-    for (f = 0; f < Shader->kernelFunctionCount; ++f)
-    {
-        gcKERNEL_FUNCTION kernelFunction = Shader->kernelFunctions[f];
-        gctUINT    codeEnd  = kernelFunction->codeStart + kernelFunction->codeCount;
-
-        if (kernelFunction->isMain)
-        {
-            continue;
-        }
-
-        gcmASSERT(kernelFunction != gcvNULL &&
-                  codeEnd <= Shader->codeCount );
-        for (i = kernelFunction->codeStart; i < codeEnd; i++)
-        {
-            gcmASSERT(codeOwner[i] == gcvNULL);
-            codeOwner[i] = kernelFunction;
-        }
-    }
-
-    /* Walk through all code to find main */
-    for (i = 0; i < Shader->lastInstruction; )
-    {
-        if (codeOwner[i] == gcvNULL)
-        {
-            gcmASSERT(mainStart == -1);
-            mainStart = i;
-            /* find the end of main */
-            for (i = i + 1; i < Shader->lastInstruction; i++)
-            {
-                if (codeOwner[i] != gcvNULL)
-                    break;
-            }
-            mainEnd = i;
-            gcmASSERT(mainStart != -1 && mainEnd != -1);
-            break;
-        }
-        else
-        {
-            i++;
-        }
-    }
-
-    if (StartCode)
-    {
-        *StartCode = mainStart;
-    }
-    if (EndCode)
-    {
-        *EndCode   = mainEnd;
-    }
-
-OnError:
-    if (codeOwner)
-    {
-        /* Free the current code buffer. */
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, codeOwner));
-    }
-
-    /* Return the status. */
     return status;
 }
 

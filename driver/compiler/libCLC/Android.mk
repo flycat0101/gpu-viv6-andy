@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -28,6 +28,8 @@ LOCAL_MODULE_TAGS    := optional
 LOCAL_MODULE_CLASS   := SHARED_LIBRARIES
 include $(BUILD_PREBUILT)
 
+include $(AQROOT)/copy_installed_module.mk
+
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES := \
     $(FIXED_ARCH_TYPE)/libLLVM_viv.so
@@ -37,6 +39,8 @@ LOCAL_MODULE_SUFFIX  := .so
 LOCAL_MODULE_TAGS    := optional
 LOCAL_MODULE_CLASS   := SHARED_LIBRARIES
 include $(BUILD_PREBUILT)
+
+include $(AQROOT)/copy_installed_module.mk
 
 else
 #
@@ -319,6 +323,7 @@ LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
 include $(BUILD_SHARED_LIBRARY)
 
+include $(AQROOT)/copy_installed_module.mk
 
 #
 # libCLC
@@ -365,4 +370,7 @@ LOCAL_MODULE         := libCLC
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
 include $(BUILD_SHARED_LIBRARY)
+
+include $(AQROOT)/copy_installed_module.mk
+
 endif

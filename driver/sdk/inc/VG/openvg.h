@@ -155,6 +155,12 @@ typedef enum {
   VG_MAX_FLOAT                                = 0x1169,
   VG_MAX_GAUSSIAN_STD_DEVIATION               = 0x116A,
 
+  /* Extension Enums: starts from 0x1200. */
+  VG_EXT_COLOR_KEY                            = 0x1200,
+  VG_EXT_COLOR_KEY_ENABLE                     = 0x1201,
+  VG_EXT_COLOR_INDEX                          = 0x1202,
+  VG_EXT_COLOR_INDEX_COUNT                    = 0x1203,
+
   VG_PARAM_TYPE_FORCE_SIZE                    = VG_MAX_ENUM
 } VGParamType;
 
@@ -384,6 +390,17 @@ typedef enum {
   VG_BW_1                                     = 12,
   VG_A_1                                      = 13,
   VG_A_4                                      = 14,
+  /* Index Color states. */
+  VG_EXT_INDEX1                               = 15,
+  VG_EXT_INDEX2                               = 16,
+  VG_EXT_INDEX4                               = 17,
+  VG_EXT_INDEX8                               = 18,
+  VG_EXT_YUY2                                 = 19,
+  VG_EXT_NV12                                 = 20,
+  VG_EXT_NV16                                 = 21,
+  VG_EXT_AYUY2                                = 22,
+  VG_EXT_ANV12                                = 23,
+  VG_EXT_ANV16                                = 24,
 
   /* {A,X}RGB channel ordering */
   VG_sXRGB_8888                               =  0 | (1 << 6),

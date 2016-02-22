@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -261,6 +261,7 @@ gckVIDMEM_ConstructVirtual(
 #if gcdENABLE_VG
     node->Virtual.kernelVirtual = gcvNULL;
 #endif
+    node->Virtual.secure        = (Flag & gcvALLOC_FLAG_SECURITY) != 0;
 
     for (i = 0; i < gcdMAX_GPU_COUNT; i++)
     {
@@ -1289,6 +1290,11 @@ _NeedVirtualMapping(
         }
         else
 #endif
+        if (Node->Virtual.secure)
+        {
+            *NeedMapping = gcvTRUE;
+        }
+        else
         {
             /* Convert logical address into a physical address. */
             gcmkONERROR(gckOS_UserLogicalToPhysical(
@@ -1657,10 +1663,29 @@ gckVIDMEM_Lock(
                         gckMMU_AllocatePagesEx(Kernel->mmu,
                                              node->Virtual.pageCount,
                                              node->Virtual.type,
+                                             node->Virtual.secure,
                                              &node->Virtual.pageTables[Kernel->core],
                                              &node->Virtual.addresses[Kernel->core]));
                 }
 
+#if gcdENABLE_TRUST_APPLICATION
+#if gcdENABLE_VG
+                if (Kernel->core != gcvCORE_VG && Kernel->hardware->secureMode == gcvSECURE_IN_TA)
+#else
+                if (Kernel->hardware->secureMode == gcvSECURE_IN_TA)
+#endif
+                {
+                    gcmkONERROR(gckKERNEL_MapInTrustApplicaiton(
+                        Kernel,
+                        node->Virtual.logical,
+                        node->Virtual.physical,
+                        node->Virtual.addresses[Kernel->core],
+                        node->Virtual.pageCount
+                        ));
+                }
+                else
+#endif
+                {
                 /* Map the pages. */
                 gcmkONERROR(
                     gckOS_MapPagesEx(os,
@@ -1670,6 +1695,7 @@ gckVIDMEM_Lock(
                                      node->Virtual.addresses[Kernel->core],
                                      node->Virtual.pageTables[Kernel->core],
                                      gcvTRUE));
+                }
 
 #if gcdENABLE_VG
                 if (Kernel->core == gcvCORE_VG)
@@ -1742,6 +1768,7 @@ OnError:
                 /* Free the pages from the MMU. */
                 gcmkVERIFY_OK(
                     gckMMU_FreePages(Kernel->mmu,
+                                     node->Virtual.secure,
                                      node->Virtual.addresses[Kernel->core],
                                      node->Virtual.pageTables[Kernel->core],
                                      node->Virtual.pageCount));
@@ -1909,6 +1936,7 @@ gckVIDMEM_Unlock(
                     {
                         gcmkONERROR(
                             gckMMU_FreePages(Kernel->mmu,
+                                             node->Virtual.secure,
                                              node->Virtual.addresses[Kernel->core],
                                              node->Virtual.pageTables[Kernel->core],
                                              node->Virtual.pageCount));

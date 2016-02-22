@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -314,19 +314,23 @@ __glChipUpdateDrawable(
     GLvoid *stencilHandle
     )
 {
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
     __GLchipDrawable *chipDrawable = (__GLchipDrawable*)drawable->privateData;
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("drawable=0x%x rtHandle=0x%x depthHandle=0x%x stencilHandle=0x%x",
                    drawable, rtHandle, depthHandle, stencilHandle);
 
+    /* Get PatchID from HAL in the very beginning */
+    gcmONERROR(gcoHAL_GetPatchID(gcvNULL, &patchId));
+
     if (!chipDrawable)
     {
         /* Allocate the array for the vertex attributes. */
         gcmONERROR(gcoOS_Allocate(gcvNULL,
-                                  sizeof(__GLchipDrawable),
+                                  gcmSIZEOF(__GLchipDrawable),
                                   (gctPOINTER*)&chipDrawable));
-
+        gcoOS_ZeroMemory(chipDrawable, gcmSIZEOF(__GLchipDrawable));
         drawable->privateData = chipDrawable;
     }
 
@@ -336,12 +340,34 @@ __glChipUpdateDrawable(
     chipDrawable->depthSurface   = (gcoSURF)depthHandle;
     chipDrawable->stencilSurface = (gcoSURF)stencilHandle;
 
-#if __GL_CHIP_STENCIL_TEST_OPT
-    gcChipPatchStencilOptReset(&chipDrawable->stencilOpt,
-                               (gctSIZE_T)drawable->width,
-                               (gctSIZE_T)drawable->height,
-                               drawable->dsFormatInfo ? (gctSIZE_T)drawable->dsFormatInfo->stencilSize : 0);
-#endif
+    /* Only enable stencil opt for those conformance tests */
+    if (patchId == gcvPATCH_GTFES30 || patchId == gcvPATCH_DEQP)
+    {
+        GLint stencilSize = drawable->dsFormatInfo ? (gctSIZE_T)drawable->dsFormatInfo->stencilSize : 0;
+
+        if (stencilSize > 0)
+        {
+            if (!chipDrawable->stencilOpt)
+            {
+                gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                          gcmSIZEOF(__GLchipStencilOpt),
+                                          (gctPOINTER*)&chipDrawable->stencilOpt));
+            }
+
+            gcChipPatchStencilOptReset(chipDrawable->stencilOpt,
+                                       (gctSIZE_T)drawable->width,
+                                       (gctSIZE_T)drawable->height,
+                                       (gctSIZE_T)stencilSize);
+        }
+        else
+        {
+            if (chipDrawable->stencilOpt)
+            {
+                gcmONERROR(gcoOS_Free(gcvNULL, (gctPOINTER)chipDrawable->stencilOpt));
+                chipDrawable->stencilOpt = gcvNULL;
+            }
+        }
+    }
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;
@@ -361,6 +387,12 @@ __glChipDestroyDrawable(
 
     if (chipDrawable)
     {
+        if (chipDrawable->stencilOpt)
+        {
+            gcmVERIFY_OK(gcoOS_Free(gcvNULL, (gctPOINTER)chipDrawable->stencilOpt));
+            chipDrawable->stencilOpt = gcvNULL;
+        }
+
         gcmVERIFY_OK(gcoOS_Free(gcvNULL, (gctPOINTER)chipDrawable));
         drawable->privateData = gcvNULL;
     }

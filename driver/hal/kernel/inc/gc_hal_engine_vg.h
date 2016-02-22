@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -1261,6 +1261,52 @@ gcoVG_EnableDither(
     IN gctBOOL Enable
     );
 
+/* Color Key States. */
+gceSTATUS
+gcoVG_SetColorKey(
+    IN gcoVG        Vg,
+#if gcdGC355_PROFILER
+    IN gcsPROFILERFUNCNODE *DList,
+    IN gctUINT TreeDepth,
+    IN gctUINT saveLayerTreeDepth,
+    IN gctUINT varTreeDepth,
+#endif
+    IN gctUINT32*    Values,
+    IN gctBOOL *    Enables
+);
+
+/* Index Color States. */
+gceSTATUS
+gcoVG_SetColorIndexTable(
+    IN gcoVG        Vg,
+#if gcdGC355_PROFILER
+    IN gcsPROFILERFUNCNODE *DList,
+    IN gctUINT TreeDepth,
+    IN gctUINT saveLayerTreeDepth,
+    IN gctUINT varTreeDepth,
+#endif
+    IN gctUINT32*    Values,
+    IN gctINT32      Count
+);
+
+/* VG RS feature support: YUV format conversion. */
+gceSTATUS
+gcoVG_Resolve(
+    IN gcoVG        Vg,
+    IN gcoSURF      Source,
+    IN gcoSURF      Target,
+    IN gctINT       SX,
+    IN gctINT       SY,
+    IN gctINT       DX,
+    IN gctINT       DY,
+    IN gctINT       Width,
+    IN gctINT       Height,
+    IN gctINT       Src_uv,
+    IN gctINT       Src_standard,
+    IN gctINT       Dst_uv,
+    IN gctINT       Dst_standard,
+    IN gctINT       Dst_alpha
+);
 #ifdef __cplusplus
 }
 #endif

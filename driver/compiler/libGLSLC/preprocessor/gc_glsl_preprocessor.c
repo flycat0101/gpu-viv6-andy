@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1111,7 +1111,7 @@ ppoPREPROCESSOR_Parse(
     *WriteInNumber = 0;
 
     /*end of input?*/
-    if(PP->inputStream == gcvNULL)
+    if (PP->inputStream == gcvNULL)
     {
         gcmFOOTER_ARG("*WriteInNumber=%d", *WriteInNumber);
         return gcvSTATUS_OK;
@@ -1142,11 +1142,16 @@ ppoPREPROCESSOR_Parse(
 
         gcmONERROR(ppoPREPROCESSOR_PreprocessingFile(PP));
 
-        if(PP->outputTokenStreamHead == gcvNULL)
+        if (PP->outputTokenStreamHead == gcvNULL)
         {
             gcmFOOTER_ARG("*WriteInNumber=%d", *WriteInNumber);
 
             return gcvSTATUS_OK;
+        }
+        else
+        {
+            /* Load the built-ins */
+            gcmONERROR(sloCOMPILER_LoadBuiltIns(PP->compiler, gcvFALSE));
         }
     }
 
@@ -1157,7 +1162,7 @@ ppoPREPROCESSOR_Parse(
 
     len += PP->outputTokenStreamHead->hasLeadingWS ? 1 : 0;
     len += PP->outputTokenStreamHead->hasTrailingControl ? 1 : 0;
-    if(len >= Max)
+    if (len >= Max)
     {
         gcmVERIFY_OK(sloCOMPILER_Report(
             PP->compiler,
@@ -1176,19 +1181,22 @@ ppoPREPROCESSOR_Parse(
         *WriteInNumber = (gctINT) len;
     }
 
-    if(PP->outputTokenStreamHead->hasLeadingWS) {
+    if (PP->outputTokenStreamHead->hasLeadingWS)
+    {
        gcmVERIFY_OK(gcoOS_StrCopySafe(Buffer, Max, " "));
        gcmONERROR(gcoOS_StrCatSafe(Buffer,
                                    Max - 1,
                                    PP->outputTokenStreamHead->poolString));
     }
-    else {
+    else
+    {
        gcmONERROR(gcoOS_StrCopySafe(Buffer,
                                     Max,
                                     PP->outputTokenStreamHead->poolString));
     }
 
-    if(PP->outputTokenStreamHead->hasTrailingControl) {
+    if (PP->outputTokenStreamHead->hasTrailingControl)
+    {
        gcmVERIFY_OK(gcoOS_StrCatSafe(Buffer, Max, " "));
     }
 
@@ -1204,7 +1212,7 @@ ppoPREPROCESSOR_Parse(
         ));
 
     /*remove head*/
-    if(PP->outputTokenStreamHead == PP->outputTokenStreamEnd)
+    if (PP->outputTokenStreamHead == PP->outputTokenStreamEnd)
     {
         gcmONERROR(ppoTOKEN_Destroy(
             PP,

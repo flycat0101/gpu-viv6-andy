@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -27,7 +27,7 @@
 #define gcdSUPPORT_TESS_GS_SHADER   1
 #define gcdSUPPORT_OCL_1_2          1
 #define ENABLE_FULL_NEW_LINKER      (gcmOPT_UseVIRCodeGen() == VIRCG_FULL)
-#define TREAT_ES20_INTEGER_AS_FLOAT 1
+#define TREAT_ES20_INTEGER_AS_FLOAT 0
 
 BEGIN_EXTERN_C()
 
@@ -42,6 +42,9 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          hasHalti3              : 1;
         gctUINT          hasHalti4              : 1;
         gctUINT          hasHalti5              : 1;
+        gctUINT          supportGS              : 1;
+        gctUINT          supportTS              : 1;
+        gctUINT          supportInteger         : 1;
         gctUINT          hasSignFloorCeil       : 1;
         gctUINT          hasSqrtTrig            : 1;
         gctUINT          hasNewSinCosLogDiv     : 1;
@@ -53,6 +56,8 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          hasSelectMapSwizzleFix : 1;
         gctUINT          hasSamplePosSwizzleFix : 1;
         gctUINT          hasLoadAttrOOBFix      : 1;
+        gctUINT          hasSampleMaskInR0ZWFix : 1;
+        gctUINT          hasICacheAllocCountFix : 1;
         gctUINT          hasSHEnhance2          : 1;
         gctUINT          hasMediumPrecision     : 1;
         gctUINT          hasInstCache           : 1;
@@ -69,6 +74,15 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          needCLXFixes           : 1;
         gctUINT          needCLXEFixes          : 1;
         gctUINT          flatDual16Fix          : 1;
+        gctUINT          supportEVIS            : 1;
+        gctUINT          supportImgAtomic       : 1;
+        gctUINT          supportAdvancedInsts   : 1;
+        gctUINT          noOneConstLimit        : 1;
+        gctUINT          noUniformA0            : 1;
+        gctUINT          supportOOBCheck        : 1;
+        gctUINT          hasUniversalTexld      : 1;
+        gctUINT          hasUniversalTexldV2    : 1;
+        gctUINT          canSrc0OfImgLdStBeTemp : 1;
 
         /* Followings will be removed after shader programming is removed out of VSC */
         gctUINT          hasSHEnhance3          : 1;
@@ -82,8 +96,9 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          outputCountFix         : 1;
         gctUINT          varyingPackingLimited  : 1;
         gctUINT          robustAtomic           : 1;
+        gctUINT          newGPIPE               : 1;
 
-        gctUINT          reserved               : 20;
+        gctUINT          reserved               : 6;
     } hwFeatureFlags;
 
     gctUINT              chipModel;
@@ -94,6 +109,7 @@ typedef struct _VSC_HW_CONFIG
     gctUINT              maxAttributeCount;
     gctUINT              maxRenderTargetCount;
     gctUINT              maxGPRCountPerCore;
+    gctUINT              maxGPRCountPerThread;
     gctUINT              maxHwNativeTotalInstCount;
     gctUINT              maxTotalInstCount;
     gctUINT              maxVSInstCount;
@@ -118,9 +134,10 @@ typedef struct _VSC_HW_CONFIG
     gctUINT              maxPSSamplerCount;
     gctUINT              maxCSSamplerCount;
     gctUINT              maxHwNativeTotalSamplerCount;
-    gctUINT              maxSamplerCountForOneShader;
-    gctUINT              texldPerCycle;
+    gctUINT              maxSamplerCountPerShader;
     gctUINT              maxUSCSizeInKbyte;
+    gctUINT              maxLocalMemSizeInByte;
+    gctUINT              maxResultCacheWinSize;
 
     /* Followings will be removed after shader programming is removed out of VSC */
     gctUINT              vsInstBufferAddrBase;
@@ -154,8 +171,9 @@ typedef gcsGLSLCaps VSC_GL_API_CONFIG, *PVSC_GL_API_CONFIG;
 #define VSC_COMPILER_OPT_VECTORIZATION                 0x0000000000002000 /* Including logic io packing */
 #define VSC_COMPILER_OPT_IO_PACKING                    0x0000000000004000 /* Physical io packing */
 #define VSC_COMPILER_OPT_FULL_ACTIVE_IO                0x0000000000008000
+#define VSC_COMPILER_OPT_DUAL16                        0x0000000000010000
 
-#define VSC_COMPILER_OPT_FULL                          0x0000000000003FFF
+#define VSC_COMPILER_OPT_FULL                          0x0000000000013FFF
 
 /* Compiler flag for special purpose */
 #define VSC_COMPILER_FLAG_COMPILE_TO_HL                0x00000001   /* Compile IR to HL, including doing all opts in HL */
@@ -169,6 +187,8 @@ typedef gcsGLSLCaps VSC_GL_API_CONFIG, *PVSC_GL_API_CONFIG;
 #define VSC_COMPILER_FLAG_UNI_UNIFORM_FIXED_BASE_ALLOC 0x00000100
 #define VSC_COMPILER_FLAG_UNI_SAMPLER_FIXED_BASE_ALLOC 0x00000200
 #define VSC_COMPILER_FLAG_RECOMPILING                  0x00000400
+#define VSC_COMPILER_FLAG_NEED_OOB_CHECK               0x00000800
+#define VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO         0x00001000
 
 #define VSC_COMPILER_FLAG_COMPILE_FULL_LEVELS          0x0000000F
 

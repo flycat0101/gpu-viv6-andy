@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -53,6 +53,8 @@
 #if defined(OPENVX_USE_VARIANTS)
 #include <VX/vx_khr_variants.h>
 #endif
+
+#include <VX/vx_ext_program.h>
 
 #include "gc_vxk_common.h"
 
@@ -118,12 +120,15 @@
 #define VX_MAX_USER_STRUCT_COUNT            1024
 #define VX_MAX_CONVOLUTION_DIM              15
 #define VX_MAX_OPTICAL_FLOW_WINDOW_DIM      9
-#define VX_MAX_PARAMETERS                   10
+#define VX_MAX_PARAMETERS                   15
 #define VX_MAX_NODES_IN_GRAPH               VX_MAX_NODE_COUNT
 #define VX_MAX_PLANES                       4
 
 
 #define VX_HOST_CORE_COUNT                  1
+
+
+
 
 /* Function macros */
 #ifndef vxmLENGTH_OF
@@ -136,7 +141,7 @@
 
 #define vxmIS_SCALAR(type)                  (VX_TYPE_INVALID < (type) && (type) < VX_TYPE_SCALAR_MAX)
 #define vxmIS_STRUCT(type)                  ((type) >= VX_TYPE_RECTANGLE && (type) < VX_TYPE_STRUCT_MAX)
-#define vxmIS_OBJECT(type)                  ((type) >= VX_TYPE_REFERENCE && (type) < VX_TYPE_OBJECT_MAX)
+#define vxmIS_OBJECT(type)                  (((type) >= VX_TYPE_REFERENCE && (type) < VX_TYPE_OBJECT_MAX) || ((type) == VX_TYPE_PROGRAM))
 
 #define vxmIS_VALID_PARAMETERS(ptr, size, type, align) \
         ((size) == sizeof(type) && ((vx_size)(ptr) & (align)) == 0)
@@ -193,6 +198,7 @@ typedef vx_size                             vx_return_value;
 
 typedef gcTHREAD_ROUTINE                    vx_thread_routine_f;
 
+typedef vx_int32                            vx_build_status;
 
 #ifndef VX_MAX_TARGET_NAME
 #define VX_MAX_TARGET_NAME                  64
@@ -202,20 +208,59 @@ typedef gcTHREAD_ROUTINE                    vx_thread_routine_f;
 
 enum vx_kernel_internal_e
 {
-    VX_KERNEL_INTERNAL_SOBEL_MxN                   = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_INTERNAL) + 0x0,
+    VX_KERNEL_INTERNAL_SOBEL_MxN                   = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x0,
 
-    VX_KERNEL_INTERNAL_HARRIS_SCORE                = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_INTERNAL) + 0x1,
+    VX_KERNEL_INTERNAL_HARRIS_SCORE                = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x1,
 
-    VX_KERNEL_INTERNAL_EUCLIDEAN_NONMAXSUPPRESSION = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_INTERNAL) + 0x2,
+    VX_KERNEL_INTERNAL_EUCLIDEAN_NONMAXSUPPRESSION = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x2,
 
-    VX_KERNEL_INTERNAL_IMAGE_LISTER                = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_INTERNAL) + 0x3,
+    VX_KERNEL_INTERNAL_IMAGE_LISTER                = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x3,
 
-    VX_KERNEL_INTERNAL_ELEMENTWISE_NORM            = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_INTERNAL) + 0x4,
+    VX_KERNEL_INTERNAL_ELEMENTWISE_NORM            = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x4,
 
-    VX_KERNEL_INTERNAL_NONMAXSUPPRESSION           = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_INTERNAL) + 0x5,
+    VX_KERNEL_INTERNAL_NONMAXSUPPRESSION           = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x5,
 
-    VX_KERNEL_INTERNAL_EDGE_TRACE                  = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_INTERNAL) + 0x6,
+    VX_KERNEL_INTERNAL_EDGE_TRACE                  = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x6,
+
+    VX_KERNEL_INTERNAL_COPY_IMAGE                  = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x7,
+
+    VX_KERNEL_INTERNAL_FAST9CORNERS_STRENGTH       = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x8,
+
+    VX_KERNEL_INTERNAL_FAST9CORNERS_NONMAX         = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x9,
+
+    VX_KERNEL_INTERNAL_CREATE_LISTER               = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0xA,
+
+    VX_KERNEL_INTERNAL_PACK_ARRAYS               = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0xB,
+
+    VX_KERNEL_INTERNAL_MINMAXLOC_FILTER            = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0xC,
+
+    VX_KERNEL_INTERNAL_GET_LOCATION                = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0xD,
+
+    VX_KERNEL_INTERNAL_MIN_MAX_LOC_PACK_ARRAYS     = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0xE,
+
+    VX_KERNEL_INTERNAL_EDGE_TRACE_THRESHOLD        = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0xF,
+
+    VX_KERNEL_INTERNAL_EDGE_TRACE_HYSTERESIS       = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x10,
+
+    VX_KERNEL_INTERNAL_EDGE_TRACE_CLAMP            = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x11,
+
+    VX_KERNEL_INTERNAL_INTEGRAL_IMAGE_STEP         = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x12,
+
+    VX_KERNEL_INTERNAL_SCHARR3x3                   = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x13,
+
+    VX_KERNEL_INTERNAL_VLK_TRACKER                 = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x14,
+
+    VX_KERNEL_INTERNAL_EQUALIZE_HISTOGRAM_HIST     = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x15,
+
+    VX_KERNEL_INTERNAL_EQUALIZE_HISTOGRAM_GCDF     = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x16,
+
+    VX_KERNEL_INTERNAL_EQUALIZE_HISTOGRAM_CDF      = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x17,
+
+    VX_KERNEL_INTERNAL_EQUALIZE_HISTOGRAM_LUT      = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x18,
+
+    VX_KERNEL_INTERNAL_EXAMPLE                     = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x19,
 };
+
 
 enum _vx_extra_df_image
 {
@@ -424,10 +469,10 @@ typedef struct _vx_scalar
 
     vx_enum                                 dataType;
 
-    vx_scalar_data*                         value;
+    vx_scalar_data *                        value;
 
-    void*                                   node;
-    void*                                   physical;
+    void *                                  node;
+    void *                                  physical;
 }
 vx_scalar_s;
 
@@ -459,6 +504,21 @@ typedef struct _vx_parameter
 }
 vx_parameter_s;
 
+#if gcdVX_OPTIMIZER
+typedef struct _vx_kernel_optimization_attribute_s
+{
+    vx_bool                                 oneKernelModule;
+    vx_bool                                 tileOptimizable;
+    vx_uint32                               dim;
+    vx_uint32                               xDependency;
+    vx_uint32                               yDependency;
+    vx_uint32                               zDependency;
+    vx_uint32                               inputImageCount;
+    vx_uint32                               outputImageCount;
+}
+vx_kernel_optimization_attribute_s;
+#endif
+
 typedef struct _vx_kernel_attribute_s
 {
     vx_size                                 localDataSize;
@@ -480,18 +540,123 @@ typedef struct _vx_kernel_attribute_s
     vx_ptr                                  tileMemoryPtr;
 #endif
     vx_reference                            stagings[10];
+
+    vx_kernel_execution_parameters_t        shaderParameter;
+
+#if gcdVX_OPTIMIZER
+    /* User-input attributes. */
+    vx_kernel_optimization_attribute_s      optAttributes;
+#endif
 }
 vx_kernel_attribute_s;
 
 typedef struct _vx_program
 {
     vx_reference_s                          base;
+    gctSTRING                               source;
+    gctUINT                                 binarySize;
+    gctUINT8_PTR                            binary;
+    gctSTRING                               buildOptions;
+    gctSTRING                               buildLog;
+    vx_build_status                         buildStatus;
 }
 vx_program_s;
 
-typedef vx_program_s *                      vx_program;
-
 typedef vx_program *                        vx_program_ptr;
+
+
+typedef struct _vx_mem
+{
+    union {
+        struct {
+            void *                  image;
+            vx_df_image             format;
+            size_t                  width;
+            size_t                  height;
+            size_t                  depth;
+            size_t                  rowPitch;
+            size_t                  slicePitch;
+            gctSIZE_T               elementSize;
+            gctSIZE_T               size;
+            gctUINT                 allocatedSize;
+            gctPHYS_ADDR            physical;           /* Image header. */
+            gctPOINTER              logical;            /* Image header. */
+            gcsSURF_NODE_PTR        node;
+            gceSURF_FORMAT          internalFormat;
+            gcoTEXTURE              texture;
+            gcoSURF                 surface;
+            gctBOOL                 surfaceMapped;
+            gctUINT32               texturePhysical;    /* Texture data. */
+            gctPOINTER              textureLogical;     /* Texture data. */
+            gctUINT                 textureStride;      /* Texture data. */
+        } image;
+    } u;
+}
+vx_mem_s;
+
+typedef vx_mem_s *                      vx_mem;
+
+typedef struct _vx_mem_alloc_info
+{
+    gctUINT                 allocatedSize;
+    gctPHYS_ADDR            physical;
+    gctPOINTER              logical;
+    gcsSURF_NODE_PTR        node;
+    gctPOINTER              data;
+}
+vx_mem_alloc_info_s;
+
+typedef vx_mem_alloc_info_s *               vx_mem_alloc_info;
+
+typedef struct _vx_argument
+{
+    gcUNIFORM               uniform;
+    size_t                  size;
+    gctPOINTER              data;
+    gctBOOL                 set;
+    gctBOOL                 isMemAlloc;
+    gctBOOL                 isPointer;
+    gctBOOL                 isMemObj;
+}
+vx_argument_s;
+
+typedef vx_argument_s *                     vx_argument;
+
+
+typedef struct _vx_shader_states
+{
+    gctUINT8_PTR            binary;
+
+    /* States info. */
+    gctSIZE_T               stateBufferSize;
+    gctPOINTER              stateBuffer;
+    gcsHINT_PTR             hints;
+}
+vx_shader_states_s;
+
+typedef struct _vx_kernel_shader
+{
+    gctSTRING               name;
+    size_t                  maxWorkGroupSize;
+    size_t                  compileWorkGroupSize[3];
+
+    vx_uint64               localMemSize;
+    vx_uint64               privateMemSize;
+    gctSIZE_T               constantMemSize;
+    gctCHAR *               constantMemBuffer;
+
+    gctUINT                 numArgs;
+    vx_argument             args;
+
+    vx_shader_states_s      states;
+    gctUINT                 attributeCount;
+
+}
+vx_kernel_shader_s;
+
+typedef vx_kernel_shader_s *                vx_kernel_shader;
+
+typedef vx_kernel_shader *                  vx_kernel_shader_ptr;
 
 typedef struct _vx_kernel
 {
@@ -504,6 +669,8 @@ typedef struct _vx_kernel
     vx_program                              program;
 
     vx_kernel_f                             function;
+
+    vx_kernel_shader                        kernelShader[2];
 
     vx_signature_s                          signature;
 
@@ -656,6 +823,8 @@ typedef struct _vx_context
 #endif
 
     vx_border_mode_t                        immediateBorderMode;
+
+    vx_evis_no_inst_s                       evisNoInst;
 }
 vx_context_s;
 
@@ -672,6 +841,19 @@ typedef struct _vx_cost_factors_s
     vx_uint64                               overhead;
 }
 vx_cost_factors_s;
+
+#if gcdVX_OPTIMIZER
+typedef struct _vx_node_optimization_attribute_s
+{
+    vx_uint32                               registerCount;
+    vx_uint32                               inputImageCount;
+    vx_uint32                               outputImageCount;
+    vx_uint32                               maxWorkGroupSize;
+    vx_uint32                               workingSetSize;
+    vx_uint32                               tileSize[3];
+}
+vx_node_optimization_attribute_s;
+#endif
 
 typedef struct _vx_node
 {
@@ -701,9 +883,21 @@ typedef struct _vx_node
 
     vx_cost_factors_s                       costFactors;
 
-    void*                                   cmdBuffer;
-
+    void *                                  cmdBuffer;
     vx_size                                 cmdSizeBytes;
+
+#if gcdVX_OPTIMIZER
+    /* Derived attributes. */
+    vx_node_optimization_attribute_s        optAttributes;
+
+    void *                                  kernelContext;
+
+    void *                                  instructionNode;
+    void *                                  optimizedCmdBuffer;
+    vx_size                                 optimizedCmdSizeBytes;
+#else
+    void *                                  kernelContext;
+#endif
 }
 vx_node_s;
 
@@ -720,6 +914,24 @@ vx_graph_parameter_s;
 typedef enum vx_direction_e                 vx_direction_e;
 
 typedef vx_perf_t *                         vx_perf;
+
+#if gcdVX_OPTIMIZER
+typedef struct _vx_node_batch_s
+{
+    vx_uint32                               startIndex;
+    vx_uint32                               endIndex;
+    vx_bool                                 cpuInvolved;
+    vx_bool                                 endHasCallback;
+
+    vx_bool                                 tiled;
+    vx_coordinates2d_t                      tileSize;
+    vx_coordinates2d_t                      tileCount;
+    vx_coordinates2d_t                      globalSize;
+}
+vx_node_batch_s;
+
+typedef vx_node_batch_s *                   vx_node_batch;
+#endif
 
 typedef struct _vx_graph
 {
@@ -746,6 +958,16 @@ typedef struct _vx_graph
     vx_mutex                                scheduleLock;
 
     vx_value_set_s                          data;
+
+#if gcdVX_OPTIMIZER
+    vx_bool                                 isSubGraph;
+    vx_bool                                 optimized;
+    vx_uint32                               optimizedNodeCount;
+    vx_node                                 optimizedNodeTable[VX_MAX_NODE_COUNT];
+
+    vx_uint32                               nodeBatchCount;
+    vx_node_batch_s                         nodeBatch[VX_MAX_NODE_COUNT];
+#endif
 }
 vx_graph_s;
 
@@ -820,7 +1042,6 @@ typedef struct _vx_image
 }
 vx_image_s;
 
-typedef vx_image_s *                        vx_image;
 typedef vx_image *                          vx_image_ptr;
 
 typedef struct _vx_array
@@ -836,6 +1057,8 @@ typedef struct _vx_array
     vx_size                                 itemCount;
 
     vx_size                                 capacity;
+
+    vx_mem_alloc_info_s                     memAllocInfo;
 }
 vx_array_s;
 
@@ -879,6 +1102,8 @@ typedef struct _vx_remap
 
     vx_uint32                               destWidth;
     vx_uint32                               destHeight;
+
+    vx_mem_alloc_info_s                     memAllocInfo;
 }
 vx_remap_s;
 
@@ -893,6 +1118,8 @@ typedef struct _vx_distribution
 
     vx_uint32                               offsetX;
     vx_uint32                               offsetY;
+
+    vx_mem_alloc_info_s                     memAllocInfo;
 }
 vx_distribution_s;
 
@@ -909,6 +1136,8 @@ typedef struct _vx_threshold
 
     vx_uint32                               trueValue;
     vx_uint32                               falseValue;
+
+    vx_mem_alloc_info_s                     memAllocInfo;
 }
 vx_threshold_s;
 
@@ -922,6 +1151,9 @@ typedef struct _vx_matrix
 
     vx_size                                 columns;
     vx_size                                 rows;
+
+    vx_mem_alloc_info_s                     memAllocInfo;
+
 }
 vx_matrix_s;
 
@@ -930,6 +1162,8 @@ typedef struct _vx_convolution
     vx_matrix_s                             matrix;
 
     vx_uint32                               scale;
+
+    vx_mem_alloc_info_s                     memAllocInfo;
 }
 vx_convolution_s;
 
@@ -945,6 +1179,8 @@ typedef struct _vx_pyramid
     vx_uint32                               width;
     vx_uint32                               height;
     vx_df_image                             format;
+
+    vx_mem_alloc_info_s                     memAllocInfo;
 }
 vx_pyramid_s;
 
@@ -1039,6 +1275,14 @@ typedef struct _vx_kernel_description_s
     vx_kernel_output_validate_f             outputValidate;
     vx_kernel_initialize_f                  initialize;
     vx_kernel_deinitialize_f                deinitialize;
+
+#if gcdVX_OPTIMIZER
+    vx_kernel_optimization_attribute_s      optAttributes;
+#endif
+
+	struct{
+		vx_char*     						source;
+	}extension;
 }
 vx_kernel_description_s;
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -3205,7 +3205,7 @@ gcChipReduceImageTexture(
                     /* Mark states of the samplers bound to this unit dirty */
                     for (index = 0; index < texUnit2Sampler->numSamplers; ++index)
                     {
-                        __glBitmaskOR(&gc->shaderProgram.samplerStateKeepDirty, texUnit2Sampler->samplers[index]);
+                        __glBitmaskSet(&gc->shaderProgram.samplerStateKeepDirty, texUnit2Sampler->samplers[index]);
                     }
                 };
             }
@@ -4678,13 +4678,6 @@ gcChipValidateChipDirty(
                 GL_ASSERT(0);
             }
         }
-
-        if (gc->state.enables.rasterizerDiscard &&
-            (!chipCtx->chipFeature.hasHwTFB) &&
-            (chipCtx->depthMode == gcvDEPTH_NONE))
-        {
-            __GLES_PRINT("WARNING: RASTERIZER_DISCARD was enabled but depthMode was NONE\n");
-        }
     }
 
     if (chipCtx->chipDirty.uPatch.patchDirty)
@@ -5434,7 +5427,16 @@ __glChipDrawNothing(
     __GLcontext *gc
     )
 {
-    return GL_TRUE;
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    gceSTATUS status;
+
+    gcmHEADER_ARG("gc=0x%x", gc);
+
+    status = gco3D_DrawNullPrimitives(chipCtx->engine);
+
+    gcmFOOTER();
+
+    return (gcmIS_ERROR(status) ? GL_FALSE : GL_TRUE);
 }
 
 GLboolean
@@ -5446,6 +5448,9 @@ __glChipFlush(
     gceSTATUS status;
 
     gcmHEADER_ARG("gc=0x%x", gc);
+
+    /* Freon requires sync to external in Flush api. */
+    gcmONERROR(gcChipFboSyncFromShadowFreon(gc, gc->frameBuffer.drawFramebufObj));
 
     /* Commit command buffer. */
     gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvFALSE));
@@ -5470,7 +5475,7 @@ __glChipFinish(
     gcmHEADER_ARG("gc=0x%x", gc);
 
     /* Sychronization between CPU and GPU, then drain all commands */
-    gcmONERROR(gcChipFramebufferMasterSyncFromShadow(gc, gc->frameBuffer.drawFramebufObj));
+    gcmONERROR(gcChipFboSyncFromShadow(gc, gc->frameBuffer.drawFramebufObj));
 
     gcmONERROR(gcoSURF_Flush(gcvNULL));
 
@@ -5936,6 +5941,7 @@ __glChipDrawBegin(
             }
         }
 
+
         /*7, If gl_PointSize was not set when draw GL_POINTS, while raster will not be discarded */
         GL_ASSERT(chipCtx->prePAProgram);
         if ((primMode == GL_POINTS) &&
@@ -5963,32 +5969,33 @@ __glChipDrawBegin(
             break;
         }
 
-#if __GL_CHIP_STENCIL_TEST_OPT
-        if (gc->state.enables.stencilTest)
+        if (chipCtx->needStencilOpt && gc->state.enables.stencilTest)
         {
             __GLchipStencilOpt *stencilOpt = gcChipPatchStencilOptGetInfo(gc, GL_FALSE);
 
-            /* If SW can determine the stencil test must fail for all fragments, we can skip the draw. */
-            if (gcChipPatchStencilOptTest(gc, stencilOpt))
+            if (stencilOpt)
             {
-                /* TODO: can add more check here. E.g. when depth test is disabled. */
-                if (stencilOpt &&
-                    (gc->state.stencil.front.fail      != GL_KEEP ||
-                     gc->state.stencil.back.fail       != GL_KEEP ||
-                     gc->state.stencil.front.depthFail != GL_KEEP ||
-                     gc->state.stencil.back.depthFail  != GL_KEEP ||
-                     gc->state.stencil.front.depthPass != GL_KEEP ||
-                     gc->state.stencil.back.depthPass  != GL_KEEP))
+                /* If SW can determine the stencil test must fail for all fragments, we can skip the draw. */
+                if (gcChipPatchStencilOptTest(gc, stencilOpt))
                 {
-                    gcChipPatchStencilOptReset(stencilOpt, stencilOpt->width, stencilOpt->height, stencilOpt->bpp);
+                    /* TODO: can add more check here. E.g. when depth test is disabled. */
+                    if (gc->state.stencil.front.fail      != GL_KEEP ||
+                        gc->state.stencil.back.fail       != GL_KEEP ||
+                        gc->state.stencil.front.depthFail != GL_KEEP ||
+                        gc->state.stencil.back.depthFail  != GL_KEEP ||
+                        gc->state.stencil.front.depthPass != GL_KEEP ||
+                        gc->state.stencil.back.depthPass  != GL_KEEP)
+                    {
+                        gcChipPatchStencilOptReset(stencilOpt, stencilOpt->width, stencilOpt->height, stencilOpt->bpp);
+                    }
+                }
+                else
+                {
+                    break;
                 }
             }
-            else
-            {
-                break;
-            }
         }
-#endif
+
         if (gc->flags & __GL_CONTEXT_SKIP_DRAW_MASK)
         {
             __GLES_PRINT("ES30:skip draw with context flag=0x%x", gc->flags);
@@ -6134,7 +6141,7 @@ __glChipDrawEnd(
                                 gcvNULL);
         }
 
-        gcmDUMP(gcvNULL, "#[fID=%d, dID=%d(draw), pID=%d, ppID=%d]",
+        gcmDUMP(gcvNULL, "#[info: fID=%d, dID=%d(draw), pID=%d, ppID=%d]",
                 frameCount, drawCount,
                 gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
                 gc->shaderProgram.currentProgram ? 0 : gc->shaderProgram.boundPPO->name);
@@ -6741,7 +6748,7 @@ __glChipComputeEnd(
         GL_ASSERT(gc->shaderProgram.activeProgObjs[__GLSL_STAGE_CS]);
         GL_ASSERT(chipCtx->activePrograms[__GLSL_STAGE_CS]);
 
-        gcmDUMP(gcvNULL, "#[fID=%d, dID=%d(compute) pID=%d]",
+        gcmDUMP(gcvNULL, "#[info: fID=%d, dID=%d(compute) pID=%d]",
                 frameCount, drawCount,
                 gc->shaderProgram.activeProgObjs[__GLSL_STAGE_CS]->objectInfo.id);
 
@@ -6799,7 +6806,6 @@ __glChipComputeEnd(
                     if (pImageUnit2Uniform->numUniform + pExtraImageUnit2Uniform->numUniform > 0)
                     {
                         gcsSURF_VIEW texView;
-                        GLint zOffset;
                         __GLtextureObject *texObj = imageUnit->texObj;
                         GLboolean layered = GL_FALSE;
                         gctSTRING fileName;
@@ -6807,8 +6813,7 @@ __glChipComputeEnd(
                         gctUINT fileNameOffset = 0;
                         gcsSURF_FORMAT_INFO_PTR formatInfo;
 
-                        zOffset = (texObj->targetIndex == __GL_TEXTURE_3D_INDEX) ? imageUnit->actualLayer : 0;
-                        texView = gcChipGetTextureSurface(chipCtx, texObj, imageUnit->level, imageUnit->actualLayer, zOffset);
+                        texView = gcChipGetTextureSurface(chipCtx, texObj, imageUnit->level, imageUnit->actualLayer);
 
                         gcmVERIFY_OK(gcoSURF_GetFormatInfo(texView.surf, &formatInfo));
 

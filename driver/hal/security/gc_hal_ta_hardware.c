@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -259,7 +259,7 @@ _CheckResolve(
     gctUINT32 target, target1;
     gctUINT32 windowSize, width, height, srcStride, dstStride;
     gctUINT32 config;
-    gctUINT32 pixelPipe = Parser->ta->hardware->pixelPipes;
+    gctUINT32 resolvePipes = Parser->ta->hardware->resolvePipes;
     gctUINT32 clearControl;
     gctUINT32 sourceEnd, targetEnd;
 
@@ -271,7 +271,7 @@ _CheckResolve(
         return;
     }
 
-    if (pixelPipe > 1)
+    if (resolvePipes > 1)
     {
         _GetValue(Parser, 0x05B0, &source);
         _GetValue(Parser, 0x05B8, &target);
@@ -1074,6 +1074,8 @@ _InitializeContextBuffer(
     gctUINT32 index;
     gcTA_HARDWARE hardware = Context->ta->hardware;
     gctUINT32 pixelPipes = hardware->pixelPipes;
+
+    gctUINT32 resolvePipes = hardware->resolvePipes;
     gctINT i;
     gctBOOL halti1;
 
@@ -1115,10 +1117,10 @@ _InitializeContextBuffer(
     index += _State(Context, index, 0x01608 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);
     index += _State(Context, index, 0x01610 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);
 
-    if (pixelPipes > 1)
+    if (resolvePipes > 1)
     {
-        index += _State(Context, index, (0x016C0 >> 2) + (0 << 3), 0x00000000, pixelPipes, gcvFALSE, gcvTRUE);
-        index += _State(Context, index, (0x016E0 >> 2) + (0 << 3), 0x00000000, pixelPipes, gcvFALSE, gcvTRUE);
+        index += _State(Context, index, (0x016C0 >> 2) + (0 << 3), 0x00000000, resolvePipes, gcvFALSE, gcvTRUE);
+        index += _State(Context, index, (0x016E0 >> 2) + (0 << 3), 0x00000000, resolvePipes, gcvFALSE, gcvTRUE);
     }
 
     index += _State(Context, index, 0x01620 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);
@@ -1869,6 +1871,8 @@ gctaHARDWARE_Construct(
     gcmkONERROR(gctaOS_ReadRegister(os, 0x00048, &specs));
 
     hardware->pixelPipes = gcmMAX((((((gctUINT32) (specs)) >> (0 ? 27:25)) & ((gctUINT32) ((((1 ? 27:25) - (0 ? 27:25) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 27:25) - (0 ? 27:25) + 1)))))) ), 1);
+
+    hardware->resolvePipes = hardware->pixelPipes;
 
     *Hardware = hardware;
 

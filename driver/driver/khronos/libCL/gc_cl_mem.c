@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -3888,6 +3888,8 @@ clReleaseMemObject(
                     }
                 }
 
+                gcmVERIFY_OK(gcoCL_Commit(gcvTRUE));
+
                 /* Invoke and free callbacks */
                 memObjCallback = MemObj->memObjCallback;
                 while (memObjCallback != gcvNULL)
@@ -3933,6 +3935,8 @@ clReleaseMemObject(
 
                 gcoCL_DestroyTexture(MemObj->u.image.texture,
                                      MemObj->u.image.surface);
+
+                gcmVERIFY_OK(gcoCL_Commit(gcvTRUE));
 
                 MemObj->u.image.texture = gcvNULL;
                 MemObj->u.image.surface = gcvNULL;

@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -63,6 +63,10 @@ ifeq ($(EGL_API_X), 1)
   INCLUDE += -I$(X11_ARM_DIR)/include
 endif
 
+ifeq ($(EGL_API_GBM), 1)
+  INCLUDE += $(shell $(PKG_CONFIG) --cflags libdrm gbm)
+endif
+
 CFLAGS += $(INCLUDE)
 
 ################################################################################
@@ -71,52 +75,61 @@ CFLAGS += $(INCLUDE)
 ifneq ($(USE_ARMCC), 1)
   ifeq ($(EGL_API_WL), 1)
     CFLAGS += -fPIC
-  else
-    ifeq ($(EGL_API_DRI), 1)
-      CFLAGS += -fPIC -Werror -march=armv7-a
-    else
-      ifeq ($(EGL_API_DFB),1)
-        CFLAGS += -pipe -fPIC -DPIC
-        CFLAGS += -DDIRECTFB_MAJOR_VERSION=$(DIRECTFB_MAJOR_VERSION) \
-                  -DDIRECTFB_MINOR_VERSION=$(DIRECTFB_MINOR_VERSION) \
-                  -DDIRECTFB_MICRO_VERSION=$(DIRECTFB_MICRO_VERSION)
-      else
-          CFLAGS += -fPIC -Werror -ansi
-      endif
-    endif
+  endif
+
+  ifeq ($(EGL_API_DRI), 1)
+    CFLAGS += -fPIC -Werror -march=armv7-a
+  endif
+
+  ifeq ($(EGL_API_DFB),1)
+    CFLAGS += -pipe -fPIC -DPIC
+    CFLAGS += -DDIRECTFB_MAJOR_VERSION=$(DIRECTFB_MAJOR_VERSION) \
+              -DDIRECTFB_MINOR_VERSION=$(DIRECTFB_MINOR_VERSION) \
+              -DDIRECTFB_MICRO_VERSION=$(DIRECTFB_MICRO_VERSION)
+  endif
+
+  ifneq ($(filter 1,$(EGL_API_FB) $(EGL_API_X) $(EGL_API_GBM)),)
+      CFLAGS += -fPIC -Werror -ansi
   endif
 endif
 
 ################################################################################
 # Describe object files.
 
+PLATFORM_CALLBACK_OBJ :=$(notdir $(PLATFORM_CALLBACK)).o
+
 OBJECTS := $(OBJ_DIR)/gc_hal_user_debug.o \
            $(OBJ_DIR)/gc_hal_user_os.o \
-           $(OBJ_DIR)/gc_hal_user_math.o
+           $(OBJ_DIR)/gc_hal_user_math.o \
+           $(OBJ_DIR)/$(PLATFORM_CALLBACK_OBJ) \
 
 ifneq ($(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_VG), 0_0)
-  ifeq ($(EGL_API_FB),1)
-    ifeq ($(EGL_API_WL),1)
-      OBJECTS += $(OBJ_DIR)/gc_hal_user_wayland.o
-    else
+  ifeq ($(EGL_API_FB)_$(EGL_API_WL),1_0)
       OBJECTS += $(OBJ_DIR)/gc_hal_user_fbdev.o
-    endif
-  else
-    ifeq ($(EGL_API_DFB),1)
-      OBJECTS += $(OBJ_DIR)/gc_hal_user_dfb.o
-    else
-      ifeq ($(EGL_API_DRI),1)
-        OBJECTS += $(OBJ_DIR)/gc_hal_user_dri.o \
-                   $(OBJ_DIR)/XF86dri.o \
-                   $(OBJ_DIR)/xf86drm.o \
-                   $(OBJ_DIR)/xf86drmHash.o \
-                   $(OBJ_DIR)/xf86drmRandom.o
-      else
-        ifeq ($(EGL_API_X),1)
-          OBJECTS += $(OBJ_DIR)/gc_hal_user_x.o
-        endif
-      endif
-    endif
+  endif
+
+  ifeq ($(EGL_API_FB)_$(EGL_API_WL),1_1)
+      OBJECTS += $(OBJ_DIR)/gc_hal_user_wayland.o
+  endif
+
+  ifeq ($(EGL_API_DFB),1)
+    OBJECTS += $(OBJ_DIR)/gc_hal_user_dfb.o
+  endif
+
+  ifeq ($(EGL_API_DRI),1)
+    OBJECTS += $(OBJ_DIR)/gc_hal_user_dri.o \
+               $(OBJ_DIR)/XF86dri.o \
+               $(OBJ_DIR)/xf86drm.o \
+               $(OBJ_DIR)/xf86drmHash.o \
+               $(OBJ_DIR)/xf86drmRandom.o
+  endif
+
+  ifeq ($(EGL_API_X),1)
+    OBJECTS += $(OBJ_DIR)/gc_hal_user_x.o
+  endif
+
+  ifeq ($(EGL_API_GBM),1)
+    OBJECTS += $(OBJ_DIR)/gc_hal_user_gbm.o
   endif
 endif
 
@@ -157,6 +170,10 @@ $(OBJ_DIR)/%.o: ../../../../driver/X/DRI/src/%.c
 endif
 
 $(OBJ_DIR)/%.o: %.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -MMD -o $@ $<
+
+$(OBJ_DIR)/$(PLATFORM_CALLBACK_OBJ): $(PLATFORM_CALLBACK).c
 	@mkdir -p $(OBJ_DIR)
 	$(CC) -c $(CFLAGS) -MMD -o $@ $<
 

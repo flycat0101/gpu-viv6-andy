@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -21,9 +21,7 @@ typedef struct __GLchipRenderbufferObjectRec
     /* Shadow resource information. */
     __GLchipResourceShadow shadow;
 
-#if __GL_CHIP_STENCIL_TEST_OPT
-    __GLchipStencilOpt stencilOpt;
-#endif
+    __GLchipStencilOpt *stencilOpt;
 
     __GLchipFmtMapInfo *formatMapInfo;
 } __GLchipRenderbufferObject;
@@ -160,6 +158,12 @@ gcChipTexMipSliceSyncFromShadow(
     );
 
 gceSTATUS
+gcChipRboSyncFromShadow(
+    __GLcontext* gc,
+    __GLrenderbufferObject *rbo
+    );
+
+gceSTATUS
 gcChipTexDirectSourceSyncFromMipSlice(
     __GLcontext *gc,
     __GLtextureObject *texObj
@@ -173,16 +177,35 @@ gcChipTexSyncFromShadow(
     );
 
 gceSTATUS
-gcChipTexShadowSyncFromMaster(
+gcChipFboSyncFromMasterSurface(
     __GLcontext *gc,
     gcsSURF_VIEW *surfView,
     GLboolean read
     );
 
 gcsSURF_VIEW
-gcChipMasterSyncFromShadow(
+gcChipFboSyncFromShadowSurface(
     __GLcontext *gc,
     gcsSURF_VIEW *surfView,
+    GLboolean read
+    );
+
+gceSTATUS
+gcChipFboSyncFromShadow(
+    __GLcontext *gc,
+    __GLframebufferObject *fbo
+    );
+
+gceSTATUS
+gcChipFboSyncFromShadowFreon(
+    __GLcontext *gc,
+    __GLframebufferObject *fbo
+    );
+
+gceSTATUS
+gcChipFBOSyncEGLImageNativeBuffer(
+    __GLcontext *gc,
+    gcoSURF surface,
     GLboolean read
     );
 
@@ -223,19 +246,6 @@ __glChipBlitFramebufferValidateState(
 GLboolean
 __glChipBlitFramebufferEnd(
     __GLcontext *gc
-    );
-
-gceSTATUS
-gcChipFramebufferMasterSyncFromShadow(
-    __GLcontext *gc,
-    __GLframebufferObject *fbo
-    );
-
-gceSTATUS
-gcChipFBOSyncEGLImageNativeBuffer(
-    __GLcontext *gc,
-    gcoSURF surface,
-    GLboolean read
     );
 
 

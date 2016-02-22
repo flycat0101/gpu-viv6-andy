@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -106,8 +106,8 @@ _BoolToString(
 
 static gctCONST_STRING spaceaddr[] = {"", "global_space ", "const_space ", "local_space "};
 static gctCONST_STRING qualifier[] = {"", "const ", "volatile ", "const volatile "};
-static gctCONST_STRING operand_precision[] = { "", ".hp", ".lp", ".defaultp"};
-static gctCONST_STRING symbol_precision[]  = { "", "hp ", "lp ", "defaultp " };
+static gctCONST_STRING operand_precision[] = { ".dp", ".lp", ".mp", ".hp", ".anyp"};
+static gctCONST_STRING symbol_precision[]  = { "dp ", "lp ", "mp ", "hp ", "anyp "};
 
 static VIR_DumpConstFormat formats[] = {
     { VIR_TYPE_UNKNOWN, "%s", 0, 0, VIR_DUMP_CONST_INVALID, gcvNULL},
@@ -303,6 +303,8 @@ _GetStorageClassString(
         return "patch out ";
     case VIR_STORAGE_PERPATCH_INOUT:
         return "patch in out ";
+    case VIR_STORAGE_INDEX_REGISTER:
+        return "addr_reg ";
     default:
         gcmASSERT(0);
         return "";
@@ -372,6 +374,8 @@ _GetUniformKindString(
         return "multiSample buffers";
     case VIR_UNIFORM_TEMP_REG_SPILL_MEM_ADDRESS:
         return "uniform_temp_reg_spill_mem_address";
+    case VIR_UNIFORM_CONST_BORDER_VALUE:
+        return "const_border_value";
     default:
         gcmASSERT(0);
         return "";
@@ -864,7 +868,7 @@ _DumpSymbol(
             isSymArrayedPerVertex(Sym) ? "(ArrayedPerVertex) " : "",
             spaceaddr[VIR_Symbol_GetAddrSpace(Sym)],
             qualifier[VIR_Symbol_GetTyQualifier(Sym)],
-            symbol_precision[VIR_Symbol_GetPrecision(Sym)],
+            VIR_Shader_IsCL(Dumper->Shader) ? "" : symbol_precision[VIR_Symbol_GetPrecision(Sym)],
             isSymPrecise(Sym) ? "precise " : ""));
 
         if(VIR_SYMFLAG_FLAT & VIR_Symbol_GetFlag(Sym))
@@ -882,6 +886,7 @@ _DumpSymbol(
                 _GetUniformKindString(VIR_Symbol_GetUniformKind(Sym))));
             break;
         case VIR_SYM_UBO:
+        case VIR_SYM_SBO:
         case VIR_SYM_VARIABLE:
         case VIR_SYM_FUNCTION:
         case VIR_SYM_TEXTURE:
@@ -904,7 +909,10 @@ _DumpSymbol(
     }
     else
     {
-        VERIFY_OK(VIR_LOG(Dumper, "%s ", symbol_precision[VIR_Symbol_GetPrecision(Sym)]));
+        if (!VIR_Shader_IsCL(Dumper->Shader))
+        {
+            VERIFY_OK(VIR_LOG(Dumper, "%s ", symbol_precision[VIR_Symbol_GetPrecision(Sym)]));
+        }
     }
 
     switch(VIR_Symbol_GetKind(Sym))
@@ -915,6 +923,7 @@ _DumpSymbol(
             VIR_Shader_GetSymNameString(Dumper->Shader, Sym)));
         break;
     case VIR_SYM_UBO:
+    case VIR_SYM_SBO:
     case VIR_SYM_TEXTURE:
     case VIR_SYM_IMAGE:
     case VIR_SYM_TYPE:           /* typedef */
@@ -1140,6 +1149,10 @@ VIR_Symbol_Dump(
     if (isSymInstanceMember(Sym))
     {
         VERIFY_OK(VIR_LOG(Dumper, " is_instance_member"));
+    }
+    if (isSymIndirectlyAddressed(Sym))
+    {
+        VERIFY_OK(VIR_LOG(Dumper, " indirectly_addressed"));
     }
     VERIFY_OK(VIR_LOG(Dumper, " >"));
 
@@ -1378,7 +1391,7 @@ _DumpOperand(
     VIR_Const       *vConst    = gcvNULL;
     VIR_OperandList *operandList = gcvNULL;
     VIR_Function    *func = VIR_Inst_GetFunction(Inst);
-
+    VIR_TypeId       componentTyId;
     VIR_DumpTypeFormat typeFormat = { gcvFALSE, gcvTRUE };
 
     gcmASSERT(Operand != gcvNULL &&
@@ -1412,14 +1425,14 @@ _DumpOperand(
             gcvTRUE,
             typeFormat);
         CHECK_ERROR(errCode, "DumpOperand");
-
-        gcmASSERT((VIR_Type_GetBaseTypeId(type) < gcmCOUNTOF(formats)) &&
-            formats[VIR_Type_GetBaseTypeId(type)].Type == (gctUINT32)VIR_Type_GetBaseTypeId(type));
+        componentTyId = VIR_GetTypeComponentType(VIR_Operand_GetType(Operand));
+        gcmASSERT((componentTyId < gcmCOUNTOF(formats)) &&
+            formats[componentTyId].Type == (gctUINT32)componentTyId);
 
         errCode = _DumpVecConst(Dumper,
             (gctUINT *)&Operand->u1.uConst,
-            &formats[VIR_GetTypeComponentType(VIR_Operand_GetType(Operand))],
-            VIR_GetTypeFlag(VIR_Type_GetBaseTypeId(type)));
+            &formats[componentTyId],
+            VIR_GetTypeFlag(componentTyId));
         CHECK_ERROR(errCode, "DumpOperand");
         break;
     case VIR_OPND_EVIS_MODIFIER:
@@ -1623,8 +1636,11 @@ _DumpOperand(
         )
     {
         /* dump precision info, mediump is default */
-        VERIFY_OK(
-            VIR_LOG(Dumper, "%s", operand_precision[VIR_Operand_GetPrecision(Operand)]));
+        if (!VIR_Shader_IsCL(Dumper->Shader))
+        {
+            VERIFY_OK(
+                VIR_LOG(Dumper, "%s", operand_precision[VIR_Operand_GetPrecision(Operand)]));
+        }
         errCode = _DumpEnableOrSwizzle(Dumper, Operand);
         CHECK_ERROR(errCode, "DumpOperand");
     }
@@ -2292,10 +2308,6 @@ VIR_Uniform_Dump(
     {
          VERIFY_OK(VIR_LOG(Dumper, " atomic_counter"));
     }
-    if (isSymUniformVIRNewAdded(sym))
-    {
-        VERIFY_OK(VIR_LOG(Dumper, " VIR_new_added"));
-    }
     if (isSymUniformTreatSamplerAsConst(sym))
     {
         VERIFY_OK(VIR_LOG(Dumper, " Treat_sampler_as_const"));
@@ -2952,8 +2964,8 @@ _VIR_Def_Dump(
     }
 
     if (bSkipPatchVertexDef &&
-        (pDef->flags.bIsPerVtxCp ||
-         pDef->flags.bIsPerPrim))
+        (pDef->flags.nativeDefFlags.bIsPerVtxCp ||
+         pDef->flags.nativeDefFlags.bIsPerPrim))
     {
         return errCode;
     }

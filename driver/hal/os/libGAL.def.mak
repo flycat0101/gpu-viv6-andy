@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -79,7 +79,7 @@ EXPORTS
     gcoOS_GetTime
     gcoOS_GetTLS
     gcoOS_CopyTLS
-	gcoOS_QueryTLS
+    gcoOS_QueryTLS
     gcoOS_HexStrToInt
     gcoOS_HexStrToFloat
     gcoOS_LoadLibrary
@@ -137,8 +137,8 @@ EXPORTS
     gcoOS_MapUserMemoryEx
     gcoOS_FscanfI
 
-	gcoOS_SysTraceBegin
-	gcoOS_SysTraceEnd
+    gcoOS_SysTraceBegin
+    gcoOS_SysTraceEnd
 
 
 !IF "$(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_VG)" != "0_0"
@@ -191,7 +191,7 @@ EXPORTS
     gcoOS_DestroyDrawable
     gcoOS_SwapBuffers
     gcoOS_SetDisplayVirtualEx
-	gcoOS_QuerySystemInfo
+    gcoOS_QuerySystemInfo
 
     ; gcsMEM
     gcfMEM_InitFSMemPool
@@ -253,8 +253,8 @@ EXPORTS
     gcoHAL_QuerySeparated2D
     gcoHAL_SetTimeOut
     gcoHAL_GetOption
-	gcoHAL_FrameInfoOps
-	gcoHAL_GetProductName
+    gcoHAL_FrameInfoOps
+    gcoHAL_GetProductName
     gcoHAL_QueryResetTimeStamp
     gcoHAL_WrapUserMemory
     gcoHAL_LockVideoMemory
@@ -264,11 +264,10 @@ EXPORTS
 !IF "$(VIVANTE_ENABLE_3D)" == "1"
     gcoHAL_QueryShaderCaps
     gcoHAL_QuerySamplerBase
-	gcoHAL_QueryUniformBase
+    gcoHAL_QueryUniformBase
     gcoHAL_QueryStreamCaps
     gcoHAL_QueryTextureCaps
     gcoHAL_QueryTextureMaxAniso
-    gcoHAL_QueryTextureTexldPerCycle
     gcoHAL_SendFence
     gcoHAL_SetBltNP2Texture
     gcoHAL_Get3DEngine
@@ -321,7 +320,7 @@ EXPORTS
     gcoSURF_Flush
     gcoSURF_GetAlignedSize
     gcoSURF_GetAlignment
-	gcoSURF_GetBottomBufferOffset
+    gcoSURF_GetBottomBufferOffset
     gcoSURF_GetColorType
     gcoSURF_GetColorSpace
     gcoSURF_GetFormat
@@ -350,7 +349,7 @@ EXPORTS
     gcoSURF_LockNode
     gcoSURF_UnLockNode
     gcoSURF_WrapSurface
-	gcoSURF_GetInfo
+    gcoSURF_GetInfo
     gcoSURF_QueryHints
 
 !IF "$(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_VG)" != "0_0"
@@ -361,7 +360,7 @@ EXPORTS
 !ENDIF
 
 !IF "$(VIVANTE_ENABLE_3D)" == "1"
-	gcoSURF_Clear
+    gcoSURF_Clear
     gcoSURF_CopyPixels
     gcoSURF_DisableTileStatus
     gcoSURF_EnableTileStatus
@@ -371,42 +370,26 @@ EXPORTS
     gcoSURF_IsCompressed
     gcoSURF_IsRenderable
     gcoSURF_IsFormatRenderableAsRT
-    gcoSURF_ReadPixel
     gcoSURF_Resample
-    gcoSURF_Resolve
-    gcoSURF_ResolveEx
-	gcoSURF_Preserve
+    gcoSURF_Preserve
     gcoSURF_GetResolveAlignment
     gcoSURF_ResolveRect
-    gcoSURF_ResolveRectEx
     gcoSURF_IsHWResolveable
     gcoSURF_BlitCPU
-	gcoSURF_BlitDraw
     gcoSURF_SetResolvability
-    gcoSURF_WritePixel
-    depr_gcoSURF_Resolve
-    depr_gcoSURF_ResolveRect
     gcoSURF_Swap
     gcoSURF_ResetSurWH
     gcoSURF_SetSharedLock
     gcoSURF_GetFence
     gcoSURF_WaitFence
     gcoSURF_AlignResolveRect
-    gcoSURF_3DBlitClearRect
-    gcoSURF_3DBlitBltRect
+ 	gcoSURF_DrawBlit
     gcoSURF_3DBlitCopy
     gcsSURF_NODE_Construct
-	gcsSURF_NODE_Destroy
+    gcsSURF_NODE_Destroy
     gcsSURF_NODE_GetHardwareAddress
     gcsSURF_NODE_SetHardwareAddress
 
-    gcoSURF_CopyPixels_v2
-    gcoSURF_ResolveRect_v2
-    gcoSURF_Resample_v2
-    gcoSURF_Clear_v2
-    gcoSURF_DrawBlit_v2
-
-    gcoSURF_SetOffset
     gcoSURF_FlushTileStatus
     gcoSURF_AppendTileStatus
 !ENDIF
@@ -534,6 +517,7 @@ EXPORTS
     gco3D_DrawIndirectPrimitives
     gco3D_MultiDrawIndirectPrimitives
     gco3D_DrawInstancedPrimitives
+    gco3D_DrawNullPrimitives
     gco3D_DrawPrimitivesCount
     gco3D_DrawPrimitivesOffset
     gco3D_DrawPattern
@@ -548,7 +532,6 @@ EXPORTS
     gco3D_SetAALineTexSlot
     gco3D_SetAALineWidth
     gco3D_SetAllEarlyDepthModes
-    gco3D_SetAllEarlyDepthModesEx
     gco3D_SetEarlyDepthFromAPP
     gco3D_SetRADepthWrite
     gco3D_SwitchDynamicEarlyDepthMode
@@ -560,7 +543,7 @@ EXPORTS
     gco3D_SetAlphaTest
     gco3D_SetAlphaTextureFunction
     gco3D_SetAntiAlias
-	gco3D_SetSamples
+    gco3D_SetSamples
     gco3D_SetAntiAliasLine
     gco3D_SetAPI
     gco3D_GetAPI
@@ -570,7 +553,7 @@ EXPORTS
     gco3D_SetBlendFunction
     gco3D_SetBlendMode
     gco3D_SetCentroids
-	gco3D_GetSampleCoords
+    gco3D_GetSampleCoords
     gco3D_SetClearColor
     gco3D_SetClearColorF
     gco3D_SetClearColorX
@@ -637,9 +620,9 @@ EXPORTS
     gco3D_SetPSOutputMapping
     gco3D_LoadProgram
     gco3D_EnableAlphaToCoverage
-	gco3D_EnableSampleCoverage
-	gco3D_SetSampleCoverageValue
-	gco3D_EnableSampleMask
+    gco3D_EnableSampleCoverage
+    gco3D_SetSampleCoverageValue
+    gco3D_EnableSampleMask
     gco3D_SetSampleMask
     gco3D_EnableSampleShading
     gco3D_EnableSampleMaskOut
@@ -649,24 +632,19 @@ EXPORTS
     gco3D_SetShaderLayered
     gco3D_IsProgramSwitched
 
-
-    ;gco3D_QueryStreamOut
-    ;gco3D_EndStreamOut
-    ;gco3D_StartStreamOut
-    ;gco3D_ReplayStreamOut
-    ;gco3D_StopStreamOut
-
     gco3D_EnableBlendingIndexed
     gco3D_SetBlendFunctionIndexed
     gco3D_SetBlendModeIndexed
     gco3D_SetColorWriteIndexed
 
-	gco3D_SetPatchVertices
+    gco3D_SetPatchVertices
 
-	gco3D_SetXfbCmd
-	gco3D_SetXfbHeader
-	gco3D_SetXfbBuffer
-	gco3D_SetRasterDiscard
+    gco3D_SetXfbCmd
+    gco3D_SetXfbHeader
+    gco3D_SetXfbBuffer
+    gco3D_SetRasterDiscard
+
+    gco3D_QueryReset
 
     ; gcoTEXTURE
     gcoTEXTURE_AddMipMap
@@ -700,12 +678,12 @@ EXPORTS
     gcoTEXTURE_UploadCompressedSub
     gcoTEXTURE_UploadSub
     gcoTEXTURE_SetDepthTextureFlag
-	gcoTEXTURE_BindTextureTS
-	gcoTEXTURE_GenerateMipMap
+    gcoTEXTURE_BindTextureTS
+    gcoTEXTURE_GenerateMipMap
     gcoTEXTURE_UploadYUV
-	gcoTEXTURE_BindTextureDesc
-	gcoTEXTURE_SetDescDirty
-	gcoTEXTURE_LockMipMap
+    gcoTEXTURE_BindTextureDesc
+    gcoTEXTURE_SetDescDirty
+    gcoTEXTURE_LockMipMap
 !ENDIF
 
     ; gcsRECT
@@ -716,18 +694,18 @@ EXPORTS
     gcsRECT_RelativeRotation
 
 !IF "$(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_2D)" != "0_0"
-	;gcsBITMASK
-	gcsBITMASK_InitAllOne
-	gcsBITMASK_InitAllZero
-	gcsBITMASK_InitOR2
-	gcsBITMASK_Test
-	gcsBITMASK_TestAndClear
-	gcsBITMASK_IsAllZero
-	gcsBITMASK_OR
-	gcsBITMASK_Clear
-	gcsBITMASK_SetAll
-	gcsBITMASK_MergeBitMaskArray
-	gcsBITMASK_OR2
+    ;gcsBITMASK
+    gcsBITMASK_InitAllOne
+    gcsBITMASK_InitAllZero
+    gcsBITMASK_InitOR
+    gcsBITMASK_Test
+    gcsBITMASK_TestAndClear
+    gcsBITMASK_IsAllZero
+    gcsBITMASK_Set
+    gcsBITMASK_Clear
+    gcsBITMASK_SetAll
+    gcsBITMASK_MergeBitMaskArray
+    gcsBITMASK_OR
 !ENDIF
 
 
@@ -748,7 +726,7 @@ EXPORTS
     gcoSHADER_BindBufferBlock
     gcCreateInstVidMem
     gcDestroyInstVidMem
-	gcCreateSpillVidMem
+    gcCreateSpillVidMem
     gcDestroySpillVidMem
 
     ; gcoSTREAM
@@ -897,6 +875,11 @@ EXPORTS
     gcoVG_SetFillRule
     gcoVG_EnableDither
     gcoVG_DrawSurfaceToImage
+!IF "$(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_2D)_$(VIVANTE_ENABLE_VG)" == "0_0_1"
+    gcoVG_SetColorKey
+    gcoVG_SetColorIndexTable
+    gcoVG_Resolve
+!ENDIF
 
     gcoVGHARDWARE_QueryPathStorage
     gcoVGHARDWARE_AssociateCompletion
@@ -946,6 +929,11 @@ EXPORTS
     gcoVGHARDWARE_SetFillRule
     gcoVGHARDWARE_EnableDither
     gcoVGHARDWARE_PackColorComponent
+!IF "$(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_2D)_$(VIVANTE_ENABLE_VG)" == "0_0_1"
+    gcoVGHARDWARE_SetColorKey
+    gcoVGHARDWARE_SetColorIndexTable
+    gcoVGHARDWARE_ResolveRect
+!ENDIF
 
     gcoHAL_Flush
     gcoHAL_AssociateCompletion
@@ -995,13 +983,20 @@ EXPORTS
     ; gcoVX
     gcoVX_Initialize
     gcoVX_BindImage
+    gcoVX_BindKernel
     gcoVX_BindUniform
     gcoVX_InvokeKernel
     gcoVX_Commit
-	gcoVX_AllocateMemory
-	gcoVX_FreeMemory
+    gcoVX_AllocateMemory
+    gcoVX_FreeMemory
     gcoVX_KernelConstruct
+    gcoVX_LockKernel
     gcoVX_Replay
+    gcoVX_LoadKernelShader
+    gcoVX_InvokeKernelShader
+    gcoVX_Flush
+    gcoVX_AllocateMemoryEx
+    gcoVX_FreeMemoryEx
 !ENDIF
     gcGetUserDebugOption
 

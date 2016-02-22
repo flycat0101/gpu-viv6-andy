@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1073,6 +1073,8 @@ gcLINKTREE_Construct(
     tree->MVPCount = 0;
     tree->WChannelEqualToZ = gcvFALSE;
 #endif
+
+    gcoHAL_GetPatchID(gcvNULL, &tree->patchID);
 
     /* Return the gcLINKTREE structure pointer. */
     *Tree = tree;
@@ -2352,7 +2354,7 @@ _InitTreeTemp(
     Temp->users                 = gcvNULL;
     Temp->assigned              = -1;
     Temp->owner                 = gcvNULL;
-    Temp->isOwnerKernel         = gcvFALSE;
+    Temp->isOwnerKernel             = gcvFALSE;
     Temp->variable              = gcvNULL;
     Temp->format                = Format;
     Temp->precision             = gcSL_PRECISION_MEDIUM;
@@ -3843,7 +3845,7 @@ gcLINKTREE_Build(
 
             /* all definition and its uses of the temp are in the same basic block,
                do not change the last use even if they are inside a loop */
-            if (gctOPT_hasFeature(FB_LIVERANGE_FIX1) &&
+            if (gcmOPT_hasFeature(FB_LIVERANGE_FIX1) &&
                 _defineAndUserInSameEBB(Tree, tempReg))
             {
                 continue;
@@ -4126,11 +4128,7 @@ gcLINKTREE_Build(
     {
         if (!Tree->attributeArray[i].inUse &&  (Tree->shader->attributes[i] != gcvNULL))
         {
-            gcePATCH_ID patchId = gcvPATCH_INVALID;
-
-            gcoHAL_GetPatchID(gcvNULL, &patchId);
-
-            if (patchId == gcvPATCH_NENAMARK && Tree->shader->type == gcSHADER_TYPE_VERTEX)
+            if (Tree->patchID == gcvPATCH_NENAMARK && Tree->shader->type == gcSHADER_TYPE_VERTEX)
             {
                 gcmATTRIBUTE_SetAlwaysUsed(Tree->shader->attributes[i], gcvTRUE);
             }
@@ -4584,7 +4582,7 @@ gcLINKTREE_RemoveDeadCode(
 {
     gctSIZE_T i;
 
-    if (gctOPT_hasFeature(FB_DISABLE_OLD_DCE))
+    if (gcmOPT_hasFeature(FB_DISABLE_OLD_DCE))
     {
         gcLINKTREE_MarkAllAsUsed(Tree);
         return gcvSTATUS_OK;
@@ -6332,7 +6330,10 @@ _CheckSingleUniformStruct(
    general checking will bring es30 conformance test
 */
             (length1 != length2) ||
-            (GetUniformCategory(vertChild) != GetUniformCategory(fragChild)))
+            (GetUniformCategory(vertChild) != GetUniformCategory(fragChild)) ||
+             (GetUniformLayoutLocation(vertChild) != -1 &&
+              GetUniformLayoutLocation(fragChild) != -1 &&
+              GetUniformLayoutLocation(vertChild) != GetUniformLayoutLocation(fragChild)))
         {
             match = gcvFALSE;
         }
@@ -6445,6 +6446,85 @@ _fixUniformPrecision(
     return precision;
 }
 
+static gceSTATUS
+_CheckIoAliasedLocation(gcLINKTREE  Tree)
+{
+    gceSTATUS            status = gcvSTATUS_OK;
+    gctUINT              i, j;
+    VSC_BIT_VECTOR       locationMask;
+    VSC_PRIMARY_MEM_POOL pmp;
+
+    /* Initialize 512KB PMP for shader use. */
+    vscPMP_Intialize(&pmp, gcvNULL, 8, sizeof(void *), gcvTRUE);
+
+    vscBV_Initialize(&locationMask, &pmp.mmWrapper, MAX_SHADER_IO_NUM);
+
+    /* attributes */
+    for (i = 0; i < Tree->attributeCount; ++i)
+    {
+        gctUINT32 components = 0, rows = 0;
+
+        /* Get the gcATTRIBUTE pointer. */
+        gcATTRIBUTE attribute = Tree->shader->attributes[i];
+
+        /* Only process valid attributes. */
+        if (attribute == gcvNULL || gcmATTRIBUTE_packedAway(attribute))
+        {
+            continue;
+        }
+
+        gcTYPE_GetTypeInfo(attribute->type, &components, &rows, 0);
+        rows *= attribute->arraySize;
+
+        if (attribute->location != -1)
+        {
+            for (j = (gctUINT)attribute->location;
+                 j < (gctUINT)attribute->location + rows;
+                 j ++)
+            {
+                if (vscBV_TestBit(&locationMask, j))
+                {
+                    status = gcvSTATUS_LOCATION_ALIASED;
+                    goto OnError;
+                }
+
+                vscBV_SetBit(&locationMask, j);
+            }
+        }
+    }
+
+    vscBV_ClearAll(&locationMask);
+
+    /* outputs */
+    for (i = 0; i < Tree->outputCount; ++i)
+    {
+        /* Get the gcOUTPUT pointer. */
+        gcOUTPUT output = Tree->shader->outputs[i];
+
+        /* Output already got killed before. */
+        if (output == gcvNULL)
+        {
+            continue;
+        }
+
+        if (output->location != -1)
+        {
+            if (vscBV_TestBit(&locationMask, output->location))
+            {
+                status = gcvSTATUS_LOCATION_ALIASED;
+                goto OnError;
+            }
+
+            vscBV_SetBit(&locationMask, output->location);
+        }
+    }
+
+OnError:
+    vscBV_Finalize(&locationMask);
+    vscPMP_Finalize(&pmp);
+    return status;
+}
+
 /*******************************************************************************
 **                               gcLINKTREE_Link
 ********************************************************************************
@@ -6478,9 +6558,24 @@ gcLINKTREE_Link(
     gcLINKTREE VertexTree = ShaderTrees[gceSGSK_VERTEX_SHADER],
                FragmentTree = ShaderTrees[gceSGSK_FRAGMENT_SHADER];
 
+    if (!ENABLE_FULL_NEW_LINKER)
+    {
+        status = _CheckIoAliasedLocation(VertexTree);
+        if (status != gcvSTATUS_OK)
+        {
+            return status;
+        }
+
+        status = _CheckIoAliasedLocation(FragmentTree);
+        if (status != gcvSTATUS_OK)
+        {
+            return status;
+        }
+    }
+
     if (VertexTree == gcvNULL || FragmentTree == gcvNULL)
     {
-        /* no kinking needed if any tree is empty */
+        /* no linking needed if any tree is empty */
         return status;
     }
     /***************************************************************************
@@ -6614,252 +6709,255 @@ gcLINKTREE_Link(
     **      uniform blocks in the vertex tree.
     */
 
-    /* Check uniform block size. */
-    for (i = 0; i < VertexTree->shader->uniformBlockCount; ++i)
+    if (!ENABLE_FULL_NEW_LINKER)
     {
-        gcsUNIFORM_BLOCK uniformBlock = VertexTree->shader->uniformBlocks[i];
-        /* Only process uniform blocks. */
-        if (uniformBlock == gcvNULL ||
-            GetUBBlockIndex(uniformBlock) == VertexTree->shader->_defaultUniformBlockIndex || /* artificial UBO's */
-            GetUBBlockIndex(uniformBlock) == VertexTree->shader->constUniformBlockIndex)
+        /* Check uniform block size. */
+        for (i = 0; i < VertexTree->shader->uniformBlockCount; ++i)
         {
-            continue;
-        }
-
-        if (GetUBBlockSize(uniformBlock) > GetGLMaxUniformBLockSize())
-        {
-            return gcvSTATUS_TOO_MANY_UNIFORMS;
-        }
-    }
-
-    for (i = 0; i < FragmentTree->shader->uniformBlockCount; ++i)
-    {
-        gcsUNIFORM_BLOCK uniformBlock = FragmentTree->shader->uniformBlocks[i];
-        /* Only uniformBlock uniform blocks. */
-        if (uniformBlock == gcvNULL ||
-            GetUBBlockIndex(uniformBlock) == FragmentTree->shader->_defaultUniformBlockIndex || /* artificial UBO's */
-            GetUBBlockIndex(uniformBlock) == FragmentTree->shader->constUniformBlockIndex)
-        {
-            continue;
-        }
-
-        if (GetUBBlockSize(uniformBlock) > GetGLMaxUniformBLockSize())
-        {
-            return gcvSTATUS_TOO_MANY_UNIFORMS;
-        }
-    }
-
-    /* Walk all uniform block. */
-    for (i = 0; i < VertexTree->shader->uniformBlockCount; ++i)
-    {
-        gcsUNIFORM_BLOCK vertUniformBlock = VertexTree->shader->uniformBlocks[i];
-        gcUNIFORM vertUniform, fragUniform;
-
-        /* Only process uniform blocks. */
-        if (vertUniformBlock == gcvNULL ||
-            GetUBBlockIndex(vertUniformBlock) == VertexTree->shader->_defaultUniformBlockIndex || /* artificial UBO's */
-            GetUBBlockIndex(vertUniformBlock) == VertexTree->shader->constUniformBlockIndex)
-        {
-            continue;
-        }
-
-        /* Walk all fragment uniform blocks. */
-        for (j = 0; j < FragmentTree->shader->uniformBlockCount; ++j)
-        {
-            gctINT16 vertBlockMember, fragBlockMember;
-            gceSTATUS status;
-
-            /* Get the gcOUTPUT pointer. */
-            gcsUNIFORM_BLOCK fragUniformBlock = FragmentTree->shader->uniformBlocks[j];
-
-            if (fragUniformBlock == gcvNULL) continue;
-
-            /* Compare the names of the vertex uniform block and fragment uniform block. */
-            if (vertUniformBlock->nameLength == fragUniformBlock->nameLength
-                && gcmIS_SUCCESS(gcoOS_MemCmp(vertUniformBlock->name,
-                                              fragUniformBlock->name,
-                                              vertUniformBlock->nameLength)))
+            gcsUNIFORM_BLOCK uniformBlock = VertexTree->shader->uniformBlocks[i];
+            /* Only process uniform blocks. */
+            if (uniformBlock == gcvNULL ||
+                GetUBBlockIndex(uniformBlock) == VertexTree->shader->_defaultUniformBlockIndex || /* artificial UBO's */
+                GetUBBlockIndex(uniformBlock) == VertexTree->shader->constUniformBlockIndex)
             {
-                gctBOOL mismatch = gcvFALSE;
+                continue;
+            }
 
-                /* check uniform block array size to be the same */
-                if((GetUBPrevSibling(vertUniformBlock) != -1 && GetUBPrevSibling(fragUniformBlock) == -1) ||
-                   (GetUBPrevSibling(vertUniformBlock) == -1 && GetUBPrevSibling(fragUniformBlock) != -1) ||
-                   (GetUBNextSibling(vertUniformBlock) != -1 && GetUBNextSibling(fragUniformBlock) == -1) ||
-                   (GetUBNextSibling(vertUniformBlock) == -1 && GetUBNextSibling(fragUniformBlock) != -1))
+            if (GetUBBlockSize(uniformBlock) > GetGLMaxUniformBLockSize())
+            {
+                return gcvSTATUS_TOO_MANY_UNIFORMS;
+            }
+        }
+
+        for (i = 0; i < FragmentTree->shader->uniformBlockCount; ++i)
+        {
+            gcsUNIFORM_BLOCK uniformBlock = FragmentTree->shader->uniformBlocks[i];
+            /* Only uniformBlock uniform blocks. */
+            if (uniformBlock == gcvNULL ||
+                GetUBBlockIndex(uniformBlock) == FragmentTree->shader->_defaultUniformBlockIndex || /* artificial UBO's */
+                GetUBBlockIndex(uniformBlock) == FragmentTree->shader->constUniformBlockIndex)
+            {
+                continue;
+            }
+
+            if (GetUBBlockSize(uniformBlock) > GetGLMaxUniformBLockSize())
+            {
+                return gcvSTATUS_TOO_MANY_UNIFORMS;
+            }
+        }
+
+        /* Walk all uniform block. */
+        for (i = 0; i < VertexTree->shader->uniformBlockCount; ++i)
+        {
+            gcsUNIFORM_BLOCK vertUniformBlock = VertexTree->shader->uniformBlocks[i];
+            gcUNIFORM vertUniform, fragUniform;
+
+            /* Only process uniform blocks. */
+            if (vertUniformBlock == gcvNULL ||
+                GetUBBlockIndex(vertUniformBlock) == VertexTree->shader->_defaultUniformBlockIndex || /* artificial UBO's */
+                GetUBBlockIndex(vertUniformBlock) == VertexTree->shader->constUniformBlockIndex)
+            {
+                continue;
+            }
+
+            /* Walk all fragment uniform blocks. */
+            for (j = 0; j < FragmentTree->shader->uniformBlockCount; ++j)
+            {
+                gctINT16 vertBlockMember, fragBlockMember;
+                gceSTATUS status;
+
+                /* Get the gcOUTPUT pointer. */
+                gcsUNIFORM_BLOCK fragUniformBlock = FragmentTree->shader->uniformBlocks[j];
+
+                if (fragUniformBlock == gcvNULL) continue;
+
+                /* Compare the names of the vertex uniform block and fragment uniform block. */
+                if (vertUniformBlock->nameLength == fragUniformBlock->nameLength
+                    && gcmIS_SUCCESS(gcoOS_MemCmp(vertUniformBlock->name,
+                                                  fragUniformBlock->name,
+                                                  vertUniformBlock->nameLength)))
                 {
-                    mismatch = gcvTRUE;
-                }
-                else if(GetUBPrevSibling(vertUniformBlock) == -1 &&
-                        GetUBNextSibling(vertUniformBlock) != -1)
-                {
+                    gctBOOL mismatch = gcvFALSE;
 
-                    gcsUNIFORM_BLOCK vertArrayElementBlock, fragArrayElementBlock;
-
-                    vertArrayElementBlock = vertUniformBlock;
-                    fragArrayElementBlock = fragUniformBlock;
-                    while (GetUBNextSibling(vertArrayElementBlock) != -1 &&
-                           GetUBNextSibling(fragArrayElementBlock) != -1)
-                    {
-                        status =  gcSHADER_GetUniformBlock(VertexTree->shader,
-                                                           GetUBNextSibling(vertArrayElementBlock),
-                                                           &vertArrayElementBlock);
-                        if (gcmIS_ERROR(status))
-                        {
-                            /* Return on error. */
-                            return status;
-                        }
-
-                        status =  gcSHADER_GetUniformBlock(FragmentTree->shader,
-                                                           GetUBNextSibling(fragArrayElementBlock),
-                                                           &fragArrayElementBlock);
-                        if (gcmIS_ERROR(status))
-                        {
-                            /* Return on error. */
-                            return status;
-                        }
-                    }
-                    if(GetUBNextSibling(vertArrayElementBlock) != -1 ||
-                       GetUBNextSibling(fragArrayElementBlock) != -1)
+                    /* check uniform block array size to be the same */
+                    if((GetUBPrevSibling(vertUniformBlock) != -1 && GetUBPrevSibling(fragUniformBlock) == -1) ||
+                       (GetUBPrevSibling(vertUniformBlock) == -1 && GetUBPrevSibling(fragUniformBlock) != -1) ||
+                       (GetUBNextSibling(vertUniformBlock) != -1 && GetUBNextSibling(fragUniformBlock) == -1) ||
+                       (GetUBNextSibling(vertUniformBlock) == -1 && GetUBNextSibling(fragUniformBlock) != -1))
                     {
                         mismatch = gcvTRUE;
                     }
-                }
-
-                if(mismatch)
-                {
-                     gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block \"%s\" array size "
-                              "does not match with corresponding uniform block array size in fragment shader",
-                              GetUBName(vertUniformBlock));
-
-                     return gcvSTATUS_UNIFORM_MISMATCH;
-                }
-
-                /* Make sure the block memory layout are of the same. */
-                if(GetUBMemoryLayout(vertUniformBlock) != GetUBMemoryLayout(fragUniformBlock))
-                {
-                    gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block \"%\" memory layout "
-                             "does not match with corresponding uniform block in fragment shader",
-                             GetUBName(vertUniformBlock));
-
-                    return gcvSTATUS_UNIFORM_MISMATCH;
-
-                }
-
-                if (GetUBBinding(vertUniformBlock) != GetUBBinding(fragUniformBlock))
-                {
-                    gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block \"%s\" binding "
-                                "does not match with corresponding uniform block binding in fragment shader",
-                                GetUBName(vertUniformBlock));
-
-                    return gcvSTATUS_UNIFORM_MISMATCH;
-                }
-
-                /* Make sure the block memory layout are of the same.
-                ** Default UBO might not have same number of uniforms
-                */
-                if(gcoOS_StrCmp(GetUBName(vertUniformBlock), "#DefaultUBO") != gcvSTATUS_OK &&
-                    gcoOS_StrCmp(GetUBName(fragUniformBlock), "#DefaultUBO") != gcvSTATUS_OK &&
-                    GetUBNumBlockElement(vertUniformBlock) != GetUBNumBlockElement(fragUniformBlock))
-                {
-                    gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block \"%\" member count "
-                             "does not match with corresponding uniform block in fragment shader",
-                             GetUBName(vertUniformBlock));
-
-                    return gcvSTATUS_UNIFORM_MISMATCH;
-
-                }
-                /* Make sure the block members are of the same type. */
-                for(k = 0, vertBlockMember = GetUBFirstChild(vertUniformBlock),
-                           fragBlockMember = GetUBFirstChild(fragUniformBlock);
-                        k < GetUBNumBlockElement(vertUniformBlock); k++)
-                {
-                    gceUNIFORM_FLAGS vertUniformFlag, fragUniformFlag;
-
-                    gcmASSERT(vertBlockMember != -1);
-                    gcmASSERT(fragBlockMember != -1);
-
-                    status =  gcSHADER_GetUniform(VertexTree->shader,
-                                                  vertBlockMember,
-                                                  &vertUniform);
-                    if (gcmIS_ERROR(status))
+                    else if(GetUBPrevSibling(vertUniformBlock) == -1 &&
+                            GetUBNextSibling(vertUniformBlock) != -1)
                     {
-                        /* Return on error. */
-                        return status;
+
+                        gcsUNIFORM_BLOCK vertArrayElementBlock, fragArrayElementBlock;
+
+                        vertArrayElementBlock = vertUniformBlock;
+                        fragArrayElementBlock = fragUniformBlock;
+                        while (GetUBNextSibling(vertArrayElementBlock) != -1 &&
+                               GetUBNextSibling(fragArrayElementBlock) != -1)
+                        {
+                            status =  gcSHADER_GetUniformBlock(VertexTree->shader,
+                                                               GetUBNextSibling(vertArrayElementBlock),
+                                                               &vertArrayElementBlock);
+                            if (gcmIS_ERROR(status))
+                            {
+                                /* Return on error. */
+                                return status;
+                            }
+
+                            status =  gcSHADER_GetUniformBlock(FragmentTree->shader,
+                                                               GetUBNextSibling(fragArrayElementBlock),
+                                                               &fragArrayElementBlock);
+                            if (gcmIS_ERROR(status))
+                            {
+                                /* Return on error. */
+                                return status;
+                            }
+                        }
+                        if(GetUBNextSibling(vertArrayElementBlock) != -1 ||
+                           GetUBNextSibling(fragArrayElementBlock) != -1)
+                        {
+                            mismatch = gcvTRUE;
+                        }
                     }
 
-                    status =  gcSHADER_GetUniform(FragmentTree->shader,
-                                                  fragBlockMember,
-                                                  &fragUniform);
-                    if (gcmIS_ERROR(status))
+                    if(mismatch)
                     {
-                        /* Return on error. */
-                        return status;
+                         gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block \"%s\" array size "
+                                  "does not match with corresponding uniform block array size in fragment shader",
+                                  GetUBName(vertUniformBlock));
+
+                         return gcvSTATUS_UNIFORM_MISMATCH;
                     }
 
-                    /* We don't need to check a uniform block member is active or not. */
-                    vertUniformFlag = GetUniformFlags(vertUniform) & (~gcvUNIFORM_FLAG_IS_INACTIVE);
-                    fragUniformFlag = GetUniformFlags(fragUniform) & (~gcvUNIFORM_FLAG_IS_INACTIVE);
-
-                    if (vertUniform->nameLength != fragUniform->nameLength
-                        || !gcmIS_SUCCESS(gcoOS_MemCmp(vertUniform->name,
-                                                      fragUniform->name,
-                                                      vertUniform->nameLength)))
+                    /* Make sure the block memory layout are of the same. */
+                    if(GetUBMemoryLayout(vertUniformBlock) != GetUBMemoryLayout(fragUniformBlock))
                     {
-                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member name \"%s\" "
-                                 "does not match with corresponding uniform block member name \"%s\" in fragment shader",
-                                 vertUniform->name, fragUniform->name);
+                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block \"%\" memory layout "
+                                 "does not match with corresponding uniform block in fragment shader",
+                                 GetUBName(vertUniformBlock));
 
                         return gcvSTATUS_UNIFORM_MISMATCH;
-                    }
-                    if (vertUniform->isRowMajor != fragUniform->isRowMajor)
-                    {
-                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member \"%s\" layout "
-                                 "does not match with corresponding uniform block member layout in fragment shader",
-                                 vertUniform->name);
 
-                        return gcvSTATUS_UNIFORM_MISMATCH;
                     }
-                    if (GetUniformCategory(vertUniform) != GetUniformCategory(fragUniform) ||
-                        vertUniform->u.type != fragUniform->u.type)
+
+                    if (GetUBBinding(vertUniformBlock) != GetUBBinding(fragUniformBlock))
                     {
-                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member \"%s\" type "
-                                 "does not match with corresponding uniform block member type in fragment shader",
-                                 vertUniform->name);
+                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block \"%s\" binding "
+                                    "does not match with corresponding uniform block binding in fragment shader",
+                                    GetUBName(vertUniformBlock));
 
                         return gcvSTATUS_UNIFORM_MISMATCH;
                     }
 
-
-                    if ((GetUniformFlagsSpecialKind(vertUniformFlag) != GetUniformFlagsSpecialKind(fragUniformFlag))
-                        || (vertUniform->arraySize != fragUniform->arraySize))
+                    /* Make sure the block memory layout are of the same.
+                    ** Default UBO might not have same number of uniforms
+                    */
+                    if(gcoOS_StrCmp(GetUBName(vertUniformBlock), "#DefaultUBO") != gcvSTATUS_OK &&
+                        gcoOS_StrCmp(GetUBName(fragUniformBlock), "#DefaultUBO") != gcvSTATUS_OK &&
+                        GetUBNumBlockElement(vertUniformBlock) != GetUBNumBlockElement(fragUniformBlock))
                     {
-                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member \"%s\" array size %d "
-                                 "does not match with corresponding uniform block member array size %d in fragment shader",
-                                 vertUniform->name, vertUniform->arraySize, fragUniform->arraySize);
+                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block \"%\" member count "
+                                 "does not match with corresponding uniform block in fragment shader",
+                                 GetUBName(vertUniformBlock));
 
                         return gcvSTATUS_UNIFORM_MISMATCH;
-                    }
 
-                    if (GetUniformBinding(vertUniform) != GetUniformBinding(fragUniform))
+                    }
+                    /* Make sure the block members are of the same type. */
+                    for(k = 0, vertBlockMember = GetUBFirstChild(vertUniformBlock),
+                               fragBlockMember = GetUBFirstChild(fragUniformBlock);
+                            k < GetUBNumBlockElement(vertUniformBlock); k++)
                     {
-                        gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member \"%s\" binding "
-                                 "does not match with corresponding uniform block member binding in fragment shader",
-                                 vertUniform->name);
+                        gceUNIFORM_FLAGS vertUniformFlag, fragUniformFlag;
 
-                        return gcvSTATUS_UNIFORM_MISMATCH;
+                        gcmASSERT(vertBlockMember != -1);
+                        gcmASSERT(fragBlockMember != -1);
+
+                        status =  gcSHADER_GetUniform(VertexTree->shader,
+                                                      vertBlockMember,
+                                                      &vertUniform);
+                        if (gcmIS_ERROR(status))
+                        {
+                            /* Return on error. */
+                            return status;
+                        }
+
+                        status =  gcSHADER_GetUniform(FragmentTree->shader,
+                                                      fragBlockMember,
+                                                      &fragUniform);
+                        if (gcmIS_ERROR(status))
+                        {
+                            /* Return on error. */
+                            return status;
+                        }
+
+                        /* We don't need to check a uniform block member is active or not. */
+                        vertUniformFlag = GetUniformFlags(vertUniform) & (~gcvUNIFORM_FLAG_IS_INACTIVE);
+                        fragUniformFlag = GetUniformFlags(fragUniform) & (~gcvUNIFORM_FLAG_IS_INACTIVE);
+
+                        if (vertUniform->nameLength != fragUniform->nameLength
+                            || !gcmIS_SUCCESS(gcoOS_MemCmp(vertUniform->name,
+                                                          fragUniform->name,
+                                                          vertUniform->nameLength)))
+                        {
+                            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member name \"%s\" "
+                                     "does not match with corresponding uniform block member name \"%s\" in fragment shader",
+                                     vertUniform->name, fragUniform->name);
+
+                            return gcvSTATUS_UNIFORM_MISMATCH;
+                        }
+                        if (vertUniform->isRowMajor != fragUniform->isRowMajor)
+                        {
+                            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member \"%s\" layout "
+                                     "does not match with corresponding uniform block member layout in fragment shader",
+                                     vertUniform->name);
+
+                            return gcvSTATUS_UNIFORM_MISMATCH;
+                        }
+                        if (GetUniformCategory(vertUniform) != GetUniformCategory(fragUniform) ||
+                            vertUniform->u.type != fragUniform->u.type)
+                        {
+                            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member \"%s\" type "
+                                     "does not match with corresponding uniform block member type in fragment shader",
+                                     vertUniform->name);
+
+                            return gcvSTATUS_UNIFORM_MISMATCH;
+                        }
+
+
+                        if ((GetUniformFlagsSpecialKind(vertUniformFlag) != GetUniformFlagsSpecialKind(fragUniformFlag))
+                            || (vertUniform->arraySize != fragUniform->arraySize))
+                        {
+                            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member \"%s\" array size %d "
+                                     "does not match with corresponding uniform block member array size %d in fragment shader",
+                                     vertUniform->name, vertUniform->arraySize, fragUniform->arraySize);
+
+                            return gcvSTATUS_UNIFORM_MISMATCH;
+                        }
+
+                        if (GetUniformBinding(vertUniform) != GetUniformBinding(fragUniform))
+                        {
+                            gcmTRACE_ZONE(gcvLEVEL_ERROR, gcvZONE_COMPILER, "gcLINKTREE_Link: verter shader uniform block member \"%s\" binding "
+                                     "does not match with corresponding uniform block member binding in fragment shader",
+                                     vertUniform->name);
+
+                            return gcvSTATUS_UNIFORM_MISMATCH;
+                        }
+
+                        vertUniform->matchIndex = fragUniform->index;
+                        fragUniform->matchIndex = vertUniform->index;
+
+                        vertBlockMember = vertUniform->nextSibling;
+                        fragBlockMember = fragUniform->nextSibling;
                     }
 
-                    vertUniform->matchIndex = fragUniform->index;
-                    fragUniform->matchIndex = vertUniform->index;
-
-                    vertBlockMember = vertUniform->nextSibling;
-                    fragBlockMember = fragUniform->nextSibling;
+                    /* This UBO is matched with a PS UBO, save the match index for it. */
+                    SetUBMatchIndex(vertUniformBlock, GetUBIndex(fragUniformBlock));
+                    SetUBMatchIndex(fragUniformBlock, GetUBIndex(vertUniformBlock));
                 }
-
-                /* This UBO is matched with a PS UBO, save the match index for it. */
-                SetUBMatchIndex(vertUniformBlock, GetUBIndex(fragUniformBlock));
-                SetUBMatchIndex(fragUniformBlock, GetUBIndex(vertUniformBlock));
             }
         }
     }
@@ -7167,7 +7265,10 @@ gcLINKTREE_Link(
                 gcUNIFORM_GetTypeEx(fragUniform, &type2, gcvNULL, &prec2, &length2);
 
                 if (type1 != type2 || prec1 != prec2 || length1 != length2 ||
-                    GetUniformCategory(vertUniform) != GetUniformCategory(fragUniform))
+                    GetUniformCategory(vertUniform) != GetUniformCategory(fragUniform) ||
+                    (GetUniformLayoutLocation(vertUniform) != -1 &&
+                     GetUniformLayoutLocation(fragUniform) != -1 &&
+                     GetUniformLayoutLocation(vertUniform) != GetUniformLayoutLocation(fragUniform)))
                 {
                     match = gcvFALSE;
                 }
@@ -7230,7 +7331,10 @@ gcLINKTREE_Link(
                 gcUNIFORM_GetTypeEx(fragUniform, &type2, gcvNULL, &prec2, &length2);
 
                 if (type1 != type2 || length1 != length2 ||
-                    GetUniformCategory(vertUniform) != GetUniformCategory(fragUniform))
+                    GetUniformCategory(vertUniform) != GetUniformCategory(fragUniform) ||
+                    (GetUniformLayoutLocation(vertUniform) != -1 &&
+                     GetUniformLayoutLocation(fragUniform) != -1 &&
+                     GetUniformLayoutLocation(vertUniform) != GetUniformLayoutLocation(fragUniform)))
                 {
                     match = gcvFALSE;
                 }
@@ -7593,6 +7697,11 @@ _BackwardMOV(
     {
         dependentCode = &shader->code[defined->index];
         if (gcmSL_TARGET_GET(dependentCode->temp, Indexed) != gcSL_NOT_INDEXED)
+        {
+            return gcvFALSE;
+        }
+
+        if (gcmSL_TARGET_GET(dependentCode->temp, Precision) != gcmSL_TARGET_GET(code->temp, Precision))
         {
             return gcvFALSE;
         }
@@ -8556,6 +8665,7 @@ gcLINKTREE_Optimize(
                     source0 = gcmSL_SOURCE_SET(source0, Indexed,gcmSL_SOURCE_GET(source, Indexed));
                     source0 = gcmSL_SOURCE_SET(source0, Neg, gcmSL_SOURCE_GET(source, Neg) ^ gcmSL_SOURCE_GET(source0, Neg));
                     source0 = gcmSL_SOURCE_SET(source0, Abs, gcmSL_SOURCE_GET(source, Abs) | gcmSL_SOURCE_GET(source0, Abs));
+                    source0 = gcmSL_SOURCE_SET(source0, Precision, gcmSL_SOURCE_GET(source, Precision));
                     source0 = gcmSL_SOURCE_SET(source0, SwizzleX, _SelectSwizzle(gcmSL_SOURCE_GET(source0, SwizzleX), source));
                     source0 = gcmSL_SOURCE_SET(source0, SwizzleY, _SelectSwizzle(gcmSL_SOURCE_GET(source0, SwizzleY), source));
                     source0 = gcmSL_SOURCE_SET(source0, SwizzleZ, _SelectSwizzle(gcmSL_SOURCE_GET(source0, SwizzleZ), source));
@@ -8574,6 +8684,7 @@ gcLINKTREE_Optimize(
                     source1 = gcmSL_SOURCE_SET(source1, Indexed, gcmSL_SOURCE_GET(source, Indexed));
                     source1 = gcmSL_SOURCE_SET(source1, Neg, gcmSL_SOURCE_GET(source, Neg) ^ gcmSL_SOURCE_GET(source1, Neg));
                     source1 = gcmSL_SOURCE_SET(source1, Abs, gcmSL_SOURCE_GET(source, Abs) | gcmSL_SOURCE_GET(source1, Abs));
+                    source1 = gcmSL_SOURCE_SET(source1, Precision, gcmSL_SOURCE_GET(source, Precision));
                     source1 = gcmSL_SOURCE_SET(source1, SwizzleX, _SelectSwizzle(gcmSL_SOURCE_GET(source1, SwizzleX), source));
                     source1 = gcmSL_SOURCE_SET(source1, SwizzleY, _SelectSwizzle(gcmSL_SOURCE_GET(source1, SwizzleY), source));
                     source1 = gcmSL_SOURCE_SET(source1, SwizzleZ, _SelectSwizzle(gcmSL_SOURCE_GET(source1, SwizzleZ), source));
@@ -8602,6 +8713,7 @@ gcLINKTREE_Optimize(
                             source1OfTexAttrCode = gcmSL_SOURCE_SET(source1OfTexAttrCode, Type, gcmSL_SOURCE_GET(source, Type));
                             source1OfTexAttrCode = gcmSL_SOURCE_SET(source1OfTexAttrCode, Indexed, gcmSL_SOURCE_GET(source, Indexed));
                             source1OfTexAttrCode = gcmSL_SOURCE_SET(source1OfTexAttrCode, Format, gcmSL_SOURCE_GET(source, Format));
+                            source1OfTexAttrCode = gcmSL_SOURCE_SET(source1OfTexAttrCode, Precision, gcmSL_SOURCE_GET(source, Precision));
                             source1OfTexAttrCode = gcmSL_SOURCE_SET(source1OfTexAttrCode, SwizzleX, _SelectSwizzle(gcmSL_SOURCE_GET(source1OfTexAttrCode, SwizzleX), source));
                             source1OfTexAttrCode = gcmSL_SOURCE_SET(source1OfTexAttrCode, SwizzleY, _SelectSwizzle(gcmSL_SOURCE_GET(source1OfTexAttrCode, SwizzleY), source));
                             source1OfTexAttrCode = gcmSL_SOURCE_SET(source1OfTexAttrCode, SwizzleZ, _SelectSwizzle(gcmSL_SOURCE_GET(source1OfTexAttrCode, SwizzleZ), source));
@@ -8623,6 +8735,7 @@ gcLINKTREE_Optimize(
                             source0OfTexAttrCode = gcmSL_SOURCE_SET(source0OfTexAttrCode, Type, gcmSL_SOURCE_GET(source, Type));
                             source0OfTexAttrCode = gcmSL_SOURCE_SET(source0OfTexAttrCode, Indexed, gcmSL_SOURCE_GET(source, Indexed));
                             source0OfTexAttrCode = gcmSL_SOURCE_SET(source0OfTexAttrCode, Format, gcmSL_SOURCE_GET(source, Format));
+                            source0OfTexAttrCode = gcmSL_SOURCE_SET(source0OfTexAttrCode, Precision, gcmSL_SOURCE_GET(source, Precision));
                             source0OfTexAttrCode = gcmSL_SOURCE_SET(source0OfTexAttrCode, SwizzleX, _SelectSwizzle(gcmSL_SOURCE_GET(source0OfTexAttrCode, SwizzleX), source));
                             source0OfTexAttrCode = gcmSL_SOURCE_SET(source0OfTexAttrCode, SwizzleY, _SelectSwizzle(gcmSL_SOURCE_GET(source0OfTexAttrCode, SwizzleY), source));
                             source0OfTexAttrCode = gcmSL_SOURCE_SET(source0OfTexAttrCode, SwizzleZ, _SelectSwizzle(gcmSL_SOURCE_GET(source0OfTexAttrCode, SwizzleZ), source));
@@ -8638,6 +8751,7 @@ gcLINKTREE_Optimize(
                             source1OfTexAttrCode = gcmSL_SOURCE_SET(source1OfTexAttrCode, Type, gcmSL_SOURCE_GET(source, Type));
                             source1OfTexAttrCode = gcmSL_SOURCE_SET(source1OfTexAttrCode, Indexed, gcmSL_SOURCE_GET(source, Indexed));
                             source1OfTexAttrCode = gcmSL_SOURCE_SET(source1OfTexAttrCode, Format, gcmSL_SOURCE_GET(source, Format));
+                            source1OfTexAttrCode = gcmSL_SOURCE_SET(source1OfTexAttrCode, Precision, gcmSL_SOURCE_GET(source, Precision));
                             source1OfTexAttrCode = gcmSL_SOURCE_SET(source1OfTexAttrCode, SwizzleX, _SelectSwizzle(gcmSL_SOURCE_GET(source1OfTexAttrCode, SwizzleX), source));
                             source1OfTexAttrCode = gcmSL_SOURCE_SET(source1OfTexAttrCode, SwizzleY, _SelectSwizzle(gcmSL_SOURCE_GET(source1OfTexAttrCode, SwizzleY), source));
                             source1OfTexAttrCode = gcmSL_SOURCE_SET(source1OfTexAttrCode, SwizzleZ, _SelectSwizzle(gcmSL_SOURCE_GET(source1OfTexAttrCode, SwizzleZ), source));
@@ -9030,6 +9144,121 @@ _IsExistOtherSamplerIdx(
     return gcvFALSE;
 }
 
+static gceSTATUS
+_ConvertGetSamplerIdxToMovOrAdd(
+    IN OUT gcLINKTREE       Tree,
+    IN gctUINT              CodeIndex,
+    IN gctINT              *NewPhysical
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcSHADER shader = Tree->shader;
+    gcSL_INSTRUCTION code = &shader->code[CodeIndex];
+    gcSL_FORMAT format;
+    gctINT newIndex;
+    gctUINT32 offsetIndex;
+    gcSL_INDEXED mode;
+    gcUNIFORM uniform;
+    union
+    {
+        gctFLOAT f;
+        gctUINT16 hex[2];
+        gctUINT32 hex32;
+    } index, offsetConst;
+
+    /* Get the sampler uniform. */
+    gcmONERROR(gcSHADER_GetUniform(shader,
+                                   gcmSL_INDEX_GET(code->source0Index, Index),
+                                   &uniform));
+    /* Get the format. */
+    format = (gcSL_FORMAT)gcmSL_TARGET_GET(code->temp, Format);
+
+    /* Get the array index. */
+    mode = (gcSL_INDEXED)gcmSL_SOURCE_GET(code->source0, Indexed);
+
+    if (mode == gcSL_NOT_INDEXED)
+    {
+        offsetIndex = 0;
+        offsetConst.hex32 = (gctUINT32)gcmSL_INDEX_GET(code->source0Index, ConstValue);
+    }
+    else
+    {
+        offsetIndex = code->source0Indexed;
+        offsetConst.hex32 = 0;
+    }
+
+    /* Update physical address. */
+    if (ENABLE_FULL_NEW_LINKER)
+    {
+        /* Clean the indexed and move the indexed to SOURCE1. */
+        code->source0 = gcmSL_SOURCE_SET(code->source0, Indexed, gcSL_NOT_INDEXED);
+        code->source0Index = gcmSL_INDEX_SET(code->source0Index, ConstValue, 0);
+        code->source0Indexed = 0;
+
+        if (mode == gcSL_NOT_INDEXED)
+        {
+            code->source1 = gcmSL_SOURCE_SET(code->source0, Type, gcSL_CONSTANT);
+            code->source1 = gcmSL_SOURCE_SET(code->source1, Format, format);
+            code->source1Index = offsetConst.hex[0];
+            code->source1Indexed = offsetConst.hex[1];
+        }
+        else
+        {
+            gcSL_SWIZZLE swizzle = (gcSL_SWIZZLE)gcmComposeSwizzle(mode - 1,
+                                                                   mode - 1,
+                                                                   mode - 1,
+                                                                   mode - 1);
+            code->source1 = gcmSL_SOURCE_SET(code->source0, Type, gcSL_TEMP);
+            code->source1 = gcmSL_SOURCE_SET(code->source1, Format, format);
+            code->source1 = gcmSL_SOURCE_SET(code->source1, Swizzle, swizzle);
+            code->source1Index = (gctUINT16)offsetIndex;
+            code->source1Indexed = 0;
+        }
+    }
+    else
+    {
+        /* Get the new physical address. */
+        newIndex = NewPhysical[uniform->index];
+        if (format == gcSL_FLOAT)
+        {
+            index.f = (gctFLOAT)newIndex + offsetConst.f;
+        }
+        else
+        {
+            index.hex32 = (gctINT)newIndex + offsetConst.hex32;
+        }
+
+        code->source0 = gcmSL_SOURCE_SET(code->source0, Type, gcSL_CONSTANT);
+        code->source0 = gcmSL_SOURCE_SET(code->source0, Format, format);
+        code->source0 = gcmSL_SOURCE_SET(code->source0, Indexed, gcSL_NOT_INDEXED);
+        code->source0Index = index.hex[0];
+        code->source0Indexed = index.hex[1];
+
+        if (mode == gcSL_NOT_INDEXED)
+        {
+            code->opcode = gcSL_MOV;
+            code->source1 = 0;
+            code->source1Index = 0;
+            code->source1Indexed = 0;
+        }
+        else
+        {
+            gcSL_SWIZZLE swizzle = (gcSL_SWIZZLE)gcmComposeSwizzle(mode - 1,
+                                                                   mode - 1,
+                                                                   mode - 1,
+                                                                   mode - 1);
+            code->opcode = gcSL_ADD;
+            code->source1 = gcmSL_SOURCE_SET(code->source0, Type, gcSL_TEMP);
+            code->source1 = gcmSL_SOURCE_SET(code->source1, Swizzle, swizzle);
+            code->source1Index = (gctUINT16)offsetIndex;
+            code->source1Indexed = 0;
+        }
+    }
+
+OnError:
+    return status;
+}
+
 /*
 ** Some samplers are not used in this shader and they are not allocated for physical register,
 ** so we need to recompute the sampler physical address.
@@ -9080,106 +9309,9 @@ gcLINKTREE_ComputeSamplerPhysicalAddress(
         /* This sampler assignment is for function argument, just change it to ADD/MOV. */
         if ((gctINT)Tree->tempArray[code->tempIndex].inputOrOutput != -1)
         {
-            /* New CG should handle this in VIR. */
-            union
-            {
-                gctFLOAT f;
-                gctUINT16 hex[2];
-                gctUINT32 hex32;
-            } index, offsetConst;
-            gcSL_FORMAT format;
-            gctINT newIndex;
-            gctUINT32 offsetIndex;
-            gcSL_INDEXED mode;
-
-            /* Get the sampler uniform. */
-            gcmONERROR(gcSHADER_GetUniform(shader,
-                                            gcmSL_INDEX_GET(code->source0Index, Index),
-                                            &uniform));
-            /* Get the format. */
-            format = (gcSL_FORMAT)gcmSL_TARGET_GET(code->temp, Format);
-
-            /* Get the array index. */
-            mode = (gcSL_INDEXED)gcmSL_SOURCE_GET(code->source0, Indexed);
-
-            if (mode == gcSL_NOT_INDEXED)
-            {
-                offsetIndex = 0;
-                offsetConst.hex32 = (gctUINT32)gcmSL_INDEX_GET(code->source0Index, ConstValue);
-            }
-            else
-            {
-                offsetIndex = code->source0Indexed;
-                offsetConst.hex32 = 0;
-            }
-
-            /* Update physical address. */
-            if (ENABLE_FULL_NEW_LINKER)
-            {
-                /* Clean the indexed and move the indexed to SOURCE1. */
-                code->source0 = gcmSL_SOURCE_SET(code->source0, Indexed, gcSL_NOT_INDEXED);
-                code->source0Index = gcmSL_INDEX_SET(code->source0Index, ConstValue, 0);
-                code->source0Indexed = 0;
-
-                if (mode == gcSL_NOT_INDEXED)
-                {
-                    code->source1 = gcmSL_SOURCE_SET(code->source0, Type, gcSL_CONSTANT);
-                    code->source1 = gcmSL_SOURCE_SET(code->source1, Format, format);
-                    code->source1Index = offsetConst.hex[0];
-                    code->source1Indexed = offsetConst.hex[1];
-                }
-                else
-                {
-                    gcSL_SWIZZLE swizzle = (gcSL_SWIZZLE)gcmComposeSwizzle(mode - 1,
-                                                                           mode - 1,
-                                                                           mode - 1,
-                                                                           mode - 1);
-                    code->source1 = gcmSL_SOURCE_SET(code->source0, Type, gcSL_TEMP);
-                    code->source1 = gcmSL_SOURCE_SET(code->source1, Format, format);
-                    code->source1 = gcmSL_SOURCE_SET(code->source1, Swizzle, swizzle);
-                    code->source1Index = (gctUINT16)offsetIndex;
-                    code->source1Indexed = 0;
-                }
-            }
-            else
-            {
-                /* Get the new physical address. */
-                newIndex = newPhysical[uniform->index];
-                if (format == gcSL_FLOAT)
-                {
-                    index.f = (gctFLOAT)newIndex + offsetConst.f;
-                }
-                else
-                {
-                    index.hex32 = (gctINT)newIndex + offsetConst.hex32;
-                }
-
-                code->source0 = gcmSL_SOURCE_SET(code->source0, Type, gcSL_CONSTANT);
-                code->source0 = gcmSL_SOURCE_SET(code->source0, Format, format);
-                code->source0 = gcmSL_SOURCE_SET(code->source0, Indexed, gcSL_NOT_INDEXED);
-                code->source0Index = index.hex[0];
-                code->source0Indexed = index.hex[1];
-
-                if (mode == gcSL_NOT_INDEXED)
-                {
-                    code->opcode = gcSL_MOV;
-                    code->source1 = 0;
-                    code->source1Index = 0;
-                    code->source1Indexed = 0;
-                }
-                else
-                {
-                    gcSL_SWIZZLE swizzle = (gcSL_SWIZZLE)gcmComposeSwizzle(mode - 1,
-                                                                           mode - 1,
-                                                                           mode - 1,
-                                                                           mode - 1);
-                    code->opcode = gcSL_ADD;
-                    code->source1 = gcmSL_SOURCE_SET(code->source0, Type, gcSL_TEMP);
-                    code->source1 = gcmSL_SOURCE_SET(code->source1, Swizzle, swizzle);
-                    code->source1Index = (gctUINT16)offsetIndex;
-                    code->source1Indexed = 0;
-                }
-            }
+            gcmONERROR(_ConvertGetSamplerIdxToMovOrAdd(Tree,
+                                                       i,
+                                                       newPhysical));
             continue;
         }
 
@@ -9251,6 +9383,12 @@ gcLINKTREE_ComputeSamplerPhysicalAddress(
             code->temp = code->tempIndex = code->tempIndexed = 0;
             code->source0 = code->source0Index = code->source0Indexed = 0;
             code->source1 = code->source1Index = code->source1Indexed = 0;
+        }
+        else
+        {
+            gcmONERROR(_ConvertGetSamplerIdxToMovOrAdd(Tree,
+                                                       i,
+                                                       newPhysical));
         }
     }
 
@@ -10961,13 +11099,11 @@ _ConvertCONV(
     gcSL_FORMAT format;
     gcSL_ENABLE enable;
     gcSL_SWIZZLE swizzle;
+    gcSL_PRECISION precision;
     gctUINT16 newTempIndex, origTempIndex;
     gctBOOL hasInteger = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SUPPORT_INTEGER);
-    gcePATCH_ID patchId = gcvPATCH_INVALID;
 
-    gcoHAL_GetPatchID(gcvNULL, &patchId);
-
-    if (ConvertToF2IOnly && patchId == gcvPATCH_GLBM25)
+    if (ConvertToF2IOnly && Tree->patchID == gcvPATCH_GLBM25)
     {
         format = gcSL_INT16;
     }
@@ -11023,6 +11159,7 @@ _ConvertCONV(
             format = gcSL_FLOAT;
             enable = (gcSL_ENABLE)gcmSL_TARGET_GET(code->temp, Enable);
             swizzle = (gcSL_SWIZZLE)_Enable2SwizzleWShift(enable);
+            precision = (gcSL_PRECISION)gcmSL_TARGET_GET(code->temp, Precision);
             newTempIndex = (gctUINT16)gcSHADER_NewTempRegs(shader, 1, gcSHADER_FLOAT_X4);
             origTempIndex = code->tempIndex;
 
@@ -11048,9 +11185,11 @@ _ConvertCONV(
             /* floor target, target */
             gcoOS_MemCopy(floorCode, absCode, gcmSIZEOF(struct _gcSL_INSTRUCTION));
             floorCode->opcode = gcSL_FLOOR;
-            floorCode->source0 = gcmSL_SOURCE_SET(floorCode->source0, Type, gcSL_TEMP);
             floorCode->source0 = gcmSL_SOURCE_SET(floorCode->source0, Indexed, gcSL_NOT_INDEXED);
             floorCode->source0 = gcmSL_SOURCE_SET(floorCode->source0, Swizzle, swizzle);
+            floorCode->source0 = gcmSL_SOURCE_SET(floorCode->source0, Precision, precision);
+            floorCode->source0 = gcmSL_SOURCE_SET(floorCode->source0, Format, gcSL_FLOAT);
+            floorCode->source0 = gcmSL_SOURCE_SET(floorCode->source0, Type, gcSL_TEMP);
             floorCode->source0Index = origTempIndex;
 
             /* mul target, target, t0 */
@@ -11608,6 +11747,8 @@ gcGetFormatFromType(
     case gcSHADER_FLOAT_X2:
     case gcSHADER_FLOAT_X3:
     case gcSHADER_FLOAT_X4:
+    case gcSHADER_FLOAT_X8:
+    case gcSHADER_FLOAT_X16:
     case gcSHADER_FLOAT_4X2:
     case gcSHADER_FLOAT_4X3:
     case gcSHADER_FLOAT_4X4:
@@ -11624,6 +11765,8 @@ gcGetFormatFromType(
     case gcSHADER_INTEGER_X2:
     case gcSHADER_INTEGER_X3:
     case gcSHADER_INTEGER_X4:
+    case gcSHADER_INTEGER_X8:
+    case gcSHADER_INTEGER_X16:
         format = gcSL_INTEGER;
         break;
 
@@ -11631,6 +11774,8 @@ gcGetFormatFromType(
     case gcSHADER_UINT_X2:
     case gcSHADER_UINT_X3:
     case gcSHADER_UINT_X4:
+    case gcSHADER_UINT_X8:
+    case gcSHADER_UINT_X16:
         format = gcSL_UINT32;
         break;
 
@@ -11645,6 +11790,8 @@ gcGetFormatFromType(
     case gcSHADER_INT64_X2:
     case gcSHADER_INT64_X3:
     case gcSHADER_INT64_X4:
+    case gcSHADER_INT64_X8:
+    case gcSHADER_INT64_X16:
         format = gcSL_INT64;
         break;
 
@@ -11652,6 +11799,8 @@ gcGetFormatFromType(
     case gcSHADER_UINT64_X2:
     case gcSHADER_UINT64_X3:
     case gcSHADER_UINT64_X4:
+    case gcSHADER_UINT64_X8:
+    case gcSHADER_UINT64_X16:
         format = gcSL_UINT64;
         break;
 
@@ -11917,6 +12066,7 @@ _generateFeedbackWrite(
             gcSHADER_TYPE tempType    = varying->type;
             gctINT        components  = gcmType_Comonents(tempType);
             gcSL_FORMAT   format      = gcGetFormatFromType(tempType);
+            gcSHADER_PRECISION precision = varying->precision;
             gcSL_ENABLE   enable;
 
             startIndex = varying->tempIndex;
@@ -11935,7 +12085,7 @@ _generateFeedbackWrite(
              */
             gcSHADER_AddOpcode(shader, gcSL_STORE,
                                (gctINT16)(startIndex+i),
-                               enable, format, gcSHADER_PRECISION_DEFAULT);
+                               enable, format, precision);
             if (BufferBaseAddress != gcvNULL)
             {
                 gcSHADER_AddSourceUniformFormatted(shader, BufferBaseAddress,
@@ -12860,6 +13010,7 @@ _changeUserToUseConstUniform(
             gcmASSERT(gcmSL_SOURCE_GET(source, Indexed) == gcSL_NOT_INDEXED);
             /* change source type and index */
             source = gcmSL_SOURCE_SET(source, Type, gcSL_UNIFORM);
+            source = gcmSL_SOURCE_SET(source, Precision, gcSHADER_PRECISION_HIGH);
             if (i == 0)
             {
                 Inst->source0      = source;
@@ -12965,6 +13116,7 @@ _replaceConstMoveWithUniformAssign(
             source0 = gcmSL_SOURCE_SET(source0, Indexed, gcSL_NOT_INDEXED);
             source0 = gcmSL_SOURCE_SET(source0, Swizzle,
                                        _Enable2SwizzleWShift(Cv->enable));
+            source0 = gcmSL_SOURCE_SET(source0, Precision, gcSHADER_PRECISION_HIGH);
 
             assignInst->source0 = source0;
             assignInst->source0Index = Cv->uniform->index;
@@ -13248,6 +13400,7 @@ _splitInstructionHasSameDestAndSrcTempIndex(
     gcSL_FORMAT format[2] = {0, 0};
     gcSL_SWIZZLE swizzle[2] = {0, 0};
     gcSL_ENABLE enable[2] = {0, 0};
+    gcSHADER_PRECISION precision[2] = {gcSHADER_PRECISION_DEFAULT, gcSHADER_PRECISION_DEFAULT};
     gctBOOL isCodeChanged = gcvFALSE;
     gctBOOL isCmpPair = gcvFALSE;
     gctUINT16 newTemp[2] = {0, 0};
@@ -13319,6 +13472,7 @@ _splitInstructionHasSameDestAndSrcTempIndex(
                                                        (gcSL_SWIZZLE) gcmSL_SOURCE_GET(inst->source0, SwizzleW));
                 format[0] = gcmSL_SOURCE_GET(inst->source0, Format);
                 swizzle[0] = _Enable2SwizzleWShift(enable[0]);
+                precision[0] = gcmSL_SOURCE_GET(inst->source0, Precision);
 
                 enable[1] = gcSL_ConvertSwizzle2Enable((gcSL_SWIZZLE) gcmSL_SOURCE_GET(inst->source1, SwizzleX),
                                                        (gcSL_SWIZZLE) gcmSL_SOURCE_GET(inst->source1, SwizzleY),
@@ -13326,6 +13480,7 @@ _splitInstructionHasSameDestAndSrcTempIndex(
                                                        (gcSL_SWIZZLE) gcmSL_SOURCE_GET(inst->source1, SwizzleW));
                 format[1] = gcmSL_SOURCE_GET(inst->source1, Format);
                 swizzle[1] = _Enable2SwizzleWShift(enable[1]);
+                precision[0] = gcmSL_SOURCE_GET(inst->source1, Precision);
             }
             else
             {
@@ -13346,6 +13501,7 @@ _splitInstructionHasSameDestAndSrcTempIndex(
                                                            (gcSL_SWIZZLE) gcmSL_SOURCE_GET(inst->source0, SwizzleW));
                     format[0] = gcmSL_SOURCE_GET(inst->source0, Format);
                     swizzle[0] = _Enable2SwizzleWShift(enable[0]);
+                    precision[0] = gcmSL_SOURCE_GET(inst->source0, Precision);
                 }
                 else
                 {
@@ -13355,6 +13511,7 @@ _splitInstructionHasSameDestAndSrcTempIndex(
                                                            (gcSL_SWIZZLE) gcmSL_SOURCE_GET(inst->source1, SwizzleW));
                     format[0] = gcmSL_SOURCE_GET(inst->source1, Format);
                     swizzle[0] = _Enable2SwizzleWShift(enable[0]);
+                    precision[0] = gcmSL_SOURCE_GET(inst->source1, Precision);
                 }
             }
 
@@ -13364,11 +13521,13 @@ _splitInstructionHasSameDestAndSrcTempIndex(
                 newTemp[0] = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
                 newInst[0]->opcode = gcSL_MOV;
                 newInst[0]->temp = gcmSL_TARGET_SET(0, Format, format[0])
-                                          | gcmSL_TARGET_SET(0, Enable, enable[0]);
+                                          | gcmSL_TARGET_SET(0, Enable, enable[0])
+                                          | gcmSL_TARGET_SET(0, Precision, precision[0]);
                 newInst[0]->tempIndex = newTemp[0];
                 newInst[0]->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_TEMP)
                                           | gcmSL_SOURCE_SET(0, Format, format[0])
-                                          | gcmSL_SOURCE_SET(0, Swizzle, swizzle[0]);
+                                          | gcmSL_SOURCE_SET(0, Swizzle, swizzle[0])
+                                          | gcmSL_SOURCE_SET(0, Precision, precision[0]);
                 newInst[0]->source0Index = inst->tempIndex;
             }
 
@@ -13377,11 +13536,13 @@ _splitInstructionHasSameDestAndSrcTempIndex(
                 newTemp[1] = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_FLOAT_X4);
                 newInst[1]->opcode = gcSL_MOV;
                 newInst[1]->temp = gcmSL_TARGET_SET(0, Format, format[1])
-                                          | gcmSL_TARGET_SET(0, Enable, enable[1]);
+                                          | gcmSL_TARGET_SET(0, Enable, enable[1])
+                                          | gcmSL_TARGET_SET(0, Precision, precision[1]);
                 newInst[1]->tempIndex = newTemp[1];
                 newInst[1]->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_TEMP)
                                           | gcmSL_SOURCE_SET(0, Format, format[1])
-                                          | gcmSL_SOURCE_SET(0, Swizzle, swizzle[1]);
+                                          | gcmSL_SOURCE_SET(0, Swizzle, swizzle[1])
+                                          | gcmSL_SOURCE_SET(0, Precision, precision[1]);
                 newInst[1]->source0Index = inst->tempIndex;
             }
 
@@ -13446,10 +13607,10 @@ _ConvertIntegerBranchToFloat(
     gctINT i;
     gcSL_INSTRUCTION currentCode, newInst[2] = {gcvNULL, gcvNULL};
     gcSL_FORMAT format;
-    gcSL_PRECISION precision;
     gcSL_SWIZZLE swizzle[2] = {0, 0};
     gcSL_ENABLE enable[2] = {0, 0};
     gctUINT16 newTemp[2] = {0, 0};
+    gcSHADER_PRECISION precision[2] = {0, 0};
     static const gcSL_ENABLE component2Enable[] = {
              gcSL_ENABLE_X,
              gcSL_ENABLE_XY,
@@ -13479,7 +13640,7 @@ _ConvertIntegerBranchToFloat(
         newInst[0] = &Shader->code[i];
         newInst[1] = &Shader->code[i + 1];
 
-        precision = gcmSL_SOURCE_GET(currentCode->source0, Precision);
+        precision[0] = gcmSL_SOURCE_GET(currentCode->source0, Precision);
 
         /* Fill the first gcSL_I2F instruction. */
         enable[0] = gcSL_ConvertSwizzle2Enable((gcSL_SWIZZLE) gcmSL_SOURCE_GET(currentCode->source0, SwizzleX),
@@ -13492,11 +13653,13 @@ _ConvertIntegerBranchToFloat(
         newInst[0]->opcode = gcSL_I2F;
         newInst[0]->temp = gcmSL_TARGET_SET(0, Format, gcSL_FLOAT)
                                   | gcmSL_TARGET_SET(0, Enable, enable[0])
-                                  | gcmSL_TARGET_SET(0, Precision, precision);
+                                  | gcmSL_TARGET_SET(0, Precision, precision[0]);
         newInst[0]->tempIndex = newTemp[0];
         newInst[0]->source0 = currentCode->source0;
         newInst[0]->source0Index = currentCode->source0Index;
         newInst[0]->source0Indexed = currentCode->source0Indexed;
+
+        precision[1] = gcmSL_SOURCE_GET(currentCode->source1, Precision);
 
         /* Fill the second gcSL_I2F instruction. */
         enable[1] = gcSL_ConvertSwizzle2Enable((gcSL_SWIZZLE) gcmSL_SOURCE_GET(currentCode->source1, SwizzleX),
@@ -13509,7 +13672,7 @@ _ConvertIntegerBranchToFloat(
         newInst[1]->opcode = gcSL_I2F;
         newInst[1]->temp = gcmSL_TARGET_SET(0, Format, gcSL_FLOAT)
                                   | gcmSL_TARGET_SET(0, Enable, enable[1])
-                                  | gcmSL_TARGET_SET(0, Precision, precision);
+                                  | gcmSL_TARGET_SET(0, Precision, precision[1]);
         newInst[1]->tempIndex = newTemp[1];
         newInst[1]->source0 = currentCode->source1;
         newInst[1]->source0Index = currentCode->source1Index;
@@ -13521,13 +13684,15 @@ _ConvertIntegerBranchToFloat(
 
         currentCode->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_TEMP)
                                         | gcmSL_SOURCE_SET(0, Format, gcSL_FLOAT)
-                                        | gcmSL_SOURCE_SET(0, Swizzle, swizzle[0]);
+                                        | gcmSL_SOURCE_SET(0, Swizzle, swizzle[0])
+                                        | gcmSL_SOURCE_SET(0, Precision, precision[0]);
         currentCode->source0Index = newTemp[0];
         currentCode->source0Indexed = 0;
 
         currentCode->source1 = gcmSL_SOURCE_SET(0, Type, gcSL_TEMP)
                                         | gcmSL_SOURCE_SET(0, Format, gcSL_FLOAT)
-                                        | gcmSL_SOURCE_SET(0, Swizzle, swizzle[1]);
+                                        | gcmSL_SOURCE_SET(0, Swizzle, swizzle[1])
+                                        | gcmSL_SOURCE_SET(0, Precision, precision[1]);
         currentCode->source1Index = newTemp[1];
         currentCode->source1Indexed = 0;
 
@@ -13553,7 +13718,7 @@ OnError:
 
 
 static gceSTATUS
-_converrtImageReadToTexld(
+_convertImageReadToTexld(
     IN gcSHADER         Shader
     )
 {
@@ -13567,7 +13732,9 @@ _converrtImageReadToTexld(
     gctUINT8            imageNum;
     gctBOOL             isConstantSamplerType;
     gctUINT32           samplerType;
+    gctUINT32           coordFormat;
     gctBOOL             isCodeChanged = gcvFALSE;
+    gctBOOL             computeOnlyGpu = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_COMPUTE_ONLY);
 
     /* Get main kernel function. */
     gcmASSERT(Shader->kernelFunctions);
@@ -13639,6 +13806,8 @@ _converrtImageReadToTexld(
         gcmASSERT(inst->source0 == instNext->source0);
         gcmASSERT(inst->source0Index == instNext->source0Index);
         gcmASSERT(inst->source0Indexed == instNext->source0Indexed);
+
+        coordFormat = gcmSL_SOURCE_GET(instNext->source0, Format);
 
         if(gcmSL_SOURCE_GET(inst->source0, Type) != gcSL_UNIFORM) {
             gctSOURCE_t *uniformSrc = gcvNULL;
@@ -13780,13 +13949,25 @@ _converrtImageReadToTexld(
             gcmASSERT(imageSamplerCount == kernelFunction->imageSamplerCount);
         }
 
-        /* Change IMAGE_SAMPLER to NOP. */
-        gcSL_SetInst2NOP(inst);
+        if ((computeOnlyGpu ||
+             gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE) ||
+             gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE_V2)) &&
+             isConstantSamplerType &&
+             (coordFormat != gcSL_FLOAT))
+        {
+           /* Use img_load for now. */
+           /* No Action needed. */
+        }
+        else
+        {
+            /* Change IMAGE_SAMPLER to NOP. */
+            gcSL_SetInst2NOP(inst);
 
-        /* Change IMAGE_RD to TEXLD. */
-        gcmSL_OPCODE_UPDATE(instNext->opcode, Opcode, gcSL_TEXLD);
-        instNext->source0Index = (gctUINT16) (origUniformCount + j);
-        instNext->source0 = gcmSL_SOURCE_SET(instNext->source0, Swizzle, gcSL_SWIZZLE_XYZW);
+            /* Change IMAGE_RD to TEXLD. */
+            gcmSL_OPCODE_UPDATE(instNext->opcode, Opcode, gcSL_TEXLD);
+            instNext->source0Index = (gctUINT16) (origUniformCount + j);
+            instNext->source0 = gcmSL_SOURCE_SET(instNext->source0, Swizzle, gcSL_SWIZZLE_XYZW);
+        }
 
         if (!isCodeChanged)
         {
@@ -14081,12 +14262,11 @@ OnError:
 }
 
 #if !DX_SHADER
-#if VSC_BUILD
 gceSTATUS
 gcLinkTree2VirShader(
     IN  gcLINKTREE              Tree,
     IN  VSC_PRIMARY_MEM_POOL*   Pmp,
-    IN VSC_HW_CONFIG            *hwCfg,
+    IN  VSC_HW_CONFIG *         hwCfg,
     OUT VIR_Shader**            VirShader
     )
 {
@@ -14179,10 +14359,6 @@ gcVirShader2LinkTree(
         gcLINKTREE_Destroy(tree);
 
         gcmONERROR(gcSHADER_ConvFromVIR(shader, VirShader, flags));
-        if (dumpCGV)
-        {
-            gcDump_Shader(gcvNULL, "Converted gcSL shader IR (from VIR).", gcvNULL, shader, gcvTRUE);
-        }
 
         /* Rebuild link tree by converted shader. */
         gcmERR_BREAK(gcLINKTREE_Construct((gcoOS)gcvNULL, Tree));
@@ -14223,8 +14399,6 @@ OnError:
     return status;
 }
 
-#endif
-
 #define USE_NEW_LINKER            1
 
 gceSTATUS
@@ -14249,7 +14423,6 @@ gcLinkTreeThruVirShaders(
     VSC_PRIMARY_MEM_POOL        pmp;
     gctUINT                     i;
 
-#if VSC_BUILD
     gcmHEADER_ARG("Trees=0x%x ",Trees);
     do
     {
@@ -14345,6 +14518,11 @@ gcLinkTreeThruVirShaders(
             scParam.cfg.clientAPI = clientAPI;
             scParam.cfg.optFlags = VSC_COMPILER_OPT_FULL;
             scParam.cfg.pHwCfg = &hwCfg;
+
+            if (Flags & gcvSHADER_FLUSH_DENORM_TO_ZERO)
+            {
+                scParam.cfg.cFlags |= VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO;
+            }
         }
         else
         {
@@ -14375,12 +14553,28 @@ gcLinkTreeThruVirShaders(
                 pgComParam.cfg.cFlags |= VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC;
             }
 
+            if (Flags & gcvSHADER_FLUSH_DENORM_TO_ZERO)
+            {
+                pgComParam.cfg.cFlags |= VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO;
+            }
+
+            if (Flags & gcvSHADER_NEED_ROBUSTNESS_CHECK)
+            {
+                pgComParam.cfg.cFlags |= VSC_COMPILER_FLAG_NEED_OOB_CHECK;
+            }
+
             pgComParam.cfg.clientAPI = clientAPI;
+
             pgComParam.cfg.optFlags = VSC_COMPILER_OPT_FULL;
             if (Flags & gcvSHADER_DISABLE_DEFAULT_UBO)
             {
                 pgComParam.cfg.optFlags &= ~VSC_COMPILER_OPT_CONSTANT_REG_SPILLABLE;
             }
+            if (Flags & gcvSHADER_DISABLE_DUAL16)
+            {
+                pgComParam.cfg.optFlags &= ~VSC_COMPILER_OPT_DUAL16;
+            }
+
             pgComParam.cfg.pHwCfg = &hwCfg;
 
             pgComParam.pGlApiCfg = gcGetGLSLCaps();
@@ -14458,7 +14652,6 @@ gcLinkTreeThruVirShaders(
 
                 gcmONERROR(gcSHADER_ConvFromVIR(geoShader, geoVirShader, Flags));
             }
-
             gcmASSERT(hwPgStates.stateBufferSize != 0 && hwPgStates.pStateBuffer != gcvNULL);
 
             /* Allocate a new state buffer. */
@@ -14594,7 +14787,7 @@ OnError:
     vscPMP_Finalize(&pmp);
     /* Return the status. */
     gcmFOOTER();
-#endif
+
     return status;
 }
 
@@ -14712,10 +14905,6 @@ gcGoThroughVIRPass_NewTree(
     /* Destroy old link tree. */
     gcLINKTREE_Destroy(tree);
     gcmONERROR(gcSHADER_ConvFromVIR(shader, Shader, flags));
-    if (dumpCGV)
-    {
-        gcDump_Shader(gcvNULL, "Converted gcSL shader IR (from VIR).", gcvNULL, shader, gcvTRUE);
-    }
 
     vscPMP_Finalize(pmp);
 
@@ -14763,7 +14952,6 @@ gcGoThroughVIRPass(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-#if VSC_BUILD
     gcmHEADER_ARG("Tree=0x%x ",*Tree);
     do
     {
@@ -14781,7 +14969,6 @@ gcGoThroughVIRPass(
 OnError:
     /* Return the status. */
     gcmFOOTER();
-#endif
     return status;
 }
 #endif  /* !DX_SHADER */
@@ -15867,7 +16054,7 @@ _gcChangeLoadToMovUniform(
                code->source1 = code->source1Index = code->source1Indexed = 0;
                code->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_UNIFORM)
                              | gcmSL_SOURCE_SET(0, Indexed, indexedMode)
-                             | gcmSL_SOURCE_SET(0, Precision, gcSHADER_PRECISION_MEDIUM)
+                             | gcmSL_SOURCE_SET(0, Precision, blockUniformMember->precision)
                              | gcmSL_SOURCE_SET(0, Format, blockUniformMember->format)
                              | gcmSL_SOURCE_SET(0, Swizzle, (gctUINT8)swizzle);
 
@@ -16535,6 +16722,18 @@ _ChangeAtomicCounterUniform2BaseAddrBindingUniform(
                      5: ATOMADD         temp.uint(4).x, temp.uint(62).x, 1
                 */
                 gcSL_SWIZZLE srcSwz = gcSL_SWIZZLE_XXXX;
+                gctUINT k;
+                gcSHADER_PRECISION precision = gcSHADER_PRECISION_DEFAULT;
+
+                for(k = i - 1; k >= 0; k--)
+                {
+                    if(Shader->code[k].tempIndex == *sourceIndexed)
+                    {
+                        precision = gcmSL_TARGET_GET(Shader->code[k].temp, Precision);
+                        break;
+                    }
+                }
+                gcmASSERT(precision != gcSHADER_PRECISION_DEFAULT);
 
                 constIndex = gcmSL_INDEX_GET(*sourceIndex, ConstValue);
                 offset     = uniform->offset + constIndex * 4;
@@ -16542,7 +16741,8 @@ _ChangeAtomicCounterUniform2BaseAddrBindingUniform(
                 gcmSL_OPCODE_UPDATE(mulInst.opcode, Opcode, gcSL_MUL);
                 mulInst.temp        = gcmSL_TARGET_SET(0, Condition, gcSL_ALWAYS)
                                     | gcmSL_TARGET_SET(0, Enable, gcSL_ENABLE_X)
-                                    | gcmSL_TARGET_SET(0, Format, gcSL_UINT32);
+                                    | gcmSL_TARGET_SET(0, Format, gcSL_UINT32)
+                                    | gcmSL_TARGET_SET(0, Precision, precision);
                 mulInst.tempIndex   = newRegNo[2];
 
                 switch (gcmSL_SOURCE_GET(*source, Indexed))
@@ -16569,6 +16769,7 @@ _ChangeAtomicCounterUniform2BaseAddrBindingUniform(
                 mulInst.source0     = gcmSL_SOURCE_SET(mulInst.source0, Indexed, gcSL_NOT_INDEXED);
                 mulInst.source0     = gcmSL_SOURCE_SET(mulInst.source0, Precision, gcSHADER_PRECISION_DEFAULT);
                 mulInst.source0     = gcmSL_SOURCE_SET(mulInst.source0, Format, gcSL_INTEGER);
+                mulInst.source0     = gcmSL_SOURCE_SET(mulInst.source0, Precision, precision);
 
                 mulInst.source0Index = *sourceIndexed;
                 mulInst.source0Index = gcmSL_INDEX_SET(mulInst.source0Index, ConstValue, 0);
@@ -16582,14 +16783,15 @@ _ChangeAtomicCounterUniform2BaseAddrBindingUniform(
                 gcmSL_OPCODE_UPDATE(addInst.opcode, Opcode, gcSL_ADD);
                 addInst.temp        = gcmSL_TARGET_SET(0, Condition, gcSL_ALWAYS)
                                     | gcmSL_TARGET_SET(0, Enable, gcSL_ENABLE_X)
-                                    | gcmSL_TARGET_SET(0, Format, gcSL_UINT32);
+                                    | gcmSL_TARGET_SET(0, Format, gcSL_UINT32)
+                                    | gcmSL_TARGET_SET(0, Precision, precision);
                 addInst.tempIndex   = newRegNo[0];
 
 
                 addInst.source0     = gcmSL_SOURCE_SET(addInst.source0, Swizzle, gcSL_SWIZZLE_XXXX);
                 addInst.source0     = gcmSL_SOURCE_SET(addInst.source0, Type, gcSL_TEMP);
                 addInst.source0     = gcmSL_SOURCE_SET(addInst.source0, Indexed, gcSL_NOT_INDEXED);
-                addInst.source0     = gcmSL_SOURCE_SET(addInst.source0, Precision, gcSHADER_PRECISION_DEFAULT);
+                addInst.source0     = gcmSL_SOURCE_SET(addInst.source0, Precision, precision);
                 addInst.source0     = gcmSL_SOURCE_SET(addInst.source0, Format, gcSL_INTEGER);
 
                 addInst.source0Index = newRegNo[2];
@@ -16619,7 +16821,7 @@ _ChangeAtomicCounterUniform2BaseAddrBindingUniform(
                 loadInst.source1     = gcmSL_SOURCE_SET(loadInst.source1, Swizzle, gcSL_SWIZZLE_XXXX);
                 loadInst.source1     = gcmSL_SOURCE_SET(loadInst.source1, Type, gcSL_TEMP);
                 loadInst.source1     = gcmSL_SOURCE_SET(loadInst.source1, Indexed, gcSL_NOT_INDEXED);
-                loadInst.source1     = gcmSL_SOURCE_SET(loadInst.source1, Precision, gcSHADER_PRECISION_DEFAULT);
+                loadInst.source1     = gcmSL_SOURCE_SET(loadInst.source1, Precision, precision);
                 loadInst.source1     = gcmSL_SOURCE_SET(loadInst.source1, Format, gcSL_INTEGER);
 
                 loadInst.source1Index   = newRegNo[0];
@@ -18042,7 +18244,6 @@ gcLinkShaders(
     /* Initialize our pass manager who will take over all passes
        whether to trigger or not */
     {
-#if VSC_BUILD
         VSC_OPTN_RAOptions* ra_options;
         gctBOOL isVirRAOn;
 
@@ -18051,9 +18252,6 @@ gcLinkShaders(
         /* need to do pre varying packing if VIR RA is on, since VIR RA may pack
          * the varyings by itself and conflict with varyingPacking */
         doPreVaryingPacking = (gcmOPT_UseVIRCodeGen() == VIRCG_None || isVirRAOn);
-#else
-        doPreVaryingPacking = (gcmOPT_UseVIRCodeGen() != VIRCG_None);
-#endif
 
         if (ENABLE_FULL_NEW_LINKER)
         {
@@ -18207,7 +18405,7 @@ gcLinkShaders(
         /*
         ** we need to do some conversion for integer branch.
         */
-        if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SUPPORT_INTEGER_BRANCH) &&
+        if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_PARTLY_SUPPORT_INTEGER_BRANCH) &&
             (Flags & gcvSHADER_ONCE_OPTIMIZER))
         {
             if (VertexShader)
@@ -18959,7 +19157,7 @@ _gcLinkFullGraphicsShaders(
     /*
     ** we need to do some conversion for integer branch.
     */
-    if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SUPPORT_INTEGER_BRANCH) &&
+    if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_PARTLY_SUPPORT_INTEGER_BRANCH) &&
         (Flags & gcvSHADER_ONCE_OPTIMIZER))
     {
         for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i ++)
@@ -18971,6 +19169,7 @@ _gcLinkFullGraphicsShaders(
         }
     }
 
+    /* Do the old optimizer. */
     for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i ++)
     {
         if (Shaders[i])
@@ -19363,12 +19562,12 @@ gcLinkKernel(
     /* Clear kernel functions arguments number. */
     Kernel->maxKernelFunctionArgs = 0;
 
-    if (Flags & gcvSHADER_IMAGE_PATCHING)
+    if (Flags & gcSHADER_HAS_IMAGE_IN_KERNEL)
     {
         /* Read_image patching. */
         /* Create image-sampler pairs, */
         /*    and replace IMAGE_SAMPLER-IMAGE_RD pairs with TEXLD. */
-        gcmONERROR(_converrtImageReadToTexld(Kernel));
+        gcmONERROR(_convertImageReadToTexld(Kernel));
     }
 
     if (Flags & gcvSHADER_OPTIMIZER)
@@ -19533,6 +19732,211 @@ OnError:
     return status;
 }
 
+static gceSTATUS
+_gcConvertSharedMemoryBaseAddr(
+    IN gcSHADER             Shader
+    )
+{
+    gceSTATUS               status = gcvSTATUS_OK;
+    gctUINT                 i, codeIndex, origLastInstruction = Shader->lastInstruction;
+    gcsSTORAGE_BLOCK        ssbo = gcvNULL;
+    gcUNIFORM               uniform, blockAddrUniform, numGroupsUniform = gcvNULL;
+    gcATTRIBUTE             attr, groupIdAttr = gcvNULL;
+    gcSL_INSTRUCTION        code = gcvNULL;
+    gctUINT16               addCodeCount = 6;
+    gctUINT16               blockAddrTempIndex;
+    gctUINT16               tempIndex1, tempIndex2, tempIndex3, tempIndex4, tempIndex5, tempIndex6;
+    gctUINT32               uintConstant[1];
+    void*                   constantPtr;
+
+    /* Only check CS right now. */
+    if (Shader->type != gcSHADER_TYPE_COMPUTE)
+    {
+        return status;
+    }
+
+    if (!gcShaderHasLocalMemoryAddr(Shader))
+    {
+        return status;
+    }
+
+    /* Find the shared memory base addr uniform. */
+    for (i = 0; i < Shader->storageBlockCount; i++)
+    {
+        ssbo = Shader->storageBlocks[i];
+
+        if (ssbo == gcvNULL)
+        {
+            continue;
+        }
+
+        if (HasIBIFlag(GetSBInterfaceBlockInfo(ssbo), gceIB_FLAG_FOR_SHARED_VARIABLE))
+        {
+            break;
+        }
+    }
+    gcmASSERT(i < Shader->storageBlockCount && ssbo);
+
+    /* Get the block address uniform and block address temp index. */
+    gcmONERROR(gcSHADER_GetUniform(Shader,
+                                   GetSBIndex(ssbo),
+                                   &blockAddrUniform));
+    blockAddrTempIndex = (gctUINT16)GetSBSharedVariableBaseAddress(ssbo);
+
+    /* Find the original code index. */
+    for (i = 0; i < Shader->codeCount; i++)
+    {
+        code = &Shader->code[i];
+
+        /* Find : MOV temp(blockAddrTempIndex), uniform(blockAddrUniform) */
+        if ((code == gcvNULL) ||
+            (gcSL_OPCODE)gcmSL_OPCODE_GET(code->opcode, Opcode) != gcSL_MOV ||
+            code->tempIndex != blockAddrTempIndex ||
+            (gcSL_TYPE)gcmSL_SOURCE_GET(code->source0, Type) != gcSL_UNIFORM ||
+            code->source0Index != GetUniformIndex(blockAddrUniform))
+        {
+            continue;
+        }
+
+        break;
+    }
+    codeIndex = i;
+    gcmASSERT(codeIndex < Shader->codeCount && code);
+
+    /* Find WorkGroupID, if not found, create it. */
+    for (i = 0; i < Shader->attributeCount; i++)
+    {
+        attr = Shader->attributes[i];
+
+        if (attr &&
+            GetATTRNameLength(attr) < 0 &&
+            GetATTRNameLength(attr) == gcSL_WORK_GROUP_ID)
+        {
+            groupIdAttr = attr;
+            break;
+        }
+    }
+
+    if (groupIdAttr == gcvNULL)
+    {
+        gcmONERROR(gcSHADER_AddAttribute(Shader,
+                                         "gl_WorkGroupID",
+                                         gcSHADER_UINT_X3,
+                                         1,
+                                         gcvFALSE,
+                                         gcSHADER_SHADER_DEFAULT,
+                                         gcSHADER_PRECISION_MEDIUM,
+                                         &groupIdAttr));
+    }
+    gcmASSERT(groupIdAttr);
+
+    /* Find num_group, if not found, create it. */
+    for (i = 0; i < Shader->uniformCount; i++)
+    {
+        uniform = Shader->uniforms[i];
+
+        if (uniform && isUniformNumGroups(uniform))
+        {
+            numGroupsUniform = uniform;
+            break;
+        }
+    }
+
+    if (numGroupsUniform == gcvNULL)
+    {
+        gcmONERROR(gcSHADER_AddUniform(Shader,
+                                       "#num_groups",
+                                       gcSHADER_UINT_X3,
+                                       1,
+                                       gcSHADER_PRECISION_MEDIUM,
+                                       &numGroupsUniform));
+    }
+    gcmASSERT(numGroupsUniform);
+
+    /* Compute group index :
+        Z * I * J + Y * I + X
+        where group Id = (X, Y, Z) and
+                num work group = (I, J, K)  */
+    gcmONERROR(gcSHADER_InsertNOP2BeforeCode(Shader, codeIndex, (gctUINT)addCodeCount, gcvTRUE));
+    Shader->instrIndex = (codeIndex == 0) ? gcSHADER_OPCODE : gcSHADER_SOURCE1;
+    Shader->lastInstruction = (codeIndex == 0) ? 0 : codeIndex - 1;
+
+    /* MUL temp1.xy, workGroupID.yz, num_group.x */
+    tempIndex1 = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X2);
+    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MUL, tempIndex1, gcSL_ENABLE_XY, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+    gcmONERROR(gcSHADER_AddSourceAttribute(Shader, groupIdAttr, gcSL_SWIZZLE_YZZZ, 0));
+    gcmONERROR(gcSHADER_AddSourceUniform(Shader, numGroupsUniform, gcSL_SWIZZLE_XXXX, 0));
+
+    /* MUL temp2.x, temp1.y, num_group.y */
+    tempIndex2 = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X1);
+    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MUL, tempIndex2, gcSL_ENABLE_X, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+    gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, tempIndex1, gcSL_SWIZZLE_YYYY, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+    gcmONERROR(gcSHADER_AddSourceUniform(Shader, numGroupsUniform, gcSL_SWIZZLE_YYYY, 0));
+
+    /* ADD temp3.x, temp2.x, temp1.x */
+    tempIndex3 = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X1);
+    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_ADD, tempIndex3, gcSL_ENABLE_X, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+    gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, tempIndex2, gcSL_SWIZZLE_XXXX, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+    gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, tempIndex1, gcSL_SWIZZLE_XXXX, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+
+    /* ADD temp4.x, temp3.x, workGroupID.x */
+    tempIndex4 = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X1);
+    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_ADD, tempIndex4, gcSL_ENABLE_X, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+    gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, tempIndex3, gcSL_SWIZZLE_XXXX, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+    gcmONERROR(gcSHADER_AddSourceAttribute(Shader, groupIdAttr, gcSL_SWIZZLE_XXXX, 0));
+
+    /* MUL temp5.x, temp4.x, shared_memory_size */
+    tempIndex5 = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X1);
+    uintConstant[0] = GetSBBlockSize(ssbo);
+    constantPtr = (void *)uintConstant;
+    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MUL, tempIndex5, gcSL_ENABLE_X, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+    gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, tempIndex4, gcSL_SWIZZLE_XXXX, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+    gcmONERROR(gcSHADER_AddSourceConstantFormattedWithPrecision(Shader, constantPtr, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+
+    /* ADD temp6.x, base_addr, temp5.x*/
+    tempIndex6 = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X1);
+    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_ADD, tempIndex6, gcSL_ENABLE_X, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+    gcmONERROR(gcSHADER_AddSourceUniform(Shader, blockAddrUniform, gcSL_SWIZZLE_XXXX, 0));
+    gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, tempIndex5, gcSL_SWIZZLE_XXXX, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+
+    /*
+    ** Change
+    ** MOV temp(blockAddrTempIndex), uniform(blockAddrUniform) -->
+    ** MOV temp(blockAddrTempIndex), temp6.x
+    */
+    code = &Shader->code[codeIndex + addCodeCount];
+    code->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_TEMP)
+                  | gcmSL_SOURCE_SET(0, Format, gcSL_UINT32)
+                  | gcmSL_SOURCE_SET(0, Swizzle, gcSL_SWIZZLE_XXXX)
+                  | gcmSL_SOURCE_SET(0, Precision, gcSHADER_PRECISION_MEDIUM);
+    code->source0Index = tempIndex6;
+
+    Shader->lastInstruction = origLastInstruction + addCodeCount;
+
+    /* Convert all load_l/store_l to load/store1. */
+    for (i = 0; i < Shader->codeCount; i++)
+    {
+        code = &Shader->code[i];
+
+        if (code == gcvNULL)
+        {
+            continue;
+        }
+
+        if ((gcSL_OPCODE)gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_LOAD_L)
+        {
+            gcmSL_OPCODE_UPDATE(code->opcode, Opcode, gcSL_LOAD);
+        }
+
+        if ((gcSL_OPCODE)gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_STORE_L)
+        {
+            gcmSL_OPCODE_UPDATE(code->opcode, Opcode, gcSL_STORE1);
+        }
+    }
+
+OnError:
+    return status;
+}
 
 /*******************************************************************************
 **                                _gcLinkComputeShader
@@ -19621,6 +20025,12 @@ _gcLinkComputeShader(
     {
         gcmVERIFY_OK(gcSHADER_SetOptimizationOption(ComputeShader,
                            opt | gcvOPTIMIZATION_LOAD_SW_W));
+    }
+
+    /* If HW can't natively support local memory, then we need to evaluate the group index. */
+    if (1)
+    {
+        gcmONERROR(_gcConvertSharedMemoryBaseAddr(ComputeShader));
     }
 
     /* if there is intrinsic builtin functions,
@@ -20085,6 +20495,7 @@ gcLinkProgram(
     IN gctINT               ShaderCount,
     IN gcSHADER *           ShaderArray,
     IN gceSHADER_FLAGS      Flags,
+    IN gceSHADER_SUB_FLAGS  *SubFlags,
     OUT gctUINT32 *         StateBufferSize,
     OUT gctPOINTER *        StateBuffer,
     OUT gcsHINT_PTR *       Hints
@@ -20119,13 +20530,22 @@ gcLinkProgram(
         return status;
     }
 
+    /* if the user did not specify dual16 highp rule */
+    if (gcmOPT_DualFP16PrecisionRuleFromEnv() == gcvFALSE)
+    {
+        if (SubFlags)
+        {
+            gcmOPT_SetDual16PrecisionRule(SubFlags->dual16PrecisionRule);
+        }
+    }
+
     if (shGroup.hasComputeOrCLShader)
     {
         status = _gcLinkComputeShader(shGroup.shaderGroup[gceSGSK_COMPUTE_SHADER],
-                                        Flags,
-                                        StateBufferSize,
-                                        StateBuffer,
-                                        Hints);
+                                      Flags,
+                                      StateBufferSize,
+                                      StateBuffer,
+                                      Hints);
     }
     else
     {
@@ -20176,7 +20596,8 @@ _LinkProgramPipeline(
                               gcvSHADER_OPTIMIZER              |
                               gcvSHADER_USE_GL_POINT_COORD     |
                               gcvSHADER_USE_GL_POSITION        |
-                              gcvSHADER_REMOVE_UNUSED_UNIFORMS);
+                              gcvSHADER_REMOVE_UNUSED_UNIFORMS |
+                              gcvSHADER_FLUSH_DENORM_TO_ZERO);
 
     gcmHEADER_ARG("VertexShader=0x%x FragmentShader=0x%x",
                   VertexShader, FragmentShader);
@@ -20360,7 +20781,8 @@ _LinkFullGraphicsProgramPipeline(
                               gcvSHADER_USE_GL_Z               |
                               gcvSHADER_USE_GL_POINT_COORD     |
                               gcvSHADER_USE_GL_POSITION        |
-                              gcvSHADER_REMOVE_UNUSED_UNIFORMS);
+                              gcvSHADER_REMOVE_UNUSED_UNIFORMS |
+                              gcvSHADER_FLUSH_DENORM_TO_ZERO);
 
     gcSHADER_KIND shaderKind[] =
     {
@@ -21191,6 +21613,7 @@ gcSaveProgram(
     gctUINT32 vertexShaderBytes;
     gctUINT32 fragmentShaderBytes;
     gctUINT32 bytes;
+    gctUINT32 hintSize = Hints ? gcSHADER_GetHintSize() : 0;
     gctUINT8_PTR bytePtr;
     gctUINT32 bufferSize;
     gctUINT8_PTR buffer = gcvNULL;
@@ -21218,7 +21641,7 @@ gcSaveProgram(
                      + gcmSIZEOF(gctUINT32) + gcmALIGN(vertexShaderBytes, 4)
                      + gcmSIZEOF(gctUINT32) + gcmALIGN(fragmentShaderBytes, 4)
                      + gcmSIZEOF(gctUINT32) + ProgramBufferSize
-                     + gcmSIZEOF(gctUINT32) + gcSHADER_GetHintSize();
+                     + gcmSIZEOF(gctUINT32) + hintSize;
 
         if (BinarySize)
         {
@@ -21326,21 +21749,27 @@ gcSaveProgram(
                       gcmSIZEOF(gctUINT32));
         buffer += gcmSIZEOF(gctUINT32);
 
-        /* Copy the state buffer. */
-        gcoOS_MemCopy(buffer,
-                      ProgramBuffer,
-                      ProgramBufferSize);
+        /* Copy the state buffer if needed. */
+        if (ProgramBufferSize > 0)
+        {
+            gcoOS_MemCopy(buffer,
+                          ProgramBuffer,
+                          ProgramBufferSize);
+        }
         buffer += ProgramBufferSize;
 
         /* Copy the size of the HINT structure. */
-        bytes = gcSHADER_GetHintSize();
+        bytes = hintSize;
         gcoOS_MemCopy(buffer,
                       &bytes,
                       gcmSIZEOF(gctUINT32));
         buffer += gcmSIZEOF(gctUINT32);
 
-        /* Copy the HINT structure. */
-        gcoOS_MemCopy(buffer, Hints, bytes);
+        /* Copy the HINT structure if needed. */
+        if (bytes > 0)
+        {
+            gcoOS_MemCopy(buffer, Hints, bytes);
+        }
         buffer += bytes;
 
         /* Assert we copied the right number of bytes */
@@ -21519,18 +21948,18 @@ gcLoadProgram(
         bytes -=  gcmSIZEOF(gctUINT32);
         buffer += gcmSIZEOF(gctUINT32);
 
-        if (ProgramBuffer)
+        if (ProgramBufferSize)
         {
-          /* Allocate program states buffer. */
-          gcmERR_BREAK(gcoOS_Allocate(os,
-                                      *bufferSize,
-                                      &pointer));
-          *ProgramBuffer = pointer;
-          *ProgramBufferSize = *bufferSize;
+            *ProgramBufferSize = *bufferSize;
+        }
 
-          gcoOS_MemCopy(*ProgramBuffer,
-                        buffer,
-                        *bufferSize);
+        /* If this binary saves state buffer, then load it. */
+        if (ProgramBuffer && *bufferSize > 0)
+        {
+            /* Allocate program states buffer. */
+            gcmERR_BREAK(gcoOS_Allocate(os, *bufferSize, &pointer));
+            *ProgramBuffer = pointer;
+            gcoOS_MemCopy(*ProgramBuffer, buffer, *bufferSize);
         }
 
         buffer += *bufferSize;
@@ -21538,8 +21967,7 @@ gcLoadProgram(
         bufferSize = (gctUINT32 *) buffer;
 
         if (bytes < sizeof(gctUINT32) ||
-            bytes < (*bufferSize + sizeof(gctUINT32)) ||
-            (Hints && *bufferSize != gcSHADER_GetHintSize()) )
+            bytes < (*bufferSize + sizeof(gctUINT32)))
         {
            /* Invalid hint size. */
            gcmFATAL("gcLoadProgram: Invalid hints size %u", bytes);
@@ -21549,7 +21977,8 @@ gcLoadProgram(
 
         buffer += gcmSIZEOF(gctUINT32);
 
-        if (Hints)
+        /* If this binary saves hints, then load it. */
+        if (Hints && *bufferSize > 0)
         {
           /* Allocate hint structure buffer. */
           gcmERR_BREAK(gcoOS_Allocate(os,
@@ -21559,9 +21988,7 @@ gcLoadProgram(
           *Hints = pointer;
 
           /* Copy the HINT structure. */
-          gcoOS_MemCopy(*Hints,
-                        buffer,
-                        *bufferSize);
+          gcoOS_MemCopy(*Hints, buffer, *bufferSize);
         }
 
         buffer += *bufferSize;
@@ -21830,6 +22257,63 @@ _gcLINKTREE_ReplaceColor2FrontBackColor(
             &frontFacing));
     }
 
+    /*
+    ** Insert:
+    ** CMP.z dest, dest0, src2
+    ** CMP.nz dest, dest0, src1
+    */
+    gcmONERROR(gcSHADER_FindMainFunction(FragmentShader, &mainStartIdx, gcvNULL));
+
+    if (varyingColor != gcvNULL)
+    {
+        fColor  = frontColor;
+        bColor  = backColor;
+
+        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(FragmentShader, mainStartIdx, 2, gcvTRUE));
+        gcOpt_Dump(gcvNULL, "Incoming Fragment Shader", gcvNULL, FragmentShader);
+        FragmentShader->instrIndex = (mainStartIdx == 0) ? gcSHADER_OPCODE : gcSHADER_SOURCE1;
+        FragmentShader->lastInstruction = (mainStartIdx == 0) ? 0 : (mainStartIdx - 1);
+
+        realColor = (gctUINT16)gcSHADER_NewTempRegs(FragmentShader, 1, gcSHADER_FLOAT_X4);
+
+        /* CMP.z dest, dest0, src2 */
+        gcmONERROR(gcSHADER_AddOpcode2(FragmentShader, gcSL_CMP, gcSL_ZERO, realColor, gcSL_ENABLE_XYZW, gcSL_FLOAT, bColor->precision));
+        gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, frontFacing, gcSL_SWIZZLE_XXXX, 0));
+        gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, bColor, gcSL_SWIZZLE_XYZW, 0));
+
+        /* CMP.nz dest, dest0, src1 */
+        gcmONERROR(gcSHADER_AddOpcode2(FragmentShader, gcSL_CMP, gcSL_NOT_ZERO, realColor, gcSL_ENABLE_XYZW, gcSL_FLOAT, fColor->precision));
+        gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, frontFacing, gcSL_SWIZZLE_XXXX, 0));
+        gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, fColor, gcSL_SWIZZLE_XYZW, 0));
+
+        FragmentShader->lastInstruction = origLastInstruction + 2;
+    }
+
+    if (varying2Color != gcvNULL)
+    {
+        fColor  = front2Color;
+        bColor  = back2Color;
+
+        gcmONERROR(gcSHADER_InsertNOP2BeforeCode(FragmentShader, mainStartIdx, 2, gcvTRUE));
+        FragmentShader->instrIndex = gcSHADER_SOURCE1;
+        FragmentShader->lastInstruction = (mainStartIdx == 0) ? 0 : (mainStartIdx - 1);
+
+        real2Color = (gctUINT16)gcSHADER_NewTempRegs(FragmentShader, 1, gcSHADER_FLOAT_X4);
+
+        /* CMP.z dest, dest0, src2 */
+        gcmONERROR(gcSHADER_AddOpcode2(FragmentShader, gcSL_CMP, gcSL_ZERO, real2Color, gcSL_ENABLE_XYZW, gcSL_FLOAT, bColor->precision));
+        gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, frontFacing, gcSL_SWIZZLE_XXXX, 0));
+        gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, bColor, gcSL_SWIZZLE_XYZW, 0));
+
+        /* CMP.nz dest, dest0, src1 */
+        gcmONERROR(gcSHADER_AddOpcode2(FragmentShader, gcSL_CMP, gcSL_NOT_ZERO, real2Color, gcSL_ENABLE_XYZW, gcSL_FLOAT, fColor->precision));
+        gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, frontFacing, gcSL_SWIZZLE_XXXX, 0));
+        gcmONERROR(gcSHADER_AddSourceAttribute(FragmentShader, fColor, gcSL_SWIZZLE_XYZW, 0));
+
+        FragmentShader->lastInstruction = origLastInstruction + 2;
+    }
+
+    /* Replace gl_Color/gl_SecondaryColor with realColor/real2Color. */
     /*
     ** Insert:
     ** CMP.z dest, dest0, src2

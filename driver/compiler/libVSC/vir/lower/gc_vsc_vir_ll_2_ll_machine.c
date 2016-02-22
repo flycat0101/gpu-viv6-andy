@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -22,17 +22,6 @@ _hasNEW_SIN_COS_LOG_DIV(
     )
 {
     return ((VIR_PatternLowerContext *)Context)->hwCfg->hwFeatureFlags.hasNewSinCosLogDiv;
-}
-
-static gctBOOL
-_setPatch(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    VIR_Inst_SetPatched(Inst, gcvTRUE);
-    return gcvTRUE;
 }
 
 static VIR_PatternMatchInst _divPatInst0[] = {
@@ -110,13 +99,17 @@ static VIR_PatternReplaceInst _maxRepInst0[] = {
 /*
         MAX 1, 2, 3
             select.lt -1, 2, 3, 2, 0
+            add       1, -1, zero
+
+        new chip's select doesn't flush denorm to zero, add zero to flush to zero
 */
 static VIR_PatternMatchInst _maxPatInst1[] = {
     { VIR_OP_MAX, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _maxRepInst1[] = {
-    { VIR_OP_AQ_SELECT, VIR_COP_LESS, 0, {  1, 2, 3, 2 }, { _setPatch } },
+    { VIR_OP_AQ_SELECT, VIR_COP_LESS, 0, {  -1, 2, 3, 2 }, { 0 } },
+    { VIR_OP_ADD, 0, 0, {  1, -1, 0, 0 }, { 0, 0, VIR_Lower_SetZero } },
 };
 
 VIR_Pattern _maxPattern[] = {
@@ -140,14 +133,18 @@ static VIR_PatternReplaceInst _minRepInst0[] = {
 
 /*
         MIN 1, 2, 3
-            select.lt 1, 2, 3, 2, 0
+            select.lt -1, 2, 3, 2, 0
+            add       1, -1, zero
+
+        new chip's select doesn't flush denorm to zero, add zero to flush to zero
 */
 static VIR_PatternMatchInst _minPatInst1[] = {
     { VIR_OP_MIN, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _minRepInst1[] = {
-    { VIR_OP_AQ_SELECT, VIR_COP_GREATER, 0, { 1, 2, 3, 2 }, { _setPatch } },
+    { VIR_OP_AQ_SELECT, VIR_COP_GREATER, 0, { -1, 2, 3, 2 }, { 0 } },
+    { VIR_OP_ADD, 0, 0, {  1, -1, 0, 0 }, { 0, 0, VIR_Lower_SetZero } },
 };
 
 VIR_Pattern _minPattern[] = {

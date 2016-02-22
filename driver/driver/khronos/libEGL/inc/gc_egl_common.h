@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -287,6 +287,11 @@ typedef struct _khrEGL_IMAGE
             gceSURF_YUV_SAMPLE_RANGE  sampleRange;
             gceSURF_YUV_CHROMA_SITING siting[2];
         } dmaBuf;
+        struct _khrEGL_IMAGE_WAYLAND_BUFFER
+        {
+            gctINT              width;
+            gctINT              height;
+        } wlbuffer;
     } u;
 }
 khrEGL_IMAGE;
@@ -422,6 +427,7 @@ typedef EGLenum (* veglCREATEIMAGERENDERBUFFER) (
     );
 
 typedef    EGLenum (* veglCREATEIMAGEVGPARENTIMAGE) (
+    void * Context,
     unsigned int vgImage,
     void ** Images,
     int * Count

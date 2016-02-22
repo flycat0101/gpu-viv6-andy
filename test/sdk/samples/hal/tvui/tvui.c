@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -1910,6 +1910,20 @@ gctBOOL InitializeSystem(
 
 		/* Create HAL object. */
 		gcmERR_BREAK(gcoHAL_Construct(gcvNULL, Test->os, &Test->hal));
+
+		{
+			gceCHIPMODEL chipModel;
+			gctUINT32 chipRev;
+
+			gcmERR_BREAK(gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRev, gcvNULL, gcvNULL));
+
+			if (chipModel == gcv320 && chipRev == 0x5007)
+			{
+				printf("Hardware gc320 5007 does not support monoblit.\n");
+				status = gcvSTATUS_NOT_SUPPORTED;
+				break;
+			}
+		}
 
 		/* Check for the PE 2.0 feature. */
 		Test->hw2DPE20 = gcoHAL_IsFeatureAvailable(Test->hal, gcvFEATURE_2DPE20);

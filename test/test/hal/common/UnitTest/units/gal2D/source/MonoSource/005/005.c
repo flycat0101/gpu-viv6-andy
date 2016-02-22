@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -171,6 +171,12 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
             runtime->notSupport = gcvTRUE;
         }
         strncat(runtime->wholeDescription, featureName, k==listLen-1 ? strlen(featureName)+1:strlen(featureName));
+    }
+
+    if (runtime->ChipModel == gcv320 && runtime->ChipRevision == 0x5007)
+    {
+        GalOutput(GalOutputType_Result | GalOutputType_Console, "MonoBlit is not supported.\n");
+        runtime->notSupport = gcvTRUE;
     }
 
     if (runtime->notSupport)

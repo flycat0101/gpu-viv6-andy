@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -73,6 +73,8 @@ typedef enum _gceVX_KERNEL
     gcvVX_KERNEL_EUCLIDEAN_NONMAXSUPPRESSION,
     gcvVX_KERNEL_EDGE_TRACE,
     gcvVX_KERNEL_IMAGE_LISTER,
+
+    gcvVX_KERNEL_EXAMPLE,
 }
 gceVX_KERNEL;
 

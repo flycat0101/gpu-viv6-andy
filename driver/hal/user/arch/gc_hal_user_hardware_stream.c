@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -284,10 +284,18 @@ gcoHARDWARE_SetAttributes(
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
 
-    attribCountMax = 12;
-    if (Hardware->features[gcvFEATURE_HALTI0])
+
+    if (Hardware->features[gcvFEATURE_PIPELINE_32_ATTRIBUTES])
+    {
+        attribCountMax = 32;
+    }
+    else if (Hardware->features[gcvFEATURE_HALTI0])
     {
         attribCountMax = 16;
+    }
+    else
+    {
+        attribCountMax = 12;
     }
 
     /* Verify the number of attributes. */
@@ -346,7 +354,7 @@ gcoHARDWARE_SetAttributes(
 
     reserveSize = 0;
 
-    if (Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+    if (Hardware->features[gcvFEATURE_NEW_GPIPE])
     {
         vertexCtrlState = 0x5E00;
         shaderCtrlState = 0x0230;
@@ -377,7 +385,7 @@ gcoHARDWARE_SetAttributes(
     /* Update the number of the elements. */
     stateDelta->elementCount = AttributeCount;
 
-    if (Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+    if (Hardware->features[gcvFEATURE_NEW_GPIPE])
     {
         feFetchCmd = memory; memory += feFetchStateReserveCount;
     }
@@ -386,7 +394,7 @@ gcoHARDWARE_SetAttributes(
     shaderCtrl = memory; memory += shaderCtrlReserveCount;
 
     /* Init load state commands. */
-    if (Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+    if (Hardware->features[gcvFEATURE_NEW_GPIPE])
     {
         *feFetchCmd++
             = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -569,7 +577,7 @@ gcoHARDWARE_SetAttributes(
                    || (mapping[i]->stream != mapping[i + 1]->stream)
                    || (fetchSize          != mapping[i + 1]->offset);
 
-        if (Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+        if (Hardware->features[gcvFEATURE_NEW_GPIPE])
         {
              /* Store the current vertex element control value. */
             _gcmSETSTATEDATA(
@@ -1821,7 +1829,7 @@ gcoHARDWARE_SetVertexArray(
     vertexCtrlReserveCount = 1 + (vertexCtrlStateCount | 1);
     shaderCtrlReserveCount = 1 + (shaderCtrlStateCount | 1);
 
-    if (Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+    if (Hardware->features[gcvFEATURE_NEW_GPIPE])
     {
         vertexCtrlState = 0x5E00;
         shaderCtrlState = 0x0230;
@@ -1833,7 +1841,7 @@ gcoHARDWARE_SetVertexArray(
         shaderCtrlState = 0x0208;
     }
 
-    if (Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+    if (Hardware->features[gcvFEATURE_NEW_GPIPE])
     {
         feFetchStateCount = attributesTotal;
         feFetchState = 0x5EA0;
@@ -1919,7 +1927,7 @@ gcoHARDWARE_SetVertexArray(
     stateDelta->elementCount = attributesTotal;
 
     /* Determine buffer pointers. */
-    if (Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+    if (Hardware->features[gcvFEATURE_NEW_GPIPE])
     {
         feFetchCmd    = memory; memory += feFetchStateReserveCount;
     }
@@ -1929,7 +1937,7 @@ gcoHARDWARE_SetVertexArray(
     streamStride  = memory; memory += streamStrideReserveCount;
     streamDivisor  = memory; memory += streamDivisorReserveCount;
 
-    if (Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+    if (Hardware->features[gcvFEATURE_NEW_GPIPE])
     {
         *feFetchCmd++
             = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -2270,7 +2278,7 @@ gcoHARDWARE_SetVertexArray(
                 = ((j + 1) == bufferPtr->numAttribs)
                 || offset + attribute->bytes != Attributes[bufferPtr->map[j+1]].offset
                     ? 1 : 0;
-            if (Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+            if (Hardware->features[gcvFEATURE_NEW_GPIPE])
             {
                  /* Store the current vertex element control value. */
                 _gcmSETSTATEDATA(
@@ -2724,7 +2732,7 @@ gcoHARDWARE_SetVertexArray(
                 || (attribute->next->offset >= base + stride)
                     ? 1 : 0;
 
-            if (Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+            if (Hardware->features[gcvFEATURE_NEW_GPIPE])
             {
                  /* Store the current vertex element control value. */
                 _gcmSETSTATEDATA(
@@ -2948,6 +2956,7 @@ gcoHARDWARE_SetVertexArrayEx(
     gctSIZE_T shaderCtrlStateCount = 0, shaderCtrlReserveCount = 0;
     gctSIZE_T genericWStateCount = 0, genericWReserveCount = 0;
     gctSIZE_T streamAddressStateCount, streamAddressReserveCount;
+    gctSIZE_T streamEndAddrStateCount = 0, streamEndAddrReserveCount = 0;
     gctSIZE_T streamStrideStateCount, streamStrideReserveCount;
     gctSIZE_T streamDivisorStateCount, streamDivisorReserveCount;
     gctSIZE_T feIDStateReserveCount = 0;
@@ -2960,6 +2969,7 @@ gcoHARDWARE_SetVertexArrayEx(
     gctUINT32_PTR streamDivisor = gcvNULL;
     gctUINT32_PTR feID          = gcvNULL;
     gctUINT32_PTR feFetchCmd    = gcvNULL;
+    gctUINT32_PTR streamEnd     = gcvNULL;
 
     gctUINT vertexCtrlState    = 0;
     gctUINT shaderCtrlState    = 0;
@@ -2969,6 +2979,7 @@ gcoHARDWARE_SetVertexArrayEx(
     gctUINT streamDivisorState = 0;
     gctUINT feIDState          = 0;
     gctUINT feFetchState       = 0;
+    gctUINT streamEndAddrState = 0;
 
     /* Define state buffer variables. */
     gcmDEFINESTATEBUFFER(reserve, stateDelta, memory, reserveSize);
@@ -3006,7 +3017,7 @@ gcoHARDWARE_SetVertexArrayEx(
         VertexInstanceIdLinkage = -1;
     }
 
-    if (Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+    if (Hardware->features[gcvFEATURE_NEW_GPIPE])
     {
         vertexCtrlState = 0x5E00;
         shaderCtrlState = 0x0230;
@@ -3031,7 +3042,7 @@ gcoHARDWARE_SetVertexArrayEx(
 
         if (VertexInstanceIdLinkage != -1)
         {
-            if (Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+            if (Hardware->features[gcvFEATURE_NEW_GPIPE])
             {
                 feIDState = 0x01F1;
                 feIDStateReserveCount = 2;
@@ -3055,7 +3066,7 @@ gcoHARDWARE_SetVertexArrayEx(
             += (vertexCtrlReserveCount + shaderCtrlReserveCount)
             *  gcmSIZEOF(gctUINT32);
 
-        if (Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+        if (Hardware->features[gcvFEATURE_NEW_GPIPE])
         {
             genericWStateCount = attributeCount;
             genericWReserveCount = 1 + (genericWStateCount | 1);
@@ -3121,11 +3132,22 @@ gcoHARDWARE_SetVertexArrayEx(
             streamDivisorState  = 0;
         }
 
+        if (Hardware->robust)
+        {
+            streamEndAddrStateCount = StreamCount;
+            streamEndAddrReserveCount = 1 + (streamEndAddrStateCount | 1);
+
+            streamEndAddrState = 0x51B0;
+        }
+
 
         /* Add stream states. */
         reserveSize
-            += (streamAddressReserveCount + streamStrideReserveCount + streamDivisorReserveCount)
-            *  gcmSIZEOF(gctUINT32);
+            += (streamAddressReserveCount +
+                streamStrideReserveCount  +
+                streamDivisorReserveCount +
+                streamEndAddrReserveCount) * gcmSIZEOF(gctUINT32);
+
 
         /***************************************************************************
         ** Reserve command buffer state and init state commands.
@@ -3140,12 +3162,12 @@ gcoHARDWARE_SetVertexArrayEx(
         vertexCtrl    = memory; memory += vertexCtrlReserveCount;
         shaderCtrl    = memory; memory += shaderCtrlReserveCount;
         if (Hardware->features[gcvFEATURE_GENERIC_ATTRIB] ||
-            Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+            Hardware->features[gcvFEATURE_NEW_GPIPE])
         {
             genericWCmd  = memory; memory += genericWReserveCount;
         }
 
-        if (Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+        if (Hardware->features[gcvFEATURE_NEW_GPIPE])
         {
             feFetchCmd = memory; memory += feFetchStateReserveCount;
         }
@@ -3156,9 +3178,14 @@ gcoHARDWARE_SetVertexArrayEx(
             streamDivisor = memory; memory += streamDivisorReserveCount;
         }
 
-        if ((Hardware->features[gcvFEATURE_32_ATTRIBUTES]) && (VertexInstanceIdLinkage != -1))
+        if ((Hardware->features[gcvFEATURE_NEW_GPIPE]) && (VertexInstanceIdLinkage != -1))
         {
             feID = memory; memory += feIDStateReserveCount;
+        }
+
+        if (Hardware->robust)
+        {
+            streamEnd = memory; memory += streamEndAddrReserveCount;
         }
 
         /* Init load state commands. */
@@ -3195,7 +3222,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0)));
 
         if (Hardware->features[gcvFEATURE_GENERIC_ATTRIB] ||
-            Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+            Hardware->features[gcvFEATURE_NEW_GPIPE])
         {
             *genericWCmd++
                 = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -3214,7 +3241,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0)));
         }
 
-        if (Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+        if (Hardware->features[gcvFEATURE_NEW_GPIPE])
         {
             *feFetchCmd++
                 = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -3284,7 +3311,7 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0)));
         }
 
-        if ((VertexInstanceIdLinkage != -1) && (Hardware->features[gcvFEATURE_32_ATTRIBUTES]))
+        if ((VertexInstanceIdLinkage != -1) && (Hardware->features[gcvFEATURE_NEW_GPIPE]))
         {
             *feID ++
                 = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -3303,6 +3330,25 @@ gcoHARDWARE_SetVertexArrayEx(
  15:0)));
         }
 
+        if (Hardware->robust)
+        {
+            *streamEnd ++
+                = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
+ 25:16))) | (((gctUINT32) ((gctUINT32) (streamEndAddrStateCount) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
+ 25:16)))
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (streamEndAddrState) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));
+        }
+
         /* Walk all stream objects. */
         for (stream = 0, streamPtr = Streams; stream < StreamCount; streamPtr = streamPtr->next, ++stream)
         {
@@ -3310,7 +3356,6 @@ gcoHARDWARE_SetVertexArrayEx(
             gctUINT divisor;
             gctUINT32 base;
             gctUINT32 fetchSize = 0;
-
             /* Check if we have to skip this stream. */
             if (streamPtr->logical == gcvNULL)
             {
@@ -3323,7 +3368,7 @@ gcoHARDWARE_SetVertexArrayEx(
 
             if (streamPtr->stream != gcvNULL)
             {
-                gcoHARDWARE_SetHWSlot(Hardware, gcvENGINE_RENDER, gcvHWSLOT_STREAM, streamPtr->node, stream);
+                gcoHARDWARE_SetHWSlot(Hardware, gcvENGINE_RENDER, gcvHWSLOT_STREAM, streamPtr->nodePtr->u.normal.node, stream);
 
                 if (DrawInstanced)
                 {
@@ -3408,6 +3453,18 @@ gcoHARDWARE_SetVertexArrayEx(
             /* Store the stream address. */
             _gcmSETSTATEDATA(stateDelta, streamAddress, streamAddressState, lastPhysical);
 
+            if (Hardware->robust)
+            {
+                gctUINT32 endAddress;
+                gctUINT32 bufBaseAddr;
+                gctUINT32 bufSize;
+                gcmASSERT(streamPtr->nodePtr);
+                gcmSAFECASTSIZET(bufSize, streamPtr->nodePtr->size);
+                gcmGETHARDWAREADDRESS(*streamPtr->nodePtr, bufBaseAddr);
+                endAddress = bufBaseAddr + bufSize - 1;
+                _gcmSETSTATEDATA(stateDelta, streamEnd, streamEndAddrState, endAddress);
+            }
+
             if (streamRegV2)
             {
                 /* Store the stream stride. */
@@ -3469,7 +3526,7 @@ gcoHARDWARE_SetVertexArrayEx(
                              (attrPtr->next->offset >= base + stride)
                            ? 1 : 0;
 
-                if (Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+                if (Hardware->features[gcvFEATURE_NEW_GPIPE])
                 {
                      /* Store the current vertex element control value. */
                     _gcmSETSTATEDATA(
@@ -3625,7 +3682,7 @@ gcoHARDWARE_SetVertexArrayEx(
                 ** program default attib here as generic to make HW work.
                 */
                 if (Hardware->features[gcvFEATURE_GENERIC_ATTRIB] ||
-                    Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+                    Hardware->features[gcvFEATURE_NEW_GPIPE])
                 {
                     gctFLOAT fDefaultAttib[] = {0.0f, 0.0f, 0.0f, 1.0f};
                     gctUINT32_PTR uDefaultAttrib = (gctUINT32_PTR)fDefaultAttib;
@@ -3669,7 +3726,7 @@ gcoHARDWARE_SetVertexArrayEx(
             /* Do we need to add vertex instance linkage? */
             if (VertexInstanceIdLinkage != -1)
             {
-                if (Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+                if (Hardware->features[gcvFEATURE_NEW_GPIPE])
                 {
                     *feID = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ? 1:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
@@ -3751,7 +3808,7 @@ gcoHARDWARE_SetVertexArrayEx(
             {
                 reserveSize += 2 * gcmSIZEOF(gctUINT32);
 
-                if(Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+                if(Hardware->features[gcvFEATURE_NEW_GPIPE])
                 {
                     reserveSize += 2 * gcmSIZEOF(gctUINT32);
                 }
@@ -3787,7 +3844,7 @@ gcmENDSTATEBATCH(reserve, memory);
 
             if (VertexInstanceIdLinkage != -1)
             {
-                if (Hardware->features[gcvFEATURE_32_ATTRIBUTES])
+                if (Hardware->features[gcvFEATURE_NEW_GPIPE])
                 {
                     {    {    gcmASSERT(((memory - gcmUINT64_TO_TYPE(reserve->lastReserve,
  gctUINT32_PTR)) & 1) == 0);    gcmASSERT((gctUINT32)1 <= 1024);
@@ -3894,7 +3951,7 @@ gcmENDSTATEBATCH(reserve, memory);
         else
         {
             gctUINT32 addr = 0;
-            gcmASSERT(!Hardware->features[gcvFEATURE_32_ATTRIBUTES]);
+            gcmASSERT(!Hardware->features[gcvFEATURE_NEW_GPIPE]);
 
             if (streamRegV2)
             {
@@ -3912,7 +3969,6 @@ gcmENDSTATEBATCH(reserve, memory);
                 streamAddressState = 0x0193;
             }
             reserveSize = 4 * gcmSIZEOF(gctUINT32);
-
             reserveSize += 2 * gcmSIZEOF(gctUINT32);
 
             /* Hardware  have a read operation ,so we create a buffer and program a address for reading. */
@@ -3933,7 +3989,7 @@ gcmENDSTATEBATCH(reserve, memory);
 
             gcmBEGINSTATEBUFFER(Hardware, reserve, stateDelta, memory, reserveSize);
 
-           *memory++
+            *memory++
             = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
  31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?

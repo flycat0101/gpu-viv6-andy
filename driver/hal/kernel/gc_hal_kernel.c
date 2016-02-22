@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -416,6 +416,7 @@ gceSTATUS
 gckKERNEL_Construct(
     IN gckOS Os,
     IN gceCORE Core,
+    IN gctUINT ChipID,
     IN gctPOINTER Context,
     IN gckDEVICE Device,
     IN gckDB SharedDB,
@@ -450,6 +451,12 @@ gckKERNEL_Construct(
     kernel->os          = Os;
     kernel->core        = Core;
     kernel->device      = Device;
+    kernel->chipID      = ChipID;
+
+#if gcdENABLE_TRUST_APPLICATION
+    /* Connect to security service for this GPU. */
+    gcmkONERROR(gckKERNEL_SecurityOpen(kernel, kernel->core, &kernel->securityChannel));
+#endif
 
     if (SharedDB == gcvNULL)
     {
@@ -521,6 +528,16 @@ gckKERNEL_Construct(
         _SetRecovery(kernel, recovery, stuckDump);
     }
 
+    /* Need the kernel reference before gckKERNEL_Construct() completes.
+       gckOS_MapPagesEx() is called to map kernel virtual command buffers. */
+    *Kernel = kernel;
+
+    kernel->virtualBufferHead =
+        kernel->virtualBufferTail = gcvNULL;
+
+    gcmkONERROR(
+        gckOS_CreateMutex(Os, (gctPOINTER)&kernel->virtualBufferLock));
+
 #if gcdENABLE_VG
     kernel->vg = gcvNULL;
 
@@ -553,6 +570,10 @@ gckKERNEL_Construct(
         kernel->virtualCommandBuffer = gcvTRUE;
 #else
         kernel->virtualCommandBuffer = gcvFALSE;
+#endif
+
+#if defined(UNDER_CE) && USE_KERNEL_VIRTUAL_BUFFERS
+        kernel->virtualCommandBuffer = gcvTRUE;
 #endif
 
 #if gcdSECURITY
@@ -643,12 +664,6 @@ gckKERNEL_Construct(
     gcmkONERROR(gckOS_CreateSyncTimeline(Os, Core, &kernel->timeline));
 #endif
 
-    kernel->virtualBufferHead =
-    kernel->virtualBufferTail = gcvNULL;
-
-    gcmkONERROR(
-        gckOS_CreateMutex(Os, (gctPOINTER)&kernel->virtualBufferLock));
-
 #if gcdSECURITY
     /* Connect to security service for this GPU. */
     gcmkONERROR(gckKERNEL_SecurityOpen(kernel, kernel->core, &kernel->securityChannel));
@@ -684,6 +699,8 @@ gckKERNEL_Construct(
     return gcvSTATUS_OK;
 
 OnError:
+    *Kernel = gcvNULL;
+
     if (kernel != gcvNULL)
     {
         gckKERNEL_Destroy(kernel);
@@ -943,6 +960,7 @@ gckKERNEL_AllocateLinearMemory(
     gctBOOL tileStatusInVirtual;
     gctBOOL contiguous = gcvFALSE;
     gctBOOL cacheable = gcvFALSE;
+    gctBOOL secure = gcvFALSE;
     gctSIZE_T bytes = Bytes;
     gctUINT32 handle = 0;
     gceDATABASE_TYPE type;
@@ -959,6 +977,7 @@ gckKERNEL_AllocateLinearMemory(
     /* Check flags. */
     contiguous = Flag & gcvALLOC_FLAG_CONTIGUOUS;
     cacheable  = Flag & gcvALLOC_FLAG_CACHEABLE;
+    secure     = Flag & gcvALLOC_FLAG_SECURITY;
 
 AllocateMemory:
 
@@ -1031,7 +1050,7 @@ AllocateMemory:
 
         else
         /* gcvPOOL_SYSTEM can't be cacheable. */
-        if (cacheable == gcvFALSE)
+        if (cacheable == gcvFALSE && secure == gcvFALSE)
         {
             /* Get pointer to gckVIDMEM object for pool. */
             status = gckKERNEL_GetVideoMemoryPool(Kernel, pool, &videoMemory);
@@ -2351,9 +2370,10 @@ gckKERNEL_Dispatch(
         {
             Kernel->profileEnable = Interface->u.SetProfileSetting.enable;
             Kernel->profileSyncMode = Interface->u.SetProfileSetting.syncMode;
-
+/*
              if ((Kernel->hardware->identity.chipModel == gcv1500 && Kernel->hardware->identity.chipRevision == 0x5246) ||
                  (Kernel->hardware->identity.chipModel == gcv3000 && Kernel->hardware->identity.chipRevision == 0x5450))
+*/
                 gcmkONERROR(gckHARDWARE_InitProfiler(Kernel->hardware));
 
 #if VIVANTE_PROFILER_PROBE
@@ -2691,6 +2711,7 @@ gckKERNEL_Dispatch(
 
     case gcvHAL_QUERY_RESET_TIME_STAMP:
         Interface->u.QueryResetTimeStamp.timeStamp = Kernel->resetTimeStamp;
+        Interface->u.QueryResetTimeStamp.contextID = Kernel->hardware->contextID;
         break;
 
     case gcvHAL_FREE_VIRTUAL_COMMAND_BUFFER:
@@ -2704,7 +2725,7 @@ gckKERNEL_Dispatch(
 
         gcmkONERROR(gckOS_DestroyUserVirtualMapping(
             Kernel->os,
-            buffer->physical,
+            buffer->virtualBuffer.physical,
             (gctSIZE_T)Interface->u.FreeVirtualCommandBuffer.bytes,
             gcmUINT64_TO_PTR(Interface->u.FreeVirtualCommandBuffer.logical)));
 
@@ -3941,17 +3962,12 @@ gckKERNEL_AllocateVirtualCommandBuffer(
     OUT gctPOINTER * Logical
     )
 {
-    gckOS os                             = Kernel->os;
-    gceSTATUS status;
-    gctPOINTER logical                   = gcvNULL;
-    gctSIZE_T pageCount;
-    gctSIZE_T bytes                      = *Bytes;
-    gckVIRTUAL_COMMAND_BUFFER_PTR buffer = gcvNULL;
-    gckMMU mmu;
-    gctUINT32 flag = gcvALLOC_FLAG_NON_CONTIGUOUS;
+    gceSTATUS                       status;
+    gckOS                           os = Kernel->os;
+    gckVIRTUAL_COMMAND_BUFFER_PTR    buffer;
 
     gcmkHEADER_ARG("Os=0x%X InUserSpace=%d *Bytes=%lu",
-                   os, InUserSpace, gcmOPT_VALUE(Bytes));
+        os, InUserSpace, gcmOPT_VALUE(Bytes));
 
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(os, gcvOBJ_OS);
@@ -3960,77 +3976,24 @@ gckKERNEL_AllocateVirtualCommandBuffer(
     gcmkVERIFY_ARGUMENT(Physical != gcvNULL);
     gcmkVERIFY_ARGUMENT(Logical != gcvNULL);
 
-    gcmkONERROR(gckOS_Allocate(os,
-                               sizeof(gckVIRTUAL_COMMAND_BUFFER),
-                               (gctPOINTER)&buffer));
+    gcmkONERROR(
+        gckOS_Allocate(
+            os,
+            sizeof(gckVIRTUAL_COMMAND_BUFFER),
+            (gctPOINTER)&buffer
+            ));
 
     gcmkONERROR(gckOS_ZeroMemory(buffer, sizeof(gckVIRTUAL_COMMAND_BUFFER)));
 
-    buffer->bytes = bytes;
-
-    gcmkONERROR(gckOS_AllocatePagedMemoryEx(os,
-                                            flag,
-                                            bytes,
-                                            gcvNULL,
-                                            &buffer->physical));
-
-    if (InUserSpace)
-    {
-        gcmkONERROR(gckOS_CreateUserVirtualMapping(os,
-                                                   buffer->physical,
-                                                   bytes,
-                                                   &logical,
-                                                   &pageCount));
-
-        *Logical =
-        buffer->userLogical = logical;
-    }
-    else
-    {
-        gcmkONERROR(gckOS_CreateKernelVirtualMapping(os,
-                                                     buffer->physical,
-                                                     bytes,
-                                                     &logical,
-                                                     &pageCount));
-
-        *Logical =
-        buffer->kernelLogical = logical;
-    }
-
-    buffer->pageCount = pageCount;
-    buffer->kernel = Kernel;
-
-    gcmkONERROR(gckOS_GetProcessID(&buffer->pid));
-
-#if gcdPROCESS_ADDRESS_SPACE
-    gcmkONERROR(gckKERNEL_GetProcessMMU(Kernel, &mmu));
-    buffer->mmu = mmu;
-#else
-    mmu = Kernel->mmu;
-#endif
-
-    gcmkONERROR(gckMMU_AllocatePages(mmu,
-                                     pageCount,
-                                     &buffer->pageTable,
-                                     &buffer->gpuAddress));
-
-
-    gcmkONERROR(gckOS_MapPagesEx(os,
-                                 Kernel->core,
-                                 buffer->physical,
-                                 pageCount,
-                                 buffer->gpuAddress,
-                                 buffer->pageTable,
-                                 gcvFALSE));
-
-    gcmkONERROR(gckMMU_Flush(mmu, gcvSURF_INDEX));
-
-    *Physical = buffer;
-
-    gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_KERNEL,
-                   "gpuAddress = %x pageCount = %d kernelLogical = %x userLogical=%x",
-                   buffer->gpuAddress, buffer->pageCount,
-                   buffer->kernelLogical, buffer->userLogical);
+    gcmkONERROR(
+        gckKERNEL_AllocateVirtualMemory(
+            Kernel,
+            gcvFALSE,
+            InUserSpace,
+            Bytes,
+            (gctPHYS_ADDR *)&buffer,
+            Logical
+            ));
 
     gcmkVERIFY_OK(gckOS_AcquireMutex(os, Kernel->virtualBufferLock, gcvINFINITE));
 
@@ -4048,44 +4011,12 @@ gckKERNEL_AllocateVirtualCommandBuffer(
 
     gcmkVERIFY_OK(gckOS_ReleaseMutex(os, Kernel->virtualBufferLock));
 
+    *Physical = buffer;
+
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
 
 OnError:
-    if (buffer && buffer->gpuAddress)
-    {
-#if gcdPROCESS_ADDRESS_SPACE
-        gcmkVERIFY_OK(
-            gckMMU_FreePages(mmu, buffer->gpuAddress, buffer->pageTable, buffer->pageCount));
-#else
-        gcmkVERIFY_OK(
-            gckMMU_FreePages(Kernel->mmu, buffer->gpuAddress, buffer->pageTable, buffer->pageCount));
-#endif
-    }
-
-    if (buffer && buffer->userLogical)
-    {
-        gcmkVERIFY_OK(
-            gckOS_DestroyUserVirtualMapping(os,
-                                            buffer->physical,
-                                            bytes,
-                                            buffer->userLogical));
-    }
-
-    if (buffer && buffer->kernelLogical)
-    {
-        gcmkVERIFY_OK(
-            gckOS_DestroyKernelVirtualMapping(os,
-                                              buffer->physical,
-                                              bytes,
-                                              buffer->kernelLogical));
-    }
-
-    if (buffer && buffer->physical)
-    {
-        gcmkVERIFY_OK(gckOS_FreePagedMemory(os, buffer->physical, bytes));
-    }
-
     gcmkVERIFY_OK(gckOS_Free(os, buffer));
 
     /* Return the status. */
@@ -4101,32 +4032,15 @@ gckKERNEL_DestroyVirtualCommandBuffer(
     IN gctPOINTER Logical
     )
 {
-    gckOS os;
-    gckKERNEL kernel;
-    gckVIRTUAL_COMMAND_BUFFER_PTR buffer = (gckVIRTUAL_COMMAND_BUFFER_PTR)Physical;
+    gckOS                           os;
+    gckKERNEL                       kernel;
+    gckVIRTUAL_COMMAND_BUFFER_PTR   buffer = (gckVIRTUAL_COMMAND_BUFFER_PTR)Physical;
 
     gcmkHEADER();
     gcmkVERIFY_ARGUMENT(buffer != gcvNULL);
 
-    kernel = buffer->kernel;
+    kernel = buffer->virtualBuffer.kernel;
     os = kernel->os;
-
-    if (!buffer->userLogical)
-    {
-        gcmkVERIFY_OK(gckOS_DestroyKernelVirtualMapping(os,
-                                                        buffer->physical,
-                                                        Bytes,
-                                                        Logical));
-    }
-
-#if !gcdPROCESS_ADDRESS_SPACE
-    gcmkVERIFY_OK(
-        gckMMU_FreePages(kernel->mmu, buffer->gpuAddress, buffer->pageTable, buffer->pageCount));
-#endif
-
-    gcmkVERIFY_OK(gckOS_UnmapPages(os, buffer->pageCount, buffer->gpuAddress));
-
-    gcmkVERIFY_OK(gckOS_FreePagedMemory(os, buffer->physical, Bytes));
 
     gcmkVERIFY_OK(gckOS_AcquireMutex(os, kernel->virtualBufferLock, gcvINFINITE));
 
@@ -4153,6 +4067,285 @@ gckKERNEL_DestroyVirtualCommandBuffer(
 
     gcmkVERIFY_OK(gckOS_ReleaseMutex(os, kernel->virtualBufferLock));
 
+    gcmkVERIFY_OK(
+        gckKERNEL_FreeVirtualMemory(
+        Physical,
+        Logical,
+        gcvFALSE
+        ));
+
+    gcmkFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gckKERNEL_AllocateVirtualMemory(
+    IN gckKERNEL Kernel,
+    IN gctBOOL NonPaged,
+    IN gctBOOL InUserSpace,
+    IN OUT gctSIZE_T * Bytes,
+    OUT gctPHYS_ADDR * Physical,
+    OUT gctPOINTER * Logical
+    )
+{
+    gckOS os                             = Kernel->os;
+    gceSTATUS status;
+    gctPOINTER logical                   = gcvNULL;
+    gctSIZE_T pageCount;
+    gctSIZE_T bytes                      = *Bytes;
+    gckVIRTUAL_BUFFER_PTR buffer         = gcvNULL;
+    gckMMU mmu;
+    gctUINT32 flag = gcvALLOC_FLAG_NON_CONTIGUOUS;
+
+    gcmkHEADER_ARG("Os=0x%X InUserSpace=%d *Bytes=%lu",
+        os, InUserSpace, gcmOPT_VALUE(Bytes));
+
+    /* Verify the arguments. */
+    gcmkVERIFY_OBJECT(os, gcvOBJ_OS);
+    gcmkVERIFY_ARGUMENT(Bytes != gcvNULL);
+    gcmkVERIFY_ARGUMENT(*Bytes > 0);
+    gcmkVERIFY_ARGUMENT(Physical != gcvNULL);
+    gcmkVERIFY_ARGUMENT(Logical != gcvNULL);
+
+    if (*Physical == gcvNULL)
+    {
+        gcmkONERROR(gckOS_Allocate(os,
+            sizeof(gckVIRTUAL_BUFFER),
+            (gctPOINTER)&buffer));
+
+        gcmkONERROR(gckOS_ZeroMemory(buffer, sizeof(gckVIRTUAL_BUFFER)));
+    }
+    else
+    {
+        buffer = *Physical;
+    }
+
+    buffer->bytes = bytes;
+
+    if (NonPaged)
+    {
+        gcmkONERROR(gckOS_AllocateNonPagedMemory(
+            os,
+            InUserSpace,
+            &bytes,
+            &buffer->physical,
+            &logical
+            ));
+    }
+    else
+    {
+        gcmkONERROR(gckOS_AllocatePagedMemoryEx(os,
+            flag,
+            bytes,
+            gcvNULL,
+            &buffer->physical));
+    }
+
+    if (NonPaged)
+    {
+        gctSIZE_T pageSize;
+        gcmkONERROR(gckOS_GetPageSize(os, &pageSize));
+
+        pageCount = (bytes + pageSize - 1) / pageSize;
+
+        if (InUserSpace)
+        {
+            *Logical =
+                buffer->userLogical = logical;
+        }
+        else
+        {
+            *Logical =
+                buffer->kernelLogical = logical;
+        }
+    }
+    else
+    {
+        if (InUserSpace)
+        {
+            gcmkONERROR(gckOS_CreateUserVirtualMapping(os,
+                buffer->physical,
+                bytes,
+                &logical,
+                &pageCount));
+
+            *Logical =
+                buffer->userLogical = logical;
+        }
+        else
+        {
+            gcmkONERROR(gckOS_CreateKernelVirtualMapping(os,
+                buffer->physical,
+                bytes,
+                &logical,
+                &pageCount));
+
+            *Logical =
+                buffer->kernelLogical = logical;
+        }
+
+    }
+
+    buffer->pageCount = pageCount;
+    buffer->kernel = Kernel;
+
+    gcmkONERROR(gckOS_GetProcessID(&buffer->pid));
+
+#if gcdPROCESS_ADDRESS_SPACE
+    gcmkONERROR(gckKERNEL_GetProcessMMU(Kernel, &mmu));
+    buffer->mmu = mmu;
+#else
+    mmu = Kernel->mmu;
+#endif
+
+    gcmkONERROR(gckMMU_AllocatePages(mmu,
+        pageCount,
+        &buffer->pageTable,
+        &buffer->gpuAddress));
+
+#if gcdENABLE_TRUST_APPLICATION
+    if (Kernel->hardware->secureMode == gcvSECURE_IN_TA)
+    {
+        gcmkONERROR(gckKERNEL_MapInTrustApplicaiton(
+            Kernel,
+            logical,
+            buffer->physical,
+            buffer->gpuAddress,
+            pageCount
+            ));
+    }
+    else
+#endif
+    {
+        gcmkONERROR(gckOS_MapPagesEx(os,
+            Kernel->core,
+            buffer->physical,
+            pageCount,
+            buffer->gpuAddress,
+            buffer->pageTable,
+            gcvFALSE));
+    }
+
+    gcmkONERROR(gckMMU_Flush(mmu, gcvSURF_INDEX));
+
+    if (*Physical == gcvNULL)
+        *Physical = buffer;
+
+    gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_KERNEL,
+        "gpuAddress = %x pageCount = %d kernelLogical = %x userLogical=%x",
+        buffer->gpuAddress, buffer->pageCount,
+        buffer->kernelLogical, buffer->userLogical);
+
+    gcmkFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    if (buffer && buffer->gpuAddress)
+    {
+#if gcdPROCESS_ADDRESS_SPACE
+        gcmkVERIFY_OK(
+            gckMMU_FreePages(mmu, gcvFALSE, buffer->gpuAddress, buffer->pageTable, buffer->pageCount));
+#else
+        gcmkVERIFY_OK(
+            gckMMU_FreePages(Kernel->mmu, gcvFALSE, buffer->gpuAddress, buffer->pageTable, buffer->pageCount));
+#endif
+    }
+
+    if (NonPaged && buffer->physical)
+    {
+        gcmkVERIFY_OK(gckOS_FreeNonPagedMemory(
+            os,
+            bytes,
+            buffer->physical,
+            logical
+            ));
+    }
+    else
+    {
+        if (buffer && buffer->userLogical)
+        {
+            gcmkVERIFY_OK(
+                gckOS_DestroyUserVirtualMapping(os,
+                buffer->physical,
+                bytes,
+                (NonPaged ? 0 : buffer->userLogical)));
+        }
+
+        if (buffer && buffer->kernelLogical)
+        {
+            gcmkVERIFY_OK(
+                gckOS_DestroyKernelVirtualMapping(os,
+                buffer->physical,
+                bytes,
+                (NonPaged ? 0 : buffer->kernelLogical)));
+        }
+
+        if (buffer && buffer->physical)
+        {
+            gcmkVERIFY_OK(gckOS_FreePagedMemory(os, buffer->physical, bytes));
+        }
+    }
+
+    if (*Physical == gcvNULL)
+        gcmkVERIFY_OK(gckOS_Free(os, buffer));
+
+    /* Return the status. */
+    gcmkFOOTER();
+    return status;
+
+}
+
+gceSTATUS
+gckKERNEL_FreeVirtualMemory(
+    IN gctPHYS_ADDR Physical,
+    IN gctPOINTER Logical,
+    IN gctBOOL NonPaged
+    )
+{
+    gckOS os;
+    gckKERNEL kernel;
+    gckMMU mmu;
+    gckVIRTUAL_BUFFER_PTR buffer = (gckVIRTUAL_BUFFER_PTR)Physical;
+
+    gcmkHEADER();
+    gcmkVERIFY_ARGUMENT(buffer != gcvNULL);
+
+    kernel = buffer->kernel;
+    os = kernel->os;
+
+#if gcdPROCESS_ADDRESS_SPACE
+    gcmkONERROR(gckKERNEL_GetProcessMMU(Kernel, &mmu));
+#else
+    mmu = kernel->mmu;
+#endif
+
+    if (!buffer->userLogical && !NonPaged)
+    {
+        gcmkVERIFY_OK(gckOS_DestroyKernelVirtualMapping(os,
+            buffer->physical,
+            buffer->bytes,
+            Logical));
+    }
+
+    gcmkVERIFY_OK(
+        gckMMU_FreePages(mmu, gcvFALSE, buffer->gpuAddress, buffer->pageTable, buffer->pageCount));
+
+    gcmkVERIFY_OK(gckOS_UnmapPages(os, buffer->pageCount, buffer->gpuAddress));
+
+    if (NonPaged)
+    {
+        gcmkVERIFY_OK(gckOS_FreeNonPagedMemory(
+            os,
+            buffer->bytes,
+            buffer->physical,
+            Logical
+            ));
+    }
+    else
+    {
+        gcmkVERIFY_OK(gckOS_FreePagedMemory(os, buffer->physical, buffer->bytes));
+    }
+
     gcmkVERIFY_OK(gckOS_Free(os, buffer));
 
     gcmkFOOTER_NO();
@@ -4164,11 +4357,11 @@ gckKERNEL_GetGPUAddress(
     IN gckKERNEL Kernel,
     IN gctPOINTER Logical,
     IN gctBOOL InUserSpace,
-    IN gckVIRTUAL_COMMAND_BUFFER_PTR Buffer,
+    IN gctPHYS_ADDR Physical,
     OUT gctUINT32 * Address
     )
 {
-    gckVIRTUAL_COMMAND_BUFFER_PTR buffer = Buffer;
+    gckVIRTUAL_BUFFER_PTR buffer = Physical;
     gctPOINTER start;
 
     gcmkHEADER_ARG("Logical = %x InUserSpace=%d.", Logical, InUserSpace);
@@ -4207,9 +4400,9 @@ gckKERNEL_QueryGPUAddress(
     /* Walk all command buffers. */
     for (buffer = Kernel->virtualBufferHead; buffer != gcvNULL; buffer = buffer->next)
     {
-        start = (gctUINT32)buffer->gpuAddress;
+        start = (gctUINT32)buffer->virtualBuffer.gpuAddress;
 
-        if (GpuAddress >= start && GpuAddress <= (start - 1 + buffer->pageCount * 4096))
+        if (GpuAddress >= start && GpuAddress <= (start - 1 + buffer->virtualBuffer.pageCount * 4096))
         {
             /* Find a range matched. */
             *Buffer = buffer;
@@ -5233,24 +5426,50 @@ gckFENCE_Create(
 
     gcmkONERROR(gckOS_CreateMutex(Os, (gctPOINTER *)&fence->mutex));
 
-    gcmkONERROR(gckOS_AllocateNonPagedMemory(
-        Os,
-        gcvFALSE,
-        &pageSize,
-        &fence->physical,
-        &fence->logical
-        ));
+    fence->kernel = Kernel;
 
-    gcmkONERROR(gckHARDWARE_ConvertLogical(
-        Kernel->hardware,
-        fence->logical,
-        gcvFALSE,
-        &fence->address
-        ));
+#if USE_KERNEL_VIRTUAL_BUFFERS
+    if (Kernel->virtualCommandBuffer)
+    {
+        gcmkONERROR(gckKERNEL_AllocateVirtualMemory(
+            Kernel,
+            gcvFALSE,
+            gcvFALSE,
+            &pageSize,
+            &fence->physical,
+            &fence->logical
+            ));
 
-    gcmkONERROR(gckMMU_FillFlatMapping(
-        Kernel->mmu, fence->address, pageSize
-        ));
+        gcmkONERROR(gckKERNEL_GetGPUAddress(
+            Kernel,
+            fence->logical,
+            gcvFALSE,
+            fence->physical,
+            &fence->address
+            ));
+    }
+    else
+#endif
+    {
+        gcmkONERROR(gckOS_AllocateNonPagedMemory(
+            Os,
+            gcvFALSE,
+            &pageSize,
+            &fence->physical,
+            &fence->logical
+            ));
+
+        gcmkONERROR(gckHARDWARE_ConvertLogical(
+            Kernel->hardware,
+            fence->logical,
+            gcvFALSE,
+            &fence->address
+            ));
+
+        gcmkONERROR(gckMMU_FillFlatMapping(
+            Kernel->mmu, fence->address, pageSize
+            ));
+    }
 
     gcsLIST_Init(&fence->waitingList);
 
@@ -5279,12 +5498,27 @@ gckFENCE_Destory(
 
     if (Fence->logical)
     {
-        gcmkVERIFY_OK(gckOS_FreeNonPagedMemory(
-            Os,
-            4096,
-            Fence->physical,
-            Fence->logical
-            ));
+#if USE_KERNEL_VIRTUAL_BUFFERS
+        if (Fence->kernel->virtualCommandBuffer)
+        {
+            gckVIRTUAL_COMMAND_BUFFER_PTR    buffer = (gckVIRTUAL_COMMAND_BUFFER_PTR)Fence->physical;
+
+            gcmkVERIFY_OK(gckKERNEL_FreeVirtualMemory(
+                Fence->physical,
+                Fence->logical,
+                gcvTRUE
+                ));
+        }
+        else
+#endif
+        {
+            gcmkVERIFY_OK(gckOS_FreeNonPagedMemory(
+                Os,
+                4096,
+                Fence->physical,
+                Fence->logical
+                ));
+        }
     }
 
     gcmkOS_SAFE_FREE(Os, Fence);
@@ -5382,6 +5616,7 @@ gceSTATUS
 gckDEVICE_AddCore(
     IN gckDEVICE Device,
     IN gceCORE Core,
+    IN gctUINT ChipID,
     IN gctPOINTER Context,
     IN gckKERNEL * Kernel
     )
@@ -5397,9 +5632,21 @@ gckDEVICE_AddCore(
 
     gcmkASSERT(Device->coreNum < gcvCORE_COUNT);
 
+    if (Core >= gcvCORE_MAJOR && Core <= gcvCORE_3D3)
+    {
+        /* Chip ID is only used for 3D cores. */
+        if (ChipID == gcvCHIP_ID_DEFAULT)
+        {
+            /* Apply default chipID if it is not set. */
+            ChipID = Core;
+        }
+    }
+
     /* Construct gckKERNEL for this core. */
     gcmkONERROR(gckKERNEL_Construct(
-        Device->os, Core, Context, Device, Device->database, &kernel));
+        Device->os, Core, ChipID, Context, Device, Device->database, Kernel));
+
+    kernel = *Kernel;
 
     if (Device->database == gcvNULL)
     {
@@ -5416,6 +5663,7 @@ gckDEVICE_AddCore(
     info[index].type = kernelType;
     info[index].core = Core;
     info[index].kernel = kernel;
+    info[index].chipID = ChipID;
 
     if (index == 0)
     {
@@ -5446,8 +5694,6 @@ gckDEVICE_AddCore(
     /* Advance total core number. */
     Device->coreNum++;
 
-    *Kernel = kernel;
-
     return gcvSTATUS_OK;
 
 OnError:
@@ -5466,6 +5712,7 @@ gckDEVICE_ChipInfo(
     for (i = 0; i < Device->coreNum; i++)
     {
         Interface->u.ChipInfo.types[i] = info[i].type;
+        Interface->u.ChipInfo.ids[i] = info[i].chipID;
     }
 
     Interface->u.ChipInfo.count = Device->coreNum;
@@ -5555,6 +5802,7 @@ gckDEVICE_Dispatch(
     {
         /* Need go through gckKERNEL dispatch. */
         kernel = Device->map[type].kernels[coreIndex];
+
 
 #if gcdENABLE_VG
         if (kernel->vg)
@@ -5652,6 +5900,87 @@ gckDEVICE_QueryGPUAddress(
 
     return status;
 }
+
+#if gcdENABLE_TRUST_APPLICATION
+gceSTATUS
+gckKERNEL_MapInTrustApplicaiton(
+    IN gckKERNEL Kernel,
+    IN gctPOINTER Logical,
+    IN gctPHYS_ADDR Physical,
+    IN gctUINT32 GPUAddress,
+    IN gctSIZE_T PageCount
+    )
+{
+    gceSTATUS status;
+    gctUINT32 * physicalArrayLogical;
+    gctSIZE_T bytes;
+    gctPOINTER logical = Logical;
+    gctUINT32 i;
+    gctSIZE_T pageSize;
+    gctUINT32 pageMask;
+
+    gcmkHEADER();
+
+    gcmkVERIFY_OK(gckOS_GetPageSize(Kernel->os, &pageSize));
+
+    pageMask = (gctUINT32)pageSize - 1;
+
+    bytes = PageCount * gcmSIZEOF(gctUINT32);
+
+     gcmkONERROR(gckOS_Allocate(
+        Kernel->os,
+        bytes,
+        (gctPOINTER *)&physicalArrayLogical
+        ));
+
+    /* Fill in physical array. */
+    for (i = 0; i < PageCount; i++)
+    {
+        gctPHYS_ADDR_T phys;
+        status = gckOS_PhysicalToPhysicalAddress(
+            Kernel->os,
+            Physical,
+            i * 4096,
+            &phys
+            );
+
+        if (status == gcvSTATUS_NOT_SUPPORTED)
+        {
+            gcmkONERROR(gckOS_GetPhysicalAddress(
+                Kernel->os,
+                logical,
+                &phys
+                ));
+        }
+
+        phys &= ~pageMask;
+
+        gcmkSAFECASTPHYSADDRT(physicalArrayLogical[i], phys);
+
+        logical = (gctUINT8_PTR)logical + 4096;
+    }
+
+    gcmkONERROR(gckKERNEL_SecurityMapMemory(
+        Kernel,
+        physicalArrayLogical,
+        0,
+        (gctUINT32)PageCount,
+        &GPUAddress
+        ));
+
+    gcmkVERIFY_OK(gckOS_Free(
+        Kernel->os,
+        physicalArrayLogical
+        ))
+
+    gcmkFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    gcmkFOOTER();
+    return status;
+}
+#endif
 
 /*******************************************************************************
 ***** Test Code ****************************************************************

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -37,87 +37,8 @@
 extern "C" {
 #endif
 
-#if defined(_WIN32) || defined(__VC32__) && !defined(__CYGWIN__) && !defined(__SCITECH_SNAP__)
-/* Win32 and Windows CE platforms. */
-#include <windows.h>
-typedef HDC             EGLNativeDisplayType;
-typedef HWND            EGLNativeWindowType;
-typedef HBITMAP         EGLNativePixmapType;
 
-#elif defined(LINUX) && defined(EGL_API_DFB) && !defined(__APPLE__)
-#include <directfb.h>
-typedef IDirectFB * EGLNativeDisplayType;
-typedef IDirectFBWindow *  EGLNativeWindowType;
-typedef struct _DFBPixmap *  EGLNativePixmapType;
-
-EGLNativeDisplayType
-dfbGetDisplay(
-    void *context
-    );
-
-void
-dfbDestroyDisplay(
-    EGLNativeDisplayType Display
-    );
-
-EGLNativeWindowType
-dfbCreateWindow(
-    EGLNativeDisplayType Display,
-    int X,
-    int Y,
-    int Width,
-    int Height
-    );
-
-void
-dfbDestroyWindow(
-    EGLNativeWindowType Window
-    );
-
-EGLNativePixmapType
-dfbCreatePixmap(
-    EGLNativeDisplayType Display,
-    int Width,
-    int Height
-    );
-
-EGLNativePixmapType
-dfbCreatePixmapWithBpp(
-    EGLNativeDisplayType Display,
-    int Width,
-    int Height,
-    int BitsPerPixel
-    );
-
-void
-dfbGetPixmapInfo(
-    EGLNativePixmapType Pixmap,
-    int * Width,
-    int * Height,
-    int * BitsPerPixel,
-    int * Stride,
-    void* * Bits
-    );
-
-void
-dfbDestroyPixmap(
-    EGLNativePixmapType Pixmap
-    );
-
-#elif defined(LINUX) && defined(EGL_API_FB) && !defined(__APPLE__)
-
-#if defined(EGL_API_WL)
-/* Wayland types for client apps. */
-typedef struct wl_display *      EGLNativeDisplayType;
-typedef struct wl_egl_window *   EGLNativeWindowType;
-typedef struct wl_egl_pixmap *   EGLNativePixmapType;
-
-#else
-/* Linux platform for FBDEV. */
-typedef struct _FBDisplay * EGLNativeDisplayType;
-typedef struct _FBWindow *  EGLNativeWindowType;
-typedef struct _FBPixmap *  EGLNativePixmapType;
-#endif
+#if defined(LINUX) && defined(EGL_API_FB) && !defined(__APPLE__)
 
 EGLNativeDisplayType
 fbGetDisplay(
@@ -222,67 +143,66 @@ fbDestroyPixmap(
     EGLNativePixmapType Pixmap
     );
 
-#elif defined(__ANDROID__) || defined(ANDROID)
-
-struct egl_native_pixmap_t;
-
-#if ANDROID_SDK_VERSION >= 9
-    #include <android/native_window.h>
-
-    typedef struct ANativeWindow*           EGLNativeWindowType;
-    typedef struct egl_native_pixmap_t*     EGLNativePixmapType;
-    typedef void*                           EGLNativeDisplayType;
-#else
-    struct android_native_window_t;
-    typedef struct android_native_window_t*    EGLNativeWindowType;
-    typedef struct egl_native_pixmap_t *        EGLNativePixmapType;
-    typedef void*                               EGLNativeDisplayType;
 #endif
 
-#elif defined(LINUX) || defined(__APPLE__)
-/* X11 platform. */
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
+#if defined(LINUX) && defined(EGL_API_DFB) && !defined(__APPLE__)
 
-typedef Display *   EGLNativeDisplayType;
-typedef Window      EGLNativeWindowType;
+EGLNativeDisplayType
+dfbGetDisplay(
+    void *context
+    );
 
-#ifdef CUSTOM_PIXMAP
-typedef void *      EGLNativePixmapType;
-#else
-typedef Pixmap      EGLNativePixmapType;
-#endif /* CUSTOM_PIXMAP */
+void
+dfbDestroyDisplay(
+    EGLNativeDisplayType Display
+    );
 
-#elif defined(__QNXNTO__)
-#include <screen/screen.h>
+EGLNativeWindowType
+dfbCreateWindow(
+    EGLNativeDisplayType Display,
+    int X,
+    int Y,
+    int Width,
+    int Height
+    );
 
-/* VOID */
-typedef int              EGLNativeDisplayType;
-typedef screen_window_t  EGLNativeWindowType;
-typedef screen_pixmap_t  EGLNativePixmapType;
+void
+dfbDestroyWindow(
+    EGLNativeWindowType Window
+    );
 
-#else
+EGLNativePixmapType
+dfbCreatePixmap(
+    EGLNativeDisplayType Display,
+    int Width,
+    int Height
+    );
 
-#error "Platform not recognized"
+EGLNativePixmapType
+dfbCreatePixmapWithBpp(
+    EGLNativeDisplayType Display,
+    int Width,
+    int Height,
+    int BitsPerPixel
+    );
 
-/* VOID */
-typedef void *  EGLNativeDisplayType;
-typedef void *  EGLNativeWindowType;
-typedef void *  EGLNativePixmapType;
+void
+dfbGetPixmapInfo(
+    EGLNativePixmapType Pixmap,
+    int * Width,
+    int * Height,
+    int * BitsPerPixel,
+    int * Stride,
+    void* * Bits
+    );
+
+void
+dfbDestroyPixmap(
+    EGLNativePixmapType Pixmap
+    );
 
 #endif
 
-#if defined(__EGL_EXPORTS) && !defined(EGLAPI)
-#if defined(_WIN32) && !defined(__SCITECH_SNAP__)
-#  define EGLAPI    __declspec(dllexport)
-# else
-#  define EGLAPI
-# endif
-#endif
-
-#ifndef EGL_EGLEXT_PROTOTYPES
-#define EGL_EGLEXT_PROTOTYPES
-#endif
 
 #ifdef __cplusplus
 }

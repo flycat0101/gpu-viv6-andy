@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -4139,6 +4139,7 @@ static gceSTATUS
 _copyBuffersEx(
     IN gctUINT StreamCount,
     IN gcsVERTEXARRAY_BUFOBJ_PTR Streams,
+    IN gcsSURF_NODE_PTR cacheNodePtr,
     IN gctUINT First,
     IN gctUINT8_PTR Logical,
     IN gctUINT32 Physical,
@@ -4178,6 +4179,7 @@ _copyBuffersEx(
             gcmSAFECASTSIZET(copiedBytes32, copiedBytes);
             streamPtr->physical = Physical + copiedBytes32;
             streamPtr->logical = Logical + copiedBytes;
+            streamPtr->nodePtr = cacheNodePtr;
             if (streamPtr->copyAll == gcvTRUE)
             {
                 /* Calculate src pointer */
@@ -4508,6 +4510,7 @@ gcoSTREAM_DynamicCacheAttributesEx(
     /* Copy the data. */
     gcmONERROR(_copyBuffersEx(StreamCount,
                               Streams,
+                              cache->dynamicNode,
                               First,
                               cache->dynamicNode->logical + offset,
                               address + offset,
@@ -4680,6 +4683,7 @@ gcoSTREAM_CacheAttributesEx(
         /* Copy the data. */
         gcmONERROR(_copyBuffersEx(StreamCount,
                                   Streams,
+                                  &newStream->node,
                                   First,
                                   logical,
                                   physical,
@@ -4750,6 +4754,7 @@ gcoSTREAM_CacheAttributesEx(
         /* Copy the data. */
         gcmONERROR(_copyBuffersEx(StreamCount,
                                   Streams,
+                                  &cache->node,
                                   First,
                                   cache->node.logical + offset,
                                   physical + offset,

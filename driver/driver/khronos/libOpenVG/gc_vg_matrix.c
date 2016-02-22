@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -17,7 +17,6 @@
 /******************************************************************************\
 *********************** Support Functions and Definitions **********************
 \******************************************************************************/
-
 /* Column-major identity matrix. */
 static vgsMATRIX _identityMatrix =
 {
@@ -1333,6 +1332,7 @@ void vgfMultiplyVector2ByMatrix2x2(
     )
 {
     vgmENTERSUBAPI(vgfMultiplyVector2ByMatrix2x2);
+
     if (vgfIsIdentity(Context, Matrix))
     {
         gcoOS_MemCopy(
@@ -1363,6 +1363,7 @@ void vgfMultiplyVector2ByMatrix3x2(
     )
 {
     vgmENTERSUBAPI(vgfMultiplyVector2ByMatrix3x2);
+
     if (vgfIsIdentity(Context, Matrix))
     {
         gcoOS_MemCopy(
@@ -1471,6 +1472,7 @@ void vgfMultiplyMatrix3x3(
 
     else
     {
+
         gctFLOAT e00
             = vgmMAT(Matrix1, 0, 0) * vgmMAT(Matrix2, 0, 0)
             + vgmMAT(Matrix1, 0, 1) * vgmMAT(Matrix2, 1, 0)
@@ -1849,6 +1851,7 @@ VG_API_CALL void VG_API_ENTRY vgGetMatrix(
             break;
         }
 
+
         /* Return the current matrix. */
         gcoOS_MemCopy(
             Matrix,
@@ -1919,6 +1922,7 @@ VG_API_CALL void VG_API_ENTRY vgMultMatrix(
 
         /* Create a shortcut to the matrix. */
         matrix = Context->matrix;
+
 
         if (Context->matrixMode == VG_MATRIX_IMAGE_USER_TO_SURFACE)
         {
@@ -2058,6 +2062,12 @@ VG_API_CALL void VG_API_ENTRY vgTranslate(
             TranslateX, TranslateY
             );
 
+        if (gcmIS_NAN(TranslateX) || gcmIS_NAN(TranslateY))
+        {
+            vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+            break;
+        }
+
         if (Context->matrixMode == VG_MATRIX_IMAGE_USER_TO_SURFACE)
         {
             vgmMAT(matrix, 0, 2)
@@ -2128,6 +2138,12 @@ VG_API_CALL void VG_API_ENTRY vgScale(
             ScaleX, ScaleY
             );
 
+        if (gcmIS_NAN(ScaleX) || gcmIS_NAN(ScaleY))
+        {
+            vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+            break;
+        }
+
         if (Context->matrixMode == VG_MATRIX_IMAGE_USER_TO_SURFACE)
         {
             vgmMAT(matrix, 0, 0) *= ScaleX;
@@ -2189,6 +2205,12 @@ VG_API_CALL void VG_API_ENTRY vgShear(
             __FUNCTION__,
             ShearX, ShearY
             );
+
+        if (gcmIS_NAN(ShearX) || gcmIS_NAN(ShearY))
+        {
+            vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+            break;
+        }
 
         if (Context->matrixMode == VG_MATRIX_IMAGE_USER_TO_SURFACE)
         {
@@ -2279,6 +2301,12 @@ VG_API_CALL void VG_API_ENTRY vgRotate(
             __FUNCTION__,
             Angle
             );
+
+        if (gcmIS_NAN(radians))
+        {
+            vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+            break;
+        }
 
         if (Context->matrixMode == VG_MATRIX_IMAGE_USER_TO_SURFACE)
         {

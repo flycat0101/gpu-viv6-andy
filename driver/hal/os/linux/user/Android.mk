@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -19,7 +19,8 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES := \
     gc_hal_user_debug.c \
     gc_hal_user_os.c \
-    gc_hal_user_math.c
+    gc_hal_user_math.c \
+    $(PLATFORM_CALLBACK).c
 
 LOCAL_CFLAGS := \
     $(CFLAGS) \

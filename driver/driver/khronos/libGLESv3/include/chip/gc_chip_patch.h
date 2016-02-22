@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -147,6 +147,10 @@ typedef enum __GCPatchNum_enum
     GC_CHIP_PATCH_MANHATTAN,
     GC_CHIP_PATCH_BATCHCOUNT,
     GC_CHIP_PATCH_NETFLIX_1,
+    GC_CHIP_PATCH_ES20_CONF_ATAN2,
+    GC_CHIP_PATCH_ES20_CONF_ATAN2_REF,
+    GC_CHIP_PATCH_DEQP_MSAA_OQ,
+
     GC_CHIP_PATCH_LAST
 } __GCPatchNum;
 
@@ -404,14 +408,6 @@ gcChipPatchLink(
     const gctCHAR **patchedSrcs,
     gctINT *replaceIndices
     );
-
-void
-gcChipPatchCompile(
-    __GLcontext *gc,
-    __GLshaderObject *shaderObject,
-    const gctCHAR **shaderSrc
-    );
-
 #if gcdUSE_WCLIP_PATCH
 void
 gcChipPatchBinary(
@@ -528,9 +524,6 @@ gcChipPatchDumpVertexPackingResult(
 
 /* Optimization for es30 conformance test BlitFramebuffer:
 */
-#define __GL_CHIP_STENCIL_TEST_OPT 1
-
-#if __GL_CHIP_STENCIL_TEST_OPT
 
 #define __GL_STENCIL_BUF_X_GRIDS 4
 #define __GL_STENCIL_BUF_Y_GRIDS 4
@@ -592,7 +585,5 @@ gcChipPatchStencilOptTest(
     __GLcontext * gc,
     __GLchipStencilOpt *stencilOpt
     );
-
-#endif
 
 #endif /* __chip_patch_h__ */

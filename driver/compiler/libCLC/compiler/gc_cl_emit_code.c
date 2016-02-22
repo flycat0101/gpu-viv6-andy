@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -460,6 +460,7 @@ IN gcSL_TYPE Type
 
 static gcsTYPE_SIZE
 _ConvToShaderDataType(
+cloCOMPILER Compiler,
 clsGEN_CODE_DATA_TYPE DataType
 )
 {
@@ -488,13 +489,24 @@ clsGEN_CODE_DATA_TYPE DataType
                    break;
 
         case 8:
-                   typeSize.type = gcSHADER_BOOLEAN_X4;
-                   typeSize.length = 2;
+
+                   if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                       typeSize.type = gcSHADER_BOOLEAN_X8;
+                   }
+                   else {
+                       typeSize.type = gcSHADER_BOOLEAN_X4;
+                       typeSize.length = 2;
+                   }
                    break;
 
         case 16:
-                   typeSize.type = gcSHADER_BOOLEAN_X4;
-                   typeSize.length = 4;
+                   if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                       typeSize.type = gcSHADER_BOOLEAN_X16;
+                   }
+                   else {
+                       typeSize.type = gcSHADER_BOOLEAN_X4;
+                       typeSize.length = 4;
+                   }
                    break;
 
         default:
@@ -594,13 +606,23 @@ clsGEN_CODE_DATA_TYPE DataType
                    break;
 
         case 8:
-                   typeSize.type = gcSHADER_INTEGER_X4;
-                   typeSize.length = 2;
+                   if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                       typeSize.type = gcSHADER_INTEGER_X8;
+                   }
+                   else {
+                       typeSize.type = gcSHADER_INTEGER_X4;
+                       typeSize.length = 2;
+                   }
                    break;
 
         case 16:
-                   typeSize .type = gcSHADER_INTEGER_X4;
-                   typeSize.length = 4;
+                   if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                       typeSize.type = gcSHADER_INTEGER_X16;
+                   }
+                   else {
+                       typeSize .type = gcSHADER_INTEGER_X4;
+                       typeSize.length = 4;
+                   }
                    break;
 
         default:
@@ -844,13 +866,23 @@ clsGEN_CODE_DATA_TYPE DataType
                    break;
 
         case 8:
-                   typeSize.type = gcSHADER_UINT_X4;
-                   typeSize.length = 2;
+                   if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                       typeSize.type = gcSHADER_UINT_X8;
+                   }
+                   else {
+                       typeSize.type = gcSHADER_UINT_X4;
+                       typeSize.length = 2;
+                   }
                    break;
 
         case 16:
-                   typeSize .type = gcSHADER_UINT_X4;
-                   typeSize.length = 4;
+                   if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                       typeSize.type = gcSHADER_UINT_X16;
+                   }
+                   else {
+                       typeSize.type = gcSHADER_UINT_X4;
+                       typeSize.length = 4;
+                   }
                    break;
 
         default:
@@ -882,14 +914,24 @@ clsGEN_CODE_DATA_TYPE DataType
                       break;
 
            case 8:
-                      typeSize.type = gcSHADER_FLOAT_X4;
-                      typeSize.length = 2;
-                      break;
+                   if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                       typeSize.type = gcSHADER_FLOAT_X8;
+                   }
+                   else {
+                       typeSize.type = gcSHADER_FLOAT_X4;
+                       typeSize.length = 2;
+                   }
+                   break;
 
            case 16:
-                      typeSize.type = gcSHADER_FLOAT_X4;
-                      typeSize.length = 4;
-                      break;
+                   if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                       typeSize.type = gcSHADER_FLOAT_X16;
+                   }
+                   else {
+                       typeSize.type = gcSHADER_FLOAT_X4;
+                       typeSize.length = 4;
+                   }
+                   break;
 
            default:
               gcmASSERT(0);
@@ -1155,6 +1197,8 @@ IN gcSHADER_TYPE Type
     case gcSHADER_FLOAT_X2:            return "gcSHADER_FLOAT_X2";
     case gcSHADER_FLOAT_X3:            return "gcSHADER_FLOAT_X3";
     case gcSHADER_FLOAT_X4:            return "gcSHADER_FLOAT_X4";
+    case gcSHADER_FLOAT_X8:            return "gcSHADER_FLOAT_X8";
+    case gcSHADER_FLOAT_X16:           return "gcSHADER_FLOAT_X16";
     case gcSHADER_FLOAT_2X2:           return "gcSHADER_FLOAT_2X2";
     case gcSHADER_FLOAT_3X3:           return "gcSHADER_FLOAT_3X3";
     case gcSHADER_FLOAT_4X4:           return "gcSHADER_FLOAT_4X4";
@@ -1162,10 +1206,14 @@ IN gcSHADER_TYPE Type
     case gcSHADER_BOOLEAN_X2:          return "gcSHADER_BOOLEAN_X2";
     case gcSHADER_BOOLEAN_X3:          return "gcSHADER_BOOLEAN_X3";
     case gcSHADER_BOOLEAN_X4:          return "gcSHADER_BOOLEAN_X4";
+    case gcSHADER_BOOLEAN_X8:          return "gcSHADER_BOOLEAN_X8";
+    case gcSHADER_BOOLEAN_X16:         return "gcSHADER_BOOLEAN_X16";
     case gcSHADER_INTEGER_X1:          return "gcSHADER_INTEGER_X1";
     case gcSHADER_INTEGER_X2:          return "gcSHADER_INTEGER_X2";
     case gcSHADER_INTEGER_X3:          return "gcSHADER_INTEGER_X3";
     case gcSHADER_INTEGER_X4:          return "gcSHADER_INTEGER_X4";
+    case gcSHADER_INTEGER_X8:          return "gcSHADER_INTEGER_X8";
+    case gcSHADER_INTEGER_X16:         return "gcSHADER_INTEGER_X16";
     case gcSHADER_SAMPLER:             return "gcSHADER_SAMPLER";
     case gcSHADER_IMAGE_2D:            return "gcSHADER_IMAGE_2D";
     case gcSHADER_IMAGE_3D:            return "gcSHADER_IMAGE_3D";
@@ -1185,14 +1233,20 @@ IN gcSHADER_TYPE Type
     case gcSHADER_UINT_X2:             return "gcSHADER_UINT_X2";
     case gcSHADER_UINT_X3:             return "gcSHADER_UINT_X3";
     case gcSHADER_UINT_X4:             return "gcSHADER_UINT_X4";
+    case gcSHADER_UINT_X8:             return "gcSHADER_UINT_X8";
+    case gcSHADER_UINT_X16:             return "gcSHADER_UINT_X16";
     case gcSHADER_INT64_X1:            return "gcSHADER_INT64_X1";
     case gcSHADER_INT64_X2:            return "gcSHADER_INT64_X2";
     case gcSHADER_INT64_X3:            return "gcSHADER_INT64_X3";
     case gcSHADER_INT64_X4:            return "gcSHADER_INT64_X4";
+    case gcSHADER_INT64_X8:            return "gcSHADER_INT64_X8";
+    case gcSHADER_INT64_X16:           return "gcSHADER_INT64_X16";
     case gcSHADER_UINT64_X1:           return "gcSHADER_UINT64_X1";
     case gcSHADER_UINT64_X2:           return "gcSHADER_UINT64_X2";
     case gcSHADER_UINT64_X3:           return "gcSHADER_UINT64_X3";
     case gcSHADER_UINT64_X4:           return "gcSHADER_UINT64_X4";
+    case gcSHADER_UINT64_X8:           return "gcSHADER_UINT64_X8";
+    case gcSHADER_UINT64_X16:          return "gcSHADER_UINT64_X16";
 
     case gcSHADER_BOOLEAN_P2:          return "gcSHADER_BOOLEAN_P2";
     case gcSHADER_BOOLEAN_P3:          return "gcSHADER_BOOLEAN_P3";
@@ -1239,12 +1293,13 @@ IN gcSHADER_TYPE Type
 
 gctCONST_STRING
 gcGetDataTypeName(
+IN cloCOMPILER Compiler,
 IN clsGEN_CODE_DATA_TYPE DataType
 )
 {
   gcsTYPE_SIZE typeSize;
 
-  typeSize = _ConvToShaderDataType(DataType);
+  typeSize = _ConvToShaderDataType(Compiler, DataType);
   return gcGetShaderDataTypeName(typeSize.type);
 }
 
@@ -2334,63 +2389,6 @@ clsGEN_CODE_DATA_TYPE DataType
     }
 }
 
-static gcSL_FORMAT
-_ConvDataTypeToFormatFamily(
-clsGEN_CODE_DATA_TYPE DataType
-)
-{
-    switch (clmGEN_CODE_elementType_GET(DataType)) {
-    case clvTYPE_BOOL:
-    case clvTYPE_BOOL_PACKED:
-        return gcSL_BOOLEAN;
-
-    case clvTYPE_INT:
-    case clvTYPE_SHORT:
-    case clvTYPE_CHAR:
-    case clvTYPE_SHORT_PACKED:
-    case clvTYPE_CHAR_PACKED:
-        return gcSL_INTEGER;
-
-    case clvTYPE_LONG:
-        return gcSL_INT64;
-
-    case clvTYPE_UINT:
-    case clvTYPE_USHORT:
-    case clvTYPE_UCHAR:
-    case clvTYPE_USHORT_PACKED:
-    case clvTYPE_UCHAR_PACKED:
-    case clvTYPE_VOID:
-        return gcSL_UINT32;
-
-    case clvTYPE_ULONG:
-        return gcSL_UINT64;
-
-    case clvTYPE_EVENT_T:
-    case clvTYPE_SAMPLER_T:
-    case clvTYPE_IMAGE2D_T:
-    case clvTYPE_IMAGE3D_T:
-    case clvTYPE_IMAGE1D_T:
-    case clvTYPE_IMAGE1D_ARRAY_T:
-    case clvTYPE_IMAGE1D_BUFFER_T:
-    case clvTYPE_IMAGE2D_ARRAY_T:
-        return gcSL_UINT32;
-
-    case clvTYPE_FLOAT:
-    case clvTYPE_HALF:
-    case clvTYPE_HALF_PACKED:
-    case clvTYPE_DOUBLE:
-        return gcSL_FLOAT;
-
-    case clvTYPE_SAMPLER2D:
-    case clvTYPE_SAMPLER3D:
-        return gcSL_FLOAT;
-
-    default:
-        gcmASSERT(0);
-        return gcSL_FLOAT;
-    }
-}
-
 static gceSTATUS
 _EmitOpcodeAndTarget(
     IN cloCOMPILER Compiler,
@@ -2540,7 +2538,7 @@ _EmitSourceTemp(
 
    gcmASSERT(SourceReg);
 
-   format = _ConvDataTypeToFormatFamily(DataType);
+   format = _ConvDataTypeToFormat(DataType);
    gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
 
    if (gcIsSamplerDataType(DataType)) {
@@ -2604,7 +2602,7 @@ _EmitSourceAttribute(
 
     gcmASSERT(SourceReg);
 
-    format = _ConvDataTypeToFormatFamily(DataType);
+    format = _ConvDataTypeToFormat(DataType);
 
     if (SourceReg->indexMode == gcSL_NOT_INDEXED)
     {
@@ -2655,7 +2653,7 @@ _EmitSourceUniform(
 
     gcmASSERT(SourceReg);
 
-    format = _ConvDataTypeToFormatFamily(DataType);
+    format = _ConvDataTypeToFormat(DataType);
 
     if (SourceReg->indexMode == gcSL_NOT_INDEXED)
     {
@@ -2834,7 +2832,7 @@ clNewAttribute(
     gcsTYPE_SIZE typeSize;
     gcSHADER_TYPE type;
 
-    typeSize = _ConvToShaderDataType(DataType);
+    typeSize = _ConvToShaderDataType(Compiler, DataType);
     type = typeSize.type;
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
@@ -2952,7 +2950,7 @@ clNewUniform(
     gcsTYPE_SIZE typeSize;
     gcSHADER_TYPE type;
 
-    typeSize = _ConvToShaderDataType(DataType);
+    typeSize = _ConvToShaderDataType(Compiler, DataType);
     type = typeSize.type;
     format = _ConvDataTypeToFormat(Format);
     flags = _GetUniformFlags(Flags, gcvNULL);
@@ -3051,7 +3049,7 @@ clNewKernelUniformArgument(
     gcsTYPE_SIZE typeSize;
     gcSHADER_TYPE type;
 
-    typeSize = _ConvToShaderDataType(DataType);
+    typeSize = _ConvToShaderDataType(Compiler, DataType);
     type = typeSize.type;
     format = _ConvDataTypeToFormat(Format);
     flags = _GetUniformFlags(clvBUILTIN_KERNEL_ARG, ParamName);
@@ -3140,7 +3138,7 @@ IN gctREG_INDEX TempRegIndex
     gcsTYPE_SIZE typeSize;
     gcSHADER_TYPE type;
 
-    typeSize = _ConvToShaderDataType(DataType);
+    typeSize = _ConvToShaderDataType(Compiler, DataType);
     type = typeSize.type;
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
@@ -3259,7 +3257,7 @@ OUT gcVARIABLE *Variable
     gcsTYPE_SIZE typeSize;
     gcSHADER_TYPE type;
 
-    typeSize = _ConvToShaderDataType(DataType);
+    typeSize = _ConvToShaderDataType(Compiler, DataType);
     type = typeSize.type;
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                       clvDUMP_CODE_EMITTER,
@@ -3350,9 +3348,14 @@ IN gctLABEL Label
 
 gctUINT8
 gcGetDefaultEnable(
+    IN cloCOMPILER Compiler,
     IN clsGEN_CODE_DATA_TYPE DataType
     )
 {
+    if((cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
+        gcmOPT_oclUseImgIntrinsicQuery()) &&
+       clmIsElementTypeImage(DataType.elementType)) return gcSL_ENABLE_XYZW;
+
     switch(clmGEN_CODE_vectorSize_NOCHECK_GET(DataType)) {
     case 0:
       return gcSL_ENABLE_X;
@@ -3507,7 +3510,7 @@ _MakeNewSource(
                         &tempTarget,
                         Source->dataType,
                         clNewTempRegs(Compiler, 1, Source->dataType.elementType),
-                        gcGetDefaultEnable(Source->dataType),
+                        gcGetDefaultEnable(Compiler, Source->dataType),
                         gcSL_NOT_INDEXED,
                         0);
 
@@ -3590,25 +3593,29 @@ _PrepareAnotherSource(
     )
 {
     gceSTATUS    status;
-    gctBOOL        insertAssign;
+    gctBOOL      insertAssign = gcvFALSE;
 
     gcmASSERT(Source0);
     gcmASSERT(Source1);
     gcmASSERT(NewSource1);
 
-    insertAssign =
-        (Source1->type == gcvSOURCE_CONSTANT && Source0->type == gcvSOURCE_UNIFORM)
-        || (Source1->type == gcvSOURCE_UNIFORM && Source0->type == gcvSOURCE_CONSTANT)
-        || (Source1->type == gcvSOURCE_UNIFORM && Source0->type == gcvSOURCE_UNIFORM
-            && (Source1->u.sourceReg.u.uniform != Source0->u.sourceReg.u.uniform
-                || Source1->u.sourceReg.regIndex != Source0->u.sourceReg.regIndex));
 
-    if (Target != gcvNULL)
+    if(!cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))
     {
         insertAssign =
-            (insertAssign
-            || (Source1->type == gcvSOURCE_TEMP
-                && Target->tempRegIndex == Source1->u.sourceReg.regIndex));
+            (Source1->type == gcvSOURCE_CONSTANT && Source0->type == gcvSOURCE_UNIFORM)
+            || (Source1->type == gcvSOURCE_UNIFORM && Source0->type == gcvSOURCE_CONSTANT)
+            || (Source1->type == gcvSOURCE_UNIFORM && Source0->type == gcvSOURCE_UNIFORM
+                && (Source1->u.sourceReg.u.uniform != Source0->u.sourceReg.u.uniform
+                    || Source1->u.sourceReg.regIndex != Source0->u.sourceReg.regIndex));
+
+        if (Target != gcvNULL)
+        {
+            insertAssign =
+                (insertAssign
+                || (Source1->type == gcvSOURCE_TEMP
+                    && Target->tempRegIndex == Source1->u.sourceReg.regIndex));
+        }
     }
 
     if (insertAssign)
@@ -3821,14 +3828,14 @@ _EmitCode(
                     LineNo,
                     StringNo,
                     _GetOpcodeName(Opcode),
-                    gcGetDataTypeName(Target->dataType)));
+                    gcGetDataTypeName(Compiler, Target->dataType)));
 
     if (Source1 == gcvNULL)
     {
         gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                           clvDUMP_CODE_EMITTER,
                           " sourceDataType=\"%s\">",
-                          gcGetDataTypeName(Source0->dataType)));
+                          gcGetDataTypeName(Compiler, Source0->dataType)));
     }
     else
     {
@@ -3837,8 +3844,8 @@ _EmitCode(
         gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                           clvDUMP_CODE_EMITTER,
                           " source0DataType=\"%s\" source1DataType=\"%s\">",
-                          gcGetDataTypeName(Source0->dataType),
-                          gcGetDataTypeName(Source1->dataType)));
+                          gcGetDataTypeName(Compiler, Source0->dataType),
+                          gcGetDataTypeName(Compiler, Source1->dataType)));
     }
 
     status = _EmitOpcodeAndTarget(Compiler,
@@ -3899,14 +3906,14 @@ _EmitCodeWRound(
                     LineNo,
                     StringNo,
                     _GetOpcodeName(Opcode),
-                    gcGetDataTypeName(Target->dataType)));
+                    gcGetDataTypeName(Compiler, Target->dataType)));
 
     if (Source1 == gcvNULL)
     {
         gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                           clvDUMP_CODE_EMITTER,
                           " sourceDataType=\"%s\">",
-                          gcGetDataTypeName(Source0->dataType)));
+                          gcGetDataTypeName(Compiler, Source0->dataType)));
     }
     else
     {
@@ -3915,8 +3922,8 @@ _EmitCodeWRound(
         gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                           clvDUMP_CODE_EMITTER,
                           " source0DataType=\"%s\" source1DataType=\"%s\">",
-                          gcGetDataTypeName(Source0->dataType),
-                          gcGetDataTypeName(Source1->dataType)));
+                          gcGetDataTypeName(Compiler, Source0->dataType),
+                          gcGetDataTypeName(Compiler, Source1->dataType)));
     }
 
     status = _EmitOpcodeAndTarget(Compiler,
@@ -4001,9 +4008,12 @@ _EmitBranchCode(
     IN gcsSOURCE * Source1
     )
 {
-    gceSTATUS    status;
-    cloCODE_EMITTER    codeEmitter;
+    gceSTATUS           status;
+    cloCODE_EMITTER     codeEmitter;
+    cloCODE_GENERATOR   codeGenerator;
+    cltELEMENT_TYPE     sourceType;
 
+    codeGenerator = cloCOMPILER_GetCodeGenerator(Compiler);
     codeEmitter = cloCOMPILER_GetCodeEmitter(Compiler);
     gcmASSERT(codeEmitter);
 
@@ -4030,7 +4040,7 @@ _EmitBranchCode(
                                     Compiler,
                                     clvDUMP_CODE_EMITTER,
                                     " source0DataType=\"%s\"",
-                                    gcGetDataTypeName(Source0->dataType)));
+                                    gcGetDataTypeName(Compiler, Source0->dataType)));
     }
 
     if (Source1 != gcvNULL)
@@ -4041,13 +4051,40 @@ _EmitBranchCode(
                                     Compiler,
                                     clvDUMP_CODE_EMITTER,
                                     " source1DataType=\"%s\"",
-                                    gcGetDataTypeName(Source1->dataType)));
+                                    gcGetDataTypeName(Compiler, Source1->dataType)));
     }
 
     gcmVERIFY_OK(cloCOMPILER_Dump(
                                 Compiler,
                                 clvDUMP_CODE_EMITTER,
                                 ">"));
+
+    if (Source0 && !codeGenerator->fulllySupportIntegerBranch)
+    {
+        sourceType = Source0->dataType.elementType;
+
+        if (sourceType == clvTYPE_CHAR || sourceType == clvTYPE_SHORT)
+        {
+            Source0->dataType.elementType = clvTYPE_INT;
+        }
+        else if (sourceType == clvTYPE_UCHAR || sourceType == clvTYPE_USHORT)
+        {
+            Source0->dataType.elementType = clvTYPE_UINT;
+        }
+    }
+    if (Source1 && !codeGenerator->fulllySupportIntegerBranch)
+    {
+        sourceType = Source1->dataType.elementType;
+
+        if (sourceType == clvTYPE_CHAR || sourceType == clvTYPE_SHORT)
+        {
+            Source1->dataType.elementType = clvTYPE_INT;
+        }
+        else if (sourceType == clvTYPE_UCHAR || sourceType == clvTYPE_USHORT)
+        {
+            Source1->dataType.elementType = clvTYPE_UINT;
+        }
+    }
 
     status = _EmitOpcodeConditional(Compiler,
                     LineNo,
@@ -4128,7 +4165,7 @@ _EmitNullTargetCode(
         gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                           clvDUMP_CODE_EMITTER,
                           " source0DataType=\"%s\"",
-                          gcGetDataTypeName(Source0->dataType)));
+                          gcGetDataTypeName(Compiler, Source0->dataType)));
     }
 
     if (Source1 != gcvNULL)
@@ -4138,7 +4175,7 @@ _EmitNullTargetCode(
         gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                           clvDUMP_CODE_EMITTER,
                           " source1DataType=\"%s\"",
-                          gcGetDataTypeName(Source1->dataType)));
+                          gcGetDataTypeName(Compiler, Source1->dataType)));
     }
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
@@ -4342,11 +4379,11 @@ _EmitIntToFloatCode(
     gcsSOURCE_InitializeUintConstant(zeroSource, (gctUINT32) 0);
     gcsSOURCE_InitializeUintConstant(oneSource, (gctUINT32) 1);
 
-    gcsTARGET_InitializeUsingIOperand(tempTarget, &tempIOperand[0]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, tempTarget, &tempIOperand[0]);
     gcsSOURCE_InitializeUsingIOperand(tempSource, &tempIOperand[0]);
 
     /* r0 */
-    gcsTARGET_InitializeUsingIOperand(refTarget, &intermIOperands[0]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, refTarget, &intermIOperands[0]);
     gcsSOURCE_InitializeUsingIOperand(refSource, &intermIOperands[0]);
     status = _EmitCode(Compiler,
                        LineNo,
@@ -4358,7 +4395,7 @@ _EmitIntToFloatCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* r1 = float(r0) */
-    gcsTARGET_InitializeUsingIOperand(intermTarget, &intermIOperands[1]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, intermTarget, &intermIOperands[1]);
     status = _EmitCode(Compiler,
                        LineNo,
                        StringNo,
@@ -4369,7 +4406,7 @@ _EmitIntToFloatCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* r2 = int(r1) */
-    gcsTARGET_InitializeUsingIOperand(intermTarget, &intermIOperands[2]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, intermTarget, &intermIOperands[2]);
     gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[1]);
     status = _EmitCode(Compiler,
                        LineNo,
@@ -4404,7 +4441,7 @@ _EmitIntToFloatCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* r5 = (uint) r1 */
-    gcsTARGET_InitializeUsingIOperand(intermTarget, &intermIOperands[5]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, intermTarget, &intermIOperands[5]);
     gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[1]);
 
     gcsSOURCE_InitializeTargetFormat(convSource, intermTarget->dataType);
@@ -4422,7 +4459,7 @@ _EmitIntToFloatCode(
 
     clsIOPERAND_New(Compiler, &tempIOperand[1], clmGenCodeDataType(T_UINT));
     gcsSOURCE_InitializeUsingIOperand(convSource, &tempIOperand[1]);
-    gcsTARGET_InitializeUsingIOperand(convTarget, &tempIOperand[1]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, convTarget, &tempIOperand[1]);
 
     status = _EmitCode(Compiler,
                        LineNo,
@@ -4443,7 +4480,7 @@ _EmitIntToFloatCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* r4 = (float) r5 */
-    gcsTARGET_InitializeUsingIOperand(intermTarget, &intermIOperands[4]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, intermTarget, &intermIOperands[4]);
     status = _EmitCode(Compiler,
                        LineNo,
                        StringNo,
@@ -4454,7 +4491,7 @@ _EmitIntToFloatCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* r3 = int(r4) */
-    gcsTARGET_InitializeUsingIOperand(intermTarget, &intermIOperands[3]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, intermTarget, &intermIOperands[3]);
     gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[4]);
     status = _EmitCode(Compiler,
                        LineNo,
@@ -4562,7 +4599,7 @@ _EmitIntToFloatCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* r4 is even, pick r4 */
-    gcsTARGET_InitializeUsingIOperand(intermTarget, &intermIOperands[1]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, intermTarget, &intermIOperands[1]);
     gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[4]);
     status = _EmitCode(Compiler,
                        LineNo,
@@ -4631,7 +4668,7 @@ _EmitIntToFloatCode(
        if (gcmIS_ERROR(status)) return status;
 
        gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[3]);
-       gcsTARGET_InitializeUsingIOperand(intermTarget, &intermIOperands[3]);
+       gcsTARGET_InitializeUsingIOperand(Compiler, intermTarget, &intermIOperands[3]);
        status = _EmitCode(Compiler,
                           LineNo,
                           StringNo,
@@ -4670,7 +4707,7 @@ _EmitIntToFloatCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* r4 is nearer, pick r4 */
-    gcsTARGET_InitializeUsingIOperand(intermTarget, &intermIOperands[1]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, intermTarget, &intermIOperands[1]);
     gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[4]);
     status = _EmitCode(Compiler,
                        LineNo,
@@ -4800,7 +4837,7 @@ _EmitFloatToIntCode(
               clmGEN_CODE_elementType_SET(dataType, clvTYPE_INT);
            }
            clsIOPERAND_New(Compiler, intermIOperand, dataType);
-           gcsTARGET_InitializeUsingIOperand(intermTarget, intermIOperand);
+           gcsTARGET_InitializeUsingIOperand(Compiler, intermTarget, intermIOperand);
 
            gcsTARGET_Initialize(intermTarget,
                                 dataType,
@@ -5111,6 +5148,10 @@ _EmitVectorNotCode(
     gceSTATUS status;
     cltELEMENT_TYPE elementType;
     gcsSOURCE falseSource[1];
+    cloCODE_GENERATOR   codeGenerator;
+    cltELEMENT_TYPE     sourceType;
+
+    codeGenerator = cloCOMPILER_GetCodeGenerator(Compiler);
 
     gcmASSERT(Source);
 
@@ -5121,6 +5162,20 @@ _EmitVectorNotCode(
                                            gcSL_EQUAL,
                                            Target);
     if (gcmIS_ERROR(status)) return status;
+
+    if (Source && !codeGenerator->fulllySupportIntegerBranch)
+    {
+        sourceType = Source->dataType.elementType;
+
+        if (sourceType == clvTYPE_CHAR || sourceType == clvTYPE_SHORT)
+        {
+            Source->dataType.elementType = clvTYPE_INT;
+        }
+        else if (sourceType == clvTYPE_UCHAR || sourceType == clvTYPE_USHORT)
+        {
+            Source->dataType.elementType = clvTYPE_UINT;
+        }
+    }
 
     if(Source) {
         status = _EmitSource(Compiler,
@@ -5139,6 +5194,20 @@ _EmitVectorNotCode(
     }
     else {
         gcsSOURCE_InitializeIntConstant(falseSource, (gctINT32) 0);
+    }
+
+    if (!codeGenerator->fulllySupportIntegerBranch)
+    {
+        sourceType = falseSource->dataType.elementType;
+
+        if (sourceType == clvTYPE_CHAR || sourceType == clvTYPE_SHORT)
+        {
+            falseSource->dataType.elementType = clvTYPE_INT;
+        }
+        else if (sourceType == clvTYPE_UCHAR || sourceType == clvTYPE_USHORT)
+        {
+            falseSource->dataType.elementType = clvTYPE_UINT;
+        }
     }
 
     status = _EmitSource(Compiler,
@@ -5290,7 +5359,7 @@ _EmitNORM2Code(
 
     /* dp2 t0, source, source */
     clsIOPERAND_New(Compiler, &intermIOperands[0], clmGenCodeDataType(T_FLOAT));
-    gcsTARGET_InitializeUsingIOperand(&intermTargets[0], &intermIOperands[0]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[0], &intermIOperands[0]);
 
     status = _EmitDP2Code(
                     Compiler,
@@ -5304,7 +5373,7 @@ _EmitNORM2Code(
 
     /* rsq t1, t0 */
     clsIOPERAND_New(Compiler, &intermIOperands[1], clmGenCodeDataType(T_FLOAT));
-    gcsTARGET_InitializeUsingIOperand(&intermTargets[1], &intermIOperands[1]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[1], &intermIOperands[1]);
     gcsSOURCE_InitializeUsingIOperand(&intermSources[0], &intermIOperands[0]);
 
     status = _EmitCode(Compiler,
@@ -5353,7 +5422,7 @@ _EmitNORM4Code(
 
     /* dp4 t0, source, source */
     clsIOPERAND_New(Compiler, &intermIOperands[0], clmGenCodeDataType(T_FLOAT));
-    gcsTARGET_InitializeUsingIOperand(&intermTargets[0], &intermIOperands[0]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[0], &intermIOperands[0]);
 
     status = _EmitCode(
                     Compiler,
@@ -5368,7 +5437,7 @@ _EmitNORM4Code(
 
     /* rsq t1, t0 */
     clsIOPERAND_New(Compiler, &intermIOperands[1], clmGenCodeDataType(T_FLOAT));
-    gcsTARGET_InitializeUsingIOperand(&intermTargets[1], &intermIOperands[1]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[1], &intermIOperands[1]);
     gcsSOURCE_InitializeUsingIOperand(&intermSources[0], &intermIOperands[0]);
 
     status = _EmitCode(
@@ -5825,7 +5894,7 @@ _EmitMulForDivCode(
     else if(clmIsElementTypeInteger(elementType)) {
         /* mul t0, source0, source1 */
         clsIOPERAND_New(Compiler, &intermIOperand, Target->dataType);
-        gcsTARGET_InitializeUsingIOperand(&intermTarget, &intermIOperand);
+        gcsTARGET_InitializeUsingIOperand(Compiler, &intermTarget, &intermIOperand);
 
         status = _EmitCode(Compiler,
                    LineNo,
@@ -5922,7 +5991,7 @@ _EmitDivCode(
 
         /* rcp t0, source1 */
         clsIOPERAND_New(Compiler, &intermIOperand, Source1->dataType);
-        gcsTARGET_InitializeUsingIOperand(&intermTarget, &intermIOperand);
+        gcsTARGET_InitializeUsingIOperand(Compiler, &intermTarget, &intermIOperand);
 
         status = _EmitCode(
                         Compiler,
@@ -5980,7 +6049,7 @@ _EmitScalarAtan2Code(
 
     /* sign t0, y (source0) */
     clsIOPERAND_New(Compiler, &intermIOperands[0], Source0->dataType);
-    gcsTARGET_InitializeUsingIOperand(&intermTargets[0], &intermIOperands[0]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[0], &intermIOperands[0]);
 
     status = _EmitCode(
                         Compiler,
@@ -6040,7 +6109,7 @@ _EmitScalarAtan2Code(
 
     /* div t1, y (source0), x (source1) */
     clsIOPERAND_New(Compiler, &intermIOperands[1], Source0->dataType);
-    gcsTARGET_InitializeUsingIOperand(&intermTargets[1], &intermIOperands[1]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[1], &intermIOperands[1]);
 
     status = _EmitDivCode(
                         Compiler,
@@ -6054,7 +6123,7 @@ _EmitScalarAtan2Code(
 
     /* abs t2, t1 */
     clsIOPERAND_New(Compiler, &intermIOperands[2], Source0->dataType);
-    gcsTARGET_InitializeUsingIOperand(&intermTargets[2], &intermIOperands[2]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[2], &intermIOperands[2]);
     gcsSOURCE_InitializeUsingIOperand(&intermSources[1], &intermIOperands[1]);
 
     status = _EmitCode(
@@ -6070,7 +6139,7 @@ _EmitScalarAtan2Code(
 
     /* atan t3, t2 */
     clsIOPERAND_New(Compiler, &intermIOperands[3], Source0->dataType);
-    gcsTARGET_InitializeUsingIOperand(&intermTargets[3], &intermIOperands[3]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[3], &intermIOperands[3]);
     gcsSOURCE_InitializeUsingIOperand(&intermSources[2], &intermIOperands[2]);
 
     status = _EmitCode(
@@ -6145,7 +6214,7 @@ _EmitScalarAtan2Code(
 
     /* sub t4, _PI, t3 */
     clsIOPERAND_New(Compiler, &intermIOperands[4], Source0->dataType);
-    gcsTARGET_InitializeUsingIOperand(&intermTargets[4], &intermIOperands[4]);
+    gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[4], &intermIOperands[4]);
     gcsSOURCE_InitializeFloatConstant(&constSource, _PI);
     gcsSOURCE_InitializeUsingIOperand(&intermSources[3], &intermIOperands[3]);
 
@@ -6517,7 +6586,7 @@ _EmitAtan2Code(
     else {
         /* sign t0, y (source0) */
         clsIOPERAND_New(Compiler, &intermIOperands[0], Source0->dataType);
-        gcsTARGET_InitializeUsingIOperand(&intermTargets[0], &intermIOperands[0]);
+        gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[0], &intermIOperands[0]);
 
         status = _EmitCode(Compiler,
                    LineNo,
@@ -6530,7 +6599,7 @@ _EmitAtan2Code(
 
         /* div t1, y (source0), x (source1) */
         clsIOPERAND_New(Compiler, &intermIOperands[1], Source0->dataType);
-        gcsTARGET_InitializeUsingIOperand(&intermTargets[1], &intermIOperands[1]);
+        gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[1], &intermIOperands[1]);
 
         status = _EmitDivCode(Compiler,
                       LineNo,
@@ -6542,7 +6611,7 @@ _EmitAtan2Code(
 
         /* abs t2, t1 */
         clsIOPERAND_New(Compiler, &intermIOperands[2], Source0->dataType);
-        gcsTARGET_InitializeUsingIOperand(&intermTargets[2], &intermIOperands[2]);
+        gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[2], &intermIOperands[2]);
         gcsSOURCE_InitializeUsingIOperand(&intermSources[1], &intermIOperands[1]);
 
         status = _EmitCode(Compiler,
@@ -6556,7 +6625,7 @@ _EmitAtan2Code(
 
         /* atan t3, t2 */
         clsIOPERAND_New(Compiler, &intermIOperands[3], Source0->dataType);
-        gcsTARGET_InitializeUsingIOperand(&intermTargets[3], &intermIOperands[3]);
+        gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[3], &intermIOperands[3]);
         gcsSOURCE_InitializeUsingIOperand(&intermSources[2], &intermIOperands[2]);
 
         status = _EmitCode(Compiler,
@@ -6570,7 +6639,7 @@ _EmitAtan2Code(
 
         /* sub t4, _PI, t3 */
         clsIOPERAND_New(Compiler, &intermIOperands[4], Source0->dataType);
-        gcsTARGET_InitializeUsingIOperand(&intermTargets[4], &intermIOperands[4]);
+        gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[4], &intermIOperands[4]);
         gcsSOURCE_InitializeFloatConstant(&constSource, _PI);
         gcsSOURCE_InitializeUsingIOperand(&intermSources[3], &intermIOperands[3]);
 
@@ -6631,7 +6700,7 @@ _EmitDP2Code(
 
     /* mul t0, source0, source1 */
     clsIOPERAND_New(Compiler, &intermIOperand, clmGenCodeDataType(T_FLOAT2));
-    gcsTARGET_InitializeUsingIOperand(&intermTarget, &intermIOperand);
+    gcsTARGET_InitializeUsingIOperand(Compiler, &intermTarget, &intermIOperand);
 
     status = _EmitCode(
                     Compiler,
@@ -6779,6 +6848,10 @@ _EmitVectorCompareCode(
     )
 {
     gceSTATUS status;
+    cloCODE_GENERATOR   codeGenerator;
+    cltELEMENT_TYPE     sourceType;
+
+    codeGenerator = cloCOMPILER_GetCodeGenerator(Compiler);
 
     gcmASSERT(Source0);
     gcmASSERT(Source1);
@@ -6790,6 +6863,33 @@ _EmitVectorCompareCode(
                            _ConvCondition(Condition),
                            Target);
     if (gcmIS_ERROR(status)) return status;
+
+    if (Source0 && !codeGenerator->fulllySupportIntegerBranch)
+    {
+        sourceType = Source0->dataType.elementType;
+
+        if (sourceType == clvTYPE_CHAR || sourceType == clvTYPE_SHORT)
+        {
+            Source0->dataType.elementType = clvTYPE_INT;
+        }
+        else if (sourceType == clvTYPE_UCHAR || sourceType == clvTYPE_USHORT)
+        {
+            Source0->dataType.elementType = clvTYPE_UINT;
+        }
+    }
+    if (Source1 && !codeGenerator->fulllySupportIntegerBranch)
+    {
+        sourceType = Source1->dataType.elementType;
+
+        if (sourceType == clvTYPE_CHAR || sourceType == clvTYPE_SHORT)
+        {
+            Source1->dataType.elementType = clvTYPE_INT;
+        }
+        else if (sourceType == clvTYPE_UCHAR || sourceType == clvTYPE_USHORT)
+        {
+            Source1->dataType.elementType = clvTYPE_UINT;
+        }
+    }
 
     if(Source0) {
        status = _EmitSource(Compiler,
@@ -8027,7 +8127,7 @@ clNewFunctionArgument(
                                           Function,
                                           Variable ? GetVariableIndex(Variable) : 0xffff,
                                           TempRegIndex + (gctREG_INDEX)(index + j * regOffset),
-                                          gcGetDefaultEnable(DataType),
+                                          gcGetDefaultEnable(Compiler, DataType),
                                           Qualifier);
 
             if (gcmIS_ERROR(status))
@@ -8087,7 +8187,7 @@ clNewKernelFunctionArgument(
                                                 Function,
                                                 Variable ? GetVariableIndex(Variable) : 0xffff,
                                                 TempRegIndex + (gctREG_INDEX)(index + j * regOffset),
-                                                gcGetDefaultEnable(DataType),
+                                                gcGetDefaultEnable(Compiler, DataType),
                                                 Qualifier);
 
             if (gcmIS_ERROR(status))
@@ -8253,7 +8353,7 @@ IN clsNAME *FuncName
         if (clmDECL_IsImage(&paramName->decl)) {
            clsNAME *sampler;
 
-       if(paramName->u.variableInfo.samplers) {
+           if(paramName->u.variableInfo.samplers) {
                clsSAMPLER_TYPES *prev;
                clsSAMPLER_TYPES *next;
                gctUINT32 imageSamplerIndex;

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -87,6 +87,7 @@ struct _gckOS
     gctINT32                    extraPageFd;
     gctPOINTER                  extraPageAddress;
     off64_t                     extraPagePAddress;
+    size_t                      extraPageSize;
 };
 
 typedef struct _gcskSIGNAL
@@ -470,6 +471,8 @@ gckOS_Construct(
     os->baseAddress = os->device->baseAddress;
 
     /* Allocate extra page to avoid cache overflow. */
+    os->extraPageSize = __PAGESIZE * 2;
+
     os->extraPageFd = drv_create_shm_object();
     if (os->extraPageFd == -1)
     {
@@ -478,26 +481,30 @@ gckOS_Construct(
 
     if (shm_ctl_special(
             os->extraPageFd, SHMCTL_ANON | SHMCTL_PHYS,
-            0, __PAGESIZE, ARM_PTE_RW) == -1)
+            0, os->extraPageSize, ARM_PTE_RW) == -1)
     {
         close(os->extraPageFd);
         gcmkONERROR(gcvSTATUS_GENERIC_IO);
     }
 
     os->extraPageAddress = mmap64(
-            0, __PAGESIZE, PROT_READ | PROT_WRITE | PROT_NOCACHE, MAP_SHARED, os->extraPageFd, 0);
+            0, os->extraPageSize, PROT_READ | PROT_WRITE | PROT_NOCACHE,
+            MAP_SHARED, os->extraPageFd, 0);
     if (os->extraPageAddress == MAP_FAILED)
     {
         close(os->extraPageFd);
         gcmkONERROR(gcvSTATUS_GENERIC_IO);
     }
 
-    if (mem_offset64(os->extraPageAddress, NOFD, __PAGESIZE, &os->extraPagePAddress, &pconfig) == -1)
+    if (mem_offset64(os->extraPageAddress, NOFD, os->extraPageSize,
+            &os->extraPagePAddress, &pconfig) == -1)
     {
-        munmap(os->extraPageAddress, __PAGESIZE);
+        munmap(os->extraPageAddress, os->extraPageSize);
         close(os->extraPageFd);
         gcmkONERROR(gcvSTATUS_GENERIC_IO);
     }
+
+    os->extraPagePAddress = gcmALIGN(os->extraPagePAddress, __PAGESIZE);
 
     gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_OS,
                   "Physical base address set to 0x%08X.\n",
@@ -576,7 +583,7 @@ gckOS_Destroy(
     /* Destroy the extra page. */
     if (Os->extraPageAddress != 0)
     {
-        munmap(Os->extraPageAddress, __PAGESIZE);
+        munmap(Os->extraPageAddress, Os->extraPageSize);
         close(Os->extraPageFd);
     }
 
@@ -6464,6 +6471,11 @@ gckOS_QueryOption(
     else if (!strcmp(Option, "powerManagement"))
     {
         *Value = device->args.powerManagement;
+        return gcvSTATUS_OK;
+    }
+    else if (!strcmp(Option, "gpuProfiler"))
+    {
+        *Value = device->args.gpuProfiler;
         return gcvSTATUS_OK;
     }
 

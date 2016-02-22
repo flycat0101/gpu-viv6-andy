@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -50,7 +50,7 @@ GLvoid __glFreeDefaultTextureObject(__GLcontext *gc, __GLtextureObject *tex)
 GLvoid __glInitTextureObject(__GLcontext *gc, __GLtextureObject *tex, GLuint id, GLuint targetIndex)
 {
     GLuint i, j;
-    GLuint maxFaces = 1, maxLevels = 1, maxDepths = 1;
+    GLuint maxFaces = 1, maxDepths = 1, maxSlices = 1, maxLevels = 1;
     GLint requestedFormat = (targetIndex == __GL_TEXTURE_BINDING_BUFFER_EXT) ? GL_R8 : GL_RGBA;
     GLvoid *pointer = NULL;
     __GLmipMapLevel *mipmaps = NULL;
@@ -128,6 +128,7 @@ GLvoid __glInitTextureObject(__GLcontext *gc, __GLtextureObject *tex, GLuint id,
     tex->samplesUsed = 0;
 
     tex->params.sampler.sRGB = GL_DECODE_EXT;
+    tex->params.contentProtected = GL_FALSE;
 
     __GL_MEMSET(tex->params.sampler.borderColor.fv, 0, 4 * sizeof(GLuint));
 
@@ -137,31 +138,37 @@ GLvoid __glInitTextureObject(__GLcontext *gc, __GLtextureObject *tex, GLuint id,
     case __GL_TEXTURE_2D_INDEX:
     case __GL_TEXTURE_2D_MS_INDEX:
         maxFaces  = 1;
+        maxSlices =
         maxDepths = 1;
         break;
     case __GL_TEXTURE_3D_INDEX:
         maxFaces  = 1;
+        maxSlices =
         maxDepths = gc->constants.maxTextureDepthSize;
         break;
     case __GL_TEXTURE_CUBEMAP_INDEX:
+        maxSlices =
         maxFaces  = 6;
         maxDepths = 1;
         break;
     case __GL_TEXTURE_2D_ARRAY_INDEX:
     case __GL_TEXTURE_2D_MS_ARRAY_INDEX:
-        maxFaces  = gc->constants.maxTextureArraySize;
-        maxDepths = 1;
+        maxFaces  = 1;
+        maxSlices =
+        maxDepths = gc->constants.maxTextureArraySize;
         break;
     case __GL_TEXTURE_EXTERNAL_INDEX:
-        maxFaces = 1;
+        maxFaces  = 1;
         maxDepths = 1;
         break;
     case __GL_TEXTURE_CUBEMAP_ARRAY_INDEX:
-        maxFaces  = gc->constants.maxTextureArraySize * 6;
-        maxDepths = 1;
+        maxFaces  = 1;
+        maxSlices =
+        maxDepths = gc->constants.maxTextureArraySize * 6;
         break;
     case __GL_TEXTURE_BINDING_BUFFER_EXT:
-        maxFaces = 1;
+        maxFaces  = 1;
+        maxSlices =
         maxDepths = 1;
         maxLevels = 1;
         break;
@@ -172,6 +179,7 @@ GLvoid __glInitTextureObject(__GLcontext *gc, __GLtextureObject *tex, GLuint id,
     tex->maxFaces  = maxFaces;
     tex->maxLevels = maxLevels;
     tex->maxDepths = maxDepths;
+    tex->maxSlices = maxSlices;
 
     pointer = gc->imports.calloc(gc, 1, maxFaces * sizeof(__GLmipMapLevel*) +
                                         maxFaces * maxLevels * sizeof(__GLmipMapLevel));
@@ -759,6 +767,11 @@ __GL_INLINE GLvoid __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint ta
             dirty = __GL_TEXPARAM_BORDER_COLOR_BIT;
             break;
         }
+
+    case GL_TEXTURE_PROTECTED_VIV:
+        tex->params.contentProtected = (GLboolean)param;
+        break;
+
     default:
         __GL_ERROR_RET(GL_INVALID_ENUM);
     }
@@ -858,6 +871,7 @@ GLvoid GL_APIENTRY __gles_TexParameterf(__GLcontext *gc, GLenum target, GLenum p
     case GL_DEPTH_STENCIL_TEXTURE_MODE:
     case GL_TEXTURE_MAX_ANISOTROPY_EXT:
     case GL_TEXTURE_SRGB_DECODE_EXT:
+    case GL_TEXTURE_PROTECTED_VIV:
         break;
     default:
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
@@ -1021,6 +1035,7 @@ GLvoid GL_APIENTRY __gles_TexParameteri(__GLcontext *gc, GLenum target, GLenum p
     case GL_DEPTH_STENCIL_TEXTURE_MODE:
     case GL_TEXTURE_MAX_ANISOTROPY_EXT:
     case GL_TEXTURE_SRGB_DECODE_EXT:
+    case GL_TEXTURE_PROTECTED_VIV:
         break;
     default:
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
@@ -1215,6 +1230,11 @@ __glGetTexParameterfv(__GLcontext *gc, GLenum target, GLenum pname, GLfloat *v)
             __GL_MEMCOPY(v, params->sampler.borderColor.fv, 4 * sizeof(GLfloat));
             break;
         }
+
+    case GL_TEXTURE_PROTECTED_VIV:
+        v[0] = (GLfloat) params->contentProtected;
+        break;
+
     default:
         __GL_ERROR_RET(GL_INVALID_ENUM);
     }

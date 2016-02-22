@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -284,7 +284,7 @@ _SaveFrameTga(
             rlvArgs.uArgs.v2.numSlices  = 1;
 
             /* Resolve render target to linear surface. */
-            gcmERR_BREAK(gcoSURF_ResolveRect_v2(&rtView, &tgtView, &rlvArgs));
+            gcmERR_BREAK(gcoSURF_ResolveRect(&rtView, &tgtView, &rlvArgs));
 #endif
         }
 
@@ -419,19 +419,27 @@ veglGetWorker(
     /* Set Worker as busy. */
     worker->draw = Surface;
 
-    gcmASSERT(Surface->freeWorkerCount > 0);
-
     /* Dec free worker count. */
     Surface->freeWorkerCount--;
 
-    /* New worker comes, not all workers are free. */
-    gcmVERIFY_OK(gcoOS_Signal(gcvNULL, Surface->workerDoneSignal, gcvFALSE));
+    gcmASSERT(Surface->freeWorkerCount < Surface->totalWorkerCount);
+
+    if (Surface->freeWorkerCount == (Surface->totalWorkerCount - 1))
+    {
+        /*
+         * It's the first time to return out a worker.
+         * Not all workers are free.
+         */
+        gcmVERIFY_OK(gcoOS_Signal(
+            gcvNULL, Surface->workerDoneSignal, gcvFALSE));
+    }
 
     if (Surface->freeWorkerCount == 0)
     {
         /* No more free workers. */
         gcmVERIFY_OK(gcoOS_Signal(
             gcvNULL, Surface->workerAvaiableSignal, gcvFALSE));
+
     }
 
     /* Release access mutex. */
@@ -509,15 +517,18 @@ veglFreeWorker(
     /* Inc free worker count. */
     ownerSurface->freeWorkerCount++;
 
-    /* At least one worker is available now. */
-    gcmVERIFY_OK(gcoOS_Signal(
-        gcvNULL, ownerSurface->workerAvaiableSignal, gcvTRUE));
-
     if (ownerSurface->freeWorkerCount == ownerSurface->totalWorkerCount)
     {
         /* All workers are processed. */
         gcmVERIFY_OK(gcoOS_Signal(
             gcvNULL, ownerSurface->workerDoneSignal, gcvTRUE));
+    }
+
+    if (ownerSurface->freeWorkerCount == 1)
+    {
+        /* The first free worker returned back. */
+        gcmVERIFY_OK(gcoOS_Signal(
+            gcvNULL, ownerSurface->workerAvaiableSignal, gcvTRUE));
     }
 
     /* Release access mutex. */
@@ -988,10 +999,6 @@ _eglSwapBuffersRegion(
             break;
         }
 
-        /* Update buffer age */
-        veglUpdateSurfaceAge(dpy);
-        draw->bufferAge = 1;
-
         _Flush(thread);
 
         width  = draw->config.width;
@@ -1298,17 +1305,7 @@ _SwapBuffersRegionNew(
         }
 #endif
 
-        if (!draw->openVG &&
-            (draw->renderMode > VEGL_INDIRECT_RENDERING))
-        {
-            /* In no-resolve mode, check if render target pixels are updated. */
-            if (!gcoSURF_QueryFlags(draw->renderTarget, gcvSURF_FLAG_CONTENT_UPDATED))
-            {
-                /* Has drawn nothing, flush and skip. */
-                _Flush(thread);
-                break;
-            }
-        }
+        veglUpdateBufferAge(dpy, draw, &draw->backBuffer);
 
         for (i = 0; i < NumRects; ++i)
         {
@@ -1334,12 +1331,38 @@ _SwapBuffersRegionNew(
          * 2. Post back buffer stage:
          *    Submit swap worker / wait until done.
          * 3. Get next window back buffer.
+         *
+         * Skip step 2,3 if single buffer mode, ie, no flip.
          */
 #if gcdENABLE_3D
         if (!draw->openVG)
         {
             /* 3D pipe. */
-            if (draw->renderMode == VEGL_DIRECT_RENDERING_FCFILL)
+            /* In no-resolve mode, check if render target pixels are updated. */
+            if ((draw->renderMode > VEGL_INDIRECT_RENDERING) &&
+                !gcoSURF_QueryFlags(draw->renderTarget, gcvSURF_FLAG_CONTENT_UPDATED) &&
+                (draw->swapBehavior == EGL_BUFFER_PRESERVED))
+            {
+                /*
+                 * Has drawn nothing in direct rendering mode, copy from
+                 * previous render target to preserve pixels
+                 */
+                gcsSURF_VIEW prevView = {draw->prevRenderTarget, 0, 1};
+                gcsSURF_VIEW rtView   = {draw->renderTarget,     0, 1};
+
+                if (draw->prevRenderTarget != gcvNULL)
+                {
+                    /* Do the copy. */
+                    if (gcmIS_ERROR(gcoSURF_ResolveRect(&prevView, &rtView, gcvNULL)))
+                    {
+                        veglSetEGLerror(thread, EGL_BAD_SURFACE);
+                        result = EGL_FALSE;
+                        break;
+                    }
+                }
+            }
+
+            else if (draw->renderMode == VEGL_DIRECT_RENDERING_FCFILL)
             {
                 /* Basic No-resolve path. */
                 if (gcmIS_ERROR(gcoSURF_FillFromTile(draw->renderTarget)))
@@ -1554,7 +1577,7 @@ _SwapBuffersRegionNew(
                 /* Resolve internal renderTarget to window back buffer. */
                 if ((rlvArgs.uArgs.v2.rectSize.x != 0) && (rlvArgs.uArgs.v2.rectSize.y != 0))
                 {
-                    status = gcoSURF_ResolveRect_v2(&rtView, &tgtView, &rlvArgs);
+                    status = gcoSURF_ResolveRect(&rtView, &tgtView, &rlvArgs);
 
                     if (gcmIS_ERROR(status))
                     {
@@ -1563,10 +1586,10 @@ _SwapBuffersRegionNew(
                         break;
                     }
                 }
-#   else
+#else
                 rlvArgs.uArgs.v2.rectSize.x = draw->config.width;
                 rlvArgs.uArgs.v2.rectSize.y = draw->config.height;
-                status = gcoSURF_ResolveRect_v2(&rtView, &tgtView, &rlvArgs);
+                status = gcoSURF_ResolveRect(&rtView, &tgtView, &rlvArgs);
 
                 if (gcmIS_ERROR(status))
                 {
@@ -1574,7 +1597,7 @@ _SwapBuffersRegionNew(
                     result = EGL_FALSE;
                     break;
                 }
-#   endif
+#endif
 
 #if gcdDUMP
                 {
@@ -1593,7 +1616,7 @@ _SwapBuffersRegionNew(
                             draw->config.height,
                             stride);
                 }
-#   endif
+#endif
             }
         }
         else
@@ -1619,6 +1642,27 @@ _SwapBuffersRegionNew(
 #endif
         }
 
+#if gcdDUMP_FRAME_TGA
+        {
+            gcsPOINT origin = {0, 0};
+            gcsPOINT size   = {draw->config.width, draw->config.height};
+
+            _SaveFrameTga(thread, draw, &origin, &size);
+        }
+#endif
+
+        if (!draw->backBuffer.flip)
+        {
+            /* Check if need stall. */
+            EGLBoolean stall = veglSynchronousPost(dpy, draw);
+
+            /* No flip, commit accumulated commands. */
+            gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, stall));
+
+            /* No need to switch back buffer. */
+            break;
+        }
+
 #if gcdANDROID_NATIVE_FENCE_SYNC >= 2
         /* Sumit swap worker / Wait until done. */
         if (veglSynchronousPost(dpy, draw))
@@ -1637,7 +1681,6 @@ _SwapBuffersRegionNew(
                 break;
             }
         }
-
         else
         {
             /* Using android native fence sync. */
@@ -1651,13 +1694,7 @@ _SwapBuffersRegionNew(
 
 #else
         /* Sumit swap worker / Wait until done. */
-
-        if (!draw->backBuffer.flip)
-        {
-            /* No flip, commit accumulated commands. */
-            gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
-        }
-        else if ((dpy->workerThread == gcvNULL) ||
+        if ((dpy->workerThread == gcvNULL) ||
             veglSynchronousPost(dpy, draw))
         {
             /* Commit-stall. */
@@ -1796,15 +1833,6 @@ _SwapBuffersRegionNew(
         /* Success. */
         veglSetEGLerror(thread,  EGL_SUCCESS);
 
-#if gcdDUMP_FRAME_TGA
-        {
-            gcsPOINT origin = {0, 0};
-            gcsPOINT size   = {draw->config.width, draw->config.height};
-
-            _SaveFrameTga(thread, draw, &origin, &size);
-        }
-#endif
-
         /* reset the flags.*/
         if (draw->renderTarget != gcvNULL)
         {
@@ -1939,7 +1967,7 @@ _SwapBuffersRegion(
                 /* (3D) VG renders in BOTTOM_TOP, while the surface is TOP_BOTTOM by default. */
                 rlvArgs.uArgs.v2.yInverted   = (Thread->api == EGL_OPENVG_API) ? gcvTRUE : gcvFALSE;
 
-                status = gcoSURF_ResolveRect_v2(&rtView, &tgtView, &rlvArgs);
+                status = gcoSURF_ResolveRect(&rtView, &tgtView, &rlvArgs);
 
                 if (gcmIS_ERROR(status))
                 {
@@ -2252,10 +2280,6 @@ _eglSwapBuffersRegion(
             veglSetEGLerror(thread, EGL_BAD_SURFACE);
             break;
         }
-
-        /* Update buffer age */
-        veglUpdateSurfaceAge(dpy);
-        draw->bufferAge = 1;
 
 #if gcdFRAME_DB
         /* Add (previous) frame to the database. */
@@ -2760,7 +2784,7 @@ eglCopyBuffers(
 #if gcdENABLE_3D
             gcsSURF_VIEW rtView = {surface->renderTarget, 0, 1};
             gcsSURF_VIEW pixmapView = {pixmapSurface, 0, 1};
-            status = gcoSURF_ResolveRect_v2(&rtView, &pixmapView, gcvNULL);
+            status = gcoSURF_ResolveRect(&rtView, &pixmapView, gcvNULL);
 #endif
         }
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -88,6 +88,11 @@ BEGIN_EXTERN_C()
 
 typedef union _gcsValue
 {
+    /* vector 16 value */
+    gctFLOAT         f32_v16[16];
+    gctINT32         i32_v16[16];
+    gctUINT32        u32_v16[16];
+
     /* vector 4 value */
     gctFLOAT         f32_v4[4];
     gctINT32         i32_v4[4];
@@ -134,12 +139,15 @@ typedef enum _gcSHADER_KIND {
 #define _SHADER_DX_LANGUAGE_TYPE  gcmCC('D', 'X', '\0', '\0')
 #define _cldLanguageType          gcmCC('C', 'L', '\0', '\0')
 
+#define _SHADER_ES11_VERSION      gcmCC('\0', '\0', '\1', '\1')
 #define _SHADER_HALTI_VERSION     gcmCC('\0', '\0', '\0', '\3')
 #define _SHADER_ES31_VERSION      gcmCC('\0', '\0', '\1', '\3')
-#define _SHADER_ES11_VERSION      gcmCC('\0', '\0', '\1', '\1')
+#define _SHADER_ES32_VERSION      gcmCC('\0', '\0', '\2', '\3')
 #define _SHADER_DX_VERSION_30     gcmCC('\3', '\0', '\0', '\0')
 #define _cldCL1Dot1               gcmCC('\0', '\0', '\0', '\1')
 #define _cldCL1Dot2               gcmCC('\0', '\0', '\2', '\1')
+
+#define _sldSharedVariableStorageBlockName  "#sh_sharedVar"
 
 /* Client version. */
 typedef enum _gcSL_OPCODE
@@ -285,10 +293,12 @@ typedef enum _gcSL_OPCODE
     gcSL_MOV_LONG, /* 0x87 mov two 4 byte integers to the lower/upper 4 bytes of a long/ulong integer */
     gcSL_MADSAT, /* 0x88 mad with saturation for integer only */
     gcSL_COPY, /* 0x89 copy register contents */
-    gcSL_IMAGE_ADDR_3D, /* 0x8A */
-    gcSL_GET_SAMPLER_LMM, /* 0x8B Get sampler's lodminmax */
-    gcSL_GET_SAMPLER_LBS, /* 0x8C Get sampler's levelbasesize */
-    gcSL_TEXLD_U, /* 0x8D For TEXLD_U, use the format of coord to select FLOAT/INT/UNSIGINED. */
+    gcSL_LOAD_L, /* 0x8A load data from local memory */
+    gcSL_STORE_L, /* 0x8B store data to local memory */
+    gcSL_IMAGE_ADDR_3D, /* 0x8C */
+    gcSL_GET_SAMPLER_LMM, /* 0x8D Get sampler's lodminmax */
+    gcSL_GET_SAMPLER_LBS, /* 0x8E Get sampler's levelbasesize */
+    gcSL_TEXLD_U, /* 0x8F For TEXLD_U, use the format of coord to select FLOAT/INT/UNSIGINED. */
     gcSL_MAXOPCODE
 }
 gcSL_OPCODE;
@@ -342,6 +352,13 @@ gcSL_OPCODE;
                                                  (Opcode) == gcSL_END_PRIMITIVE)
 
 #define gcSL_isOpcodeUseTargetAsSource(Opcode)  ((Opcode) == gcSL_STORE               ||  \
+                                                 (Opcode) == gcSL_IMAGE_WR            ||  \
+                                                 (Opcode) == gcSL_IMAGE_WR_3D         ||  \
+                                                 (Opcode) == gcSL_ATTR_ST)
+
+#define gcSL_isOpcodeTargetInvalid(Opcode)      ((Opcode) == gcSL_STORE               ||  \
+                                                 (Opcode) == gcSL_STORE1              ||  \
+                                                 (Opcode) == gcSL_STORE_L             ||  \
                                                  (Opcode) == gcSL_IMAGE_WR            ||  \
                                                  (Opcode) == gcSL_IMAGE_WR_3D         ||  \
                                                  (Opcode) == gcSL_ATTR_ST)
@@ -609,10 +626,10 @@ typedef enum _gcSL_MODIFIER_SAT
 typedef enum _gcSL_PRECISION
 {
     gcSL_PRECISION_DEFAULT, /* 0x0 */
-    gcSL_PRECISION_HIGH, /* 0x1 */
+    gcSL_PRECISION_LOW, /* 0x1 */
     gcSL_PRECISION_MEDIUM, /* 0x2 */
-    gcSL_PRECISION_LOW, /* 0x3 */
-    gcSL_PRECISION_ANY, /* 0x3 */
+    gcSL_PRECISION_HIGH, /* 0x3 */
+    gcSL_PRECISION_ANY, /* 0x4 */
 } gcSL_PRECISION;
 
 /* gcSHADER_TYPE enumeration. */
@@ -823,6 +840,16 @@ typedef enum _gcSHADER_TYPE
     gcSHADER_INT16_P16,
     gcSHADER_INT16_P32,
 
+    gcSHADER_INTEGER_X8,
+    gcSHADER_INTEGER_X16,
+    gcSHADER_UINT_X8,
+    gcSHADER_UINT_X16,
+    gcSHADER_FLOAT_X8,
+    gcSHADER_FLOAT_X16,
+    gcSHADER_INT64_X8,
+    gcSHADER_INT64_X16,
+    gcSHADER_UINT64_X8,
+    gcSHADER_UINT64_X16,
     gcSHADER_UNKONWN_TYPE, /* do not add type after this */
     gcSHADER_TYPE_COUNT         /* must to change gcvShaderTypeInfo at the
                                  * same time if you add any new type! */
@@ -893,9 +920,9 @@ typedef gctUINT16  gctTYPE_QUALIFIER;
 typedef enum _gcSHADER_PRECISION
 {
     gcSHADER_PRECISION_DEFAULT, /* 0x00 */
-    gcSHADER_PRECISION_HIGH, /* 0x01 */
+    gcSHADER_PRECISION_LOW, /* 0x01 */
     gcSHADER_PRECISION_MEDIUM, /* 0x02 */
-    gcSHADER_PRECISION_LOW, /* 0x03 */
+    gcSHADER_PRECISION_HIGH, /* 0x03 */
     gcSHADER_PRECISION_ANY, /* 0x04 */
 }
 gcSHADER_PRECISION;
@@ -986,11 +1013,12 @@ gceKERNEL_FUNCTION_PROPERTY_FLAGS;
 /* HALTI interface block layout qualifiers */
 typedef enum _gceINTERFACE_BLOCK_LAYOUT_ID
 {
-    gcvINTERFACE_BLOCK_NONE    = 0,
+    gcvINTERFACE_BLOCK_NONE      = 0,
     gcvINTERFACE_BLOCK_SHARED    = 0x01,
     gcvINTERFACE_BLOCK_STD140    = 0x02,
     gcvINTERFACE_BLOCK_PACKED    = 0x04,
     gcvINTERFACE_BLOCK_STD430    = 0x08,
+    gcvINTERFACE_BLOCK_ROW_MAJOR = 0x10,
 }
 gceINTERFACE_BLOCK_LAYOUT_ID;
 
@@ -1302,6 +1330,7 @@ typedef enum _gceBuiltinNameKind
 #define gcdSL_TARGET_Condition                  10 : 5
 /* Target format of type gcSL_FORMAT. */
 #define gcdSL_TARGET_Format                    15 : 4
+#define gcdSL_TARGET_Packed                    19 : 1
 typedef gctUINT32 gctTARGET_t;
 
 #define gcmSL_TARGET_GET(Value, Field) \
@@ -2277,7 +2306,14 @@ struct _gcUNIFORM
 
     /* Physically assigned values. */
     gctUINT8                        swizzle;
+    /*
+    ** 1) If this uniform is a normal constant uniform, save the const index in physical.
+    ** 2) If this uniform is a normal texture uniform, save the sampler index in physical.
+    ** 3) If this uniform is a sampler_buffer, save the const index in physical,
+    **    save the sampler index in samplerPhysical
+    */
     gctINT                          physical;
+    gctINT                          samplerPhysical;
     gctUINT32                       address;
     gctUINT32                       RAPriority;
 
@@ -2426,6 +2462,8 @@ struct _gcUNIFORM
 #define GetUniformIsPointer(u)                  ((u)->isPointer)
 #define GetUniformPhysical(u)                   ((u)->physical)
 #define SetUniformPhysical(u, p)                (GetUniformPhysical(u) = (p))
+#define GetUniformSamplerPhysical(u)            ((u)->samplerPhysical)
+#define SetUniformSamplerPhysical(u, p)         (GetUniformSamplerPhysical(u) = (p))
 #define GetUniformSwizzle(u)                    ((u)->swizzle)
 #define SetUniformSwizzle(u, s)                 (GetUniformSwizzle(u) = (s))
 #define GetUniformAddress(u)                    ((u)->address)
@@ -3020,7 +3058,7 @@ struct _gcVARIABLE
 #define GetVariableTopLevelArraySize(v)         ((v)->topLevelArraySize)
 #define SetVariableTopLevelArraySize(v, s)      ((v)->topLevelArraySize = (s))
 #define GetVariableArrayLengthCount(v)          ((v)->arrayLengthCount)
-#define GetVariableTempIndex1(v)                ((v)->tempIndex)
+#define GetVariableTempIndex(v)                 ((v)->tempIndex)
 #define GetVariableNameLength(v)                ((v)->nameLength)
 #define GetVariableName(v)                      ((v)->name)
 
@@ -3563,14 +3601,18 @@ struct _gcsKERNEL_FUNCTION
     gctUINT32                       tempIndexEnd;
     gctUINT32                       tempIndexCount;
 
+    /*
+    ** the codeEnd only includes the kernel function declaration code count.
+    ** The codeCount includes the kernel function declaration code count and the kernel function call,
+    */
     gctUINT                         codeStart;
+    gctUINT                         codeEnd;
     gctUINT                         codeCount;
 
     gctBOOL                         isRecursion;
 
     /* kernel specific fields */
     gcSHADER                        shader;
-    gctUINT                         codeEnd;
 
     /* kernel info: */
     /* Local address space size */
@@ -3776,7 +3818,11 @@ typedef enum _gcSHADER_FLAGS
     gcSHADER_FLAG_HAS_EXTERN_VARIABLE       = 0x200, /* the shader has extern variables */
     gcSHADER_FLAG_NEED_PATCH_FOR_CENTROID   = 0x400, /* the shader uses centroid varyings as
                                                          the argument of interpolate functions */
-    gcSHADER_FLAG_HAS_32BITMODULUS          = 0x800, /* the shader has been  */
+    gcSHADER_FLAG_HAS_32BITMODULUS          = 0x800, /* the shader has 32 bit modulus and has been converted to 16 bit ops.  */
+    gcSHADER_FLAG_HAS_BASE_MEMORY_ADDR      = 0x1000, /* the shader has base memory address, for CL only. */
+    gcSHADER_FLAG_HAS_LOCAL_MEMORY_ADDR     = 0x2000, /* the shader has local memory address. */
+    gcSHADER_FLAG_HAS_INT64                 = 0x4000, /* the shader has 64 bit integer data and operation. */
+    gcSHADER_FLAG_HAS_IMAGE_QUERY           = 0x8000, /* the shader has image query */
 } gcSHADER_FLAGS;
 
 #define gcShaderIsOldHeader(Shader)             (((Shader)->flags & gcSHADER_FLAG_OLDHEADER) != 0)
@@ -3791,6 +3837,10 @@ typedef enum _gcSHADER_FLAGS
 #define gcShaderHasExternVariable(Shader)       (((Shader)->flags & gcSHADER_FLAG_HAS_EXTERN_VARIABLE) != 0)
 #define gcShaderNeedPatchForCentroid(Shader)    (((Shader)->flags & gcSHADER_FLAG_NEED_PATCH_FOR_CENTROID) != 0)
 #define gcShaderHas32BitModulus(Shader)         (((Shader)->flags & gcSHADER_FLAG_HAS_32BITMODULUS) != 0)
+#define gcShaderHasBaseMemoryAddr(Shader)       (((Shader)->flags & gcSHADER_FLAG_HAS_BASE_MEMORY_ADDR) != 0)
+#define gcShaderHasLocalMemoryAddr(Shader)      (((Shader)->flags & gcSHADER_FLAG_HAS_LOCAL_MEMORY_ADDR) != 0)
+#define gcShaderHasInt64(Shader)                (((Shader)->flags & gcSHADER_FLAG_HAS_INT64) != 0)
+#define gcShaderHasImageQuery(Shader)           (((Shader)->flags & gcSHADER_FLAG_HAS_IMAGE_QUERY) != 0)
 
 #define gcShaderGetFlag(Shader)                 (Shader)->flags)
 
@@ -3811,6 +3861,14 @@ typedef enum _gcSHADER_FLAGS
 #define gcShaderClrNeedPatchForCentroid(Shader) do { (Shader)->flags &= ~gcSHADER_FLAG_NEED_PATCH_FOR_CENTROID; } while (0)
 #define gcShaderSetHas32BitModulus(Shader)      do { (Shader)->flags |= gcSHADER_FLAG_HAS_32BITMODULUS; } while (0)
 #define gcShaderClrHas32BitModulus(Shader)      do { (Shader)->flags &= ~gcSHADER_FLAG_HAS_32BITMODULUS; } while (0)
+#define gcShaderSetHasBaseMemoryAddr(Shader)    do { (Shader)->flags |= gcSHADER_FLAG_HAS_BASE_MEMORY_ADDR; } while (0)
+#define gcShaderClrHasBaseMemoryAddr(Shader)    do { (Shader)->flags &= ~gcSHADER_FLAG_HAS_BASE_MEMORY_ADDR; } while (0)
+#define gcShaderSetHasLocalMemoryAddr(Shader)   do { (Shader)->flags |= gcSHADER_FLAG_HAS_LOCAL_MEMORY_ADDR; } while (0)
+#define gcShaderClrHasLocalMemoryAddr(Shader)   do { (Shader)->flags &= ~gcSHADER_FLAG_HAS_LOCAL_MEMORY_ADDR; } while (0)
+#define gcShaderSetHasInt64(Shader)             do { (Shader)->flags |= gcSHADER_FLAG_HAS_INT64; } while (0)
+#define gcShaderClrHasInt64(Shader)             do { (Shader)->flags &= ~gcSHADER_FLAG_HAS_INT64; } while (0)
+#define gcShaderSetHasImageQuery(Shader)        do { (Shader)->flags |= gcSHADER_FLAG_HAS_IMAGE_QUERY; } while (0)
+#define gcShaderClrHasImageQuery(Shader)        do { (Shader)->flags &= ~gcSHADER_FLAG_HAS_IMAGE_QUERY; } while (0)
 #define gcShaderSetFlag(Shader, Flag)           do { (Shader)->flags = (Flag); } while (0)
 
 typedef struct _gcLibraryList gcLibraryList;
@@ -4106,10 +4164,10 @@ struct _gcSHADER
     gctUINT32                   replaceIndex;
 #endif
 
-    gctBOOL                     dual16Mode;
+    gctBOOL                     isDual16Shader;
     /* for recompile only - whether the recompile's master shader is dual16 or not,
        if yes, we need to force recompile shader to be dual16 if possible */
-    gctBOOL                     masterDual16Mode;
+    gctBOOL                     isMasterDual16Shader;
 
     gctUINT32                   RARegWaterMark;
     gctUINT32                   RATempReg;

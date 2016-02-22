@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -517,10 +517,13 @@ gcoOS_GetDisplayByIndex(
 
         display->orgVarInfo = display->varInfo;
 
+        /* Default aligned height, equals to y resolution. */
+        display->alignedHeight = display->varInfo.yres;
+
         for (i = display->multiBuffer; i >= 1; --i)
         {
             /* Try setting up multi buffering. */
-            display->varInfo.yres_virtual = display->varInfo.yres * i;
+            display->varInfo.yres_virtual = display->alignedHeight * i;
 
             if (ioctl(display->file, FBIOPUT_VSCREENINFO, &display->varInfo) >= 0)
             {
@@ -550,7 +553,7 @@ gcoOS_GetDisplayByIndex(
         {
             /* Calculate actual buffer count. */
             display->multiBuffer = display->varInfo.yres_virtual
-                                 / display->height;
+                                 / display->alignedHeight;
         }
 
         /* Compute aligned height of one backBuffer. */
@@ -558,8 +561,16 @@ gcoOS_GetDisplayByIndex(
                                / display->multiBuffer;
 
         /* Move to off-screen memory. */
-        display->backBufferY = display->varInfo.yoffset
-                             + display->alignedHeight;
+        if (display->varInfo.yoffset % display->alignedHeight == 0)
+        {
+            display->backBufferY = display->varInfo.yoffset
+                                 + display->alignedHeight;
+        }
+        else
+        {
+            display->varInfo.yoffset = 0;
+            display->backBufferY = display->alignedHeight;
+        }
 
         if (display->backBufferY >= (int)(display->varInfo.yres_virtual))
         {

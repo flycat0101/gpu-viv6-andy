@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -319,6 +319,9 @@ typedef struct _gcsHAL_QUERY_CHIP_IDENTITY
 
     /* Number of pixel pipes. */
     gctUINT32                   pixelPipes;
+
+    /* Number of resolve pipes. */
+    gctUINT32                   resolvePipes;
 
     /* Number of instructions. */
     gctUINT32                   instructionCount;
@@ -1018,6 +1021,9 @@ typedef struct _gcsHAL_INTERFACE
 
             /* Chip types. */
             OUT gceHARDWARE_TYPE        types[gcdCHIP_COUNT];
+
+            /* Chip IDs. */
+            OUT gctUINT32               ids[gcvCORE_COUNT];
         }
         ChipInfo;
 
@@ -1132,6 +1138,7 @@ typedef struct _gcsHAL_INTERFACE
         struct _gcsHAL_QUERY_RESET_TIME_STAMP
         {
             OUT gctUINT64           timeStamp;
+            OUT gctUINT64           contextID;
         }
         QueryResetTimeStamp;
 
@@ -1230,6 +1237,12 @@ typedef struct _gcsHAL_INTERFACE
             IN gctUINT32                timeOut;
         }
         WaitFence;
+
+        struct _gcsHAL_COMMIT_DONE
+        {
+            IN gctUINT64                context;
+        }
+        CommitDone;
 
 #if gcdENABLE_DEC_COMPRESSION && gcdDEC_ENABLE_AHB
         struct _gcsHAL_DEC300_READ

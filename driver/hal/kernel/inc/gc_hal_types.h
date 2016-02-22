@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -482,6 +482,7 @@ typedef enum _gceSTATUS
     gcvSTATUS_INTERRUPTED           =   -26,
     gcvSTATUS_DEVICE                =   -27,
     gcvSTATUS_NOT_MULTI_PIPE_ALIGNED =   -28,
+    gcvSTATUS_OUT_OF_SAMPLER         =   -29,
 
     /* Linker errors. */
     gcvSTATUS_GLOBAL_TYPE_MISMATCH              =   -1000,
@@ -514,6 +515,7 @@ typedef enum _gceSTATUS
     gcvSTATUS_NON_INVOCATION_ID_AS_INDEX        =   -1025,
     gcvSTATUS_INPUT_ARRAY_SIZE_MISMATCH         =   -1026,
     gcvSTATUS_OUTPUT_ARRAY_SIZE_MISMATCH        =   -1027,
+    gcvSTATUS_LOCATION_ALIASED                  =   -1028,
 
     /* Compiler errors. */
     gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR    =   -2000,
@@ -977,23 +979,6 @@ struct _gckQUEUE
     gctUINT32                   front;
     gctUINT32                   count;
     gctUINT32                   size;
-};
-
-#define gcdENTRY_QUEUE_SIZE 256
-typedef struct _gckENTRYDATA * gckENTRYDATA;
-struct _gckENTRYDATA
-{
-    gctUINT32                   physical;
-    gctUINT32                   bytes;
-};
-
-typedef struct _gckENTRYQUEUE * gckENTRYQUEUE;
-struct _gckENTRYQUEUE
-{
-    struct _gckENTRYDATA        data[gcdENTRY_QUEUE_SIZE];
-    gctUINT32                   rear;
-    gctUINT32                   front;
-    gctUINT32                   count;
 };
 
 typedef enum _gceTRACEMODE

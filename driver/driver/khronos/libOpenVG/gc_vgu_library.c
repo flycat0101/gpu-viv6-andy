@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1534,6 +1534,7 @@ VGU_API_CALL VGUErrorCode VGU_API_ENTRY vguComputeWarpQuadToSquare(
         /* Reset the projective matrix. */
         vgfInvalidateMatrix(Context, &projective);
 
+
         /* Get projective transformation matrix. */
         result = vguComputeWarpSquareToQuad(
             SourceX0, SourceY0,
@@ -1645,6 +1646,7 @@ VGU_API_CALL VGUErrorCode VGU_API_ENTRY vguComputeWarpSquareToQuad(
 
         sumX = DestinationX0 - DestinationX1 + DestinationX3 - DestinationX2;
         sumY = DestinationY0 - DestinationY1 + DestinationY3 - DestinationY2;
+
         /* Affine result? */
         if ((sumX == 0.0f) && (sumY == 0.0f))
         {
@@ -1764,6 +1766,7 @@ VGU_API_CALL VGUErrorCode VGU_API_ENTRY vguComputeWarpQuadToQuad(
         /* Reset matrices. */
         vgfInvalidateMatrix(Context, &q2s);
         vgfInvalidateMatrix(Context, &s2q);
+
 
         result = vguComputeWarpQuadToSquare(
             SourceX0, SourceY0,

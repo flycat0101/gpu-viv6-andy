@@ -90,6 +90,7 @@
 		eglBindWaylandDisplayWL;
 		eglUnbindWaylandDisplayWL;
 		eglQueryWaylandBufferWL;
+		eglCreateWaylandBufferFromImageWL;
 
 		dfbGetDisplay;
 		dfbDestroyDisplay;

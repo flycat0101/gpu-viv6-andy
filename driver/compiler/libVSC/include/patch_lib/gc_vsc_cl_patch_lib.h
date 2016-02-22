@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2733,7 +2733,6 @@
     CONVERT_FLOAT_COORD_TO_INT_COORD_##IMAGETYPE \
     CLAMP_COORD_UPPER_##IMAGETYPE \
     LOAD_TEXEL_##IMAGETYPE##ORDER(int4, ) \
-"/* Testing function, not real. */" \
 "int4 \n" \
 "_read_image_nearest_unnorm_none_intcoord_i_uint32_"#IMAGETYPE#ORDER" \n" \
     read_image_ARGS_INT_COORD_##IMAGETYPE \
@@ -3189,9 +3188,9 @@ WRITE_IMAGE(uint4, uint4, 2d)
 WRITE_IMAGE(uint4, uchar4, 2DARRAY)
 WRITE_IMAGE(uint4, ushort4, 2DARRAY)
 WRITE_IMAGE(uint4, uint4, 2DARRAY)
-WRITE_IMAGE(uint4, uchar4, 3d)
+/*WRITE_IMAGE(uint4, uchar4, 3d)
 WRITE_IMAGE(uint4, ushort4, 3d)
-WRITE_IMAGE(uint4, uint4, 3d)
+WRITE_IMAGE(uint4, uint4, 3d)*/
 
 /* write_imagei */
 WRITE_IMAGE(int4, char4, 1d)
@@ -3206,9 +3205,9 @@ WRITE_IMAGE(int4, int4, 2d)
 WRITE_IMAGE(int4, char4, 2DARRAY)
 WRITE_IMAGE(int4, short4, 2DARRAY)
 WRITE_IMAGE(int4, int4, 2DARRAY)
-WRITE_IMAGE(int4, char4, 3d)
+/*WRITE_IMAGE(int4, char4, 3d)
 WRITE_IMAGE(int4, short4, 3d)
-WRITE_IMAGE(int4, int4, 3d)
+WRITE_IMAGE(int4, int4, 3d)*/
 
 /* write_imagef */
 WRITE_IMAGEF_NORM(uchar4, 255.0, 1d)
@@ -3227,10 +3226,10 @@ WRITE_IMAGEF_NORM(uchar4, 255.0, 2DARRAY)
 WRITE_IMAGEF_NORM(char4, 127.0, 2DARRAY)
 WRITE_IMAGEF_NORM(ushort4, 65535.0, 2DARRAY)
 WRITE_IMAGEF_NORM(short4, 32767.0, 2DARRAY)
-WRITE_IMAGEF_NORM(uchar4, 255.0, 3d)
+/*WRITE_IMAGEF_NORM(uchar4, 255.0, 3d)
 WRITE_IMAGEF_NORM(char4, 127.0, 3d)
 WRITE_IMAGEF_NORM(ushort4, 65535.0, 3d)
-WRITE_IMAGEF_NORM(short4, 32767.0, 3d)
+WRITE_IMAGEF_NORM(short4, 32767.0, 3d)*/
 
 "void\n"
 "_write_image_float4_float4_1d (\n"
@@ -3276,7 +3275,7 @@ WRITE_IMAGEF_NORM(short4, 32767.0, 3d)
 "    float4 * base = (float4 *) ((uchar *)image.x + image.y * (uint)coord.y + image.z * (uint)coord.z); \n"
 "    base[coord.x] = color; \n"
 "} \n"
-"void\n"
+/*"void\n"
 "_write_image_float4_float4_3d (\n"
 "    uint3 image, \n"
 "    uint3 imageSize, \n"
@@ -3286,7 +3285,7 @@ WRITE_IMAGEF_NORM(short4, 32767.0, 3d)
 "{ \n"
 "    float4 * base = (float4 *) ((uchar *)image.x + image.y * (uint)coord.y + image.z * (uint)coord.z); \n"
 "    base[coord.x] = color; \n"
-"} \n"
+"} \n"*/
 "void\n"
 "_write_image_float4_half4_1d (\n"
 "    uint image, \n"
@@ -3331,7 +3330,7 @@ WRITE_IMAGEF_NORM(short4, 32767.0, 3d)
 "    half * base = (half *) ((uchar *)image.x + image.y * (uint)coord.y + image.z * (uint)coord.z); \n"
 "    vstore_half4(color, coord.x, base); \n"
 "} \n"
-"void\n"
+/*"void\n"
 "_write_image_float4_half4_3d (\n"
 "    uint3 image, \n"
 "    uint3 imageSize, \n"
@@ -3341,7 +3340,7 @@ WRITE_IMAGEF_NORM(short4, 32767.0, 3d)
 "{ \n"
 "    half * base = (half *) ((uchar *)image.x + image.y * (uint)coord.y + image.z * (uint)coord.z); \n"
 "    vstore_half4(color, coord.x, base); \n"
-"} \n"
+"} \n"*/
 "void\n"
 "_write_image_null_1d (\n"
 "    uint image, \n"
@@ -3377,8 +3376,8 @@ WRITE_IMAGEF_NORM(short4, 32767.0, 3d)
 "    float4 color \n"
 "    ) \n"
 "{ \n"
-"} \n"
-"void\n"
+"} \n";
+/*"void\n"
 "_write_image_null_3d (\n"
 "    uint3 image, \n"
 "    uint3 imageSize, \n"
@@ -3386,8 +3385,7 @@ WRITE_IMAGEF_NORM(short4, 32767.0, 3d)
 "    float4 color \n"
 "    ) \n"
 "{ \n"
-"} \n"
-;
+"} \n"*/
 
 static gctSTRING gcLibCLImage_WriteFunc_BGRA =
 /* write_imageui */
@@ -3403,9 +3401,9 @@ WRITE_IMAGE_BGRA(uint4, uint4, 2d)
 WRITE_IMAGE_BGRA(uint4, uchar4, 2DARRAY)
 WRITE_IMAGE_BGRA(uint4, ushort4, 2DARRAY)
 WRITE_IMAGE_BGRA(uint4, uint4, 2DARRAY)
-WRITE_IMAGE_BGRA(uint4, uchar4, 3d)
+/*WRITE_IMAGE_BGRA(uint4, uchar4, 3d)
 WRITE_IMAGE_BGRA(uint4, ushort4, 3d)
-WRITE_IMAGE_BGRA(uint4, uint4, 3d)
+WRITE_IMAGE_BGRA(uint4, uint4, 3d)*/
 
 /* write_imagei */
 WRITE_IMAGE_BGRA(int4, char4, 1d)
@@ -3420,9 +3418,9 @@ WRITE_IMAGE_BGRA(int4, int4, 2d)
 WRITE_IMAGE_BGRA(int4, char4, 2DARRAY)
 WRITE_IMAGE_BGRA(int4, short4, 2DARRAY)
 WRITE_IMAGE_BGRA(int4, int4, 2DARRAY)
-WRITE_IMAGE_BGRA(int4, char4, 3d)
+/*WRITE_IMAGE_BGRA(int4, char4, 3d)
 WRITE_IMAGE_BGRA(int4, short4, 3d)
-WRITE_IMAGE_BGRA(int4, int4, 3d)
+WRITE_IMAGE_BGRA(int4, int4, 3d)*/
 
 /* write_imagef */
 WRITE_IMAGEF_NORM_BGRA(uchar4, 255.0, 1d)
@@ -3441,10 +3439,10 @@ WRITE_IMAGEF_NORM_BGRA(uchar4, 255.0, 2DARRAY)
 WRITE_IMAGEF_NORM_BGRA(char4, 127.0, 2DARRAY)
 WRITE_IMAGEF_NORM_BGRA(ushort4, 65535.0, 2DARRAY)
 WRITE_IMAGEF_NORM_BGRA(short4, 32767.0, 2DARRAY)
-WRITE_IMAGEF_NORM_BGRA(uchar4, 255.0, 3d)
+/*WRITE_IMAGEF_NORM_BGRA(uchar4, 255.0, 3d)
 WRITE_IMAGEF_NORM_BGRA(char4, 127.0, 3d)
 WRITE_IMAGEF_NORM_BGRA(ushort4, 65535.0, 3d)
-WRITE_IMAGEF_NORM_BGRA(short4, 32767.0, 3d)
+WRITE_IMAGEF_NORM_BGRA(short4, 32767.0, 3d)*/
 
 "void\n"
 "_write_image_float4_float4_BGRA_1d (\n"
@@ -3498,7 +3496,7 @@ WRITE_IMAGEF_NORM_BGRA(short4, 32767.0, 3d)
 "    base[coord.x].r = color.b; \n"
 "    base[coord.x].b = color.r; \n"
 "} \n"
-"void\n"
+/*"void\n"
 "_write_image_float4_float4_BGRA_3d (\n"
 "    uint3 image, \n"
 "    uint3 imageSize, \n"
@@ -3510,7 +3508,7 @@ WRITE_IMAGEF_NORM_BGRA(short4, 32767.0, 3d)
 "    base[coord.x] = color; \n"
 "    base[coord.x].r = color.b; \n"
 "    base[coord.x].b = color.r; \n"
-"} \n"
+"} \n"*/
 "void\n"
 "_write_image_float4_half4_BGRA_1d (\n"
 "    uint image, \n"
@@ -3566,8 +3564,8 @@ WRITE_IMAGEF_NORM_BGRA(short4, 32767.0, 3d)
 "    t.r = color.b; \n"
 "    t.b = color.r; \n"
 "    vstore_half4(t, coord.x, base); \n"
-"} \n"
-"void\n"
+"} \n";
+/*"void\n"
 "_write_image_float4_half4_BGRA_3d (\n"
 "    uint3 image, \n"
 "    uint3 imageSize, \n"
@@ -3580,9 +3578,10 @@ WRITE_IMAGEF_NORM_BGRA(short4, 32767.0, 3d)
 "    t.r = color.b; \n"
 "    t.b = color.r; \n"
 "    vstore_half4(t, coord.x, base); \n"
-"} \n";
+"} \n";*/
 
 static gctSTRING gcLibCLPatch_MainFunc =
+"/* Testing function, not real. */ \n"
 "__kernel void sampleKernel(\n"
 "    read_only image2d_t input, \n"
 "    sampler_t imageSampler, \n"
@@ -3596,6 +3595,45 @@ static gctSTRING gcLibCLPatch_MainFunc =
 
 #if _SUPPORT_LONG_ULONG_DATA_TYPE
 /************************************* 64-bit integer SHIFT. ***********************************/
+#define _longulong_left_shift_long_scalar    \
+"long long_LeftShift_scalar(uint count, long src0, long src1)   \n" \
+"{ \n"                                      \
+"    uint lowV, highV; \n"  \
+"    uint lowR, highR; \n" \
+"    uint mask; \n" \
+"    uint n;\n" \
+"    long result = 0L; \n" \
+"\n"\
+"    n = viv_getlonglo(src1); \n" \
+"    n = n & 63; \n" \
+"    lowV = viv_getlonglo(src0); \n" \
+"    highV = viv_getlonghi(src0); \n" \
+" \n" \
+"    if (n == 0) \n" \
+"    { \n" \
+"        lowR = lowV;\n"\
+"        highR = highV;\n"\
+"    } \n" \
+"    else \n" \
+"    if (n >= 32) \n" \
+"    { \n" \
+"        n -= 32; \n" \
+"        lowR = 0; \n" \
+"        highR = lowV << n; \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        lowR = lowV << n; \n" \
+"        highR = highV << n; \n" \
+"        lowV = lowV >> (32 - n); \n" \
+"        mask = (~0) >> (32 - n); \n" \
+"        lowV = lowV & mask; \n" \
+"        highR = highR | lowV; \n" \
+"    } \n" \
+"    viv_setlong(result, as_uint(lowR), as_uint(highR)); \n" \
+"    return result; \n" \
+"} \n"
+
 #define _longulong_left_shift_long    \
 "long4 long_LeftShift(uint count, long4 src0, long4 src1)   \n" \
 "{ \n"                                      \
@@ -3644,6 +3682,46 @@ static gctSTRING gcLibCLPatch_MainFunc =
 "        else if (i == 2) {result.z = tl;}\n"\
 "        else             {result.w = tl;}\n"\
 "    }\n" \
+"    return result; \n" \
+"} \n"
+
+#define _longulong_left_shift_ulong_scalar    \
+"ulong ulong_LeftShift_scalar(uint count, ulong src0, ulong src1)   \n" \
+"{ \n"                                      \
+"    uint lowV, highV; \n"  \
+"    uint lowR, highR; \n" \
+"    uint mask; \n" \
+"    ulong result = 0L; \n" \
+"    uint n;\n" \
+"\n"\
+"    n = viv_getlonglo(src1); \n" \
+"    n = n & 63; \n" \
+"    lowV = viv_getlonglo(src0); \n" \
+"    highV = viv_getlonghi(src0); \n" \
+" \n" \
+"    if (n == 0) \n" \
+"    { \n" \
+"        lowR = lowV;\n"\
+"        highR = highV;\n"\
+"    } \n" \
+"    else \n" \
+"    if (n >= 32) \n" \
+"    { \n" \
+"        n -= 32; \n" \
+"        lowR = 0; \n" \
+"        highR = lowV << n; \n" \
+"    } \n" \
+"    else \n" \
+"    { \n" \
+"        lowR = lowV << n; \n" \
+"        highR = highV << n; \n" \
+"        lowV = lowV >> (32 - n); \n" \
+"        mask = (~0) >> (32 - n); \n" \
+"        lowV = lowV & mask; \n" \
+"        highR = highR | lowV; \n" \
+"    } \n" \
+" \n" \
+"    viv_setlong(result, as_uint(lowR), as_uint(highR)); \n" \
 "    return result; \n" \
 "} \n"
 
@@ -8337,8 +8415,9 @@ static gctSTRING    gcLibCLLong_Func1 =
 static gctSTRING    gcLibCLLong_Func2 =
     _longulong_subsat_long
     _longulong_subsat_ulong
-    _longulong_f2i_long;
-
+    _longulong_f2i_long
+    _longulong_left_shift_long_scalar
+    _longulong_left_shift_ulong_scalar;
 #endif
 
 

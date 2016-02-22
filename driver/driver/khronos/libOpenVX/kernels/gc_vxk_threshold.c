@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,12 +13,30 @@
 
 #include <gc_vxk_common.h>
 
-vx_status vxThreshold(vx_image src_image, vx_threshold threshold, vx_image dst_image)
+vx_status vxThreshold(vx_node node, vx_image src_image, vx_threshold threshold, vx_image dst_image)
 {
+    vx_status status = VX_SUCCESS;
     vx_enum type = 0;
     vx_int32 value = 0, lower = 0, upper = 0;
-    gcoVX_Kernel_Context context = {{0}};
     vx_uint32 bin[2];
+    gcoVX_Kernel_Context * kernelContext = gcvNULL;
+
+#if gcdVX_OPTIMIZER
+    if (node && node->kernelContext)
+    {
+        kernelContext = (gcoVX_Kernel_Context *) node->kernelContext;
+    }
+    else
+#endif
+    {
+        if (node->kernelContext == VX_NULL)
+        {
+            /* Allocate a local copy for old flow. */
+            node->kernelContext = (gcoVX_Kernel_Context *) vxAllocate(sizeof(gcoVX_Kernel_Context));
+        }
+        kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
+        kernelContext->objects_num = 0;
+    }
 
     vxQueryThreshold(threshold, VX_THRESHOLD_ATTRIBUTE_TYPE, &type, sizeof(type));
 
@@ -26,12 +44,12 @@ vx_status vxThreshold(vx_image src_image, vx_threshold threshold, vx_image dst_i
     {
         vxQueryThreshold(threshold, VX_THRESHOLD_ATTRIBUTE_THRESHOLD_VALUE, &value, sizeof(value));
         bin[0] = FORMAT_VALUE(value + 1);
-        bin[1] = FORMAT_VALUE(0xffU);
+        bin[1] = FORMAT_VALUE(0xffu);
 
-        gcoOS_MemCopy(&context.uniforms[0].uniform, bin, sizeof(bin));
-        context.uniforms[0].num = 2 * 4;
+        gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));
+        kernelContext->uniforms[0].num = 2 * 4;
         /* policy == 1, the type is binary, otherwise range */
-        context.params.policy = 1;
+        kernelContext->params.policy = 1;
     }
     else if (type == VX_THRESHOLD_TYPE_RANGE)
     {
@@ -40,22 +58,32 @@ vx_status vxThreshold(vx_image src_image, vx_threshold threshold, vx_image dst_i
         bin[0] = FORMAT_VALUE(lower);
         bin[1] = FORMAT_VALUE(upper);
 
-        gcoOS_MemCopy(&context.uniforms[0].uniform, bin, sizeof(bin));
-        context.uniforms[0].num = 2 * 4;
+        gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));
+        kernelContext->uniforms[0].num = 2 * 4;
     }
 
-    context.uniforms[0].index = 2;
-    context.uniform_num = 1;
+    kernelContext->uniforms[0].index = 2;
+    kernelContext->uniform_num = 1;
 
     /*index = 0*/
-    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src_image, GC_VX_INDEX_AUTO);
+    gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src_image, GC_VX_INDEX_AUTO);
 
     /*index = 1*/
-    gcoVX_AddObject(&context, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst_image, GC_VX_INDEX_AUTO);
+    gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst_image, GC_VX_INDEX_AUTO);
 
-    context.params.kernel = gcvVX_KERNEL_THRESHOLD;
-    context.params.xstep = 16;
+    kernelContext->params.kernel = gcvVX_KERNEL_THRESHOLD;
+    kernelContext->params.xstep = 16;
 
-    return gcfVX_Kernel(&context);
+    kernelContext->params.evisNoInst = node->base.context->evisNoInst;
+
+    status = gcfVX_Kernel(kernelContext);
+
+#if gcdVX_OPTIMIZER
+    if (!node || !node->kernelContext)
+    {
+        vxFree(kernelContext);
+    }
+#endif
+
+    return status;
 }
-

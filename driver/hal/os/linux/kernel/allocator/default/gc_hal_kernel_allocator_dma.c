@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -196,6 +196,8 @@ _DmaAlloc(
 
     Mdl->priv = mdlPriv;
 
+    Mdl->dmaHandle = mdlPriv->dmaHandle;
+
     /* Statistic. */
     allocatorPriv->size += NumPages * PAGE_SIZE;
 
@@ -238,19 +240,20 @@ gctINT
 _DmaMapUser(
     gckALLOCATOR Allocator,
     PLINUX_MDL Mdl,
-    PLINUX_MDL_MAP MdlMap,
-    gctBOOL Cacheable
+    gctBOOL Cacheable,
+    OUT gctPOINTER * UserLogical
     )
 {
 
     PLINUX_MDL      mdl = Mdl;
-    PLINUX_MDL_MAP  mdlMap = MdlMap;
     struct mdl_dma_priv *mdlPriv=(struct mdl_dma_priv *)Mdl->priv;
+    struct vm_area_struct * vma;
+    gctPOINTER      userLogical = gcvNULL;
 
-    gcmkHEADER_ARG("Allocator=%p Mdl=%p MdlMap=%p gctBOOL=%d", Allocator, Mdl, MdlMap, Cacheable);
+    gcmkHEADER_ARG("Allocator=%p Mdl=%p gctBOOL=%d", Allocator, Mdl, Cacheable);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0)
-    mdlMap->vmaAddr = (gctSTRING)vm_mmap(gcvNULL,
+    userLogical = (gctSTRING)vm_mmap(gcvNULL,
                     0L,
                     mdl->numPages * PAGE_SIZE,
                     PROT_READ | PROT_WRITE,
@@ -259,7 +262,7 @@ _DmaMapUser(
 #else
     down_write(&current->mm->mmap_sem);
 
-    mdlMap->vmaAddr = (gctSTRING)do_mmap_pgoff(gcvNULL,
+    userLogical = (gctSTRING)do_mmap_pgoff(gcvNULL,
                     0L,
                     mdl->numPages * PAGE_SIZE,
                     PROT_READ | PROT_WRITE,
@@ -273,11 +276,11 @@ _DmaMapUser(
         gcvLEVEL_INFO, gcvZONE_OS,
         "%s(%d): vmaAddr->0x%X for phys_addr->0x%X",
         __FUNCTION__, __LINE__,
-        (gctUINT32)(gctUINTPTR_T)mdlMap->vmaAddr,
+        (gctUINT32)(gctUINTPTR_T)userLogical,
         (gctUINT32)(gctUINTPTR_T)mdl
         );
 
-    if (IS_ERR(mdlMap->vmaAddr))
+    if (IS_ERR(userLogical))
     {
         gcmkTRACE_ZONE(
             gcvLEVEL_INFO, gcvZONE_OS,
@@ -285,17 +288,15 @@ _DmaMapUser(
             __FUNCTION__, __LINE__
             );
 
-        mdlMap->vmaAddr = gcvNULL;
-
         gcmkFOOTER_ARG("*status=%d", gcvSTATUS_OUT_OF_MEMORY);
         return gcvSTATUS_OUT_OF_MEMORY;
     }
 
     down_write(&current->mm->mmap_sem);
 
-    mdlMap->vma = find_vma(current->mm, (unsigned long)mdlMap->vmaAddr);
+    vma = find_vma(current->mm, (unsigned long)userLogical);
 
-    if (mdlMap->vma == gcvNULL)
+    if (vma == gcvNULL)
     {
         up_write(&current->mm->mmap_sem);
 
@@ -305,8 +306,6 @@ _DmaMapUser(
             __FUNCTION__, __LINE__
             );
 
-        mdlMap->vmaAddr = gcvNULL;
-
         gcmkFOOTER_ARG("*status=%d", gcvSTATUS_OUT_OF_RESOURCES);
         return gcvSTATUS_OUT_OF_RESOURCES;
     }
@@ -314,15 +313,15 @@ _DmaMapUser(
     /* map kernel memory to user space.. */
 #if defined CONFIG_MIPS
     if (remap_pfn_range(
-            mdlMap->vma,
-            mdlMap->vma->vm_start,
+            vma,
+            vma->vm_start,
             mdlPriv->dmaHandle >> PAGE_SHIFT,
             mdl->numPages * PAGE_SIZE,
-            gcmkNONPAGED_MEMROY_PROT(mdlMap->vma->vm_page_prot)) < 0)
+            gcmkNONPAGED_MEMROY_PROT(vma->vm_page_prot)) < 0)
 #else
     /* map kernel memory to user space.. */
     if (dma_mmap_writecombine(gcvNULL,
-            mdlMap->vma,
+            vma,
             mdlPriv->kvaddr,
             mdlPriv->dmaHandle,
             mdl->numPages * PAGE_SIZE) < 0)
@@ -336,13 +335,13 @@ _DmaMapUser(
             __FUNCTION__, __LINE__
             );
 
-         mdlMap->vmaAddr = gcvNULL;
-
         gcmkFOOTER_ARG("*status=%d", gcvSTATUS_OUT_OF_MEMORY);
         return gcvSTATUS_OUT_OF_MEMORY;
     }
 
     up_write(&current->mm->mmap_sem);
+
+    *UserLogical = userLogical;
 
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
@@ -407,15 +406,6 @@ _DmaUnmapKernel(
 }
 
 extern gceSTATUS
-_DefaultLogicalToPhysical(
-    IN gckALLOCATOR Allocator,
-    IN PLINUX_MDL Mdl,
-    IN gctPOINTER Logical,
-    IN gctUINT32 ProcessID,
-    OUT gctPHYS_ADDR_T * Physical
-    );
-
-extern gceSTATUS
 _DefaultCache(
     IN gckALLOCATOR Allocator,
     IN PLINUX_MDL Mdl,
@@ -435,7 +425,7 @@ _DmaPhysical(
 {
     struct mdl_dma_priv *mdlPriv=(struct mdl_dma_priv *)Mdl->priv;
 
-    *Physical = mdlPriv->dmaHandle + Offset * PAGE_SIZE;
+    *Physical = mdlPriv->dmaHandle + Offset;
 
     return gcvSTATUS_OK;
 }
@@ -453,7 +443,6 @@ gcsALLOCATOR_OPERATIONS DmaAllocatorOperations = {
     .UnmapUser          = _DmaUnmapUser,
     .MapKernel          = _DmaMapKernel,
     .UnmapKernel        = _DmaUnmapKernel,
-    .LogicalToPhysical  = _DefaultLogicalToPhysical,
     .Cache              = _DefaultCache,
     .Physical           = _DmaPhysical,
 };

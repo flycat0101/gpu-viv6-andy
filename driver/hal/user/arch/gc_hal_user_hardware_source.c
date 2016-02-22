@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -28,8 +28,8 @@
 **      gcoHARDWARE Hardware
 **          Pointer to an gcoHARDWARE object.
 **
-**      gcsSURF_INFO_PTR Surface
-**          Pointer to the source surface descriptor.
+**      gcoSURF Surface
+**          Pointer to the source surface object.
 **
 **  OUTPUT:
 **
@@ -40,7 +40,7 @@ static gceSTATUS
 _SetSourceTileStatus(
     IN gcoHARDWARE Hardware,
     IN gctUINT RegGroupIndex,
-    IN gcsSURF_INFO_PTR Source,
+    IN gcoSURF Source,
     OUT gctBOOL *CacheMode
     )
 {
@@ -52,35 +52,50 @@ _SetSourceTileStatus(
     gcmHEADER_ARG("Hardware=0x%x RegGroupIndex=%d Source=0x%x CacheMode=0x%x",
                     Hardware, RegGroupIndex, Source, CacheMode);
 
-    if (!Hardware->features[gcvFEATURE_2D_FC_SOURCE])
+    if (!Hardware->features[gcvFEATURE_2D_V4COMPRESSION])
     {
-        gcmFOOTER_NO();
-        return gcvSTATUS_SKIP;
-    }
+        if (!Hardware->features[gcvFEATURE_2D_FC_SOURCE])
+        {
+            gcmFOOTER_NO();
+            return gcvSTATUS_SKIP;
+        }
 
-    gcmGETCURRENTHARDWARE(hwType);
-    if (hwType == gcvHARDWARE_3D2D)
-    {
-        gcmPRINT("WARN: Skip set shared register!");
+        gcmGETCURRENTHARDWARE(hwType);
+        if (hwType == gcvHARDWARE_3D2D)
+        {
+            gcmPRINT("WARN: Skip set shared register!");
 
-        gcmFOOTER_NO();
-        return gcvSTATUS_SKIP;
+            gcmFOOTER_NO();
+            return gcvSTATUS_SKIP;
+        }
     }
 
      if (Source->tileStatusConfig == gcv2D_TSC_DISABLE ||
          gcmHAS2DCOMPRESSION(Source) ||
          gcmHASOTHERCOMPRESSIONNO3D(Source))
     {
-        /* Disable tile status. */
-        gcmONERROR(gcoHARDWARE_Load2DState32(
-            Hardware,
-            0x01720 + regOffset,
-            0x00000000
-            ));
+        if (!Hardware->features[gcvFEATURE_2D_V4COMPRESSION])
+        {
+            /* Disable tile status. */
+            gcmONERROR(gcoHARDWARE_Load2DState32(
+                Hardware,
+                0x01720 + regOffset,
+                0x00000000
+                ));
+        }
+        else
+        {
+            gcmONERROR(gcoHARDWARE_Load2DState32(
+                Hardware,
+                0x12FC0 + regOffset,
+                0x00000000
+                ));
+        }
     }
     else
     {
         gctUINT32 config, address;
+        gctUINT32 format = 0;
 
         gcmGETHARDWAREADDRESS(Source->node, address);
         if (address & 0xFF)
@@ -88,39 +103,189 @@ _SetSourceTileStatus(
             gcmONERROR(gcvSTATUS_NOT_ALIGNED);
         }
 
-        if (Source->tileStatusConfig & gcv2D_TSC_ENABLE)
+        if (!Hardware->features[gcvFEATURE_2D_V4COMPRESSION])
         {
-            config = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            if (Source->tileStatusConfig & gcv2D_TSC_ENABLE)
+            {
+                config = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ? 1:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
  1:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 1:0) - (0 ? 1:0) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ? 1:0)));
-        }
-        else if (Source->tileStatusConfig & gcv2D_TSC_COMPRESSED)
-        {
-            config = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            }
+            else if (Source->tileStatusConfig & gcv2D_TSC_COMPRESSED)
+            {
+                config = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ? 1:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
  1:0))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ? 1:0) - (0 ? 1:0) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ? 1:0)));
+            }
+            else
+            {
+                config = 0;
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            }
+
+            if (Source->tileStatusConfig & (gcv2D_TSC_COMPRESSED | gcv2D_TSC_DOWN_SAMPLER))
+            {
+                switch (Source->tileStatusFormat)
+                {
+                case gcvSURF_A4R4G4B4:
+                case gcvSURF_X4R4G4B4:
+                    format = 0x0;
+                    break;
+
+                case gcvSURF_A1R5G5B5:
+                case gcvSURF_X1R5G5B5:
+                    format = 0x1;
+                    break;
+
+                case gcvSURF_R5G6B5:
+                    format = 0x2;
+                    break;
+
+                case gcvSURF_A8R8G8B8:
+                    format = 0x3;
+                    break;
+
+                case gcvSURF_X8R8G8B8:
+                    format = 0x4;
+                    break;
+
+                default:
+                    gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+                }
+
+                config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:4) - (0 ? 7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
+ 7:4))) | (((gctUINT32) ((gctUINT32) (format) & ((gctUINT32) ((((1 ? 7:4) - (0 ?
+ 7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
+ 7:4)));
+            }
+
+            if (Source->tileStatusConfig & gcv2D_TSC_DOWN_SAMPLER)
+            {
+                cacheMode = gcvTRUE;
+                config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 8:8) - (0 ? 8:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ?
+ 8:8))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 8:8) - (0 ? 8:8) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ? 8:8)));
+            }
+            else
+            {
+                config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 8:8) - (0 ? 8:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ?
+ 8:8))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 8:8) - (0 ? 8:8) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ? 8:8)));
+            }
+
+            gcmONERROR(gcoHARDWARE_Load2DState32(
+                Hardware,
+                0x01720 + regOffset,
+                config
+                ));
+
+            gcmONERROR(gcoHARDWARE_Load2DState32(
+                Hardware,
+                0x01740 + regOffset,
+                Source->tileStatusGpuAddress
+                ));
+
+            gcmDUMP_2D_SURFACE(gcvTRUE, Source->tileStatusGpuAddress);
+
+            gcmONERROR(gcoHARDWARE_Load2DState32(
+                Hardware,
+                0x01760 + regOffset,
+                Source->tileStatusClearValue
+                ));
         }
         else
         {
-            config = 0;
-            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-        }
+            if (Source->tileStatusConfig & gcv2D_TSC_ENABLE)
+            {
+                config = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:0) - (0 ? 1:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
+ 1:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 1:0) - (0 ? 1:0) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ? 1:0)));
+            }
+            else if (Source->tileStatusConfig & gcv2D_TSC_V4_COMPRESSED)
+            {
+                gctUINT32 bpp;
+                gcmONERROR(gcoHARDWARE_ConvertFormat(Source->format, &bpp, gcvNULL));
 
-        if (Source->tileStatusConfig & (gcv2D_TSC_COMPRESSED | gcv2D_TSC_DOWN_SAMPLER))
-        {
-            gctUINT32 format = 0;
+                if (bpp == 8)
+                {
+                    gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+                }
+                /* Check alignment first */
+                else if (Source->stride & 0xFF)
+                {
+                    gcmONERROR(gcvSTATUS_NOT_ALIGNED);
+                }
+                else
+                {
+                    if (Source->tiling == gcvTILED)
+                    {
+                        if (Source->tileStatusConfig == gcv2D_TSC_V4_COMPRESSED_256B)
+                        {
+                            if ((Source->alignedW & 0xFF) || (Source->alignedH & 0xFF))
+                            {
+                                gcmONERROR(gcvSTATUS_NOT_ALIGNED);
+                            }
+                        }
+                        else
+                        {
+                            if ((Source->alignedW & 0x7F) || (Source->alignedH & 0x7F))
+                            {
+                                gcmONERROR(gcvSTATUS_NOT_ALIGNED);
+                            }
+                        }
+                    }
+                    else if (Source->tiling == gcvSUPERTILED || Source->tiling == gcvYMAJOR_SUPERTILED)
+                    {
+                        if ((Source->alignedW & 0x3F) || (Source->alignedH & 0x3F))
+                        {
+                            gcmONERROR(gcvSTATUS_NOT_ALIGNED);
+                        }
+                    }
+                    else
+                    {
+                        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+                    }
+                }
+
+                config = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:0) - (0 ? 1:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
+ 1:0))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ? 1:0) - (0 ? 1:0) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ? 1:0)));
+
+                if (Source->tileStatusConfig == gcv2D_TSC_V4_COMPRESSED_256B)
+                {
+                    config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 20:20) - (0 ? 20:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 20:20) - (0 ? 20:20) + 1))))))) << (0 ?
+ 20:20))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 20:20) - (0 ? 20:20) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 20:20) - (0 ? 20:20) + 1))))))) << (0 ? 20:20)));
+                }
+                else
+                {
+                    config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 20:20) - (0 ? 20:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 20:20) - (0 ? 20:20) + 1))))))) << (0 ?
+ 20:20))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 20:20) - (0 ? 20:20) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 20:20) - (0 ? 20:20) + 1))))))) << (0 ? 20:20)));
+                }
+            }
+            else
+            {
+                config = 0;
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            }
 
             switch (Source->tileStatusFormat)
             {
             case gcvSURF_A4R4G4B4:
-            case gcvSURF_X4R4G4B4:
                 format = 0x0;
                 break;
 
             case gcvSURF_A1R5G5B5:
-            case gcvSURF_X1R5G5B5:
                 format = 0x1;
                 break;
 
@@ -132,7 +297,7 @@ _SetSourceTileStatus(
                 format = 0x3;
                 break;
 
-            case gcvSURF_X8R8G8B8:
+            case gcvSURF_R8G8B8:
                 format = 0x4;
                 break;
 
@@ -145,43 +310,58 @@ _SetSourceTileStatus(
  7:4))) | (((gctUINT32) ((gctUINT32) (format) & ((gctUINT32) ((((1 ? 7:4) - (0 ?
  7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
  7:4)));
+
+            if (Source->tiling == gcvTILING_Y_MAJOR)
+            {
+                config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:19) - (0 ? 19:19) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:19) - (0 ? 19:19) + 1))))))) << (0 ?
+ 19:19))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 19:19) - (0 ? 19:19) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 19:19) - (0 ? 19:19) + 1))))))) << (0 ? 19:19)));
+            }
+            else
+            {
+                config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:19) - (0 ? 19:19) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:19) - (0 ? 19:19) + 1))))))) << (0 ?
+ 19:19))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 19:19) - (0 ? 19:19) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 19:19) - (0 ? 19:19) + 1))))))) << (0 ? 19:19)));
+            }
+
+            if ((Source->tileStatusConfig & gcv2D_TSC_COMPRESSED) &&
+                (Source->tileStatusConfig & gcv2D_TSC_DOWN_SAMPLER))
+            {
+                config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:18) - (0 ? 18:18) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:18) - (0 ? 18:18) + 1))))))) << (0 ?
+ 18:18))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 18:18) - (0 ? 18:18) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 18:18) - (0 ? 18:18) + 1))))))) << (0 ? 18:18)));
+            }
+            else
+            {
+                config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:18) - (0 ? 18:18) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:18) - (0 ? 18:18) + 1))))))) << (0 ?
+ 18:18))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 18:18) - (0 ? 18:18) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 18:18) - (0 ? 18:18) + 1))))))) << (0 ? 18:18)));
+            }
+
+            gcmONERROR(gcoHARDWARE_Load2DState32(
+                Hardware,
+                0x12FC0 + regOffset,
+                config
+                ));
+
+            gcmONERROR(gcoHARDWARE_Load2DState32(
+                Hardware,
+                0x12EE0 + regOffset,
+                Source->tileStatusGpuAddress
+                ));
+
+            gcmDUMP_2D_SURFACE(gcvTRUE, Source->tileStatusGpuAddress);
+
+            gcmONERROR(gcoHARDWARE_Load2DState32(
+                Hardware,
+                0x12FA0 + regOffset,
+                Source->tileStatusClearValue
+                ));
         }
-
-        if (Source->tileStatusConfig & gcv2D_TSC_DOWN_SAMPLER)
-        {
-            cacheMode = gcvTRUE;
-            config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 8:8) - (0 ? 8:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ?
- 8:8))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 8:8) - (0 ? 8:8) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ? 8:8)));
-        }
-        else
-        {
-            config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 8:8) - (0 ? 8:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ?
- 8:8))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 8:8) - (0 ? 8:8) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ? 8:8)));
-        }
-
-        gcmONERROR(gcoHARDWARE_Load2DState32(
-            Hardware,
-            0x01720 + regOffset,
-            config
-            ));
-
-        gcmONERROR(gcoHARDWARE_Load2DState32(
-            Hardware,
-            0x01740 + regOffset,
-            Source->tileStatusGpuAddress
-            ));
-
-        gcmDUMP_2D_SURFACE(gcvTRUE, Source->tileStatusGpuAddress);
-
-        gcmONERROR(gcoHARDWARE_Load2DState32(
-            Hardware,
-            0x01760 + regOffset,
-            Source->tileStatusClearValue
-            ));
     }
 
     if (CacheMode != gcvNULL)
@@ -207,8 +387,8 @@ OnError:
 **      gcoHARDWARE Hardware
 **          Pointer to an gcoHARDWARE object.
 **
-**      gcsSURF_INFO_PTR Surface
-**          Pointer to the destination surface descriptor.
+**      gcoSURF Surface
+**          Pointer to the destination surface object.
 **
 **      gctUINT32_PTR Index
 **          Surface index in source group.
@@ -226,7 +406,7 @@ OnError:
 static gceSTATUS
 _SetSourceCompression(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gctUINT32 Index,
     IN gctBOOL MultiSrc,
     IN OUT gctUINT32_PTR Config
@@ -470,11 +650,11 @@ OnError:
 **      gcoHARDWARE Hardware
 **          Pointer to an gcoHARDWARE object.
 **
-**      gcsSURF_INFO_PTR SrcSurface
-**          Pointer to the source surface descriptor.
+**      gcoSURF SrcSurface
+**          Pointer to the source surface object.
 **
-**      gcsSURF_INFO_PTR DestSurface
-**          Pointer to the destination surface descriptor.
+**      gcoSURF DstSurface
+**          Pointer to the destination surface object.
 **
 **      gctUINT CompressNum
 **          Compressed source surface number.
@@ -491,8 +671,8 @@ gceSTATUS
 gcoHARDWARE_GetCompressionCmdSize(
     IN gcoHARDWARE Hardware,
     IN gcs2D_State_PTR State,
-    IN gcsSURF_INFO_PTR SrcSurface,
-    IN gcsSURF_INFO_PTR DstSurface,
+    IN gcoSURF SrcSurface,
+    IN gcoSURF DstSurface,
     IN gctUINT CompressNum,
     IN gce2D_COMMAND Command,
     OUT gctUINT32 *CmdSize
@@ -607,11 +787,11 @@ OnError:
 **      gcoHARDWARE Hardware
 **          Pointer to an gcoHARDWARE object.
 **
-**      gcsSURF_INFO_PTR SrcSurface
-**          Pointer to the source surface descriptor.
+**      gcoSURF SrcSurface
+**          Pointer to the source surface object.
 **
-**      gcsSURF_INFO_PTR DestSurface
-**          Pointer to the destination surface descriptor.
+**      gcoSURF DstSurface
+**          Pointer to the destination surface object.
 **
 **      gce2D_COMMAND Command
 **          2D command type.
@@ -624,8 +804,8 @@ gceSTATUS
 gcoHARDWARE_SetCompression(
     IN gcoHARDWARE Hardware,
     IN gcs2D_State_PTR State,
-    IN gcsSURF_INFO_PTR SrcSurface,
-    IN gcsSURF_INFO_PTR DstSurface,
+    IN gcoSURF SrcSurface,
+    IN gcoSURF DstSurface,
     IN gce2D_COMMAND Command,
     IN gctBOOL AnyCompress
     )
@@ -931,8 +1111,8 @@ OnError:
 **      gcoHARDWARE Hardware
 **          Pointer to an gcoHARDWARE object.
 **
-**      gcsSURF_INFO_PTR Surface
-**          Pointer to the source surface descriptor.
+**      gcoSURF Surface
+**          Pointer to the source surface object.
 **
 **      gctBOOL CoordRelative
 **          If gcvFALSE, the source origin represents absolute pixel coordinate
@@ -945,7 +1125,7 @@ OnError:
 */
 gceSTATUS gcoHARDWARE_SetColorSource(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gctBOOL CoordRelative,
     IN gctUINT32 Transparency,
     IN gce2D_YUV_COLOR_MODE Mode,
@@ -961,8 +1141,7 @@ gceSTATUS gcoHARDWARE_SetColorSource(
     gctUINT32 rgbaSwizzle, uvSwizzle;
     gctBOOL fullRot;
 
-    gcmHEADER_ARG("Surface=0x%x CoordRelative=%d",
-                    Surface, CoordRelative);
+    gcmHEADER_ARG("Surface=0x%x CoordRelative=%d", Surface, CoordRelative);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
@@ -1124,6 +1303,14 @@ gceSTATUS gcoHARDWARE_SetColorSource(
  7:7))) | (((gctUINT32) (0x1  & ((gctUINT32) ((((1 ? 7:7) - (0 ? 7:7) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
+        if (Hardware->features[gcvFEATURE_2D_MAJOR_SUPER_TILE])
+        {
+            data[3] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:9) - (0 ? 10:9) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ?
+ 10:9))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 10:9) - (0 ? 10:9) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ? 10:9)));
+        }
+
         configEx = 0x00000000;
 
         break;
@@ -1134,10 +1321,35 @@ gceSTATUS gcoHARDWARE_SetColorSource(
  7:7))) | (((gctUINT32) (0x1  & ((gctUINT32) ((((1 ? 7:7) - (0 ? 7:7) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
-        configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        if (Hardware->features[gcvFEATURE_2D_MAJOR_SUPER_TILE])
+        {
+            data[3] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:9) - (0 ? 10:9) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ?
+ 10:9))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 10:9) - (0 ? 10:9) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ? 10:9)));
+            configEx = 0x00000000;
+        }
+        else
+        {
+            configEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  3:3) - (0 ? 3:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ?
  3:3))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 3:3) - (0 ? 3:3) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ? 3:3)));
+        }
+
+        break;
+
+    case gcvYMAJOR_SUPERTILED:
+        data[3] = ((((gctUINT32) (data[3])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:7) - (0 ? 7:7) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ?
+ 7:7))) | (((gctUINT32) (0x1  & ((gctUINT32) ((((1 ? 7:7) - (0 ? 7:7) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
+        data[3] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:9) - (0 ? 10:9) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ?
+ 10:9))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 10:9) - (0 ? 10:9) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ? 10:9)));
+
+        configEx = 0x00000000;
 
         break;
 
@@ -1472,8 +1684,8 @@ OnError:
 **      gcoHARDWARE Hardware
 **          Pointer to an gcoHARDWARE object.
 **
-**      gcsSURF_INFO_PTR Surface
-**          Pointer to the source surface descriptor.
+**      gcoSURF Surface
+**          Pointer to the source surface object.
 **
 **      gctBOOL CoordRelative
 **          If gcvFALSE, the source origin represents absolute pixel coordinate
@@ -1492,7 +1704,7 @@ OnError:
 */
 gceSTATUS gcoHARDWARE_SetMaskedSource(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     IN gctBOOL CoordRelative,
     IN gceSURF_MONOPACK MaskPack,
     IN gctUINT32 Transparency
@@ -2498,8 +2710,8 @@ OnError:
 **      gcoHARDWARE Hardware
 **          Pointer to an gcoHARDWARE object.
 **
-**      gcsSURF_INFO_PTR Surface
-**          Pointer to the source surface descriptor.
+**      gcoSURF Surface
+**          Pointer to the source surface object.
 **
 **      gctBOOL CoordRelative
 **          If gcvFALSE, the source origin represents absolute pixel coordinate
@@ -2523,7 +2735,7 @@ gcoHARDWARE_SetMultiSource(
     gctUINT32 data[4];
     gctUINT32 rgbaSwizzle, uvSwizzle; /* Determine color swizzle. */
     gcs2D_MULTI_SOURCE_PTR src = &State->multiSrc[SrcIndex];
-    gcsSURF_INFO_PTR Surface = &src->srcSurface;
+    gcoSURF Surface = &src->srcSurface;
     gctUINT regOffset = RegGroupIndex << 2;
     gctBOOL cacheMode = gcvFALSE;
     gctUINT32 address;
@@ -2669,25 +2881,78 @@ gcoHARDWARE_SetMultiSource(
         break;
 
     case gcvTILED:
-        data[0] = ((((gctUINT32) (data[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        if (Hardware->features[gcvFEATURE_2D_MAJOR_SUPER_TILE])
+        {
+            gcmONERROR(gcoHARDWARE_Load2DState32(
+                Hardware,
+                0x12A60 + regOffset,
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:7) - (0 ? 7:7) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ?
+ 7:7))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 7:7) - (0 ? 7:7) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7))) |
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:9) - (0 ? 10:9) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ?
+ 10:9))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 10:9) - (0 ? 10:9) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ? 10:9)))));
+        }
+        else
+        {
+            data[0] = ((((gctUINT32) (data[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  7:7) - (0 ? 7:7) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ?
  7:7))) | (((gctUINT32) (0x1  & ((gctUINT32) ((((1 ? 7:7) - (0 ? 7:7) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
-
+        }
         data[1] = 0x00000000;
 
         break;
 
     case gcvSUPERTILED:
-        data[0] = ((((gctUINT32) (data[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        if (Hardware->features[gcvFEATURE_2D_MAJOR_SUPER_TILE])
+        {
+            gcmONERROR(gcoHARDWARE_Load2DState32(
+                Hardware,
+                0x12A60 + regOffset,
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:7) - (0 ? 7:7) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ?
+ 7:7))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 7:7) - (0 ? 7:7) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7))) |
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:9) - (0 ? 10:9) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ?
+ 10:9))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 10:9) - (0 ? 10:9) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ? 10:9)))));
+
+            data[1] = 0x00000000;
+        }
+        else
+        {
+            data[0] = ((((gctUINT32) (data[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  7:7) - (0 ? 7:7) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ?
  7:7))) | (((gctUINT32) (0x1  & ((gctUINT32) ((((1 ? 7:7) - (0 ? 7:7) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
-        data[1] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            data[1] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  3:3) - (0 ? 3:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ?
  3:3))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 3:3) - (0 ? 3:3) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ? 3:3)));
+        }
+
+        break;
+
+    case gcvYMAJOR_SUPERTILED:
+        gcmONERROR(gcoHARDWARE_Load2DState32(
+            Hardware,
+            0x12A60 + regOffset,
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 7:7) - (0 ?
+ 7:7) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ?
+ 7:7))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 7:7) - (0 ? 7:7) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7))) |
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 10:9) - (0 ?
+ 10:9) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ?
+ 10:9))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 10:9) - (0 ? 10:9) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ? 10:9)))
+            ));
+
+        data[1] = 0x00000000;
 
         break;
 
@@ -3314,7 +3579,7 @@ OnError:
 **      gcoHARDWARE Hardware
 **          Pointer to an gcoHARDWARE object.
 **
-**      gcsSURF_INFO_PTR Surface
+**      gcoSURF Surface
 **          Pointer to the source surface descriptor.
 **
 **      gctBOOL CoordRelative
@@ -3340,7 +3605,7 @@ gcoHARDWARE_SetMultiSourceEx(
     gctUINT32 data[4];
     gctUINT32 rgbaSwizzle, uvSwizzle; /* Determine color swizzle. */
     gcs2D_MULTI_SOURCE_PTR src = &State->multiSrc[SrcIndex];
-    gcsSURF_INFO_PTR Surface = &src->srcSurface;
+    gcoSURF Surface = &src->srcSurface;
     gctUINT regOffset = RegGroupIndex << 2;
     gctBOOL cacheMode = gcvFALSE;
     gctBOOL setSrcRect = gcvTRUE;
@@ -3489,6 +3754,13 @@ gcoHARDWARE_SetMultiSourceEx(
  7:7))) | (((gctUINT32) (0x1  & ((gctUINT32) ((((1 ? 7:7) - (0 ? 7:7) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
+        if (Hardware->features[gcvFEATURE_2D_MAJOR_SUPER_TILE])
+        {
+            data[0] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:9) - (0 ? 10:9) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ?
+ 10:9))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 10:9) - (0 ? 10:9) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ? 10:9)));
+        }
         data[1] = 0x00000000;
 
         break;
@@ -3499,10 +3771,36 @@ gcoHARDWARE_SetMultiSourceEx(
  7:7))) | (((gctUINT32) (0x1  & ((gctUINT32) ((((1 ? 7:7) - (0 ? 7:7) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
 
-        data[1] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        if (Hardware->features[gcvFEATURE_2D_MAJOR_SUPER_TILE])
+        {
+            data[0] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:9) - (0 ? 10:9) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ?
+ 10:9))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 10:9) - (0 ? 10:9) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ? 10:9)));
+            data[1] = 0x00000000;
+        }
+        else
+        {
+            data[1] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  3:3) - (0 ? 3:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ?
  3:3))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 3:3) - (0 ? 3:3) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ? 3:3)));
+        }
+
+        break;
+
+    case gcvYMAJOR_SUPERTILED:
+        data[0] = ((((gctUINT32) (data[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:7) - (0 ? 7:7) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ?
+ 7:7))) | (((gctUINT32) (0x1  & ((gctUINT32) ((((1 ? 7:7) - (0 ? 7:7) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:7) - (0 ? 7:7) + 1))))))) << (0 ? 7:7)));
+
+        data[0] |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 10:9) - (0 ? 10:9) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ?
+ 10:9))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 10:9) - (0 ? 10:9) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 10:9) - (0 ? 10:9) + 1))))))) << (0 ? 10:9)));
+
+        data[1] = 0x00000000;
 
         break;
 
@@ -4520,12 +4818,10 @@ gcoHARDWARE_SetMultiSourceEx(
 
         if ((sw != dw) || (sh != dh))
         {
-            gctINT32 hfact = gcoHARDWARE_GetStretchFactor(src->enableGDIStretch, sw, dw);
-            gctINT32 vfact = gcoHARDWARE_GetStretchFactor(src->enableGDIStretch, sh, dh);
+            gctINT32 hfact = gcoHARDWARE_GetStretchFactor(gcvTRUE, sw, dw);
+            gctINT32 vfact = gcoHARDWARE_GetStretchFactor(gcvTRUE, sh, dh);
 
-            if (sw != dw) xf = 0x8000; else xf = 0;
-            if (sh != dh) yf = 0x8000; else yf = 0;
-
+            xf = yf = 0x8000;
             config = ((((gctUINT32) (~0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
  2:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?

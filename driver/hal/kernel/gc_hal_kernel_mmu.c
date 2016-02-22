@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -70,8 +70,6 @@ gceMMU_TYPE;
 #define gcmENTRY_COUNT(x) ((x & 0xFFFFFF00) >> 8)
 
 #define gcdMMU_TABLE_DUMP       0
-
-#define gcdUSE_MMU_EXCEPTION    1
 
 #define gcdVERTEX_START      (128 << 10)
 
@@ -188,20 +186,20 @@ _FillMap(
 
 static gceSTATUS
 _Link(
-    IN gckMMU Mmu,
+    IN gcsADDRESS_AREA_PTR Area,
     IN gctUINT32 Index,
     IN gctUINT32 Next
     )
 {
-    if (Index >= Mmu->pageTableEntries)
+    if (Index >= Area->pageTableEntries)
     {
         /* Just move heap pointer. */
-        Mmu->heapList = Next;
+        Area->heapList = Next;
     }
     else
     {
         /* Address page table. */
-        gctUINT32_PTR map = Mmu->mapLogical;
+        gctUINT32_PTR map = Area->mapLogical;
 
         /* Dispatch on node type. */
         switch (gcmENTRY_TYPE(map[Index]))
@@ -228,13 +226,13 @@ _Link(
 
 static gceSTATUS
 _AddFree(
-    IN gckMMU Mmu,
+    IN gcsADDRESS_AREA_PTR Area,
     IN gctUINT32 Index,
     IN gctUINT32 Node,
     IN gctUINT32 Count
     )
 {
-    gctUINT32_PTR map = Mmu->mapLogical;
+    gctUINT32_PTR map = Area->mapLogical;
 
     if (Count == 1)
     {
@@ -249,23 +247,23 @@ _AddFree(
     }
 
     /* Append the node. */
-    return _Link(Mmu, Index, Node);
+    return _Link(Area, Index, Node);
 }
 
 static gceSTATUS
 _Collect(
-    IN gckMMU Mmu
+    IN gcsADDRESS_AREA_PTR Area
     )
 {
-    gctUINT32_PTR map = Mmu->mapLogical;
+    gctUINT32_PTR map = Area->mapLogical;
     gceSTATUS status;
     gctUINT32 i, previous, start = 0, count = 0;
 
-    previous = Mmu->heapList = ~0U;
-    Mmu->freeNodes = gcvFALSE;
+    previous = Area->heapList = ~0U;
+    Area->freeNodes = gcvFALSE;
 
     /* Walk the entire page table. */
-    for (i = 0; i < Mmu->pageTableEntries; ++i)
+    for (i = 0; i < Area->pageTableEntries; ++i)
     {
         /* Dispatch based on type of page. */
         switch (gcmENTRY_TYPE(map[i]))
@@ -275,7 +273,7 @@ _Collect(
             if (count > 0)
             {
                 /* Add the node. */
-                gcmkONERROR(_AddFree(Mmu, previous, start, count));
+                gcmkONERROR(_AddFree(Area, previous, start, count));
 
                 /* Reset the node. */
                 previous = start;
@@ -317,7 +315,7 @@ _Collect(
     if (count > 0)
     {
         /* Add the node to the list. */
-        gcmkONERROR(_AddFree(Mmu, previous, start, count));
+        gcmkONERROR(_AddFree(Area, previous, start, count));
     }
 
     gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_MMU,
@@ -369,30 +367,30 @@ _MtlbOffset(
 
 gctUINT32
 _AddressToIndex(
-    IN gckMMU Mmu,
+    IN gcsADDRESS_AREA_PTR Area,
     IN gctUINT32 Address
     )
 {
     gctUINT32 mtlbOffset = (Address & gcdMMU_MTLB_MASK) >> gcdMMU_MTLB_SHIFT;
     gctUINT32 stlbOffset = (Address & gcdMMU_STLB_4K_MASK) >> gcdMMU_STLB_4K_SHIFT;
 
-    return (mtlbOffset - Mmu->dynamicMappingStart) * gcdMMU_STLB_4K_ENTRY_NUM + stlbOffset;
+    return (mtlbOffset - Area->dynamicMappingStart) * gcdMMU_STLB_4K_ENTRY_NUM + stlbOffset;
 }
 
 static gctUINT32_PTR
 _StlbEntry(
-    gckMMU Mmu,
+    gcsADDRESS_AREA_PTR Area,
     gctUINT32 Address
     )
 {
-    gctUINT32 index = _AddressToIndex(Mmu, Address);
+    gctUINT32 index = _AddressToIndex(Area, Address);
 
-    return &Mmu->pageTableLogical[index];
+    return &Area->pageTableLogical[index];
 }
 
 static gceSTATUS
 _FillFlatMappingInMap(
-    gckMMU Mmu,
+    gcsADDRESS_AREA_PTR Area,
     gctUINT32 Index,
     gctUINT32 NumPages
     )
@@ -401,11 +399,11 @@ _FillFlatMappingInMap(
     gctUINT32 i;
     gctBOOL gotIt = gcvFALSE;
     gctUINT32 index = Index;
-    gctUINT32_PTR map = Mmu->mapLogical;
+    gctUINT32_PTR map = Area->mapLogical;
     gctUINT32 previous = ~0U;
 
     /* Find node which contains index. */
-    for (i = 0; !gotIt && (i < Mmu->pageTableEntries);)
+    for (i = 0; !gotIt && (i < Area->pageTableEntries);)
     {
         gctUINT32 numPages;
 
@@ -451,7 +449,7 @@ _FillFlatMappingInMap(
     case gcvMMU_SINGLE:
         /* Unlink single node from free list. */
         gcmkONERROR(
-            _Link(Mmu, previous, map[i] >> 8));
+            _Link(Area, previous, map[i] >> 8));
         break;
 
     case gcvMMU_FREE:
@@ -466,18 +464,18 @@ _FillFlatMappingInMap(
             if (countLeft)
             {
                 start = i;
-                _AddFree(Mmu, previous, start, countLeft);
+                _AddFree(Area, previous, start, countLeft);
                 previous = start;
             }
 
             if (countRight)
             {
                 start = index + NumPages;
-                _AddFree(Mmu, previous, start, countRight);
+                _AddFree(Area, previous, start, countRight);
                 previous = start;
             }
 
-            _Link(Mmu, previous, next);
+            _Link(Area, previous, next);
         }
         break;
     }
@@ -552,22 +550,22 @@ _SetupProcessAddressSpace(
                /* Address space mapped by one MTLB entry. */
                / (1 << gcdMMU_MTLB_SHIFT);
 
-    Mmu->dynamicMappingStart = 0;
+    area->dynamicMappingStart = 0;
 
-    Mmu->pageTableSize = numEntries * 4096;
+    area->pageTableSize = numEntries * 4096;
 
-    Mmu->pageTableEntries = Mmu->pageTableSize / gcmSIZEOF(gctUINT32);
+    area->pageTableEntries = area->pageTableSize / gcmSIZEOF(gctUINT32);
 
     gcmkONERROR(gckOS_Allocate(Mmu->os,
-                               Mmu->pageTableSize,
-                               (void **)&Mmu->mapLogical));
+                               area->pageTableSize,
+                               (void **)&area->mapLogical));
 
     /* Initialization. */
-    map      = Mmu->mapLogical;
-    map[0]   = (Mmu->pageTableEntries << 8) | gcvMMU_FREE;
+    map      = area->mapLogical;
+    map[0]   = (area->pageTableEntries << 8) | gcvMMU_FREE;
     map[1]   = ~0U;
-    Mmu->heapList  = 0;
-    Mmu->freeNodes = gcvFALSE;
+    area->heapList  = 0;
+    area->freeNodes = gcvFALSE;
 
     return gcvSTATUS_OK;
 
@@ -591,20 +589,20 @@ _FillFlatMapping(
     gctUINT32 mEnd = end >> gcdMMU_MTLB_SHIFT;
     gctUINT32 sStart = (start & gcdMMU_STLB_64K_MASK) >> gcdMMU_STLB_64K_SHIFT;
     gctUINT32 sEnd = (end & gcdMMU_STLB_64K_MASK) >> gcdMMU_STLB_64K_SHIFT;
-    gctBOOL ace = gckHARDWARE_IsFeatureAvailable(Mmu->hardware, gcvFEATURE_ACE);
     gctPHYS_ADDR_T physical;
     gctUINT32 size;
 
     gctUINT32 mtlb = _MtlbOffset(PhysBase);
+    gcsADDRESS_AREA_PTR area = &Mmu->area[0];
 
     /************************ Setup flat mapping in dynamic range. ****************/
 
-    if (Mmu->dynamicMappingStart != gcvINVALID_ADDRESS && mtlb >= Mmu->dynamicMappingStart)
+    if (area->dynamicMappingStart != gcvINVALID_ADDRESS && mtlb >= area->dynamicMappingStart)
     {
         gctUINT32_PTR stlbEntry;
         gctUINT i;
 
-        stlbEntry = _StlbEntry(Mmu, PhysBase);
+        stlbEntry = _StlbEntry(area, PhysBase);
 
         /* Must be aligned to page. */
         gcmkASSERT((Size & 0xFFF) == 0);
@@ -618,7 +616,7 @@ _FillFlatMapping(
         gcmkSAFECASTSIZET(size, Size);
 
         /* Flat mapping in map. */
-        _FillFlatMappingInMap(Mmu, _AddressToIndex(Mmu, PhysBase), size / 4096);
+        _FillFlatMappingInMap(area, _AddressToIndex(area, PhysBase), size / 4096);
 
         return gcvSTATUS_OK;
     }
@@ -692,13 +690,6 @@ _FillFlatMapping(
                       | (1 << 0);
 
             gcmkSAFECASTPHYSADDRT(mtlbEntry, physical);
-
-            if (ace)
-            {
-                mtlbEntry = mtlbEntry
-                          /* Secure */
-                          | (1 << 4);
-            }
 
             _WritePageEntry(Mmu->mtlbLogical + mStart, mtlbEntry);
 
@@ -777,6 +768,13 @@ _FillFlatMapping(
 
     /* Release the mutex. */
     gcmkVERIFY_OK(gckOS_ReleaseMutex(Mmu->os, Mmu->pageTableMutex));
+
+#if gcdENABLE_TRUST_APPLICATION
+    if (Mmu->hardware->secureMode == gcvSECURE_IN_TA)
+    {
+        gckKERNEL_SecurityMapMemory(Mmu->hardware->kernel, gcvNULL, PhysBase, (gctUINT32)Size/4096, &PhysBase);
+    }
+#endif
 
     return gcvSTATUS_OK;
 
@@ -901,6 +899,38 @@ OnError:
 }
 
 static gceSTATUS
+_SetupAddressArea(
+    IN gckOS Os,
+    IN gcsADDRESS_AREA_PTR Area,
+    IN gctUINT32 NumMTLBEntries
+    )
+{
+    gceSTATUS status;
+    gctUINT32_PTR map;
+
+    gcmkHEADER();
+    Area->pageTableSize = NumMTLBEntries * 4096;
+
+    gcmkSAFECASTSIZET(Area->pageTableEntries, Area->pageTableSize / gcmSIZEOF(gctUINT32));
+
+    gcmkONERROR(gckOS_Allocate(Os, Area->pageTableSize, (void **)&Area->mapLogical));
+
+    /* Initialization. */
+    map      = Area->mapLogical;
+    map[0]   = (Area->pageTableEntries << 8) | gcvMMU_FREE;
+    map[1]   = ~0U;
+    Area->heapList  = 0;
+    Area->freeNodes = gcvFALSE;
+
+    gcmkFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    gcmkFOOTER();
+    return status;
+}
+
+static gceSTATUS
 _SetupDynamicSpace(
     IN gckMMU Mmu
     )
@@ -911,10 +941,11 @@ _SetupDynamicSpace(
     gctPHYS_ADDR_T physical;
     gctUINT32 address;
     gctINT numEntries = 0;
-    gctUINT32_PTR map;
     gctBOOL acquired = gcvFALSE;
     gctUINT32 mtlbEntry;
-    gctBOOL ace = gckHARDWARE_IsFeatureAvailable(Mmu->hardware, gcvFEATURE_ACE);
+    gcsADDRESS_AREA_PTR area = &Mmu->area[0];
+    gcsADDRESS_AREA_PTR areaSecure = &Mmu->area[gcvADDRESS_AREA_SECURE];
+    gctUINT32 secureAreaSize = 0;
 
     /* Find all the dynamic address space. */
     gcmkONERROR(_FindDynamicSpace(Mmu, &nodeArray, &nodeArraySize));
@@ -924,48 +955,53 @@ _SetupDynamicSpace(
     {
         if (nodeArray[i].entries > numEntries)
         {
-            Mmu->dynamicMappingStart = nodeArray[i].start;
+            area->dynamicMappingStart = nodeArray[i].start;
             numEntries               = nodeArray[i].entries;
         }
     }
 
     gckOS_Free(Mmu->os, (gctPOINTER)nodeArray);
 
-    Mmu->pageTableSize = numEntries * 4096;
+#if gcdENABLE_TRUST_APPLICATION
+    secureAreaSize = gcdMMU_SECURE_AREA_SIZE;
+#endif
 
-    gcmkSAFECASTSIZET(Mmu->pageTableEntries, Mmu->pageTableSize / gcmSIZEOF(gctUINT32));
+    /* Setup secure address area if need. */
+    if (secureAreaSize > 0)
+    {
+        gcmkASSERT(numEntries > (gctINT)secureAreaSize);
 
-    gcmkONERROR(gckOS_Allocate(Mmu->os,
-                               Mmu->pageTableSize,
-                               (void **)&Mmu->mapLogical));
+        areaSecure->dynamicMappingStart = area->dynamicMappingStart
+                                        + (numEntries - secureAreaSize);
+
+        gcmkONERROR(_SetupAddressArea(Mmu->os, areaSecure, secureAreaSize));
+
+        numEntries -= secureAreaSize;
+    }
+
+    /* Setup normal address area. */
+    gcmkONERROR(_SetupAddressArea(Mmu->os, area, numEntries));
 
     /* Construct Slave TLB. */
     gcmkONERROR(gckOS_AllocateContiguous(Mmu->os,
                 gcvFALSE,
-                &Mmu->pageTableSize,
-                &Mmu->pageTablePhysical,
-                (gctPOINTER)&Mmu->pageTableLogical));
+                &area->pageTableSize,
+                &area->pageTablePhysical,
+                (gctPOINTER)&area->pageTableLogical));
 
 #if gcdUSE_MMU_EXCEPTION
-    gcmkONERROR(_FillPageTable(Mmu->pageTableLogical,
-                               Mmu->pageTableEntries,
+    gcmkONERROR(_FillPageTable(area->pageTableLogical,
+                               area->pageTableEntries,
                                /* Enable exception */
                                1 << 1));
 #else
     /* Invalidate all entries. */
-    gcmkONERROR(gckOS_ZeroMemory(Mmu->pageTableLogical,
-                Mmu->pageTableSize));
+    gcmkONERROR(gckOS_ZeroMemory(area->pageTableLogical,
+                area->pageTableSize));
 #endif
 
-    /* Initilization. */
-    map      = Mmu->mapLogical;
-    map[0]   = (Mmu->pageTableEntries << 8) | gcvMMU_FREE;
-    map[1]   = ~0U;
-    Mmu->heapList  = 0;
-    Mmu->freeNodes = gcvFALSE;
-
     gcmkONERROR(gckOS_GetPhysicalAddress(Mmu->os,
-                Mmu->pageTableLogical,
+                area->pageTableLogical,
                 &physical));
 
     gcmkSAFECASTPHYSADDRT(address, physical);
@@ -975,8 +1011,8 @@ _SetupDynamicSpace(
     acquired = gcvTRUE;
 
     /* Map to Master TLB. */
-    for (i = (gctINT)Mmu->dynamicMappingStart;
-         i < (gctINT)Mmu->dynamicMappingStart + numEntries;
+    for (i = (gctINT)area->dynamicMappingStart;
+         i < (gctINT)area->dynamicMappingStart + numEntries;
          i++)
     {
         mtlbEntry = address
@@ -986,13 +1022,6 @@ _SetupDynamicSpace(
                   | (0 << 1)
                   /* Present */
                   | (1 << 0);
-
-        if (ace)
-        {
-            mtlbEntry = mtlbEntry
-                      /* Secure */
-                      | (1 << 4);
-        }
 
         _WritePageEntry(Mmu->mtlbLogical + i, mtlbEntry);
 
@@ -1011,17 +1040,17 @@ _SetupDynamicSpace(
     return gcvSTATUS_OK;
 
 OnError:
-    if (Mmu->mapLogical)
+    if (area->mapLogical)
     {
         gcmkVERIFY_OK(
-            gckOS_Free(Mmu->os, (gctPOINTER) Mmu->mapLogical));
+            gckOS_Free(Mmu->os, (gctPOINTER) area->mapLogical));
 
 
         gcmkVERIFY_OK(
             gckOS_FreeContiguous(Mmu->os,
-                                 Mmu->pageTablePhysical,
-                                 (gctPOINTER) Mmu->pageTableLogical,
-                                 Mmu->pageTableSize));
+                                 area->pageTablePhysical,
+                                 (gctPOINTER) area->pageTableLogical,
+                                 area->pageTableSize));
     }
 
     if (acquired)
@@ -1049,6 +1078,24 @@ _GetPageCountOfUsedNode(
     }
 
     return count;
+}
+
+static gcsADDRESS_AREA_PTR
+_GetProcessArea(
+    IN gckMMU Mmu,
+    IN gctBOOL Secure
+    )
+{
+    gceADDRESS_AREA area = gcvADDRESS_AREA_NORMAL;
+
+#if gcdENABLE_TRUST_APPLICATION
+    if (Secure == gcvTRUE)
+    {
+        area = gcvADDRESS_AREA_SECURE;
+    }
+#endif
+
+    return &Mmu->area[area];
 }
 
 /*******************************************************************************
@@ -1089,6 +1136,7 @@ _Construct(
     gctUINT32 contiguousSize;
     gctUINT32 gpuAddress;
     gctPHYS_ADDR_T gpuPhysical;
+    gcsADDRESS_AREA_PTR area = gcvNULL;
 
     gcmkHEADER_ARG("Kernel=0x%x MmuSize=%lu", Kernel, MmuSize);
 
@@ -1117,48 +1165,51 @@ _Construct(
     mmu->os               = os;
     mmu->hardware         = hardware;
     mmu->pageTableMutex   = gcvNULL;
-    mmu->pageTableLogical = gcvNULL;
     mmu->mtlbLogical      = gcvNULL;
     mmu->staticSTLB       = gcvNULL;
     mmu->enabled          = gcvFALSE;
-    mmu->mapLogical       = gcvNULL;
-
     gcsLIST_Init(&mmu->hardwareList);
+
+
+    area = &mmu->area[0];
+    area->mapLogical       = gcvNULL;
+    area->pageTableLogical = gcvNULL;
 
     /* Create the page table mutex. */
     gcmkONERROR(gckOS_CreateMutex(os, &mmu->pageTableMutex));
 
+
     if (hardware->mmuVersion == 0)
     {
-        mmu->pageTableSize = MmuSize;
+        area->pageTableSize = MmuSize;
 
         /* Construct address space management table. */
         gcmkONERROR(gckOS_Allocate(mmu->os,
-                                   mmu->pageTableSize,
+                                   area->pageTableSize,
                                    &pointer));
 
-        mmu->mapLogical = pointer;
+        area->mapLogical = pointer;
 
         /* Construct page table read by GPU. */
         gcmkONERROR(gckOS_AllocateContiguous(mmu->os,
                     gcvFALSE,
-                    &mmu->pageTableSize,
-                    &mmu->pageTablePhysical,
-                    (gctPOINTER)&mmu->pageTableLogical));
+                    &area->pageTableSize,
+                    &area->pageTablePhysical,
+                    (gctPOINTER)&area->pageTableLogical));
 
 
         /* Compute number of entries in page table. */
-        gcmkSAFECASTSIZET(mmu->pageTableEntries, mmu->pageTableSize / sizeof(gctUINT32));
+        gcmkSAFECASTSIZET(area->pageTableEntries, area->pageTableSize / sizeof(gctUINT32));
 
         /* Mark all pages as free. */
-        map      = mmu->mapLogical;
+        map      = area->mapLogical;
 
-        _FillPageTable(mmu->pageTableLogical, mmu->pageTableEntries, mmu->safeAddress);
+        _FillPageTable(area->pageTableLogical, area->pageTableEntries, mmu->safeAddress);
 
-        map[0] = (mmu->pageTableEntries << 8) | gcvMMU_FREE;
+        map[0] = (area->pageTableEntries << 8) | gcvMMU_FREE;
         map[1] = ~0U;
-        mmu->heapList  = 0;
-        mmu->freeNodes = gcvFALSE;
+        area->heapList  = 0;
+        area->freeNodes = gcvFALSE;
     }
     else
     {
@@ -1174,7 +1225,7 @@ _Construct(
 
         mmu->mtlbLogical = pointer;
 
-        mmu->dynamicMappingStart = gcvINVALID_ADDRESS;
+        area->dynamicMappingStart = gcvINVALID_ADDRESS;
 
 #if gcdPROCESS_ADDRESS_SPACE
         _FillPageTable(pointer, mmu->mtlbSize / 4, gcdMMU_MTLB_EXCEPTION);
@@ -1281,17 +1332,17 @@ OnError:
     /* Roll back. */
     if (mmu != gcvNULL)
     {
-        if (mmu->mapLogical != gcvNULL)
+        if (area != gcvNULL && area->mapLogical != gcvNULL)
         {
             gcmkVERIFY_OK(
-                gckOS_Free(os, (gctPOINTER) mmu->mapLogical));
+                gckOS_Free(os, (gctPOINTER) area->mapLogical));
 
 
             gcmkVERIFY_OK(
                 gckOS_FreeContiguous(os,
-                                     mmu->pageTablePhysical,
-                                     (gctPOINTER) mmu->pageTableLogical,
-                                     mmu->pageTableSize));
+                                     area->pageTablePhysical,
+                                     (gctPOINTER) area->pageTableLogical,
+                                     area->pageTableSize));
         }
 
         if (mmu->mtlbLogical != gcvNULL)
@@ -1344,9 +1395,7 @@ _Destroy(
     IN gckMMU Mmu
     )
 {
-#if gcdPROCESS_ADDRESS_SPACE
     gctUINT32 i;
-#endif
     gcmkHEADER_ARG("Mmu=0x%x", Mmu);
 
     /* Verify the arguments. */
@@ -1389,21 +1438,26 @@ _Destroy(
                     Mmu->mtlbSize));
     }
 
-    /* Free address space management table. */
-    if (Mmu->mapLogical != gcvNULL)
+    for (i = 0; i < gcvADDRESS_AREA_COUNT; i++)
     {
-        gcmkVERIFY_OK(
-            gckOS_Free(Mmu->os, (gctPOINTER) Mmu->mapLogical));
-    }
+        gcsADDRESS_AREA_PTR area = &Mmu->area[i];
 
-    if (Mmu->pageTableLogical != gcvNULL)
-    {
-        /* Free page table. */
-        gcmkVERIFY_OK(
-            gckOS_FreeContiguous(Mmu->os,
-                                 Mmu->pageTablePhysical,
-                                 (gctPOINTER) Mmu->pageTableLogical,
-                                 Mmu->pageTableSize));
+        /* Free address space management table. */
+        if (area->mapLogical != gcvNULL)
+        {
+            gcmkVERIFY_OK(
+                gckOS_Free(Mmu->os, (gctPOINTER) area->mapLogical));
+        }
+
+        if (area->pageTableLogical != gcvNULL)
+        {
+            /* Free page table. */
+            gcmkVERIFY_OK(
+                gckOS_FreeContiguous(Mmu->os,
+                                     area->pageTablePhysical,
+                                     (gctPOINTER) area->pageTableLogical,
+                                     area->pageTableSize));
+        }
     }
 
     /* Delete the page table mutex. */
@@ -1469,11 +1523,12 @@ _AdjustIndex(
 {
     gceSTATUS status;
     gctUINT32 index = Index;
-    gctUINT32_PTR map = Mmu->mapLogical;
+    gcsADDRESS_AREA_PTR area = &Mmu->area[0];
+    gctUINT32_PTR map = area->mapLogical;
 
     gcmkHEADER();
 
-    for (; index < Mmu->pageTableEntries;)
+    for (; index < area->pageTableEntries;)
     {
         gctUINT32 result = 0;
         gctUINT32 nodeSize = 0;
@@ -1643,6 +1698,7 @@ _AllocatePages(
     IN gckMMU Mmu,
     IN gctSIZE_T PageCount,
     IN gceSURF_TYPE Type,
+    IN gctBOOL Secure,
     OUT gctPOINTER * PageTable,
     OUT gctUINT32 * Address
     )
@@ -1654,6 +1710,7 @@ _AllocatePages(
     gctBOOL gotIt;
     gctUINT32 address;
     gctUINT32 pageCount;
+    gcsADDRESS_AREA_PTR area = _GetProcessArea(Mmu, Secure);
 
     gcmkHEADER_ARG("Mmu=0x%x PageCount=%lu", Mmu, PageCount);
 
@@ -1662,7 +1719,7 @@ _AllocatePages(
     gcmkVERIFY_ARGUMENT(PageCount > 0);
     gcmkVERIFY_ARGUMENT(PageTable != gcvNULL);
 
-    if (PageCount > Mmu->pageTableEntries)
+    if (PageCount > area->pageTableEntries)
     {
         /* Not enough pages avaiable. */
         gcmkONERROR(gcvSTATUS_OUT_OF_RESOURCES);
@@ -1680,9 +1737,9 @@ _AllocatePages(
     mutex = gcvTRUE;
 
     /* Cast pointer to page table. */
-    for (map = Mmu->mapLogical, gotIt = gcvFALSE; !gotIt;)
+    for (map = area->mapLogical, gotIt = gcvFALSE; !gotIt;)
     {
-        index = Mmu->heapList;
+        index = area->heapList;
 
         if ((Mmu->hardware->mmuVersion == 0) && (Type == gcvSURF_VERTEX))
         {
@@ -1696,7 +1753,7 @@ _AllocatePages(
         }
 
         /* Walk the heap list. */
-        for (; !gotIt && (index < Mmu->pageTableEntries);)
+        for (; !gotIt && (index < area->pageTableEntries);)
         {
             /* Check the node type. */
             switch (gcmENTRY_TYPE(map[index]))
@@ -1736,12 +1793,12 @@ _AllocatePages(
         }
 
         /* Test if we are out of memory. */
-        if (index >= Mmu->pageTableEntries)
+        if (index >= area->pageTableEntries)
         {
-            if (Mmu->freeNodes)
+            if (area->freeNodes)
             {
                 /* Time to move out the trash! */
-                gcmkONERROR(_Collect(Mmu));
+                gcmkONERROR(_Collect(area));
 
                 /* We are going to search from start, so reset previous to start. */
                 previous = ~0U;
@@ -1759,7 +1816,7 @@ _AllocatePages(
     case gcvMMU_SINGLE:
         /* Unlink single node from free list. */
         gcmkONERROR(
-            _Link(Mmu, previous, map[index]) >> 8);
+            _Link(area, previous, map[index]) >> 8);
         break;
 
     case gcvMMU_FREE:
@@ -1770,7 +1827,7 @@ _AllocatePages(
         case 0:
             /* The entire node is consumed, just unlink it. */
             gcmkONERROR(
-                _Link(Mmu, previous, map[index + 1]));
+                _Link(area, previous, map[index + 1]));
             break;
 
         case 1:
@@ -1807,8 +1864,16 @@ _AllocatePages(
         map[index] = (pageCount << 8) | gcvMMU_USED;
     }
 
+    if (area->pageTableLogical != gcvNULL)
+    {
     /* Return pointer to page table. */
-    *PageTable = &Mmu->pageTableLogical[index];
+    *PageTable = &area->pageTableLogical[index];
+    }
+    else
+    {
+        /* Page table for secure area is handled in trust application. */
+        *PageTable = gcvNULL;
+    }
 
     /* Build virtual address. */
     if (Mmu->hardware->mmuVersion == 0)
@@ -1819,7 +1884,7 @@ _AllocatePages(
     else
     {
         gctUINT32 masterOffset = index / gcdMMU_STLB_4K_ENTRY_NUM
-                               + Mmu->dynamicMappingStart;
+                               + area->dynamicMappingStart;
         gctUINT32 slaveOffset = index % gcdMMU_STLB_4K_ENTRY_NUM;
 
         address = (masterOffset << gcdMMU_MTLB_SHIFT)
@@ -1876,6 +1941,7 @@ OnError:
 gceSTATUS
 _FreePages(
     IN gckMMU Mmu,
+    IN gctBOOL Secure,
     IN gctUINT32 Address,
     IN gctPOINTER PageTable,
     IN gctSIZE_T PageCount
@@ -1886,13 +1952,13 @@ _FreePages(
     gctBOOL acquired = gcvFALSE;
     gctUINT32 pageCount;
     gcuQUEUEDATA data;
+    gcsADDRESS_AREA_PTR area = _GetProcessArea(Mmu, Secure);
 
     gcmkHEADER_ARG("Mmu=0x%x PageTable=0x%x PageCount=%lu",
                    Mmu, PageTable, PageCount);
 
     /* Verify the arguments. */
     gcmkVERIFY_OBJECT(Mmu, gcvOBJ_MMU);
-    gcmkVERIFY_ARGUMENT(PageTable != gcvNULL);
     gcmkVERIFY_ARGUMENT(PageCount > 0);
 
     gcmkSAFECASTSIZET(pageCount, PageCount);
@@ -1902,7 +1968,7 @@ _FreePages(
 #endif
 
     /* Get the node by index. */
-    node = Mmu->mapLogical + ((gctUINT32_PTR)PageTable - Mmu->pageTableLogical);
+    node = area->mapLogical + ((gctUINT32_PTR)PageTable - area->pageTableLogical);
 
 #if gcdBOUNDARY_CHECK
     node -= gcdBOUNDARY_CHECK;
@@ -1925,6 +1991,9 @@ _FreePages(
     {
        /* Single page node. */
         node[0] = (~((1U<<8)-1)) | gcvMMU_SINGLE;
+
+        if (PageTable != gcvNULL)
+        {
 #if gcdUSE_MMU_EXCEPTION
         /* Enable exception */
         _WritePageEntry(PageTable, (1 << 1));
@@ -1932,12 +2001,15 @@ _FreePages(
         _WritePageEntry(PageTable, 0);
 #endif
     }
+    }
     else
     {
         /* Mark the node as free. */
         node[0] = (pageCount << 8) | gcvMMU_FREE;
         node[1] = ~0U;
 
+        if (PageTable != gcvNULL)
+        {
 #if gcdUSE_MMU_EXCEPTION
         /* Enable exception */
         gcmkVERIFY_OK(_FillPageTable(PageTable, pageCount, 1 << 1));
@@ -1945,9 +2017,10 @@ _FreePages(
         gcmkVERIFY_OK(_FillPageTable(PageTable, pageCount, 0));
 #endif
     }
+    }
 
     /* We have free nodes. */
-    Mmu->freeNodes = gcvTRUE;
+    area->freeNodes = gcvTRUE;
 
     /* Record freed address range. */
     data.addressData.start = Address;
@@ -1956,6 +2029,13 @@ _FreePages(
 
     gcmkVERIFY_OK(gckOS_ReleaseMutex(Mmu->os, Mmu->pageTableMutex));
     acquired = gcvFALSE;
+
+#if gcdENABLE_TRUST_APPLICATION
+    if (Mmu->hardware->secureMode == gcvSECURE_IN_TA)
+    {
+        gckKERNEL_SecurityUnmapMemory(Mmu->hardware->kernel, Address, (gctUINT32)PageCount);
+    }
+#endif
 
     /* Success. */
     gcmkFOOTER_NO();
@@ -1980,7 +2060,7 @@ gckMMU_AllocatePages(
     )
 {
     return gckMMU_AllocatePagesEx(
-                Mmu, PageCount, gcvSURF_TYPE_UNKNOWN, PageTable, Address);
+                Mmu, PageCount, gcvSURF_TYPE_UNKNOWN, gcvFALSE, PageTable, Address);
 }
 
 gceSTATUS
@@ -1988,22 +2068,24 @@ gckMMU_AllocatePagesEx(
     IN gckMMU Mmu,
     IN gctSIZE_T PageCount,
     IN gceSURF_TYPE Type,
+    IN gctBOOL Secure,
     OUT gctPOINTER * PageTable,
     OUT gctUINT32 * Address
     )
 {
-    return _AllocatePages(Mmu, PageCount, Type, PageTable, Address);
+    return _AllocatePages(Mmu, PageCount, Type, Secure, PageTable, Address);
 }
 
 gceSTATUS
 gckMMU_FreePages(
     IN gckMMU Mmu,
+    IN gctBOOL Secure,
     IN gctUINT32 Address,
     IN gctPOINTER PageTable,
     IN gctSIZE_T PageCount
     )
 {
-    return _FreePages(Mmu, Address, PageTable, PageCount);
+    return _FreePages(Mmu, Secure, Address, PageTable, PageCount);
 }
 
 gceSTATUS
@@ -2075,13 +2157,6 @@ gckMMU_GetPageEntry(
                   | gcdMMU_MTLB_PRESENT
                   ;
 
-        if (ace)
-        {
-            mtlbEntry = mtlbEntry
-                      /* Secure */
-                      | (1 << 4);
-        }
-
         /* Insert Slave TLB address to Master TLB entry.*/
         _WritePageEntry(Mmu->mtlbLogical + offset, mtlbEntry);
 
@@ -2106,10 +2181,10 @@ _CheckMap(
     )
 {
     gceSTATUS status;
-    gctUINT32_PTR map = Mmu->mapLogical;
+    gctUINT32_PTR map = area->mapLogical;
     gctUINT32 index;
 
-    for (index = Mmu->heapList; index < Mmu->pageTableEntries;)
+    for (index = area->heapList; index < area->pageTableEntries;)
     {
         /* Check the node type. */
         switch (gcmENTRY_TYPE(map[index]))
@@ -2189,7 +2264,7 @@ gckMMU_FreePagesEx(
     gcmkVERIFY_ARGUMENT(PageCount > 0);
 
     /* Get the node by index. */
-    node = Mmu->mapLogical + _AddressToIndex(Mmu, Address);
+    node = area->mapLogical + _AddressToIndex(Mmu, Address);
 
     gcmkONERROR(gckOS_AcquireMutex(Mmu->os, Mmu->pageTableMutex, gcvINFINITE));
 
@@ -2206,7 +2281,7 @@ gckMMU_FreePagesEx(
     }
 
     /* We have free nodes. */
-    Mmu->freeNodes = gcvTRUE;
+    area->freeNodes = gcvTRUE;
 
 #if gcdUSE_MMU_EXCEPTION
     for (i = 0; i < PageCount; i++)
@@ -2309,6 +2384,7 @@ gckMMU_DumpPageTableEntry(
     gctUINT32 index;
     gctUINT32 mtlb, stlb;
 #endif
+    gcsADDRESS_AREA_PTR area = &Mmu->area[0];
 
     gcmkHEADER_ARG("Mmu=0x%08X Address=0x%08X", Mmu, Address);
     gcmkVERIFY_OBJECT(Mmu, gcvOBJ_MMU);
@@ -2328,13 +2404,13 @@ gckMMU_DumpPageTableEntry(
 #else
     mtlb   = (Address & gcdMMU_MTLB_MASK) >> gcdMMU_MTLB_SHIFT;
 
-    if (mtlb >= Mmu->dynamicMappingStart)
+    if (mtlb >= area->dynamicMappingStart)
     {
         stlb   = (Address & gcdMMU_STLB_4K_MASK) >> gcdMMU_STLB_4K_SHIFT;
 
-        pageTable = Mmu->pageTableLogical;
+        pageTable = area->pageTableLogical;
 
-        index = (mtlb - Mmu->dynamicMappingStart)
+        index = (mtlb - area->dynamicMappingStart)
               * gcdMMU_STLB_4K_ENTRY_NUM
               + stlb;
 
@@ -2401,7 +2477,8 @@ gckMMU_DumpAddressSpace(
 {
     gctUINT i;
     gctUINT next;
-    gctUINT32_PTR map = Mmu->mapLogical;
+    gcsADDRESS_AREA_PTR area = &Mmu->area[0];
+    gctUINT32_PTR map = area->mapLogical;
     gctBOOL used = gcvFALSE;
     gctUINT32 numPages;
 
@@ -2409,7 +2486,7 @@ gckMMU_DumpAddressSpace(
     gcmkVERIFY_OK(gckOS_AcquireMutex(Mmu->os, Mmu->pageTableMutex, gcvINFINITE));
 
     /* Find node which contains index. */
-    for (i = 0; i < Mmu->pageTableEntries; i = next)
+    for (i = 0; i < area->pageTableEntries; i = next)
     {
         switch (gcmENTRY_TYPE(map[i]))
         {

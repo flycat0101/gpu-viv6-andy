@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -155,7 +155,7 @@ USE_OPENCL=1
 BUILD_OPENCL_ICD=1
 !      ENDIF
 !      IFNDEF BUILD_OPENCL_FP
-BUILD_OPENCL_FP=0
+BUILD_OPENCL_FP=1
 !      ENDIF
 !   ENDIF
 BUILD_HALTI=1

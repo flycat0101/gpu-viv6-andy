@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -241,7 +241,7 @@ static gceSTATUS resolveRenderTargetWithDirectMode(
 
     wrapView.surf = _GetWrapSurface(resolve, (gctPOINTER)destPhyStart, (gctPOINTER)destStart, width, height, alignedwidth * dpGlobalInfo.bpp);
 
-    status = gcoSURF_ResolveRect_v2(&rtView, &wrapView, gcvNULL);
+    status = gcoSURF_ResolveRect(&rtView, &wrapView, gcvNULL);
 
     if (gcmIS_ERROR(status))
     {
@@ -418,7 +418,7 @@ GLvoid resolveRenderTargetToScreen(__GLcontext * gc)
                 rlvArgs.uArgs.v2.rectSize.y  = draw->height;
                 rlvArgs.uArgs.v2.numSlices   = 1;
 
-                gcoSURF_ResolveRect_v2(&rtView, &displayView, &rlvArgs);
+                gcoSURF_ResolveRect(&rtView, &displayView, &rlvArgs);
                 gcoSURF_CPUCacheOperation(resolve, gcvCACHE_CLEAN);
                 gcoHAL_Commit(gcvNULL, gcvTRUE);
                 gcoSURF_Destroy(displaySurf);
@@ -475,7 +475,7 @@ GLvoid resolveBufferToOnScreen(__GLcontext * gc)
         rlvArgs.uArgs.v2.rectSize.y  = draw->height;
         rlvArgs.uArgs.v2.numSlices   = 1;
 
-        gcoSURF_ResolveRect_v2(&rtView, &tgtView, &rlvArgs);
+        gcoSURF_ResolveRect(&rtView, &tgtView, &rlvArgs);
     }
 
     gcoSURF_CPUCacheOperation(tgtView.surf, gcvCACHE_CLEAN);
@@ -561,7 +561,7 @@ GLvoid resolveBuffer(__GLcontext * gc,  GLboolean swapFront)
         rlvArgs.uArgs.v2.rectSize.x = draw->width;
         rlvArgs.uArgs.v2.rectSize.y = draw->height;
         rlvArgs.uArgs.v2.numSlices  = 1;
-        gcoSURF_ResolveRect_v2(&rtView, &tgtView, &rlvArgs);
+        gcoSURF_ResolveRect(&rtView, &tgtView, &rlvArgs);
     }
 
 #if DIRECT_TO_FB

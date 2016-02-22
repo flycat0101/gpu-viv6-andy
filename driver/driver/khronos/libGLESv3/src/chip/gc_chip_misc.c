@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -112,11 +112,16 @@ __glChipBeginQuery(
                                           gcvPOOL_DEFAULT));
 
         gcoSURF_LockNode(&queryHeader->headerNode, gcvNULL, &queryHeader->headerLocked);
+
+        gcoOS_ZeroMemory(queryHeader->headerLocked, queryHeader->headerSize);
+
     }
+    else
+    {
+        gcmASSERT(queryHeader->headerLocked != gcvNULL);
 
-    gcmASSERT(queryHeader->headerLocked);
-
-    gcoOS_ZeroMemory(queryHeader->headerLocked, queryHeader->headerSize);
+        gcoOS_ZeroMemory(queryHeader->headerLocked, queryHeader->headerSize);
+    }
 
     gcmGETHARDWAREADDRESS(queryHeader->headerNode, physical);
 
@@ -226,8 +231,13 @@ __glChipGetQueryObject(
 
     if (gcmIS_SUCCESS(status))
     {
+        __GLattribute *cState = &gc->commitState;
+        __GLprogramObject *fsProgObj = __glGetCurrentStageProgram(gc, __GLSL_STAGE_FS);
+        __GLchipSLProgram *fsProgram = fsProgObj ? (__GLchipSLProgram*)fsProgObj->privateData : gcvNULL;
+
         queryHeader = chipQuery->queryHeader;
-        gcmASSERT(queryHeader->headerLocked);
+
+        gcmASSERT(queryHeader->headerLocked != gcvNULL);
 
         gcmONERROR(gco3D_GetQuery(chipCtx->engine,
                                   chipQuery->type,
@@ -241,10 +251,48 @@ __glChipGetQueryObject(
             queryObj->count += *((GLint64*)queryHeader->headerLocked + i);
         }
 
+        if (fsProgram &&
+            fsProgram->progFlags.msaaOQ &&
+            chipCtx->drawRTSamples > 1 &&
+            chipCtx->drawStencilView.surf &&
+            cState->enables.stencilTest &&
+            cState->stencil.front.testFunc == GL_EQUAL &&
+            cState->stencil.back.testFunc == GL_EQUAL &&
+            cState->stencil.front.reference == 0 &&
+            cState->stencil.back.reference == 0)
+        {
+            gctSIZE_T num = chipCtx->drawRTWidth * chipCtx->drawRTHeight;
+            GLubyte *pixels = (GLubyte*)gc->imports.malloc(gc, 4 * num);
+
+            __glEvaluateDrawableChange(gc, __GL_BUFFER_READ_BIT);
+
+            if (__glChipReadPixels(gc, 0, 0, (GLsizei)chipCtx->drawRTWidth, (GLsizei)chipCtx->drawRTHeight, GL_RGBA, GL_UNSIGNED_BYTE, pixels))
+            {
+                gctSIZE_T i;
+                gctBOOL occuled = GL_FALSE;
+                for (i = 0; i < num; ++i)
+                {
+                    if (pixels[i * 4] != 0)
+                    {
+                        occuled = GL_TRUE;
+                        break;
+                    }
+                }
+
+                if (!occuled)
+                {
+                    queryObj->count = 0;
+                }
+            }
+
+            gc->imports.free(gc, pixels);
+        }
+
 #if gcdDUMP
         {
             gctUINT32 physical = 0;
-            gcmDUMP(gcvNULL, "#verify occlusion/xfb/prim query");
+            gcmGETHARDWAREADDRESS(queryHeader->headerNode, physical);
+            gcmDUMP(gcvNULL, "#[info: verify occlusion/xfb/prim query");
             gcmDUMP_BUFFER(gcvNULL,
                            "verify",
                            physical,
@@ -366,7 +414,7 @@ __glChipSyncImage(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-    gcmONERROR(gcChipFramebufferMasterSyncFromShadow(gc, gc->frameBuffer.drawFramebufObj));
+    gcmONERROR(gcChipFboSyncFromShadow(gc, gc->frameBuffer.drawFramebufObj));
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;
@@ -616,7 +664,10 @@ __glChipEndXFB(
     else
     {
         gcmONERROR(gco3D_FlushSHL1Cache(chipCtx->engine));
-        gcmONERROR(gco3D_Semaphore(chipCtx->engine, gcvWHERE_COMMAND, gcvWHERE_PIXEL, gcvHOW_SEMAPHORE));
+        gcmONERROR(gco3D_Semaphore(chipCtx->engine,
+                                   chipCtx->chipFeature.hasCommandPrefetch ? gcvWHERE_COMMAND_PREFETCH : gcvWHERE_COMMAND,
+                                   gcvWHERE_PIXEL,
+                                   gcvHOW_SEMAPHORE));
     }
 
 #if gcdDUMP
@@ -649,7 +700,7 @@ __glChipEndXFB(
                                             &buffer));
                 gcmVERIFY_OK(gcoBUFOBJ_GetSize(chipBufInfo->bufObj, &size));
 
-                gcmDUMP(gcvNULL, "#verify xfb buffer when endxfb");
+                gcmDUMP(gcvNULL, "#[info: verify xfb buffer when endxfb");
                 gcmDUMP_BUFFER(gcvNULL,
                                "verify",
                                physical,
@@ -657,7 +708,7 @@ __glChipEndXFB(
                                0,
                                size);
 
-                gcmDUMP(gcvNULL, "#upload stream with xfb out in case 2nd pass rendering");
+                gcmDUMP(gcvNULL, "#[info: upload stream with xfb out in case 2nd pass rendering");
                 gcmDUMP_BUFFER(gcvNULL,
                                "stream",
                                physical,
@@ -975,7 +1026,7 @@ __glChipBlendBarrier(
         rlvArgs.uArgs.v2.rectSize.x = (gctINT)chipCtx->drawRTWidth;
         rlvArgs.uArgs.v2.rectSize.y = (gctINT)chipCtx->drawRTHeight;
         rlvArgs.uArgs.v2.numSlices  = 1;
-        gcmONERROR(gcoSURF_ResolveRect_v2(rtView0, &texView, &rlvArgs));
+        gcmONERROR(gcoSURF_ResolveRect(rtView0, &texView, &rlvArgs));
         gcmONERROR(gcoTEXTURE_Flush(chipCtx->rtTexture));
         gcmONERROR(gco3D_Semaphore(chipCtx->engine, gcvWHERE_RASTER, gcvWHERE_PIXEL, gcvHOW_SEMAPHORE));
     }

@@ -52,6 +52,7 @@ SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_filter_blt_d
 SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_engine.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_frag_proc.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_texture.o
+SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_texture_upload.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_stream.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_shader.o
 endif

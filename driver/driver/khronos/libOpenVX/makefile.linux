@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -23,8 +23,9 @@ include ./makefile.linux.def
 VX_DRIVER_CORE         := driver/src
 VX_VXU                 := utility
 VX_ENTRY               := entry
+VX_EXTENSION           := extension
 
-LIB_VX := $(VX_DRIVER_CORE) $(VX_VXU)
+LIB_VX := $(VX_DRIVER_CORE) $(VX_VXU) $(VX_EXTENSION)
 
 ######################################################
 # Define the macros used in the common file.
@@ -41,5 +42,6 @@ include $(AQROOT)/common.node
 # Define the denpendencies.
 
 $(VX_VXU): $(VX_DRIVER_CORE)
-$(VX_ENTRY): $(VX_DRIVER_CORE) $(VX_VXU)
+$(VX_EXTENSION): $(VX_DRIVER_CORE)
+$(VX_ENTRY): $(VX_DRIVER_CORE) $(VX_VXU) $(VX_EXTENSION)
 

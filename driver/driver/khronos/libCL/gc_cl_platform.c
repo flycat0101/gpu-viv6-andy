@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -71,6 +71,9 @@ clfGetDefaultPlatformID(
         static gctINT32  delayCount = -1;
 #if BUILD_OPENCL_FP
         gctSTRING epProfile = "EMBEDDED_PROFILE";
+        gceCHIPMODEL  chipModel;
+        gctUINT32 chipRevision;
+        gctBOOL chipEnableFP = gcvFALSE;
 #endif
 
         clgDefaultPlatform = &_platform;
@@ -89,7 +92,10 @@ clfGetDefaultPlatformID(
 #if BUILD_OPENCL_FP
         /* Initialize hardware. */
         status = gcoCL_InitializeHardware();
-        if((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) != gcvSTATUS_TRUE) || (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) != gcvSTATUS_TRUE))
+        gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
+        chipEnableFP = ((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008));
+        if((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) != gcvSTATUS_TRUE) || (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) != gcvSTATUS_TRUE)
+            || (chipEnableFP == gcvFALSE))
         {
             /*if the features on the platform are not availble, still report embedded profile even if BUILD_OPENCL_FP is 1*/
             clgDefaultPlatform->profile = epProfile;

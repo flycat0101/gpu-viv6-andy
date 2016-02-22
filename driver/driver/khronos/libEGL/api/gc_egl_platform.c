@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -772,8 +772,8 @@ veglBindWindow(
     }
 
     /* Check window resize. */
-    if ((info->width  != (gctUINT) width) ||
-        (info->height != (gctUINT) height) ||
+    if ((info->width  != (gctUINT)width) ||
+        (info->height != (gctUINT)height) ||
         (info->format != format))
     {
         /* Window changed. */
@@ -1678,6 +1678,29 @@ veglSynchronousPost(
     return gcoOS_SynchronousFlip((HALNativeDisplayType)Display->hdc);
 }
 
+EGLBoolean
+veglUpdateBufferAge(
+    IN VEGLDisplay Display,
+    IN VEGLSurface Surface,
+    IN struct eglBackBuffer * BackBuffer
+    )
+{
+    /* TODO */
+    return EGL_TRUE;
+}
+
+EGLBoolean
+veglQueryBufferAge(
+    IN VEGLDisplay Display,
+    IN VEGLSurface Surface,
+    IN struct eglBackBuffer * BackBuffer,
+    OUT EGLint *BufferAge
+    )
+{
+    /* TODO */
+    return EGL_FALSE;
+}
+
 /******************************************************************************/
 /* Pixmap. */
 
@@ -2358,8 +2381,26 @@ wl_egl_window_resize(struct wl_egl_window *window, int width, int height, int dx
 {
     gcmASSERT(window);
 
-    gcoOS_ResizeWindow(gcvNULL, (HALNativeWindowType*)(window), width, height);
+   if(window->info->width != width || window->info->height != height)
+   {
+       VEGLThreadData thread;
+       gcoOS_ResizeWindow(gcvNULL, (HALNativeWindowType*)(window), width, height);
+
+       /* Get thread data. */
+       thread = veglGetThreadData();
+       if(thread != gcvNULL && thread->context != gcvNULL)
+       {
+           EGLDisplay dpy;
+           NativeDisplayType display_id;
+           display_id = veglGetDefaultDisplay();
+           dpy = eglGetDisplay(display_id);
+           veglResizeSurface(veglGetDisplay(dpy), thread->context->draw,
+                              width, height);
+       }
+   }
+
 }
+
 void wl_egl_window_get_attached_size(struct wl_egl_window *egl_window,int *width, int *height)
 {
     gcmASSERT(egl_window);
@@ -2371,7 +2412,6 @@ void wl_egl_window_get_attached_size(struct wl_egl_window *egl_window,int *width
 }
 
 #endif
-
 
 /******************************************************************************/
 

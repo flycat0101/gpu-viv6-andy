@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -99,7 +99,8 @@ endif
 
 LOCAL_MODULE         := libGLESv2_$(TAG)
 LOCAL_MODULE_TAGS    := optional
-LOCAL_MODULE_PATH    := $(TARGET_OUT_SHARED_LIBRARIES)/egl
 LOCAL_PRELINK_MODULE := false
 include $(BUILD_SHARED_LIBRARY)
+
+include $(AQROOT)/copy_installed_module.mk
 

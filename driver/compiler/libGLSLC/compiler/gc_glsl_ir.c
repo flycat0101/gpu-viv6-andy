@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1404,6 +1404,349 @@ slsDATA_TYPE_IsArrayHasImplicitLength(
     return hasImplicitLength;
 }
 
+gcSHADER_TYPE
+slsDATA_TYPE_ConvElementDataType(
+    IN slsDATA_TYPE * DataType
+    )
+{
+    gcmASSERT(DataType);
+
+    switch (DataType->elementType)
+    {
+    case slvTYPE_BOOL:
+        switch (slmDATA_TYPE_vectorSize_GET(DataType))
+        {
+        case 0: return gcSHADER_BOOLEAN_X1;
+        case 2: return gcSHADER_BOOLEAN_X2;
+        case 3: return gcSHADER_BOOLEAN_X3;
+        case 4: return gcSHADER_BOOLEAN_X4;
+
+        default:
+            gcmASSERT(0);
+            return gcSHADER_BOOLEAN_X4;
+        }
+
+    case slvTYPE_INT:
+        switch (slmDATA_TYPE_vectorSize_GET(DataType))
+        {
+        case 0: return gcSHADER_INTEGER_X1;
+        case 2: return gcSHADER_INTEGER_X2;
+        case 3: return gcSHADER_INTEGER_X3;
+        case 4: return gcSHADER_INTEGER_X4;
+
+        default:
+            gcmASSERT(0);
+            return gcSHADER_INTEGER_X4;
+        }
+
+    case slvTYPE_FLOAT:
+        switch (slmDATA_TYPE_matrixColumnCount_GET(DataType))
+        {
+        case 0:
+            switch (slmDATA_TYPE_vectorSize_GET(DataType))
+            {
+            case 0: return gcSHADER_FLOAT_X1;
+            case 2: return gcSHADER_FLOAT_X2;
+            case 3: return gcSHADER_FLOAT_X3;
+            case 4: return gcSHADER_FLOAT_X4;
+
+            default:
+                gcmASSERT(0);
+                return gcSHADER_FLOAT_X4;
+            }
+
+        case 2:
+            switch (slmDATA_TYPE_matrixRowCount_GET(DataType)) {
+            case 2:
+                return gcSHADER_FLOAT_2X2;
+
+            case 3:
+                return gcSHADER_FLOAT_2X3;
+
+            case 4:
+                return gcSHADER_FLOAT_2X4;
+
+            default:
+                gcmASSERT(0);
+                return gcSHADER_FLOAT_2X2;
+            }
+
+        case 3:
+            switch (slmDATA_TYPE_matrixRowCount_GET(DataType)) {
+            case 2:
+                return gcSHADER_FLOAT_3X2;
+
+            case 3:
+                return gcSHADER_FLOAT_3X3;
+
+            case 4:
+                return gcSHADER_FLOAT_3X4;
+
+            default:
+                gcmASSERT(0);
+                return gcSHADER_FLOAT_3X3;
+            }
+
+        case 4:
+            switch (slmDATA_TYPE_matrixRowCount_GET(DataType)) {
+            case 2:
+                return gcSHADER_FLOAT_4X2;
+
+            case 3:
+                return gcSHADER_FLOAT_4X3;
+
+            case 4:
+                return gcSHADER_FLOAT_4X4;
+
+            default:
+                gcmASSERT(0);
+                return gcSHADER_FLOAT_4X4;
+            }
+
+        default:
+            gcmASSERT(0);
+            return gcSHADER_FLOAT_4X4;
+        }
+
+    case slvTYPE_SAMPLER2D:
+        return gcSHADER_SAMPLER_2D;
+
+    case slvTYPE_SAMPLERCUBE:
+        return gcSHADER_SAMPLER_CUBIC;
+
+    case slvTYPE_SAMPLERCUBEARRAY:
+        return gcSHADER_SAMPLER_CUBEMAP_ARRAY;
+
+    case slvTYPE_SAMPLER1DARRAY:
+        return gcSHADER_SAMPLER_1D_ARRAY;
+
+    case slvTYPE_SAMPLER1DARRAYSHADOW:
+        return gcSHADER_SAMPLER_1D_ARRAY_SHADOW;
+
+    case slvTYPE_SAMPLER2DSHADOW:
+        return gcSHADER_SAMPLER_2D_SHADOW;
+
+    case slvTYPE_SAMPLER3D:
+        return gcSHADER_SAMPLER_3D;
+
+    case slvTYPE_SAMPLERBUFFER:
+        return gcSHADER_SAMPLER_BUFFER;
+
+    case slvTYPE_SAMPLER2DARRAY:
+        return gcSHADER_SAMPLER_2D_ARRAY;
+
+    case slvTYPE_SAMPLER2DARRAYSHADOW:
+        return gcSHADER_SAMPLER_2D_ARRAY_SHADOW;
+
+    case slvTYPE_SAMPLERCUBESHADOW:
+        return gcSHADER_SAMPLER_CUBE_SHADOW;
+
+    case slvTYPE_SAMPLERCUBEARRAYSHADOW:
+        return gcSHADER_SAMPLER_CUBEMAP_ARRAY_SHADOW;
+
+    case slvTYPE_ISAMPLERCUBE:
+        return gcSHADER_ISAMPLER_CUBIC;
+
+    case slvTYPE_ISAMPLERCUBEARRAY:
+        return gcSHADER_ISAMPLER_CUBEMAP_ARRAY;
+
+    case slvTYPE_ISAMPLER2D:
+        return gcSHADER_ISAMPLER_2D;
+
+    case slvTYPE_ISAMPLER3D:
+        return gcSHADER_ISAMPLER_3D;
+
+    case slvTYPE_ISAMPLERBUFFER:
+        return gcSHADER_ISAMPLER_BUFFER;
+
+    case slvTYPE_ISAMPLER2DARRAY:
+        return gcSHADER_ISAMPLER_2D_ARRAY;
+
+    case slvTYPE_USAMPLERCUBE:
+        return gcSHADER_USAMPLER_CUBIC;
+
+    case slvTYPE_USAMPLERCUBEARRAY:
+        return gcSHADER_USAMPLER_CUBEMAP_ARRAY;
+
+    case slvTYPE_USAMPLER2D:
+        return gcSHADER_USAMPLER_2D;
+
+    case slvTYPE_USAMPLER3D:
+        return gcSHADER_USAMPLER_3D;
+
+    case slvTYPE_USAMPLERBUFFER:
+        return gcSHADER_USAMPLER_BUFFER;
+
+    case slvTYPE_USAMPLER2DARRAY:
+        return gcSHADER_USAMPLER_2D_ARRAY;
+
+    case slvTYPE_SAMPLEREXTERNALOES:
+        return gcSHADER_SAMPLER_EXTERNAL_OES;
+
+    case slvTYPE_SAMPLER2DMS:
+        return gcSHADER_SAMPLER_2D_MS;
+
+    case slvTYPE_ISAMPLER2DMS:
+        return gcSHADER_ISAMPLER_2D_MS;
+
+    case slvTYPE_USAMPLER2DMS:
+        return gcSHADER_USAMPLER_2D_MS;
+
+    case slvTYPE_SAMPLER2DMSARRAY:
+        return gcSHADER_SAMPLER_2D_MS_ARRAY;
+
+    case slvTYPE_ISAMPLER2DMSARRAY:
+        return gcSHADER_ISAMPLER_2D_MS_ARRAY;
+
+    case slvTYPE_USAMPLER2DMSARRAY:
+        return gcSHADER_USAMPLER_2D_MS_ARRAY;
+
+    case slvTYPE_IMAGE2D:
+        return gcSHADER_IMAGE_2D;
+
+    case slvTYPE_IIMAGE2D:
+        return gcSHADER_IIMAGE_2D;
+
+    case slvTYPE_UIMAGE2D:
+        return gcSHADER_UIMAGE_2D;
+
+    case slvTYPE_IMAGE2DARRAY:
+        return gcSHADER_IMAGE_2D_ARRAY;
+
+    case slvTYPE_IIMAGE2DARRAY:
+        return gcSHADER_IIMAGE_2D_ARRAY;
+
+    case slvTYPE_UIMAGE2DARRAY:
+        return gcSHADER_UIMAGE_2D_ARRAY;
+
+    case slvTYPE_IMAGE3D:
+        return gcSHADER_IMAGE_3D;
+
+    case slvTYPE_IIMAGE3D:
+        return gcSHADER_IIMAGE_3D;
+
+    case slvTYPE_UIMAGE3D:
+        return gcSHADER_UIMAGE_3D;
+
+    case slvTYPE_IMAGECUBE:
+        return gcSHADER_IMAGE_CUBE;
+
+    case slvTYPE_IMAGECUBEARRAY:
+        return gcSHADER_IMAGE_CUBEMAP_ARRAY;
+
+    case slvTYPE_IIMAGECUBE:
+        return gcSHADER_IIMAGE_CUBE;
+
+    case slvTYPE_IIMAGECUBEARRAY:
+        return gcSHADER_IIMAGE_CUBEMAP_ARRAY;
+
+    case slvTYPE_UIMAGECUBE:
+        return gcSHADER_UIMAGE_CUBE;
+
+    case slvTYPE_UIMAGECUBEARRAY:
+        return gcSHADER_UIMAGE_CUBEMAP_ARRAY;
+
+    case slvTYPE_IMAGEBUFFER:
+        return gcSHADER_IMAGE_BUFFER;
+
+    case slvTYPE_IIMAGEBUFFER:
+        return gcSHADER_IIMAGE_BUFFER;
+
+    case slvTYPE_UIMAGEBUFFER:
+        return gcSHADER_UIMAGE_BUFFER;
+
+    case slvTYPE_UINT:
+        switch (slmDATA_TYPE_vectorSize_GET(DataType))
+        {
+        case 0: return gcSHADER_UINT_X1;
+        case 2: return gcSHADER_UINT_X2;
+        case 3: return gcSHADER_UINT_X3;
+        case 4: return gcSHADER_UINT_X4;
+
+        default:
+           gcmASSERT(0);
+           return gcSHADER_UINT_X4;
+        }
+    case slvTYPE_ATOMIC_UINT:
+        return gcSHADER_ATOMIC_UINT;
+    default:
+        gcmASSERT(0);
+        return gcSHADER_FLOAT_X4;
+    }
+}
+
+gctINT
+slsDATA_TYPE_GetLogicalCountForAnArray(
+    IN slsDATA_TYPE * DataType
+    )
+{
+    gctINT count = 1;
+    gctINT i;
+
+    if (slsDATA_TYPE_IsInheritFromUnsizedDataType(DataType))
+    {
+        count = 1;
+    }
+    else
+    {
+        for (i = 0; i < DataType->arrayLengthCount; i++)
+        {
+            if (DataType->arrayLengthList[i] > 0)
+            {
+                count *= DataType->arrayLengthList[i];
+            }
+            else
+            {
+                count = 1;
+                break;
+            }
+        }
+    }
+
+    if (slsDATA_TYPE_IsPerVertexArray(DataType) &&
+        DataType->arrayLength != -1 && DataType->arrayLength != 0)
+    {
+        count /= DataType->arrayLength;
+    }
+
+    return count;
+}
+
+gctUINT
+slsDATA_TYPE_GetLogicalOperandCount(
+    IN slsDATA_TYPE * DataType,
+    IN gctBOOL bCalcTypeSize
+    )
+{
+    gctUINT     count = 0;
+    slsNAME *   fieldName;
+
+    gcmASSERT(DataType);
+
+    if (DataType->elementType == slvTYPE_STRUCT ||
+        slsDATA_TYPE_IsUnderlyingInterfaceBlock(DataType))
+    {
+        gcmASSERT(DataType->fieldSpace);
+
+        FOR_EACH_DLINK_NODE(&DataType->fieldSpace->names, slsNAME, fieldName)
+        {
+            gcmASSERT(fieldName->dataType);
+            count += slsDATA_TYPE_GetLogicalOperandCount(fieldName->dataType, bCalcTypeSize);
+        }
+    }
+    else
+    {
+        if (bCalcTypeSize)
+            count = gcGetDataTypeSize(slsDATA_TYPE_ConvElementDataType(DataType));
+        else
+            count = 1;
+    }
+
+    count *= slsDATA_TYPE_GetLogicalCountForAnArray(DataType);
+
+    return count;
+}
+
 /* Name and Name space. */
 gceSTATUS
 slsNAME_Construct(
@@ -1477,21 +1820,19 @@ slsNAME_Construct(
         case slvFUNC_NAME:
             name->u.funcInfo.localSpace                 = gcvNULL;
             name->u.funcInfo.functionBodySpace          = gcvNULL;
-            name->u.funcInfo.isFuncDef                  = gcvFALSE;
-            name->u.funcInfo.hasVoidParameter           = gcvFALSE;
             name->u.funcInfo.funcBody                   = gcvNULL;
-            name->u.funcInfo.isIntrinsicCall            = gcvFALSE;
             name->u.funcInfo.intrinsicKind              = gceINTRIN_NONE;
             name->u.funcInfo.mangled_symbol             = gcvNULL;
-            name->u.funcInfo.hasVarArg                  = gcvFALSE;
-            name->u.funcInfo.hasMemoryAccess            = gcvFALSE;
             name->u.funcInfo.function                   = gcvNULL;
-            name->u.funcInfo.flags                      = slvBUILT_IN_FUNC_NONE;
+            name->u.funcInfo.evaluate                   = gcvNULL;
+            name->u.funcInfo.genCode                    = gcvNULL;
+            name->u.funcInfo.flags                      = slvFUNC_NONE;
             break;
 
         case slvINTERFACE_BLOCK_NAME:
             slsDLINK_LIST_Initialize(&name->u.interfaceBlockContent.members);
-            name->u.interfaceBlockContent.u.interfaceBlockInfo = gcvNULL;
+            name->u.interfaceBlockContent.u.interfaceBlockInfo  = gcvNULL;
+            name->u.interfaceBlockContent.flags                 = slvIB_NONE;
             break;
 
         default:
@@ -1803,9 +2144,8 @@ slsNAME_Dump(
         gcmVERIFY_OK(sloCOMPILER_Dump(
                                     Compiler,
                                     slvDUMP_IR,
-                                    " localSpace=\"0x%x\" isFuncDef=\"%s\" funcBody=\"0x%x\" />",
+                                    " localSpace=\"0x%x\" funcBody=\"0x%x\" />",
                                     Name->u.funcInfo.localSpace,
-                                    (Name->u.funcInfo.isFuncDef)? "true" : "false",
                                     Name->u.funcInfo.funcBody));
         break;
 
@@ -1998,14 +2338,10 @@ slsNAME_SPACE_Search(
         {
             if (name->type == slvFUNC_NAME && name->u.funcInfo.mangled_symbol == Symbol)
             {
-                if (name->extension != slvEXTENSION_NONE)
-                {
-                    if (!sloCOMPILER_ExtensionEnabled(
-                                                    Compiler,
+                if (!sloCOMPILER_ExtensionEnabled(Compiler,
                                                     name->extension))
-                    {
-                        continue;
-                    }
+                {
+                    continue;
                 }
 
                 *Name = name;
@@ -2017,14 +2353,10 @@ slsNAME_SPACE_Search(
         {
             if (name->symbol == Symbol)
             {
-                if (name->extension != slvEXTENSION_NONE)
-                {
-                    if (!sloCOMPILER_ExtensionEnabled(
-                                                    Compiler,
+                if (!sloCOMPILER_ExtensionEnabled(Compiler,
                                                     name->extension))
-                    {
-                        continue;
-                    }
+                {
+                    continue;
                 }
 
                 *Name = name;
@@ -2174,12 +2506,9 @@ slsNAME_SPACE_CheckNewFuncName(
             if (name->type == slvFUNC_NAME)
             {
                 /* es20 and es30 have different built-in functions. */
-                if (name->extension != slvEXTENSION_NONE)
+                if (!sloCOMPILER_ExtensionEnabled(Compiler, name->extension))
                 {
-                    if (!sloCOMPILER_ExtensionEnabled(Compiler, name->extension))
-                    {
-                        continue;
-                    }
+                    continue;
                 }
                 /* for built-in functions,
                 ** on es20: Redefining functions is disallowed. The overloading of built-in functions is allowed
@@ -2225,8 +2554,8 @@ slsNAME_SPACE_CheckNewFuncName(
                 && _IsSameFuncName(Compiler, name, FuncName, &areAllParamQualifiersEqual))
             {
                 /* A function can only have one definition. */
-                if (FuncName->u.funcInfo.isFuncDef &&
-                    name->u.funcInfo.isFuncDef)
+                if (slsFUNC_HAS_FLAG(&(FuncName->u.funcInfo), slvFUNC_DEFINED) &&
+                    slsFUNC_HAS_FLAG(&(name->u.funcInfo), slvFUNC_DEFINED))
                 {
                     gcmVERIFY_OK(sloCOMPILER_Report(
                                                     Compiler,
@@ -2419,6 +2748,7 @@ _IsCorrespondingFuncName(
     slsNAME *   paramName;
     sloIR_EXPR  argument;
     gctUINT     operandCount = 0;
+    gctBOOL     hasVarArg = slsFUNC_HAS_FLAG(&(FuncName->u.funcInfo), slvFUNC_HAS_VAR_ARG);
 
     gcmHEADER_ARG("Compiler=0x%x FuncName=0x%x PolynaryExpr=0x%x",
                    Compiler, FuncName, PolynaryExpr);
@@ -2450,7 +2780,7 @@ _IsCorrespondingFuncName(
 
     if (operandCount != paramCount)
     {
-        if(!FuncName->u.funcInfo.hasVarArg)
+        if (!hasVarArg)
         {
             gcmFOOTER_ARG("<return>=%d", gcvFALSE);
             return gcvFALSE;
@@ -2474,7 +2804,7 @@ _IsCorrespondingFuncName(
 
         if (paramName->type != slvPARAMETER_NAME) break;
 
-        if (FuncName->u.funcInfo.hasVarArg)
+        if (hasVarArg)
         {
             if (_IsGenericTypeMatch(Compiler, paramName->dataType->type, argument->dataType->type))
             {
@@ -2502,7 +2832,7 @@ _IsCorrespondingFuncName(
             return gcvFALSE;
         }
 
-        if (FuncName->u.funcInfo.hasMemoryAccess &&
+        if (slsFUNC_HAS_FLAG(&(FuncName->u.funcInfo), slvFUNC_HAS_MEM_ACCESS) &&
             slsDATA_TYPE_NeedMemoryAccess(argument->dataType))
         {
             if (argument->dataType->qualifiers.layout.imageFormat != slvLAYOUT_IMAGE_FORMAT_R32F &&
@@ -2521,7 +2851,7 @@ _IsCorrespondingFuncName(
     if (((slsDLINK_NODE *)paramName != &FuncName->u.funcInfo.localSpace->names
             && paramName->type == slvPARAMETER_NAME) ||
          ((slsDLINK_NODE *)argument != &PolynaryExpr->operands->members
-          && !FuncName->u.funcInfo.hasVarArg))
+          && !hasVarArg))
     {
         gcmFOOTER_ARG("<return>=%d", gcvFALSE);
         return gcvFALSE;

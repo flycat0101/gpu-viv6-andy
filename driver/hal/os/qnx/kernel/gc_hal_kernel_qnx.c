@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -248,7 +248,7 @@ gckKERNEL_MapVideoMemory(
     OUT gctPOINTER * Logical
     )
 {
-    gctUINT32 baseAddress;
+    gctUINT32 baseAddress = 0;
     off64_t offset;
 
     gcmkHEADER_ARG("Kernel=0x%x InUserSpace=%d Address=%08x",
@@ -263,7 +263,10 @@ gckKERNEL_MapVideoMemory(
     }
     else
     {
-        gcmkVERIFY_OK(gckOS_GetBaseAddress(Kernel->os, &baseAddress));
+        if (Kernel->hardware->mmuVersion == 0)
+        {
+            gcmkVERIFY_OK(gckOS_GetBaseAddress(Kernel->os, &baseAddress));
+        }
 
         offset = (off64_t)(Address + baseAddress) - (off64_t)drv_mempool_get_basePAddress();
     }
@@ -409,4 +412,3 @@ gckKERNEL_QuerySettings(
     gcmkFOOTER_ARG("Settings->signal=%d", Settings->signal);
     return gcvSTATUS_OK;
 }
-

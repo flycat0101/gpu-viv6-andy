@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -277,6 +277,9 @@ typedef struct _gcsHAL_QUERY_CHIP_IDENTITY
 
     /* Number of pixel pipes. */
     gctUINT32                   pixelPipes;
+
+    /* Number of resolve pipes. */
+    gctUINT32                   resolvePipes;
 
     /* Number of instructions. */
     gctUINT32                   instructionCount;
@@ -976,6 +979,9 @@ typedef struct _gcsHAL_INTERFACE
 
             /* Chip types. */
             OUT gceHARDWARE_TYPE        types[gcdCHIP_COUNT];
+
+            /* Chip IDs. */
+            OUT gctUINT32               ids[gcvCORE_COUNT];
         }
         ChipInfo;
 
@@ -1090,6 +1096,7 @@ typedef struct _gcsHAL_INTERFACE
         struct _gcsHAL_QUERY_RESET_TIME_STAMP
         {
             OUT gctUINT64           timeStamp;
+            OUT gctUINT64           contextID;
         }
         QueryResetTimeStamp;
 
@@ -1188,6 +1195,12 @@ typedef struct _gcsHAL_INTERFACE
             IN gctUINT32                timeOut;
         }
         WaitFence;
+
+        struct _gcsHAL_COMMIT_DONE
+        {
+            IN gctUINT64                context;
+        }
+        CommitDone;
 
 #if gcdENABLE_DEC_COMPRESSION && gcdDEC_ENABLE_AHB
         struct _gcsHAL_DEC300_READ

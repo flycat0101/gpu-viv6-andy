@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -186,6 +186,30 @@ VX_INTERNAL_CALLBACK_API void vxoNode_Destructor(vx_reference ref)
         vxFree(node->kernelAttributes.localDataPtr);
         node->kernelAttributes.localDataPtr = VX_NULL;
     }
+
+#if !gcdVX_OPTIMIZER
+    if (node->kernelContext)
+    {
+        gcoVX_Kernel_Context * kernelContext = (gcoVX_Kernel_Context *)(node->kernelContext);
+
+        for (i = 0; i < GC_VX_MAX_HARDWARE_CONTEXT; i++)
+        {
+            if (kernelContext->hwContext[i])
+            {
+                if (kernelContext->hwContext[i]->node && kernelContext->hwContext[i]->node->pool != gcvPOOL_UNKNOWN)
+                {
+                    gcoVX_FreeMemory(kernelContext->hwContext[i]->node);
+                    kernelContext->hwContext[i]->node = gcvNULL;
+                }
+                vxFree(kernelContext->hwContext[i]);
+                kernelContext->hwContext[i] = gcvNULL;
+            }
+        }
+
+        vxFree(node->kernelContext);
+        node->kernelContext = gcvNULL;
+    }
+#endif
 
     /* Remove the ref count of the kernel from the node */
     vxoReference_Release((vx_reference *)&node->kernel, VX_TYPE_KERNEL, VX_REF_INTERNAL);
@@ -390,6 +414,9 @@ VX_INTERNAL_API vx_status vxoNode_SetChildGraph(vx_node node, vx_graph graph)
     {
         if (node->childGraph != VX_NULL)
         {
+#if gcdVX_OPTIMIZER
+            node->childGraph->isSubGraph = vx_false_e;
+#endif
             vxoReference_Release((vx_reference *)&node->childGraph, VX_TYPE_GRAPH, VX_REF_INTERNAL);
         }
     }
@@ -429,6 +456,11 @@ VX_INTERNAL_API vx_status vxoNode_SetChildGraph(vx_node node, vx_graph graph)
                 return VX_ERROR_INVALID_GRAPH;
             }
         }
+
+#if gcdVX_OPTIMIZER
+        vxmASSERT(!graph->isSubGraph);
+        graph->isSubGraph = vx_true_e;
+#endif
 
         node->childGraph = graph;
 
@@ -518,6 +550,8 @@ VX_INTERNAL_API vx_status vxoNode_Replay(vx_node node)
     if ((node->cmdBuffer == NULL) || (node->cmdSizeBytes == 0))
         return VX_FAILURE;
 
+    vxoPerf_Begin(&node->perf);
+
     gcStatus = gcoVX_Replay((gctPOINTER)node->cmdBuffer, (gctUINT32)node->cmdSizeBytes);
     if (gcStatus != gcvSTATUS_OK)
         return VX_FAILURE;
@@ -526,7 +560,6 @@ VX_INTERNAL_API vx_status vxoNode_Replay(vx_node node)
     if (gcStatus != gcvSTATUS_OK)
         return VX_FAILURE;
 
-    vxoPerf_Begin(&node->perf);
     node->executed = vx_true_e;
     node->status = VX_SUCCESS;
     vxoPerf_End(&node->perf);
@@ -540,6 +573,37 @@ VX_INTERNAL_API vx_status vxoNode_Release(vx_node_ptr nodePtr)
     {
         free((*nodePtr)->cmdBuffer);
     }
+
+#if gcdVX_OPTIMIZER
+    if ((*nodePtr)->kernelContext)
+    {
+        vxFree((*nodePtr)->kernelContext);
+    }
+#else
+    if ((*nodePtr)->kernelContext)
+    {
+        vx_int32 i = 0;
+        gcoVX_Kernel_Context * kernelContext = (gcoVX_Kernel_Context *)((*nodePtr)->kernelContext);
+
+        for (i = 0; i < GC_VX_MAX_HARDWARE_CONTEXT; i++)
+        {
+            //hardwareContext = kernelContext->hwContext[i];
+            if (kernelContext->hwContext[i])
+            {
+                if (kernelContext->hwContext[i]->node && kernelContext->hwContext[i]->node->pool != gcvPOOL_UNKNOWN)
+                {
+                    gcoVX_FreeMemory(kernelContext->hwContext[i]->node);
+                    kernelContext->hwContext[i]->node = gcvNULL;
+                }
+                vxFree(kernelContext->hwContext[i]);
+                kernelContext->hwContext[i] = gcvNULL;
+            }
+        }
+
+        vxFree((*nodePtr)->kernelContext);
+        (*nodePtr)->kernelContext = gcvNULL;
+    }
+#endif
 
     return vxoReference_Release((vx_reference_ptr)nodePtr, VX_TYPE_NODE, VX_REF_EXTERNAL);
 }
@@ -674,6 +738,13 @@ VX_PUBLIC_API vx_status vxSetNodeAttribute(vx_node node, vx_enum attribute, void
             node->kernelAttributes.borderMode = *(vx_border_mode_t *)ptr;
             break;
 
+        case VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_kernel_execution_parameters_t, 0x3);
+
+            node->kernelAttributes.shaderParameter = *(vx_kernel_execution_parameters_t *)ptr;
+            break;
+
+
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
             return VX_ERROR_NOT_SUPPORTED;
@@ -714,6 +785,16 @@ VX_PUBLIC_API vx_nodecomplete_f vxRetrieveNodeCallback(vx_node node)
     return node->completeCallback;
 }
 
+VX_PUBLIC_API vx_status vxSetChildGraphOfNode(vx_node node, vx_graph graph)
+{
+    return vxoNode_SetChildGraph(node, graph);
+}
+
+VX_PUBLIC_API vx_graph vxGetChildGraphOfNode(vx_node node)
+{
+    return vxoNode_GetChildGraph(node);
+}
+
 #if defined(OPENVX_USE_VARIANTS)
 VX_PUBLIC_API vx_status vxChooseKernelVariant(vx_node node, vx_char variantName[VX_MAX_VARIANT_NAME])
 {
@@ -728,7 +809,6 @@ VX_PUBLIC_API vx_status vxChooseKernelVariant(vx_node node, vx_char variantName[
     target = &node->base.context->targetTable[node->targetIndex];
 
     gcoOS_StrDup(gcvNULL, node->kernel->name, &kernelName);
-
     colonCharPtr    = strchr(kernelName, ':');
 
     if (colonCharPtr != VX_NULL) *colonCharPtr = '\0';

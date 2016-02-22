@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -113,6 +113,12 @@ VX_PUBLIC_API vx_status vxSetMetaFormatAttribute(vx_meta_format meta_format, vx_
 
             meta_format->u.scalarInfo.type = *(vx_enum *)ptr;
             break;
+
+		case VX_REF_ATTRIBUTE_TYPE:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
+
+            meta_format->type = *(vx_enum *)ptr;
+			break;
 
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);

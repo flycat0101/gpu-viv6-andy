@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1463,7 +1463,7 @@ void _ReadPixelFrom_S8D32F_2_A8R8G8B8(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcs
 
 _PFNreadPixel gcoSURF_GetReadPixelFunc(gcoSURF surf)
 {
-    switch (surf->info.format)
+    switch (surf->format)
     {
     case gcvSURF_A8:
         return _ReadPixelFrom_A8;
@@ -2847,7 +2847,7 @@ void _WritePixelTo_S8D32F_2_A8R8G8B8(gcsPIXEL* inPixel, gctPOINTER outAddr[gcdMA
 
 _PFNwritePixel gcoSURF_GetWritePixelFunc(gcoSURF surf)
 {
-    switch (surf->info.format)
+    switch (surf->format)
     {
     case gcvSURF_A8:
         return _WritePixelTo_A8;
@@ -3177,6 +3177,7 @@ _PFNwritePixel gcoSURF_GetWritePixelFunc(gcoSURF surf)
     case gcvSURF_A32F:
     case gcvSURF_A32F_1_R32F:
         return _WritePixelTo_A32F;
+
     case gcvSURF_L32F:
     case gcvSURF_L32F_1_R32F:
         return _WritePixelTo_L32F;

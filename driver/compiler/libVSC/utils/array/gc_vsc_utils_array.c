@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -106,8 +106,8 @@ gctUINT vscSRARR_AddElement(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, void* pNewEle)
 void* vscSRARR_GetNextEmpty(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, gctUINT *pIndex)
 {
     _CheckElementSpace(pArray);
-    *pIndex = pArray->elementCount;
-    return (gctUINT8*)pArray->pElement + pArray->elementSize*pArray->elementCount;
+    *pIndex = pArray->elementCount ++;
+    return (gctUINT8*)pArray->pElement + pArray->elementSize*(*pIndex);
 }
 
 void* vscSRARR_GetElement(VSC_SIMPLE_RESIZABLE_ARRAY* pArray, gctUINT index)

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -48,11 +48,11 @@ typedef struct _VIR_DOM_TREE
 }VIR_DOM_TREE;
 
 typedef VSC_TNODE_LIST_ITERATOR DOM_TREE_ITERATOR;
-#define DOM_TREE_ITERATOR_ITERATOR_INIT(iter, pDomTree)    VSC_TNODE_LIST_ITERATOR_INIT((iter), pDomTree)
-#define DOM_TREE_ITERATOR_ITERATOR_FIRST(iter)             VSC_TNODE_LIST_ITERATOR_FIRST((iter))
-#define DOM_TREE_ITERATOR_ITERATOR_NEXT(iter)              VSC_TNODE_LIST_ITERATOR_NEXT((iter))
-#define DOM_TREE_ITERATOR_ITERATOR_PREV(iter)              VSC_TNODE_LIST_ITERATOR_PREV((iter))
-#define DOM_TREE_ITERATOR_ITERATOR_LAST(iter)              VSC_TNODE_LIST_ITERATOR_LAST((iter))
+#define DOM_TREE_ITERATOR_ITERATOR_INIT(iter, pDomTree)    VSC_TNODE_LIST_ITERATOR_INIT((iter), &pDomTree->tree)
+#define DOM_TREE_ITERATOR_ITERATOR_FIRST(iter)             (VIR_DOM_TREE_NODE*)VSC_TNODE_LIST_ITERATOR_FIRST((iter))
+#define DOM_TREE_ITERATOR_ITERATOR_NEXT(iter)              (VIR_DOM_TREE_NODE*)VSC_TNODE_LIST_ITERATOR_NEXT((iter))
+#define DOM_TREE_ITERATOR_ITERATOR_PREV(iter)              (VIR_DOM_TREE_NODE*)VSC_TNODE_LIST_ITERATOR_PREV((iter))
+#define DOM_TREE_ITERATOR_ITERATOR_LAST(iter)              (VIR_DOM_TREE_NODE*)VSC_TNODE_LIST_ITERATOR_LAST((iter))
 
 typedef VSC_CHILD_LIST_ITERATOR DOM_TREE_NODE_CHILD_ITERATOR;
 #define DOM_TREE_NODE_CHILD_ITERATOR_INIT(iter, pDomTreeNode) VSC_CHILD_LIST_ITERATOR_INIT((iter), &(pDomTreeNode)->treeNode)
@@ -92,6 +92,17 @@ typedef struct _VIR_CFG_EDGE
     VIR_CFG_EDGE_TYPE         type;
 }VIR_CFG_EDGE;
 
+typedef struct _VIR_BB_REACH_RELATION
+{
+    /* Forwardly, which BB can reach to this BB (reachInBB) and which BB can this BB reach to (reachOutBB) */
+    VSC_BIT_VECTOR            fwdReachInBBSet;
+    VSC_BIT_VECTOR            fwdReachOutBBSet;
+
+    /* Backwardly, which BB can reach to this BB (reachInBB) and which BB can this BB reach to (reachOutBB) */
+    VSC_BIT_VECTOR            bwdReachInBBSet;
+    VSC_BIT_VECTOR            bwdReachOutBBSet;
+}VIR_BB_REACH_RELATION;
+
 #define CFG_EDGE_GET_TO_BB(pCfgEdge)    ((VIR_BASIC_BLOCK*)((pCfgEdge)->dgEdge.pToNode))
 
 #define VIR_BB_FLAG_HavingLLI          0x1
@@ -100,6 +111,9 @@ struct _VIR_BASIC_BLOCK
 {
     /* Graph node. It must be put at FIRST place!!!! */
     VSC_DG_NODE               dgNode;
+
+    /* CG-wide global BB id */
+    gctUINT                   globalBbId;
 
     /* Owner control flow graph of BB */
     VIR_CONTROL_FLOW_GRAPH*   pOwnerCFG;
@@ -134,6 +148,11 @@ struct _VIR_BASIC_BLOCK
     /* Who are this BB control (reversed-) dependent on?? */
     VSC_BIT_VECTOR            dfSet;
     VSC_BIT_VECTOR            cdSet;
+
+    /* Local (function-wide, search with dgNode.id) and global (CG-wide, search with globalBbId) basic
+       block reach relation info */
+    VIR_BB_REACH_RELATION     localReachSet;
+    VIR_BB_REACH_RELATION     globalReachSet;
 
     /* BB flags */
     gctUINT32                 flags;
@@ -218,6 +237,8 @@ typedef VSC_GNODE_LIST_ITERATOR CFG_ITERATOR;
                                     (&(pCFG)->dgGraph.tailNodeArray, 0))
 
 #define CFG_GET_BB_BY_ID(pCFG, id) (VIR_BASIC_BLOCK*)vscDG_GetNodeById(&(pCFG)->dgGraph, (id))
+#define CFG_GET_DOM_TREE(pCFG)     (&(pCFG)->domTree)
+#define CFG_GET_PDOM_TREE(pCFG)    (&(pCFG)->postDomTree)
 
 /*
  *   Call graph definition
@@ -272,6 +293,12 @@ struct _VIR_CALL_GRAPH
     /* This CG is belonging to which shader */
     VIR_Shader*               pOwnerShader;
 
+    /* Global (CG-wide) BB id (VIR_BASIC_BLOCK::globalBbId) generator */
+    gctUINT                   nextGlobalBbId;
+
+    /* To hash BB by VIR_BASIC_BLOCK::globalBbId */
+    VSC_HASH_TABLE            globalBbHashTable;
+
     /* Memory pool that this CG is built on */
     VSC_PRIMARY_MEM_POOL      pmp;
 };
@@ -282,6 +309,10 @@ typedef VSC_GNODE_LIST_ITERATOR CG_ITERATOR;
 #define CG_ITERATOR_NEXT(iter)         VSC_GNODE_LIST_ITERATOR_NEXT((iter))
 #define CG_ITERATOR_PREV(iter)         VSC_GNODE_LIST_ITERATOR_PREV((iter))
 #define CG_ITERATOR_LAST(iter)         VSC_GNODE_LIST_ITERATOR_LAST((iter))
+
+#define CG_GET_HIST_GLOBAL_BB_COUNT(pCG) (pCG)->nextGlobalBbId
+#define CG_GET_BB_BY_GLOBAL_ID(pCG, globalBbId)                             \
+         (VIR_BASIC_BLOCK*)vscHTBL_DirectGet(&pCG->globalBbHashTable, (void*)(gctUINTPTR_T)globalBbId)
 
 #define CG_GET_MAIN_FUNC(pCG) ((*(VIR_FUNC_BLOCK**)vscSRARR_GetElement      \
                                (&(pCG)->dgGraph.rootNodeArray, 0))->pVIRFunc)
@@ -317,6 +348,10 @@ VSC_ErrCode vscVIR_BuildControlDep(VIR_Shader* pShader);
 VSC_ErrCode vscVIR_DestroyControlDep(VIR_Shader* pShader);
 VSC_ErrCode vscVIR_BuildDomFrontier(VIR_Shader* pShader);
 VSC_ErrCode vscVIR_DestroyDomFrontier(VIR_Shader* pShader);
+
+/* BB reach-relation functions */
+VSC_ErrCode vscVIR_BuildBbReachRelation(VIR_Shader* pShader);
+VSC_ErrCode vscVIR_DestroyBbReachRelation(VIR_Shader* pShader);
 
 END_EXTERN_C()
 

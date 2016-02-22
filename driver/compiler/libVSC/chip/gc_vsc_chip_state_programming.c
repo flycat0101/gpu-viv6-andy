@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,7 +13,6 @@
 
 #include "gc_vsc.h"
 #include "chip/gc_vsc_chip_state_programming.h"
-#include "chip/gc_vsc_chip_mc_codec.h"
 
 #define VSC_CHIP_STATES_ALLOC_GRANULARITY  512
 
@@ -95,6 +94,8 @@ VSC_ErrCode vscInitializeChipStatesProgrammer(VSC_CHIP_STATES_PROGRAMMER* pState
     pHints->unifiedStatus.samplerPSEnd      = 0;
 
     pHints->sampleMaskLoc = -1;
+    pHints->psOutCntl0to3 = -1;
+    pHints->psOutCntl4to7 = -1;
 
 #if TEMP_SHADER_PATCH
     pHints->pachedShaderIdentifier = gcvMACHINECODE_COUNT;
@@ -564,7 +565,7 @@ static VSC_ErrCode _ProgramVsInsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PR
  4:4)));
     }
 
-    if (pShHwInfo->pSEP->exeHints.derivedHints.globalStates.bAtomicOp &&
+    if ((pShHwInfo->pSEP->exeHints.derivedHints.globalStates.memoryAccessHint & SHADER_EDH_MEM_ACCESS_HINT_ATOMIC) &&
         pStatesPgmer->pHwCfg->hwFeatureFlags.robustAtomic)
     {
         shaderConfigData |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -840,7 +841,7 @@ static VSC_ErrCode _ProgramVsCompileTimeConsts(SHADER_HW_INFO* pShHwInfo, VSC_CH
 
     startConstRegAddr = _GetVsStartConstRegAddr(pShHwInfo, pStatesPgmer);
 
-    pStatesPgmer->pHints->unifiedStatus.constGPipeEnd = pShHwInfo->pSEP->constantMapping.hwConstRegCount;
+    pStatesPgmer->pHints->unifiedStatus.constGPipeEnd += pShHwInfo->pSEP->constantMapping.hwConstRegCount;
     pStatesPgmer->pHints->vsConstBase = startConstRegAddr * 4;
 
     errCode = _ProgramRegedCTC(pShHwInfo,
@@ -874,6 +875,19 @@ OnError:
     return errCode;
 }
 
+static gctUINT _GetCalibratedGprCount(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
+{
+    gctUINT   calibratedGprCount = pShHwInfo->pSEP->gprCount;
+
+    if (pShHwInfo->hwProgrammingHints.hwInstFetchMode == HW_INST_FETCH_MODE_CACHE &&
+        !pStatesPgmer->pHwCfg->hwFeatureFlags.hasICacheAllocCountFix)
+    {
+        calibratedGprCount = vscMAX(calibratedGprCount, 3);
+    }
+
+    return calibratedGprCount;
+}
+
 static VSC_ErrCode _ProgramVS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
@@ -888,6 +902,7 @@ static VSC_ErrCode _ProgramVS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     gctUINT                    vsInput16RegNo = 0, ptSzLinkNo = NOT_ASSIGNED;
     gctUINT                    hwRegNoForVtxId = NOT_ASSIGNED, hwRegNoForInstanceId = NOT_ASSIGNED;
     gctUINT                    firstValidIoChannel, hwThreadGroupSize, resultCacheWinSize;
+    gctUINT                    calibratedGprCount = _GetCalibratedGprCount(pShHwInfo, pStatesPgmer);
 
     gcmASSERT(pVsSEP->inputMapping.ioVtxPxl.ioMode == SHADER_IO_MODE_PASSIVE);
     gcmASSERT(pVsSEP->outputMapping.ioVtxPxl.ioMode == SHADER_IO_MODE_PASSIVE);
@@ -989,7 +1004,7 @@ static VSC_ErrCode _ProgramVS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
                           hwLoc.cmnHwLoc.u.hwRegNo;
                 gcmASSERT(hwRegNo != NOT_ASSIGNED);
 
-                if (pStatesPgmer->pHwCfg->hwFeatureFlags.has32Attributes &&
+                if (pStatesPgmer->pHwCfg->hwFeatureFlags.newGPIPE &&
                     pVsSEP->outputMapping.ioVtxPxl.ioMode == SHADER_IO_MODE_PASSIVE)
                 {
                     /* Convert link into output reg mapping array index and shift */
@@ -1074,12 +1089,8 @@ static VSC_ErrCode _ProgramVS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     pStatesPgmer->pHints->vsInstCount = pVsSEP->countOfMCInst;
     pStatesPgmer->pHints->vsOutputCount  = vsOutputCount;
     pStatesPgmer->pHints->vsPositionZDependsOnW = pVsSEP->exeHints.derivedHints.prePaStates.bOutPosZDepW;
-    pStatesPgmer->pHints->vsMaxTemp = pVsSEP->gprCount;
-    pStatesPgmer->pHints->useLoadStore[gcvPROGRAM_STAGE_VERTEX] = pVsSEP->exeHints.derivedHints.globalStates.bLoadStore;
-    pStatesPgmer->pHints->useImgReadWrite[gcvPROGRAM_STAGE_VERTEX] = pVsSEP->exeHints.derivedHints.globalStates.bImgReadWrite;
-    pStatesPgmer->pHints->useAtomicOp[gcvPROGRAM_STAGE_VERTEX] = pVsSEP->exeHints.derivedHints.globalStates.bAtomicOp;
-    pStatesPgmer->pHints->useMemoryAccess[gcvPROGRAM_STAGE_VERTEX] = pVsSEP->exeHints.derivedHints.globalStates.bMemAccess;
-    pStatesPgmer->pHints->useBarrier[gcvPROGRAM_STAGE_VERTEX] = pVsSEP->exeHints.derivedHints.globalStates.bBarrierOp;
+    pStatesPgmer->pHints->vsMaxTemp = calibratedGprCount;
+    pStatesPgmer->pHints->memoryAccessFlags[gcvPROGRAM_STAGE_VERTEX] = (gceMEMORY_ACCESS_FLAG)pVsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
     pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_VERTEX] = pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
     pStatesPgmer->pHints->unifiedStatus.samplerGPipeStart -= pVsSEP->samplerMapping.hwSamplerRegCount;
 
@@ -1102,7 +1113,7 @@ static VSC_ErrCode _ProgramVS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
 
     /* Why no chip model check????????? */
     effectiveOutputCount = (!pStatesPgmer->pHwCfg->hwFeatureFlags.outputCountFix) ?
-                            gcmALIGN(vsOutputCount, 2)                :
+                            gcmALIGN(vsOutputCount, 2)                            :
                             (((vsOutputCompCount + 7) >> 2) +
                              ((pStatesPgmer->pHints->vsHasPointSize && ((vsOutputCompCount % 4 )) == 0) ? 1 : 0)
                             );
@@ -1155,7 +1166,7 @@ static VSC_ErrCode _ProgramVS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
  21:16)));
     VSC_LOAD_HW_STATE(0x0202, state);
 
-    if (pStatesPgmer->pHwCfg->hwFeatureFlags.has32Attributes)
+    if (pStatesPgmer->pHwCfg->hwFeatureFlags.newGPIPE)
     {
         /* Program output */
         VSC_LOAD_HW_STATES(0x0238, baseOutputRegMapping, ((vsOutputCount + 3) / 4));
@@ -1203,7 +1214,7 @@ static VSC_ErrCode _ProgramVS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     /* Program used GPR count */
     state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 6:0) - (0 ?
  6:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
- 6:0))) | (((gctUINT32) ((gctUINT32) (pVsSEP->gprCount) & ((gctUINT32) ((((1 ?
+ 6:0))) | (((gctUINT32) ((gctUINT32) (calibratedGprCount) & ((gctUINT32) ((((1 ?
  6:0) - (0 ? 6:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
  6:0)));
     VSC_LOAD_HW_STATE(0x0203, state);
@@ -1330,7 +1341,7 @@ static VSC_ErrCode _ProgramHsCompileTimeConsts(SHADER_HW_INFO* pShHwInfo, VSC_CH
 
     startConstRegAddr = _GetHsStartConstRegAddr(pShHwInfo, pStatesPgmer);
 
-    pStatesPgmer->pHints->unifiedStatus.constGPipeEnd = pShHwInfo->pSEP->constantMapping.hwConstRegCount;
+    pStatesPgmer->pHints->unifiedStatus.constGPipeEnd += pShHwInfo->pSEP->constantMapping.hwConstRegCount;
     pStatesPgmer->pHints->tcsConstBase = startConstRegAddr * 4;
 
     errCode = _ProgramRegedCTC(pShHwInfo,
@@ -1590,11 +1601,7 @@ static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
         }
     }
 
-    pStatesPgmer->pHints->useLoadStore[gcvPROGRAM_STAGE_TCS] = pHsSEP->exeHints.derivedHints.globalStates.bLoadStore;
-    pStatesPgmer->pHints->useImgReadWrite[gcvPROGRAM_STAGE_TCS] = pHsSEP->exeHints.derivedHints.globalStates.bImgReadWrite;
-    pStatesPgmer->pHints->useAtomicOp[gcvPROGRAM_STAGE_TCS] = pHsSEP->exeHints.derivedHints.globalStates.bAtomicOp;
-    pStatesPgmer->pHints->useMemoryAccess[gcvPROGRAM_STAGE_TCS] = pHsSEP->exeHints.derivedHints.globalStates.bMemAccess;
-    pStatesPgmer->pHints->useBarrier[gcvPROGRAM_STAGE_TCS] = pHsSEP->exeHints.derivedHints.globalStates.bBarrierOp;
+    pStatesPgmer->pHints->memoryAccessFlags[gcvPROGRAM_STAGE_TCS] = (gceMEMORY_ACCESS_FLAG)pHsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
     pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_TCS] = pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
     pStatesPgmer->pHints->unifiedStatus.samplerGPipeStart -= pHsSEP->samplerMapping.hwSamplerRegCount;
 
@@ -1629,19 +1636,19 @@ static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     hsPerCPOutputAttrCount = (pHsSEP->outputMapping.ioVtxPxl.ioMode == SHADER_IO_MODE_ACTIVE) ? 0 : hsPerCPOutputCount;
     state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 18:12) - (0 ?
  18:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:12) - (0 ? 18:12) + 1))))))) << (0 ?
- 18:12))) | (((gctUINT32) ((gctUINT32) (pHsSEP->gprCount) & ((gctUINT32) ((((1 ?
+ 18:12))) | (((gctUINT32) ((gctUINT32) (_GetCalibratedGprCount(pShHwInfo, pStatesPgmer)) & ((gctUINT32) ((((1 ?
  18:12) - (0 ? 18:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:12) - (0 ? 18:12) + 1))))))) << (0 ?
- 18:12)))              |
+ 18:12))) |
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 25:20) - (0 ?
  25:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:20) - (0 ? 25:20) + 1))))))) << (0 ?
  25:20))) | (((gctUINT32) ((gctUINT32) (hsPerCPOutputAttrCount) & ((gctUINT32) ((((1 ?
  25:20) - (0 ? 25:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:20) - (0 ? 25:20) + 1))))))) << (0 ?
- 25:20))) |
+ 25:20)))                   |
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 9:8) - (0 ?
  9:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 9:8) - (0 ? 9:8) + 1))))))) << (0 ?
  9:8))) | (((gctUINT32) ((gctUINT32) (remapMode) & ((gctUINT32) ((((1 ?
  9:8) - (0 ? 9:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 9:8) - (0 ? 9:8) + 1))))))) << (0 ?
- 9:8)))                          |
+ 9:8)))                                            |
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 5:0) - (0 ?
  5:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
  5:0))) | (((gctUINT32) ((gctUINT32) (pHsSEP->exeHints.nativeHints.prvStates.ts.outputCtrlPointCount) & ((gctUINT32) ((((1 ?
@@ -1833,7 +1840,7 @@ static VSC_ErrCode _ProgramDsCompileTimeConsts(SHADER_HW_INFO* pShHwInfo, VSC_CH
 
     startConstRegAddr = _GetDsStartConstRegAddr(pShHwInfo, pStatesPgmer);
 
-    pStatesPgmer->pHints->unifiedStatus.constGPipeEnd = pShHwInfo->pSEP->constantMapping.hwConstRegCount;
+    pStatesPgmer->pHints->unifiedStatus.constGPipeEnd += pShHwInfo->pSEP->constantMapping.hwConstRegCount;
     pStatesPgmer->pHints->tesConstBase = startConstRegAddr * 4;
 
     errCode = _ProgramRegedCTC(pShHwInfo,
@@ -1967,11 +1974,7 @@ static VSC_ErrCode _ProgramDS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     pStatesPgmer->pHints->prePaShaderHasPointSize = (pDsSEP->outputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_POINTSIZE].ioIndexMask != 0);
     pStatesPgmer->pHints->prePaShaderHasPrimitiveId = (pDsSEP->outputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_PRIMITIVEID].ioIndexMask != 0);
     pStatesPgmer->pHints->shader2PaOutputCount = dsOutputCount - soOnlyOutputCount - dummyOutputCount;
-    pStatesPgmer->pHints->useLoadStore[gcvPROGRAM_STAGE_TES] = pDsSEP->exeHints.derivedHints.globalStates.bLoadStore;
-    pStatesPgmer->pHints->useImgReadWrite[gcvPROGRAM_STAGE_TES] = pDsSEP->exeHints.derivedHints.globalStates.bImgReadWrite;
-    pStatesPgmer->pHints->useAtomicOp[gcvPROGRAM_STAGE_TES] = pDsSEP->exeHints.derivedHints.globalStates.bAtomicOp;
-    pStatesPgmer->pHints->useMemoryAccess[gcvPROGRAM_STAGE_TES] = pDsSEP->exeHints.derivedHints.globalStates.bMemAccess;
-    pStatesPgmer->pHints->useBarrier[gcvPROGRAM_STAGE_TES] = pDsSEP->exeHints.derivedHints.globalStates.bBarrierOp;
+    pStatesPgmer->pHints->memoryAccessFlags[gcvPROGRAM_STAGE_TES] = (gceMEMORY_ACCESS_FLAG)pDsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
     pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_TES] = pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
     pStatesPgmer->pHints->unifiedStatus.samplerGPipeStart -= pDsSEP->samplerMapping.hwSamplerRegCount;
 
@@ -1997,14 +2000,14 @@ static VSC_ErrCode _ProgramDS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     dsOutputAttrCount = (pDsSEP->outputMapping.ioVtxPxl.ioMode == SHADER_IO_MODE_ACTIVE) ? 0 : dsOutputCount;
     state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 18:12) - (0 ?
  18:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:12) - (0 ? 18:12) + 1))))))) << (0 ?
- 18:12))) | (((gctUINT32) ((gctUINT32) (pDsSEP->gprCount) & ((gctUINT32) ((((1 ?
+ 18:12))) | (((gctUINT32) ((gctUINT32) (_GetCalibratedGprCount(pShHwInfo, pStatesPgmer)) & ((gctUINT32) ((((1 ?
  18:12) - (0 ? 18:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:12) - (0 ? 18:12) + 1))))))) << (0 ?
- 18:12)))         |
+ 18:12))) |
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 9:4) - (0 ?
  9:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 9:4) - (0 ? 9:4) + 1))))))) << (0 ?
  9:4))) | (((gctUINT32) ((gctUINT32) (dsOutputAttrCount) & ((gctUINT32) ((((1 ?
  9:4) - (0 ? 9:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 9:4) - (0 ? 9:4) + 1))))))) << (0 ?
- 9:4))) |
+ 9:4)))                        |
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
  0:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
  0:0))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 0:0) - (0 ?
@@ -2201,7 +2204,7 @@ static VSC_ErrCode _ProgramGsCompileTimeConsts(SHADER_HW_INFO* pShHwInfo, VSC_CH
 
     startConstRegAddr = _GetGsStartConstRegAddr(pShHwInfo, pStatesPgmer);
 
-    pStatesPgmer->pHints->unifiedStatus.constGPipeEnd = pShHwInfo->pSEP->constantMapping.hwConstRegCount;
+    pStatesPgmer->pHints->unifiedStatus.constGPipeEnd += pShHwInfo->pSEP->constantMapping.hwConstRegCount;
     pStatesPgmer->pHints->gsConstBase = startConstRegAddr * 4;
 
     errCode = _ProgramRegedCTC(pShHwInfo,
@@ -2435,11 +2438,7 @@ static VSC_ErrCode _ProgramGS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     pStatesPgmer->pHints->prePaShaderHasPointSize = (pGsSEP->outputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_POINTSIZE].ioIndexMask != 0);
     pStatesPgmer->pHints->prePaShaderHasPrimitiveId = (pGsSEP->outputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_PRIMITIVEID].ioIndexMask != 0);
     pStatesPgmer->pHints->shader2PaOutputCount = gsOutputCount - soOnlyOutputCount - dummyOutputCount;
-    pStatesPgmer->pHints->useLoadStore[gcvPROGRAM_STAGE_GEOMETRY] = pGsSEP->exeHints.derivedHints.globalStates.bLoadStore;
-    pStatesPgmer->pHints->useImgReadWrite[gcvPROGRAM_STAGE_GEOMETRY] = pGsSEP->exeHints.derivedHints.globalStates.bImgReadWrite;
-    pStatesPgmer->pHints->useAtomicOp[gcvPROGRAM_STAGE_GEOMETRY] = pGsSEP->exeHints.derivedHints.globalStates.bAtomicOp;
-    pStatesPgmer->pHints->useMemoryAccess[gcvPROGRAM_STAGE_GEOMETRY] = pGsSEP->exeHints.derivedHints.globalStates.bMemAccess;
-    pStatesPgmer->pHints->useBarrier[gcvPROGRAM_STAGE_GEOMETRY] = pGsSEP->exeHints.derivedHints.globalStates.bBarrierOp;
+    pStatesPgmer->pHints->memoryAccessFlags[gcvPROGRAM_STAGE_GEOMETRY] = (gceMEMORY_ACCESS_FLAG)pGsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
     pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_GEOMETRY] = pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
     pStatesPgmer->pHints->unifiedStatus.samplerGPipeStart -= pGsSEP->samplerMapping.hwSamplerRegCount;
 
@@ -2460,42 +2459,42 @@ static VSC_ErrCode _ProgramGS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
  0:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
  0:0))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 0:0) - (0 ?
  0:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0)))                               |
+ 0:0)))                                                     |
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 21:20) - (0 ?
  21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
  21:20))) | (((gctUINT32) ((gctUINT32) (startRemapHwReg) & ((gctUINT32) ((((1 ?
  21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
- 21:20)))          |
+ 21:20)))                                |
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 9:4) - (0 ?
  9:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 9:4) - (0 ? 9:4) + 1))))))) << (0 ?
  9:4))) | (((gctUINT32) ((gctUINT32) (gsOutputAttrCount) & ((gctUINT32) ((((1 ?
  9:4) - (0 ? 9:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 9:4) - (0 ? 9:4) + 1))))))) << (0 ?
- 9:4)))       |
+ 9:4)))                             |
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 18:12) - (0 ?
  18:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:12) - (0 ? 18:12) + 1))))))) << (0 ?
- 18:12))) | (((gctUINT32) ((gctUINT32) (pGsSEP->gprCount) & ((gctUINT32) ((((1 ?
+ 18:12))) | (((gctUINT32) ((gctUINT32) (_GetCalibratedGprCount(pShHwInfo, pStatesPgmer)) & ((gctUINT32) ((((1 ?
  18:12) - (0 ? 18:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:12) - (0 ? 18:12) + 1))))))) << (0 ?
- 18:12)))          |
+ 18:12))) |
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 26:26) - (0 ?
  26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
  26:26))) | (((gctUINT32) ((gctUINT32) (bGsPrimitiveId) & ((gctUINT32) ((((1 ?
  26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))      |
+ 26:26)))                            |
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 27:27) - (0 ?
  27:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 27:27) - (0 ? 27:27) + 1))))))) << (0 ?
  27:27))) | (((gctUINT32) ((gctUINT32) (bGsInstancingId) & ((gctUINT32) ((((1 ?
  27:27) - (0 ? 27:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 27:27) - (0 ? 27:27) + 1))))))) << (0 ?
- 27:27)))      |
+ 27:27)))                            |
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 25:25) - (0 ?
  25:25) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:25) - (0 ? 25:25) + 1))))))) << (0 ?
  25:25))) | (((gctUINT32) ((gctUINT32) (bNeedMetaDataForSO) & ((gctUINT32) ((((1 ?
  25:25) - (0 ? 25:25) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:25) - (0 ? 25:25) + 1))))))) << (0 ?
- 25:25)))    |
+ 25:25)))                          |
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 29:28) - (0 ?
  29:28) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:28) - (0 ? 29:28) + 1))))))) << (0 ?
  29:28))) | (((gctUINT32) ((gctUINT32) (compCountOfLastOutput) & ((gctUINT32) ((((1 ?
  29:28) - (0 ? 29:28) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:28) - (0 ? 29:28) + 1))))))) << (0 ?
- 29:28))) |
+ 29:28)))                       |
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 24:24) - (0 ?
  24:24) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 24:24) - (0 ? 24:24) + 1))))))) << (0 ?
  24:24))) | (((gctUINT32) ((gctUINT32) (pGsSEP->exeHints.derivedHints.prvStates.gs.bHasPrimRestartOp) & ((gctUINT32) ((((1 ?
@@ -2683,7 +2682,7 @@ static VSC_ErrCode _ProgramPsInsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PR
  4:4)));
     }
 
-    if (pShHwInfo->pSEP->exeHints.derivedHints.globalStates.bAtomicOp &&
+    if ((pShHwInfo->pSEP->exeHints.derivedHints.globalStates.memoryAccessHint & SHADER_EDH_MEM_ACCESS_HINT_ATOMIC) &&
         pStatesPgmer->pHwCfg->hwFeatureFlags.robustAtomic)
     {
         shaderConfigData |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -2781,7 +2780,9 @@ static VSC_ErrCode _ProgramPsInsts(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PR
     else
     {
         /* ----- Register case ----- */
+
         gcmASSERT(!pStatesPgmer->pHwCfg->hwFeatureFlags.hasHalti5);
+
         /* Program start and end PC. */
         if (pShHwInfo->hwProgrammingHints.hwInstFetchMode == HW_INST_FETCH_MODE_UNUNIFIED_BUFFER)
         {
@@ -3170,10 +3171,12 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     gctUINT                    lastValidInputIndex = NOT_ASSIGNED;
     gctBOOL                    bHalfAttribute = gcvFALSE, bForceSampleFreq = gcvFALSE;
     gctBOOL                    bHasSampleFreqInput = gcvFALSE, bHighPOnDual16 = gcvFALSE;
+    gctBOOL                    bHasCentroidInput = gcvFALSE;
     gctINT                     output2RTIndex[MAX_HW_PS_COLOR_OUTPUTS];
     gctUINT                    firstValidIoChannel, hpInputCount = 0, startHwRegForNonPosInputs = NOT_ASSIGNED;
     SHADER_IO_CHANNEL_MAPPING* pThisIoChannelMapping;
     gctINT                     ptCoordStartComponent = -1, rtArrayStartComponent = -1, primIdStartComponent = -1;
+    gctUINT                    calibratedGprCount = _GetCalibratedGprCount(pShHwInfo, pStatesPgmer);
 #if !IO_HW_LOC_NUMBER_IN_ORDER
     gctUINT                    sortedIoIdxArray[MAX_SHADER_IO_NUM];
 #endif
@@ -3340,6 +3343,8 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
                 interpolationType[psInputComponnentCount] = _GetPSInputChannelInterpolationType(pPsSEP, pThisIoChannelMapping);
                 interpolationLoc[psInputComponnentCount] = _GetPSInputChannelInterpolationLoc(pPsSEP, pThisIoChannelMapping,
                                                                                               bForceSampleFreq);
+
+                bHasCentroidInput = pThisIoChannelMapping->flag.bCentroidInterpolate;
 
                 if (pThisIoChannelMapping->flag.bSampleFrequency)
                 {
@@ -3595,11 +3600,7 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     }
 
     pStatesPgmer->pHints->psHasDiscard = pStatesPgmer->pHints->hasKill = pPsSEP->exeHints.derivedHints.prvStates.ps.bPxlDiscard;
-    pStatesPgmer->pHints->useLoadStore[gcvPROGRAM_STAGE_FRAGMENT] = pPsSEP->exeHints.derivedHints.globalStates.bLoadStore;
-    pStatesPgmer->pHints->useImgReadWrite[gcvPROGRAM_STAGE_FRAGMENT] = pPsSEP->exeHints.derivedHints.globalStates.bImgReadWrite;
-    pStatesPgmer->pHints->useAtomicOp[gcvPROGRAM_STAGE_FRAGMENT] = pPsSEP->exeHints.derivedHints.globalStates.bAtomicOp;
-    pStatesPgmer->pHints->useMemoryAccess[gcvPROGRAM_STAGE_FRAGMENT] = pPsSEP->exeHints.derivedHints.globalStates.bMemAccess;
-    pStatesPgmer->pHints->useBarrier[gcvPROGRAM_STAGE_FRAGMENT] = pPsSEP->exeHints.derivedHints.globalStates.bBarrierOp;
+    pStatesPgmer->pHints->memoryAccessFlags[gcvPROGRAM_STAGE_FRAGMENT] = (gceMEMORY_ACCESS_FLAG)pPsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
     pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_FRAGMENT] = pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
 
     if (pShHwInfo->hwProgrammingHints.hwSamplerFetchMode == HW_SAMPLER_FETCH_MODE_UNIFIED_REG_FILE)
@@ -3619,15 +3620,19 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     pStatesPgmer->pHints->psHighPVaryingCount = hpInputCount;
     pStatesPgmer->pHints->removeAlphaAssignment = (pPsSEP->exeHints.derivedHints.prvStates.ps.alphaWriteOutputIndexMask != 0);
     pStatesPgmer->pHints->psHasFragDepthOut = (pPsSEP->outputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_DEPTH].ioIndexMask != 0);
+    pStatesPgmer->pHints->useDSX = pPsSEP->exeHints.derivedHints.prvStates.ps.bDerivRTx;
+    pStatesPgmer->pHints->useDSY = pPsSEP->exeHints.derivedHints.prvStates.ps.bDerivRTy;
     pStatesPgmer->pHints->yInvertAware = ((pPsSEP->inputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_ISFRONTFACE].ioIndexMask != 0) ||
                                           (pPsSEP->exeHints.derivedHints.prvStates.ps.inputPosChannelValid & (1 << CHANNEL_Y)) ||
                                           (pPsSEP->exeHints.derivedHints.prvStates.ps.inputPntCoordChannelValid & (1 << CHANNEL_Y)) ||
                                           pPsSEP->exeHints.derivedHints.prvStates.ps.bDerivRTy);
 
+    pStatesPgmer->pHints->hasCentroidInput = bHasCentroidInput;
+
     pStatesPgmer->pHints->fsMaxTemp = pPsSEP->inputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_SAMPLE_DEPTH].ioIndexMask ?
                                       /* FlushShader will add 1 back under msaa case */
-                                      (pPsSEP->gprCount - (pPsSEP->exeHints.derivedHints.globalStates.bExecuteOnDual16 ? 2 : 1)) :
-                                      pPsSEP->gprCount;
+                                      (calibratedGprCount - (pPsSEP->exeHints.derivedHints.globalStates.bExecuteOnDual16 ? 2 : 1)) :
+                                      calibratedGprCount;
 
     gcoOS_MemCopy((gctPOINTER)pStatesPgmer->pHints->psOutput2RtIndex, (gctPOINTER)output2RTIndex, sizeof(output2RTIndex));
     gcoOS_MemCopy((gctPOINTER)pStatesPgmer->pHints->interpolationType, (gctPOINTER)interpolationType, sizeof(interpolationType));
@@ -3680,7 +3685,6 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     if (pPsSEP->exeHints.derivedHints.globalStates.bExecuteOnDual16)
     {
         if (pPsSEP->inputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_POSITION].ioIndexMask != 0 ||
-            pStatesPgmer->pHints->sampleMaskLoc == 0x1 ||
             pStatesPgmer->pHints->sampleMaskLoc == 0x2 ||
             startHwRegForNonPosInputs == 2 ||
             /* Following 2 conditions look not make sense, right??? Need double check!! */
@@ -3713,9 +3717,11 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
 
     /* Program color output */
     VSC_LOAD_HW_STATE(0x0401, psColorOutputState);
+    pStatesPgmer->pHints->psOutCntl0to3 = psColorOutputState;
     if (pStatesPgmer->pHwCfg->maxRenderTargetCount > 4)
     {
         VSC_LOAD_HW_STATE(0x040B, psColorOutputCtrlState);
+        pStatesPgmer->pHints->psOutCntl4to7 = psColorOutputCtrlState;
     }
 
     /* Program color output precision */
@@ -3725,7 +3731,7 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
         VSC_LOAD_HW_STATE(0x040E, psExtColorOutputPrecisionState);
     }
 
-    if (pStatesPgmer->pHwCfg->hwFeatureFlags.has32Attributes)
+    if (pStatesPgmer->pHwCfg->hwFeatureFlags.newGPIPE)
     {
         /* Program varying pack */
         for (i = 0; i < MAX_HW_IO_COUNT/8; i ++)
@@ -4622,7 +4628,7 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     /* Program used GPR count */
     state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 6:0) - (0 ?
  6:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
- 6:0))) | (((gctUINT32) ((gctUINT32) (pPsSEP->gprCount) & ((gctUINT32) ((((1 ?
+ 6:0))) | (((gctUINT32) ((gctUINT32) (calibratedGprCount) & ((gctUINT32) ((((1 ?
  6:0) - (0 ? 6:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
  6:0)));
     VSC_LOAD_HW_STATE(0x0403, state);
@@ -4665,6 +4671,7 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
     gctUINT                    gpsInputCount = 0, theadIdIdx = 0;
     gctUINT                    firstValidIoChannel;
     gctUINT                    varyingPacking[2] = {0, 0};
+    gctUINT                    calibratedGprCount = _GetCalibratedGprCount(pShHwInfo, pStatesPgmer);
     SHADER_IO_USAGE            threadIdSeq[3] = {SHADER_IO_USAGE_THREADID,
                                                  SHADER_IO_USAGE_THREADID,
                                                  SHADER_IO_USAGE_THREADID};
@@ -4755,15 +4762,11 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
 
     pStatesPgmer->pHints->threadWalkerInPS = gcvTRUE;
     pStatesPgmer->pHints->elementCount = gpsInputCount;
-    pStatesPgmer->pHints->fsMaxTemp = pGpsSEP->gprCount;
+    pStatesPgmer->pHints->fsMaxTemp = calibratedGprCount;
     pStatesPgmer->pHints->fsInstCount = pGpsSEP->countOfMCInst;
     pStatesPgmer->pHints->fsIsDual16 = pGpsSEP->exeHints.derivedHints.globalStates.bExecuteOnDual16;
     pStatesPgmer->pHints->fsInputCount = (gpsInputCount > 0) ? gpsInputCount : 1;
-    pStatesPgmer->pHints->useLoadStore[gcvPROGRAM_STAGE_COMPUTE] = pGpsSEP->exeHints.derivedHints.globalStates.bLoadStore;
-    pStatesPgmer->pHints->useImgReadWrite[gcvPROGRAM_STAGE_COMPUTE] = pGpsSEP->exeHints.derivedHints.globalStates.bImgReadWrite;
-    pStatesPgmer->pHints->useAtomicOp[gcvPROGRAM_STAGE_COMPUTE] = pGpsSEP->exeHints.derivedHints.globalStates.bAtomicOp;
-    pStatesPgmer->pHints->useMemoryAccess[gcvPROGRAM_STAGE_COMPUTE] = pGpsSEP->exeHints.derivedHints.globalStates.bMemAccess;
-    pStatesPgmer->pHints->useBarrier[gcvPROGRAM_STAGE_COMPUTE] = pGpsSEP->exeHints.derivedHints.globalStates.bBarrierOp;
+    pStatesPgmer->pHints->memoryAccessFlags[gcvPROGRAM_STAGE_COMPUTE] = (gceMEMORY_ACCESS_FLAG)pGpsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
     pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_COMPUTE] = pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
 
     if (pShHwInfo->hwProgrammingHints.hwSamplerFetchMode == HW_SAMPLER_FETCH_MODE_UNIFIED_REG_FILE)
@@ -4799,7 +4802,7 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
  6:4) - (0 ? 6:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:4) - (0 ? 6:4) + 1))))))) << (0 ?
  6:4)));
 
-    if (pStatesPgmer->pHwCfg->hwFeatureFlags.has32Attributes)
+    if (pStatesPgmer->pHwCfg->hwFeatureFlags.newGPIPE)
     {
         VSC_LOAD_HW_STATE(0x02A4, state);
         VSC_LOAD_HW_STATE(0x0420, state);
@@ -4815,7 +4818,7 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
     /* Program used GPR count */
     state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 6:0) - (0 ?
  6:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
- 6:0))) | (((gctUINT32) ((gctUINT32) (pGpsSEP->gprCount) & ((gctUINT32) ((((1 ?
+ 6:0))) | (((gctUINT32) ((gctUINT32) (calibratedGprCount) & ((gctUINT32) ((((1 ?
  6:0) - (0 ? 6:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
  6:0)));
     VSC_LOAD_HW_STATE(0x0403, state);

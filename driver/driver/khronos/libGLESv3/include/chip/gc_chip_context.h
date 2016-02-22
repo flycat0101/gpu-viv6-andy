@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -127,6 +127,10 @@ typedef struct __GLchipFeatureRec
     GLboolean                   hasHwTFB;
     GLboolean                   txDefaultValueFix;
     GLboolean                   hasCommandPrefetch;
+    GLboolean                   hasYuvAssembler10bit;
+    GLboolean                   supportMSAA2X;
+    GLboolean                   hasSecurity;
+    GLboolean                   hasRobustness;
 } __GLchipFeature;
 
 
@@ -259,12 +263,13 @@ struct __GLchipContextRec
     gctGLSLInitCompiler         pfInitCompiler;
     gctGLSLFinalizeCompiler     pfFinalizeCompiler;
 
-    /* Below 3 shortcuts ONLY can be used withine draw validation.
-    ** Any places out of there is invalid.
+    /* Attention: Below 3 shortcuts ONLY can be used within draw/compute validation,
+    **            Any places out of there is invalid. Because the program may be
+    **            deleted, while this fields have no chance to be reset and left wild.
     */
-    __GLchipSLProgram           *activePrograms[__GLSL_STAGE_LAST];
+    __GLchipSLProgram          *activePrograms[__GLSL_STAGE_LAST];
     gcePROGRAM_STAGE_BIT        activeStageBits;
-    __GLchipSLProgram           *prePAProgram;
+    __GLchipSLProgram          *prePAProgram;
 
     /* Cmd/state buffer cache of hash type: currently only used for pipeline obj cmd cache */
     __GLchipUtilsHash*          cmdInstaceCache;
@@ -273,6 +278,7 @@ struct __GLchipContextRec
     gcsPROGRAM_STATE_PTR        activeProgState;
 
     __GLchipFeature             chipFeature;
+    GLboolean                   needStencilOpt;
 
     /* Temporary bitmap. */
     gcoSURF                     tempBitmap;
@@ -386,8 +392,6 @@ struct __GLchipContextRec
 
     gcePATCH_ID                 patchId;
 
-    GLuint64                    resetTimeStamp;
-
     gcoTEXTURE                  rtTexture;
 
     /* App setting -> HAL rt slot mapping */
@@ -401,6 +405,10 @@ struct __GLchipContextRec
     gceSTATUS                   errorStatus;
 
     gctBOOL                     doPatchCondition[GC_CHIP_PATCH_NUM];
+    GLint                       numSamples;
+    GLint                       samples[4];
+
+    gctBOOL                     robust;
 };
 
 
@@ -809,8 +817,7 @@ gcChipGetTextureSurface(
     __GLchipContext *chipCtx,
     __GLtextureObject *texObj,
     GLint level,
-    GLint face,
-    GLint zoffset
+    GLint slice
     );
 
 gceSTATUS
@@ -844,7 +851,7 @@ gcChipProcessPixelStore(
     gctSIZE_T skipImgs,
     gctSIZE_T *pRowStride,
     gctSIZE_T *pImgHeight,
-    const GLvoid** pBuf
+    gctSIZE_T *pSkipBytes
     );
 
 /* chip_codec.c */

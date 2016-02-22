@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -640,6 +640,8 @@ VX_API vx_node vxRemapNode(vx_graph graph,
  * \retval * Node handle.
  */
 VX_API vx_node vxHalfScaleGaussianNode(vx_graph graph, vx_image input, vx_image output, vx_int32 kernel_size);
+
+VX_API vx_node vxExampleNode(vx_graph graph, vx_image input, vx_image output);
 
 #ifdef __cplusplus
 }

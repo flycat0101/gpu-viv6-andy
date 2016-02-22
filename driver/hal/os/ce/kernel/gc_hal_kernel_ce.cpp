@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -234,6 +234,7 @@ GCHAL::GCHAL(
 
     for (i = 0; i < gcdMAX_GPU_COUNT; i++)
     {
+		m_Kernels[i]         = gcvNULL;
         m_InterruptIDs[i]    = INVALID_IRQ_NO;
         m_MemBases[i]        = 0;
     }
@@ -369,7 +370,7 @@ GCHAL::GCHAL(
 
     if (m_InterruptIDs[gcvCORE_MAJOR] != INVALID_IRQ_NO)
     {
-        gckDEVICE_AddCore(m_Device, gcvCORE_MAJOR, this, &m_Kernels[gcvCORE_MAJOR]);
+        gckDEVICE_AddCore(m_Device, gcvCORE_MAJOR, gcvCHIP_ID_DEFAULT, this, &m_Kernels[gcvCORE_MAJOR]);
 
         // Set the power management
         gcmkONERROR(gckHARDWARE_SetPowerManagement(
@@ -387,7 +388,7 @@ GCHAL::GCHAL(
 
     if (m_InterruptIDs[gcvCORE_2D] != INVALID_IRQ_NO)
     {
-        gckDEVICE_AddCore(m_Device, gcvCORE_2D, this, &m_Kernels[gcvCORE_2D]);
+        gckDEVICE_AddCore(m_Device, gcvCORE_2D, gcvCHIP_ID_DEFAULT, this, &m_Kernels[gcvCORE_2D]);
 
         /* Verify the hardware type */
         gcmkONERROR(gckHARDWARE_GetType(m_Kernels[gcvCORE_2D]->hardware, &type));
@@ -417,7 +418,7 @@ GCHAL::GCHAL(
     if (m_InterruptIDs[gcvCORE_VG] != INVALID_IRQ_NO)
     {
 #if gcdENABLE_VG
-        gckDEVICE_AddCore(m_Device, gcvCORE_VG, this, &m_Kernels[gcvCORE_VG]);
+        gckDEVICE_AddCore(m_Device, gcvCORE_VG, gcvCHIP_ID_DEFAULT, this, &m_Kernels[gcvCORE_VG]);
 
         // Set the power management
         gcmkONERROR(gckVGHARDWARE_SetPowerManagement(

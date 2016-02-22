@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -62,6 +62,18 @@ _HasAlpha(
     IN gceSURF_FORMAT Format
     );
 
+static gctBOOL
+_IsValidRect(
+    IN gcsRECT * Rect
+    );
+
+void
+_MapSource2Target(
+    IN hwcLayer * Layer,
+    IN gcsRECT * SrcRect,
+    OUT gcsRECT * DstRect
+    );
+
 
 /*******************************************************************************
 **
@@ -109,6 +121,7 @@ _Set(
     IN hwc_display_contents_1_t * HwDisplay
     )
 {
+    gctBOOL compose = gcvTRUE;
 
     /***************************************************************************
     ** Display Detection.
@@ -386,18 +399,6 @@ _Set(
             /* Enable 2D compression for this frame if available. */
             target->tsConfig = gcv2D_TSC_2D_COMPRESSED;
         }
-
-#if ENABLE_SWAP_RECTANGLE
-        /* Save swap rectangle. */
-        if (SwapRect)
-        {
-            target->swapRect = *SwapRect;
-        }
-        else
-        {
-            target->swapRect = Display->res;
-        }
-#endif
 
         /* Update valid flag. */
         if (Display->valid == gcvFALSE)
@@ -1017,10 +1018,126 @@ _Set(
 #if ENABLE_SWAP_RECTANGLE
 
     /***************************************************************************
-    ** Swap Rectangle Optimization.
+    ** Current Swap Rectangle Update.
     */
 
     if (Display->hasG2D)
+    {
+#if ANDROID_SDK_VERSION >= 23
+        if (Context->device.common.version >= HWC_DEVICE_API_VERSION_1_5
+            && SwapRect != gcvNULL)
+        {
+            gcsRECT drect = {65535, 65535, 0, 0};
+
+            for (gctUINT32 j = 0; j < Display->layerCount; j++)
+            {
+                hwc_layer_1_t * hwLayer = &HwDisplay->hwLayers[j];
+                hwc_region_t * damage = &hwLayer->surfaceDamage;
+
+                if (!damage->numRects)
+                {
+                    /*
+                     * The layer has full damage region.
+                     * Merge this layer target rect directly.
+                     */
+                    gcsRECT_PTR dstRect = (gcsRECT *) &hwLayer->displayFrame;
+
+                    drect.left   = gcmMAX(0, gcmMIN(dstRect->left,   drect.left));
+                    drect.top    = gcmMAX(0, gcmMIN(dstRect->top,    drect.top));
+                    drect.right  = gcmMIN(Display->res.right,  gcmMAX(dstRect->right,  drect.right));
+                    drect.bottom = gcmMIN(Display->res.bottom, gcmMAX(dstRect->bottom, drect.bottom));
+
+                    if (Context->dumpCompose & DUMP_DAMAGE_LAYERS)
+                    {
+                        LOGD("  DAMAGE RECT: layer=%d [%d,%d,%d,%d] (full damage)", j,
+                             gcmMAX(0, dstRect->left),
+                             gcmMAX(0, dstRect->top),
+                             gcmMIN(Display->res.right, dstRect->right),
+                             gcmMIN(Display->res.bottom, dstRect->bottom));
+                    }
+
+                    continue;
+                }
+                else
+                {
+                    gcsRECT srect = {65535, 65535, 0, 0}, dsrect;
+
+                    for (gctUINT32 k = 0; k < damage->numRects; k++)
+                    {
+                        if (Context->dumpCompose & DUMP_DAMAGE_LAYERS)
+                        {
+                            LOGD("  DAMAGE RECT: layer=%d [%d,%d,%d,%d]", j,
+                                 damage->rects[k].left,
+                                 damage->rects[k].top,
+                                 damage->rects[k].right,
+                                 damage->rects[k].bottom);
+                        }
+
+                        if (_IsValidRect((gcsRECT_PTR)&damage->rects[k]))
+                        {
+                            /* Merge valid damage region of this layer source first. */
+                            srect.left   = gcmMIN(damage->rects[k].left,   srect.left);
+                            srect.top    = gcmMIN(damage->rects[k].top,    srect.top);
+                            srect.right  = gcmMAX(damage->rects[k].right,  srect.right);
+                            srect.bottom = gcmMAX(damage->rects[k].bottom, srect.bottom);
+                        }
+                    }
+
+                    if (_IsValidRect(&srect))
+                    {
+                        /* Map source rect to target. */
+                        _MapSource2Target(&Display->layers[j], &srect, &dsrect);
+
+                        if (Context->dumpCompose & DUMP_DAMAGE_LAYERS)
+                        {
+                            LOGD("    SWAP MERGE: [%d,%d,%d,%d] => [%d,%d,%d,%d]",
+                                srect.left, srect.top, srect.right, srect.bottom,
+                                dsrect.left, dsrect.top, dsrect.right, dsrect.bottom);
+                        }
+
+                        if (_IsValidRect(&dsrect))
+                        {
+                            /* Merge valid transformed layer target damage region. */
+                            drect.left   = gcmMIN(dsrect.left,   drect.left);
+                            drect.top    = gcmMIN(dsrect.top,    drect.top);
+                            drect.right  = gcmMAX(dsrect.right,  drect.right);
+                            drect.bottom = gcmMAX(dsrect.bottom, drect.bottom);
+                        }
+                    }
+                }
+            }
+
+            SwapRect = &drect;
+        }
+#endif
+
+        /* Save swap rectangle. */
+        if (SwapRect && Display->layerCount)
+        {
+            Display->target->swapRect = *SwapRect;
+        }
+        else
+        {
+            Display->target->swapRect = Display->res;
+        }
+
+#if ANDROID_SDK_VERSION >= 23
+        if (Context->device.common.version >= HWC_DEVICE_API_VERSION_1_5
+        && (Context->dumpCompose & DUMP_DAMAGE_LAYERS))
+        {
+            LOGD("  TARGET SWAP RECT: [%d,%d,%d,%d]",
+                Display->target->swapRect.left,
+                Display->target->swapRect.top,
+                Display->target->swapRect.right,
+                Display->target->swapRect.bottom);
+        }
+#endif
+    }
+
+    /***************************************************************************
+    ** Swap Rectangle Optimization.
+    */
+
     {
         /* Get short cuts. */
         hwcBuffer * buffer           = Display->target;
@@ -1032,6 +1149,15 @@ _Set(
             Display->swapArea = NULL;
         }
 
+#if ANDROID_SDK_VERSION >= 23
+        /* Single buffer with no damage layers. */
+        if (Context->device.common.version >= HWC_DEVICE_API_VERSION_1_5
+            && buffer == buffer->next
+            && !_IsValidRect(&buffer->swapRect))
+        {
+            compose = gcvFALSE;
+        } else
+#endif
         /* Optimize: do not need split area for full screen composition. */
         if (
             (   (buffer->swapRect.left > 0)
@@ -1042,11 +1168,14 @@ _Set(
         &&  (buffer != buffer->next)
         )
         {
-            /* Put target swap rectangle. */
-            Display->swapArea = _AllocateArea(Display,
-                                              NULL,
-                                              &buffer->swapRect,
-                                              1U);
+            if (_IsValidRect(&buffer->swapRect))
+            {
+                /* Put target swap rectangle. */
+                Display->swapArea = _AllocateArea(Display,
+                                                  NULL,
+                                                  &buffer->swapRect,
+                                                  1U);
+            }
 
             /* Point to earlier buffer. */
             buffer = buffer->next;
@@ -1056,7 +1185,20 @@ _Set(
              * 1 means target swap rectangle. */
             while (buffer != Display->target)
             {
-                _SplitArea(Display, Display->swapArea, &buffer->swapRect, 0U);
+                if (_IsValidRect(&buffer->swapRect))
+                {
+                    if (Display->swapArea == NULL)
+                    {
+                        Display->swapArea = _AllocateArea(Display,
+                                                          NULL,
+                                                          &buffer->swapRect,
+                                                          0U);
+                    }
+                    else
+                    {
+                        _SplitArea(Display, Display->swapArea, &buffer->swapRect, 0U);
+                    }
+                }
 
                 /* Advance to next buffer. */
                 buffer = buffer->next;
@@ -1089,7 +1231,7 @@ _Set(
     ** Do Compose.
     */
 
-    if (Display->hasG2D)
+    if (Display->hasG2D && compose)
     {
         gceSTATUS status;
 
@@ -1365,6 +1507,7 @@ _DetectSource(
     layer->orgRect.right  = sourceCrop->right;
     layer->orgRect.bottom = bottom;
 
+    layer->rotateRect = *srcRect;
     layer->orgDest = *dstRect;
 
     /* Compute stretch factor. */
@@ -1429,6 +1572,10 @@ _DetectSource(
     gctINT srcHeight = srcRect->bottom - srcRect->top;
     gctINT dstWidth  = dstRect->right  - dstRect->left;
     gctINT dstHeight = dstRect->bottom - dstRect->top;
+
+    /* Initialize the scale. */
+    layer->xScale = 1.0f;
+    layer->yScale = 1.0f;
 
     /* Determine blit type: bit, stretch or filter? */
     if ((hFactor != 1.0f) || (vFactor != 1.0f))
@@ -1563,6 +1710,114 @@ _HasAlpha(
             || (Format == gcvSURF_B8G8R8A8)
             || (Format == gcvSURF_R8G8B8A8)
            );
+}
+
+
+
+static gctBOOL
+_IsValidRect(
+    IN gcsRECT * Rect
+    )
+{
+   return ((Rect->bottom > Rect->top) &&
+           (Rect->right > Rect->left));
+}
+
+
+void
+_MapSource2Target(
+    IN hwcLayer * Layer,
+    IN gcsRECT * SrcRect,
+    OUT gcsRECT * DstRect
+    )
+{
+    gcsRECT srect, rect;
+
+    /*
+     * The input SrcRect is inside src layer
+     * and is still before-transformed.
+     * But source layer rect has been transformed.
+     * So transform the SrcRect first.
+     */
+
+    /* Support source bottom-top orientation. */
+    if (Layer->orientation == gcvORIENTATION_TOP_BOTTOM)
+    {
+        rect = *SrcRect;
+    }
+    else
+    {
+        rect.left   = SrcRect->left;
+        rect.right  = SrcRect->right;
+        rect.top    = Layer->height - SrcRect->bottom;
+        rect.bottom = Layer->height - SrcRect->top;
+    }
+
+    switch (Layer->rotation)
+    {
+    case gcvSURF_0_DEGREE:
+    default:
+        srect = rect;
+        break;
+
+    case gcvSURF_90_DEGREE:
+        srect.left   = rect.top;
+        srect.top    = Layer->width - rect.right;
+        srect.right  = rect.bottom;
+        srect.bottom = Layer->width - rect.left;
+        break;
+
+    case gcvSURF_180_DEGREE:
+        srect.left   = Layer->width  - rect.right;
+        srect.top    = Layer->height - rect.bottom;
+        srect.right  = Layer->width  - rect.left;
+        srect.bottom = Layer->height - rect.top;
+        break;
+
+    case gcvSURF_270_DEGREE:
+        srect.left   = Layer->height - rect.bottom;
+        srect.top    = rect.left;
+        srect.right  = Layer->height - rect.top;
+        srect.bottom = rect.right;
+        break;
+    }
+
+    if (Layer->hMirror)
+    {
+        srect.left  = Layer->rotateRect.right - srect.right;
+        srect.right = Layer->rotateRect.right - srect.left;
+    }
+
+    if (Layer->vMirror)
+    {
+        srect.top    = Layer->rotateRect.bottom - srect.bottom;
+        srect.bottom = Layer->rotateRect.bottom - srect.top;
+    }
+
+    /* Check if SrcRect is out of visible target range. */
+    if (srect.right  <= Layer->srcRect.left  ||
+        srect.bottom <= Layer->srcRect.top   ||
+        srect.left   >= Layer->srcRect.right ||
+        srect.top    >= Layer->srcRect.bottom)
+    {
+        *DstRect = {65535, 65535, 0, 0};
+        return;
+    }
+
+    /* Map SrcRect to target. */
+    gctFLOAT dl = (srect.left   - Layer->srcRect.left)   * Layer->xScale;
+    gctFLOAT dt = (srect.top    - Layer->srcRect.top)    * Layer->yScale;
+    gctFLOAT dr = (Layer->srcRect.right  - srect.right)  * Layer->xScale;
+    gctFLOAT db = (Layer->srcRect.bottom - srect.bottom) * Layer->yScale;
+
+    rect.left  = dl <= 0 ?                    0 : gctINT(Layer->dstRect.left  + dl + 0.5f);
+    rect.right = dr <= 0 ? Layer->dstRect.right : gctINT(Layer->dstRect.right - dr + 0.5f);
+
+    rect.top    = dt <= 0 ?                     0 : gctINT(Layer->dstRect.top    + dt + 0.5f);
+    rect.bottom = db <= 0 ? Layer->dstRect.bottom : gctINT(Layer->dstRect.bottom - db + 0.5f);
+
+
+    *DstRect = rect;
 }
 
 
@@ -2268,30 +2523,47 @@ hwc_set(
         if (backBuffer != NULL)
         {
 #if ENABLE_SWAP_RECTANGLE
-            gcsRECT rect;
-
-            /* Get swap rectangle from android_native_buffer_t. */
-            gctUINT32 origin = (gctUINT32) backBuffer->common.reserved[0];
-            gctUINT32 size   = (gctUINT32) backBuffer->common.reserved[1];
-
-            /* Update swap rectangle. */
-            if (size == 0)
+#if ANDROID_SDK_VERSION >= 23
+            if (context->device.common.version >= HWC_DEVICE_API_VERSION_1_5)
             {
-                /* This means full screen swap rectangle. */
-                swapRect = &dpy->res;
+                if (dpy->geometryChanged)
+                {
+                    /* If geometry changed, render full screen. */
+                    swapRect = NULL;
+                }
+                else
+                {
+                    /* Initialize the swapRect for damage region support. */
+                    swapRect = &dpy->res;
+                }
             }
-
             else
+#endif
             {
-                rect.left   = (origin >> 16);
-                rect.top    = (origin &  0xFFFF);
-                rect.right  = (origin >> 16) + (size >> 16);
-                rect.bottom = (origin &  0xFFFF) + (size & 0xFFFF);
+                gcsRECT rect;
 
-                swapRect = &rect;
+                /* Get swap rectangle from android_native_buffer_t. */
+                gctUINT32 origin = (gctUINT32) backBuffer->common.reserved[0];
+                gctUINT32 size   = (gctUINT32) backBuffer->common.reserved[1];
+
+                /* Update swap rectangle. */
+                if (size == 0)
+                {
+                    /* This means full screen swap rectangle. */
+                    swapRect = &dpy->res;
+                }
+
+                else
+                {
+                    rect.left   = (origin >> 16);
+                    rect.top    = (origin &  0xFFFF);
+                    rect.right  = (origin >> 16) + (size >> 16);
+                    rect.bottom = (origin &  0xFFFF) + (size & 0xFFFF);
+
+                    swapRect = &rect;
+                }
             }
 #endif
-
             target = (private_handle_t *) backBuffer->handle;
         }
 

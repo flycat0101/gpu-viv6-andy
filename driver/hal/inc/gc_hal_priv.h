@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -45,8 +45,10 @@ typedef enum _gcePATCH_ID
     gcvPATCH_ANTUTU,        /* Antutu 3.x */
     gcvPATCH_ANTUTU4X,      /* Antutu 4.x */
     gcvPATCH_ANTUTU5X,      /* Antutu 5.x */
+    gcvPATCH_ANTUTUGL3,     /* Antutu 3D Rating */
     gcvPATCH_QUADRANT,
     gcvPATCH_GPUBENCH,
+    gcvPATCH_DUOKAN,
     gcvPATCH_GLOFTSXHM,
     gcvPATCH_XRUNNER,
     gcvPATCH_BUSPARKING3D,

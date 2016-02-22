@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -18,12 +18,13 @@ VSC_OPTN_Options theVSCOption;
 VSC_OPTN_Options *
 VSC_OPTN_Get_Options()
 {
-    if (!theVSCOption.initialized)
+    if (!theVSCOption.initialized || theVSCOption.reset)
     {
-        /* initialize the option */
+        /* initialize or reset the option */
         VSC_OPTN_Options_SetDefault(&theVSCOption);
         VSC_OPTN_Options_GetOptionFromEnv(&theVSCOption);
         theVSCOption.initialized = gcvTRUE;
+        theVSCOption.reset = gcvFALSE;
     }
     return &theVSCOption;
 }
@@ -39,128 +40,6 @@ gctUINT32 _VSC_OPTN_GetSubOptionLength(
     }
 
     return (gctUINT32)(pos - str);
-}
-
-/* HW configuration option */
-void VSC_OPTN_HWOptions_SetDefault(
-    IN OUT VSC_OPTN_HWOptions* options
-    )
-{
-    VSC_OPTN_HWOptions_SetRegFilesPerCore(options, 4);
-    VSC_OPTN_HWOptions_SetRegFileLen(options, 128);
-    VSC_OPTN_HWOptions_SetGroupDispatchCycles(options, 4);
-    VSC_OPTN_HWOptions_SetPipelineCycles(options, 28);
-    VSC_OPTN_HWOptions_SetTexldCycles(options, 384);
-    VSC_OPTN_HWOptions_SetMemldCycles(options, 384);
-}
-
-void VSC_OPTN_HWOptions_GetOptionFromString(
-    IN gctSTRING str,
-    IN OUT VSC_OPTN_HWOptions* options
-    )
-{
-    while (str[0] == ':')
-    {
-        ++str;
-        if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "reg_files_per_core:", sizeof("reg_files_per_core:") - 1))
-        {
-            gctUINT32 reg_files_per_core;
-            gctUINT32 len;
-
-            str += sizeof("reg_files_per_core:") - 1;
-            len = _VSC_OPTN_GetSubOptionLength(str);
-            reg_files_per_core = vscSTR_StrToUint32(str, len);
-            VSC_OPTN_HWOptions_SetRegFilesPerCore(options, reg_files_per_core);
-            str += len;
-        }
-        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "reg_file_len:", sizeof("reg_file_len:") - 1))
-        {
-            gctUINT32 reg_file_len;
-            gctUINT32 len;
-
-            str += sizeof("reg_file_len:") - 1;
-            len = _VSC_OPTN_GetSubOptionLength(str);
-            reg_file_len = vscSTR_StrToUint32(str, len);
-            VSC_OPTN_HWOptions_SetRegFileLen(options, reg_file_len);
-            str += len;
-        }
-        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "group_dispatch_cycles:", sizeof("group_dispatch_cycles:") - 1))
-        {
-            gctUINT32 group_dispatch_cycles;
-            gctUINT32 len;
-
-            str += sizeof("group_dispatch_cycles:") - 1;
-            len = _VSC_OPTN_GetSubOptionLength(str);
-            group_dispatch_cycles = vscSTR_StrToUint32(str, len);
-            VSC_OPTN_HWOptions_SetGroupDispatchCycles(options, group_dispatch_cycles);
-            str += len;
-        }
-        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "pipeline_cycles:", sizeof("pipeline_cycles:") - 1))
-        {
-            gctUINT32 pipeline_cycles;
-            gctUINT32 len;
-
-            str += sizeof("pipeline_cycles:") - 1;
-            len = _VSC_OPTN_GetSubOptionLength(str);
-            pipeline_cycles = vscSTR_StrToUint32(str, len);
-            VSC_OPTN_HWOptions_SetPipelineCycles(options, pipeline_cycles);
-            str += len;
-        }
-        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "texld_cycles:", sizeof("texld_cycles:") - 1))
-        {
-            gctUINT32 texld_cycles;
-            gctUINT32 len;
-
-            str += sizeof("texld_cycles:") - 1;
-            len = _VSC_OPTN_GetSubOptionLength(str);
-            texld_cycles = vscSTR_StrToUint32(str, len);
-            VSC_OPTN_HWOptions_SetTexldCycles(options, texld_cycles);
-            str += len;
-        }
-        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "memld_cycles:", sizeof("memld_cycles:") - 1))
-        {
-            gctUINT32 memld_cycles;
-            gctUINT32 len;
-
-            str += sizeof("memld_cycles:") - 1;
-            len = _VSC_OPTN_GetSubOptionLength(str);
-            memld_cycles = vscSTR_StrToUint32(str, len);
-            VSC_OPTN_HWOptions_SetMemldCycles(options, memld_cycles);
-            str += len;
-        }
-    }
-}
-
-void VSC_OPTN_HWOptions_Dump(
-    IN VSC_OPTN_HWOptions* options,
-    IN VIR_Dumper* dumper
-    )
-{
-    VIR_LOG(dumper, "hardware options:\n");
-    VIR_LOG(dumper, "    reg_files_per_core: %d\n", VSC_OPTN_HWOptions_GetRegFilesPerCore(options));
-    VIR_LOG(dumper, "    reg_file_len: %d\n", VSC_OPTN_HWOptions_GetRegFileLen(options));
-    VIR_LOG(dumper, "    group_dispatch_cycles: %d\n", VSC_OPTN_HWOptions_GetGroupDispatchCycles(options));
-    VIR_LOG(dumper, "    pipeline_cycles: %d\n", VSC_OPTN_HWOptions_GetPipelineCycles(options));
-    VIR_LOG(dumper, "    texld_cycles: %d\n", VSC_OPTN_HWOptions_GetTexldCycles(options));
-    VIR_LOG(dumper, "    memld_cycles: %d\n", VSC_OPTN_HWOptions_GetMemldCycles(options));
-    VIR_LOG_FLUSH(dumper);
-}
-
-void VSC_OPTN_HWOptions_Usage(
-    IN VIR_Dumper* dumper
-    )
-{
-    gctSTRING usage =
-        "-HW:\n"
-        "    reg_files_per_core      register file count per core\n"
-        "    reg_file_len            register file length\n"
-        "    group_dispatch_cycles   group dispatching cycles\n"
-        "    pipeline_cycles         pipeline cycles\n"
-        "    texld_cycles            texture load cycles\n"
-        "    memld_cycles            memory load cycles\n";
-
-    VIR_LOG(dumper, usage);
-    VIR_LOG_FLUSH(dumper);
 }
 
 /* Default UBO options */
@@ -366,6 +245,73 @@ void VSC_OPTN_ILOptions_Usage(
     VIR_LOG_FLUSH(dumper);
 }
 
+/* Precision Update options */
+void VSC_OPTN_PUOptions_SetDefault(
+    IN OUT VSC_OPTN_PUOptions* options
+    )
+{
+    VSC_OPTN_PUOptions_SetSwitchOn(options, gcvTRUE);
+    VSC_OPTN_PUOptions_SetTrace(options, 0);
+}
+
+void VSC_OPTN_PUOptions_GetOptionFromString(
+    IN gctSTRING str,
+    IN OUT VSC_OPTN_PUOptions* options
+    )
+{
+    while (str[0] == ':')
+    {
+        ++str;
+        if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "on", sizeof("on") - 1))
+        {
+            VSC_OPTN_PUOptions_SetSwitchOn(options, gcvTRUE);
+            str += sizeof("on") - 1;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "off", sizeof("off") - 1))
+        {
+            VSC_OPTN_PUOptions_SetSwitchOn(options, gcvFALSE);
+            str += sizeof("off") - 1;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "trace:", sizeof("trace:")-1))
+        {
+            gctUINT32 trace;
+            gctUINT32 len;
+
+            str += sizeof("trace:") -1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            trace = vscSTR_StrToUint32(str, len);
+            VSC_OPTN_PUOptions_SetTrace(options, trace);
+            str += len;
+        }
+    }
+}
+
+void VSC_OPTN_PUOptions_Dump(
+    IN VSC_OPTN_PUOptions* options,
+    IN VIR_Dumper* dumper
+    )
+{
+    VIR_LOG(dumper, "precision updater options:\n");
+    VIR_LOG(dumper, "    on: %s\n", VSC_OPTN_PUOptions_GetSwitchOn(options) ? "true" : "false");
+    VIR_LOG(dumper, "    trace: %x\n", VSC_OPTN_PUOptions_GetTrace(options));
+    VIR_LOG_FLUSH(dumper);
+}
+
+void VSC_OPTN_PUOptions_Usage(
+    IN VIR_Dumper* dumper
+    )
+{
+    gctSTRING usage =
+        "-PU:\n"
+        "    on                  turn on VIR inliner\n"
+        "    off                 turn off VIR inliner\n"
+        "    trace:              0x1    trace inliner\n"
+        "                        0x2    trace output\n";
+
+    VIR_LOG(dumper, usage);
+    VIR_LOG_FLUSH(dumper);
+}
+
 /* M2L lower option */
 void VSC_OPTN_LowerM2LOptions_SetDefault(
     IN OUT VSC_OPTN_LowerM2LOptions* options
@@ -515,7 +461,9 @@ void VSC_OPTN_PHOptions_SetDefault(
                       VSC_OPTN_PHOptions_OPTS_MAD |
                       VSC_OPTN_PHOptions_OPTS_RSQ |
                       VSC_OPTN_PHOptions_OPTS_RUC |
-                      VSC_OPTN_PHOptions_OPTS_MOV_LDARR;
+                      VSC_OPTN_PHOptions_OPTS_MOV_LDARR |
+                      VSC_OPTN_PHOptions_OPTS_ICAST |
+                      VSC_OPTN_PHOptions_OPTS_LSHIFT_LS;
 
     if (!ENABLE_FULL_NEW_LINKER)
     {
@@ -876,7 +824,7 @@ void VSC_OPTN_ISOptions_SetDefault(
     VSC_OPTN_ISOptions_SetBandwidthOnly(options, gcvFALSE);
     VSC_OPTN_ISOptions_SetRegCount(options, 0);         /* 0 is invalid number here */
     VSC_OPTN_ISOptions_SetDepGran(options, VSC_OPTN_ISOptions_DEPGRAN_GROSS);
-    VSC_OPTN_ISOptions_SetBBCeiling(options, 500);
+    VSC_OPTN_ISOptions_SetBBCeiling(options, 1024);
     VSC_OPTN_ISOptions_SetAlgorithm(options, VSC_OPTN_ISOptions_ALGORITHM_LISTSCHEDULING
                                            /*, VSC_OPTN_ISOptions_ALGORITHM_BUBBLESCHEDULING*/);
     /*VSC_OPTN_ISOptions_SetDepGran(options, VSC_OPTN_ISOptions_DEPGRAN_DU_PER_CHANNAL);*/
@@ -1291,6 +1239,7 @@ void VSC_OPTN_RAOptions_SetDefault(
     VSC_OPTN_RAOptions_SetTrace(options, 0);
     VSC_OPTN_RAOptions_SetOPTS(options, 0x3);
     VSC_OPTN_RAOptions_SetRegisterCount(options, 0);
+    VSC_OPTN_RAOptions_SetSTBubbleSize(options, 8);
     VSC_OPTN_RAOptions_SetSpillBeforeShader(options, gcvMAXUINT32);
     VSC_OPTN_RAOptions_SetSpillAfterShader(options, gcvMAXUINT32);
 }
@@ -1357,6 +1306,17 @@ void VSC_OPTN_RAOptions_GetOptionFromString(
             VSC_OPTN_RAOptions_SetRegisterCount(options, registerCount);
             str += len;
         }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "bubble:", sizeof("bubble:") - 1))
+        {
+            gctUINT32 stBubbleSize;
+            gctUINT32 len;
+
+            str += sizeof("bubble:") - 1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            stBubbleSize = vscSTR_StrToUint32(str, len);
+            VSC_OPTN_RAOptions_SetSTBubbleSize(options, stBubbleSize);
+            str += len;
+        }
         else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "bs:", sizeof("bs:") - 1))
         {
             gctUINT32 beforeShader;
@@ -1393,6 +1353,7 @@ void VSC_OPTN_RAOptions_Dump(
     VIR_LOG(dumper, "    opts: %x\n", VSC_OPTN_RAOptions_GetOPTS(options));
     VIR_LOG(dumper, "    trace: %x\n", VSC_OPTN_RAOptions_GetTrace(options));
     VIR_LOG(dumper, "    registerCount: %d\n", VSC_OPTN_RAOptions_GetRegisterCount(options));
+    VIR_LOG(dumper, "    st bubble size: %d\n", VSC_OPTN_RAOptions_GetSTBubbleSize(options));
     VIR_LOG(dumper, "    bs: %d\n", VSC_OPTN_RAOptions_GetSpillBeforeShader(options));
     VIR_LOG(dumper, "    as: %d\n", VSC_OPTN_RAOptions_GetSpillAfterShader(options));
     VIR_LOG_FLUSH(dumper);
@@ -1414,6 +1375,7 @@ void VSC_OPTN_RAOptions_Usage(
         "                        0x4    assign color\n"
         "                        0x8    final vir\n"
         "    regs:               set the number of registers\n"
+        "    bubble:             set bubble size for st instruction\n"
         "    bs:                 set spill shader before\n"
         "    as:                 set spill shader after\n";
     VIR_LOG(dumper, usage);
@@ -1630,9 +1592,7 @@ void VSC_OPTN_LCSEOptions_SetDefault(
     )
 {
     VSC_OPTN_LCSEOptions_SetSwitchOn(options, gcvTRUE);
-    VSC_OPTN_LCSEOptions_SetHeuristics(options, VSC_OPTN_LCSEOptions_HEUR_NONE ||
-                                                VSC_OPTN_LCSEOptions_HEUR_LOAD_ONLY ||
-                                                VSC_OPTN_LCSEOptions_HEUR_EXCLUDE_MUL);
+    VSC_OPTN_LCSEOptions_SetOpts(options, VSC_OPTN_LCSEOptions_OPT_LOAD | VSC_OPTN_LCSEOptions_OPT_OTHERS);
     VSC_OPTN_LCSEOptions_SetBeforeShader(options, gcvMAXUINT32);
     VSC_OPTN_LCSEOptions_SetAfterShader(options, gcvMAXUINT32);
     VSC_OPTN_LCSEOptions_SetBeforeFunc(options, gcvMAXUINT32);
@@ -1658,15 +1618,15 @@ void VSC_OPTN_LCSEOptions_GetOptionFromString(
             VSC_OPTN_LCSEOptions_SetSwitchOn(options, gcvFALSE);
             str += sizeof("off") - 1;
         }
-        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "heuristics:", sizeof("heuristics:") - 1))
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "opts:", sizeof("opts:") - 1))
         {
-            gctUINT32 heuristics;
+            gctUINT32 opts;
             gctUINT32 len;
 
-            str += sizeof("heuristics:") - 1;
+            str += sizeof("opts:") - 1;
             len = _VSC_OPTN_GetSubOptionLength(str);
-            heuristics = vscSTR_StrToUint32(str, len);
-            VSC_OPTN_LCSEOptions_SetHeuristics(options, heuristics);
+            opts = vscSTR_StrToUint32(str, len);
+            VSC_OPTN_LCSEOptions_SetOpts(options, opts);
             str += len;
         }
         else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "bs:", sizeof("bs:") - 1))
@@ -1732,12 +1692,13 @@ void VSC_OPTN_LCSEOptions_Dump(
     IN VIR_Dumper           *dumper
     )
 {
-    VIR_LOG(dumper, "copy propagation options:\n");
-    VIR_LOG(dumper, "    on: %s\n", VSC_OPTN_LCSEOptions_GetSwitchOn(options) ? "true" : "false");
-    VIR_LOG(dumper, "    bs: %d\n", VSC_OPTN_LCSEOptions_GetBeforeShader(options));
-    VIR_LOG(dumper, "    as: %d\n", VSC_OPTN_LCSEOptions_GetAfterShader(options));
-    VIR_LOG(dumper, "    bf: %d\n", VSC_OPTN_LCSEOptions_GetBeforeFunc(options));
-    VIR_LOG(dumper, "    af: %d\n", VSC_OPTN_LCSEOptions_GetAfterFunc(options));
+    VIR_LOG(dumper, "LCSE options:\n");
+    VIR_LOG(dumper, "    on:   %s\n", VSC_OPTN_LCSEOptions_GetSwitchOn(options) ? "true" : "false");
+    VIR_LOG(dumper, "    opts: %x\n", VSC_OPTN_LCSEOptions_GetOpts(options));
+    VIR_LOG(dumper, "    bs:   %d\n", VSC_OPTN_LCSEOptions_GetBeforeShader(options));
+    VIR_LOG(dumper, "    as:   %d\n", VSC_OPTN_LCSEOptions_GetAfterShader(options));
+    VIR_LOG(dumper, "    bf:   %d\n", VSC_OPTN_LCSEOptions_GetBeforeFunc(options));
+    VIR_LOG(dumper, "    af:   %d\n", VSC_OPTN_LCSEOptions_GetAfterFunc(options));
     VIR_LOG(dumper, "    trace: %x\n", VSC_OPTN_LCSEOptions_GetTrace(options));
     VIR_LOG_FLUSH(dumper);
 }
@@ -1748,11 +1709,14 @@ void VSC_OPTN_LCSEOptions_Usage(
 {
     gctSTRING usage =
         "-LCSE:\n"
-        "    on                  turn on constant propagation and folding\n"
-        "    off                 turn off constant propagation and folding\n"
-        "    trace:              0x1    trace constant propagation and folding input\n"
-        "                        0x2    trace constant propagation and folding output\n"
-        "                        0x4    trace constant propagation and folding algorithm\n\n";
+        "    on                  turn on local common subexpression elimination\n"
+        "    off                 turn off local common subexpression elimination\n"
+        "    opts                0x1    ld lcse\n"
+        "                        0x2    attr_ld lcse\n"
+        "                        0x4    other expressions lcse\n"
+        "    trace:              0x1    trace local common subexpression elimination input\n"
+        "                        0x2    trace local common subexpression elimination output\n"
+        "                        0x4    trace local common subexpression elimination algorithm\n\n";
 
     VIR_LOG(dumper, usage);
     VIR_LOG_FLUSH(dumper);
@@ -1843,6 +1807,72 @@ void VSC_OPTN_DCEOptions_Usage(
     VIR_LOG_FLUSH(dumper);
 }
 
+/* dual16 phase options*/
+void VSC_OPTN_DUAL16Options_SetDefault(
+    IN OUT VSC_OPTN_DUAL16Options* options
+    )
+{
+    VSC_OPTN_DUAL16Options_SetPercentage(options, (gctFLOAT)0.67);
+    VSC_OPTN_DUAL16Options_SetTrace(options, 0);
+}
+
+void VSC_OPTN_DUAL16Options_GetOptionFromString(
+    IN gctSTRING str,
+    IN OUT VSC_OPTN_DUAL16Options  *options
+    )
+{
+    while (str[0] == ':')
+    {
+        ++str;
+        if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "percentage:", sizeof("percentage:")-1))
+        {
+            gctUINT32 percentage;
+            gctUINT32 len;
+
+            str += sizeof("percentage:") -1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            percentage = vscSTR_StrToUint32(str, len);
+            VSC_OPTN_DUAL16Options_SetPercentage(options, (gctFLOAT)((gctFLOAT)percentage / 100.0));
+            str += len;
+        }
+        else if (gcvSTATUS_OK == gcoOS_StrNCmp(str, "trace:", sizeof("trace:")-1))
+        {
+            gctUINT32 trace;
+            gctUINT32 len;
+
+            str += sizeof("trace:") -1;
+            len = _VSC_OPTN_GetSubOptionLength(str);
+            trace = vscSTR_StrToUint32(str, len);
+            VSC_OPTN_DUAL16Options_SetTrace(options, trace);
+            str += len;
+        }
+    }
+}
+
+void VSC_OPTN_DUAL16Options_Dump(
+    IN VSC_OPTN_DUAL16Options  *options,
+    IN VIR_Dumper           *dumper
+    )
+{
+    VIR_LOG(dumper, "dual16 phase options:\n");
+    VIR_LOG(dumper, "    trace: %x\n", VSC_OPTN_DUAL16Options_GetTrace(options));
+    VIR_LOG_FLUSH(dumper);
+}
+
+void VSC_OPTN_DUAL16Options_Usage(
+    IN VIR_Dumper   *dumper
+    )
+{
+    gctSTRING usage =
+        "-DUAL16:\n"
+        "    trace:              0x1    trace input\n"
+        "                        0x2    trace output\n"
+        "                        0x4    trace operands\n"
+        "                        0x8    trace instructions\n\n";
+
+    VIR_LOG(dumper, usage);
+    VIR_LOG_FLUSH(dumper);
+}
 
 /* final clean up phase options*/
 void VSC_OPTN_FCPOptions_SetDefault(
@@ -2015,9 +2045,9 @@ void VSC_OPTN_Options_SetDefault(
     IN OUT VSC_OPTN_Options* options
     )
 {
-    VSC_OPTN_HWOptions_SetDefault(VSC_OPTN_Options_GetHWOptions(options));
     VSC_OPTN_UF_AUBO_Options_SetDefault(VSC_OPTN_Options_GetAUBOOptions(options));
     VSC_OPTN_ILOptions_SetDefault(VSC_OPTN_Options_GetInlinerOptions(options));
+    VSC_OPTN_PUOptions_SetDefault(VSC_OPTN_Options_GetPUOptions(options));
     VSC_OPTN_LowerM2LOptions_SetDefault(VSC_OPTN_Options_GetLowerM2LOptions(options));
     VSC_OPTN_SCLOptions_SetDefault(VSC_OPTN_Options_GetSCLOptions(options));
     VSC_OPTN_PHOptions_SetDefault(VSC_OPTN_Options_GetPHOptions(options));
@@ -2030,6 +2060,7 @@ void VSC_OPTN_Options_SetDefault(
     VSC_OPTN_CPFOptions_SetDefault(VSC_OPTN_Options_GetCPFOptions(options));
     VSC_OPTN_LCSEOptions_SetDefault(VSC_OPTN_Options_GetLCSEOptions(options));
     VSC_OPTN_DCEOptions_SetDefault(VSC_OPTN_Options_GetDCEOptions(options));
+    VSC_OPTN_DUAL16Options_SetDefault(VSC_OPTN_Options_GetDUAL16Options(options));
     VSC_OPTN_FCPOptions_SetDefault(VSC_OPTN_Options_GetFCPOptions(options));
     VSC_OPTN_MCGenOptions_SetDefault(VSC_OPTN_Options_GetMCGenOptions(options));
     VSC_OPTN_SEPGenOptions_SetDefault(VSC_OPTN_Options_GetSEPGenOptions(options));
@@ -2047,14 +2078,6 @@ void VSC_OPTN_Options_GetOptionFromString(
 {
     gctSTRING pos = gcvNULL;
 
-    /* hardware configuration: */
-    gcoOS_StrStr(str, "-HW", &pos);
-    if (pos)
-    {
-        pos += sizeof("-HW") - 1;
-        VSC_OPTN_HWOptions_GetOptionFromString(pos, VSC_OPTN_Options_GetHWOptions(options));
-    }
-
     /* default UBO options */
     gcoOS_StrStr(str, "-DUBO", &pos);
     if (pos)
@@ -2069,6 +2092,14 @@ void VSC_OPTN_Options_GetOptionFromString(
     {
         pos += sizeof("-IL") - 1;
         VSC_OPTN_ILOptions_GetOptionFromString(pos, VSC_OPTN_Options_GetInlinerOptions(options));
+    }
+
+    /* precision updater options */
+    gcoOS_StrStr(str, "-PU", &pos);
+    if (pos)
+    {
+        pos += sizeof("-PU") - 1;
+        VSC_OPTN_PUOptions_GetOptionFromString(pos, VSC_OPTN_Options_GetPUOptions(options));
     }
 
     /* lowering from mid level to low level Options: */
@@ -2151,6 +2182,14 @@ void VSC_OPTN_Options_GetOptionFromString(
         VSC_OPTN_RAOptions_GetOptionFromString(pos, VSC_OPTN_Options_GetRAOptions(options));
     }
 
+    /* dual16 phase Options: */
+    gcoOS_StrStr(str, "-DUAL16", &pos);
+    if (pos)
+    {
+        pos += sizeof("-DUAL16") - 1;
+        VSC_OPTN_DUAL16Options_GetOptionFromString(pos, VSC_OPTN_Options_GetDUAL16Options(options));
+    }
+
     /* final clean up phase Options: */
     gcoOS_StrStr(str, "-FCP", &pos);
     if (pos)
@@ -2196,9 +2235,9 @@ void VSC_OPTN_Options_Dump(
     )
 {
     VIR_LOG(dumper, "%s\nDUMP OPTIONS\n%s\n", VSC_TRACE_BAR_LINE, VSC_TRACE_BAR_LINE);
-    VSC_OPTN_HWOptions_Dump(VSC_OPTN_Options_GetHWOptions(options), dumper);
     VSC_OPTN_UF_AUBO_Options_Dump(VSC_OPTN_Options_GetAUBOOptions(options), dumper);
     VSC_OPTN_ILOptions_Dump(VSC_OPTN_Options_GetInlinerOptions(options), dumper);
+    VSC_OPTN_PUOptions_Dump(VSC_OPTN_Options_GetPUOptions(options), dumper);
     VSC_OPTN_LowerM2LOptions_Dump(VSC_OPTN_Options_GetLowerM2LOptions(options), dumper);
     VSC_OPTN_SCLOptions_Dump(VSC_OPTN_Options_GetSCLOptions(options), dumper);
     VSC_OPTN_CPPOptions_Dump(VSC_OPTN_Options_GetCPPOptions(options), dumper);
@@ -2209,6 +2248,7 @@ void VSC_OPTN_Options_Dump(
     VSC_OPTN_ISOptions_Dump(VSC_OPTN_Options_GetPreRAISOptions(options), dumper);
     VSC_OPTN_RAOptions_Dump(VSC_OPTN_Options_GetRAOptions(options), dumper);
     VSC_OPTN_ISOptions_Dump(VSC_OPTN_Options_GetPostRAISOptions(options), dumper);
+    VSC_OPTN_DUAL16Options_Dump(VSC_OPTN_Options_GetDUAL16Options(options), dumper);
     VSC_OPTN_FCPOptions_Dump(VSC_OPTN_Options_GetFCPOptions(options), dumper);
     VIR_LOG(dumper, "dump_options: %s\n", VSC_OPTN_Options_GetDumpOptions(options) ? "true" : "false");
     VIR_LOG(dumper, "options usage: %s\n", VSC_OPTN_Options_GetOptionsUsage(options) ? "true" : "false");
@@ -2220,9 +2260,9 @@ void VSC_OPTN_Options_Usage(
     )
 {
     VIR_LOG(dumper, "%s\nOPTIONS USAGE\n%s\n", VSC_TRACE_BAR_LINE, VSC_TRACE_BAR_LINE);
-    VSC_OPTN_HWOptions_Usage(dumper);
     VSC_OPTN_UF_AUBO_Options_Usage(dumper);
     VSC_OPTN_ILOptions_Usage(dumper);
+    VSC_OPTN_PUOptions_Usage(dumper);
     VSC_OPTN_LowerM2LOptions_Usage(dumper);
     VSC_OPTN_SCLOptions_Usage(dumper);
     VSC_OPTN_PHOptions_Usage(dumper);
@@ -2232,6 +2272,7 @@ void VSC_OPTN_Options_Usage(
     VSC_OPTN_SIMPOptions_Usage(dumper);
     VSC_OPTN_ISOptions_Usage(dumper);
     VSC_OPTN_RAOptions_Usage(dumper);
+    VSC_OPTN_DUAL16Options_Usage(dumper);
     VSC_OPTN_FCPOptions_Usage(dumper);
     VIR_LOG(dumper, "-DUMP_OPTIONS        dump options\n");
     VIR_LOG(dumper, "-USAGE               print options usage\n");

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -310,8 +310,7 @@ _CreateSurfaceObjects(
             {
                 gcePATCH_ID patchId = gcvPATCH_INVALID;
                 gctUINT samples;
-                gceSURF_TYPE type = gcvSURF_DEPTH
-                                  | gcvSURF_CREATE_AS_DISPLAYBUFFER;
+                gceSURF_TYPE type;
 
                 samples = Surface->config.samples;
 
@@ -324,6 +323,7 @@ _CreateSurfaceObjects(
                     samples = 0;
                 }
 
+                type = (samples > 1) ? gcvSURF_DEPTH : (gcvSURF_DEPTH | gcvSURF_CREATE_AS_DISPLAYBUFFER);
                 if (Surface->protectedContent)
                 {
                     type = (gceSURF_TYPE) (type | gcvSURF_PROTECTED_CONTENT);
@@ -561,7 +561,8 @@ _DestroySurfaceObjects(
     return status;
 }
 
-EGLint veglResizeSurface(
+EGLint
+veglResizeSurface(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
     IN gctUINT Width,
@@ -569,6 +570,8 @@ EGLint veglResizeSurface(
     )
 {
     EGLint eglResult = EGL_SUCCESS;
+    gcoSURF prevRenderTarget = gcvNULL;
+    gcoSURF prevDepth        = gcvNULL;
     gceSTATUS status;
 
     gcmHEADER_ARG("Surface=0x%x Width=%u Height=%u", Surface, Width, Height);
@@ -577,6 +580,7 @@ EGLint veglResizeSurface(
     {
         VEGLThreadData thread;
         VEGLContext current;
+        gcmASSERT(Surface->type & EGL_WINDOW_BIT);
 
         /* Get thread data. */
         thread = veglGetThreadData();
@@ -600,6 +604,27 @@ EGLint veglResizeSurface(
                 /* Error freeing surface objects. */
                 eglResult = EGL_BAD_ALLOC;
                 break;
+            }
+        }
+
+        if (Surface->swapBehavior == EGL_BUFFER_PRESERVED)
+        {
+            /* Reference previous render target. */
+            prevRenderTarget = (Surface->renderMode > 0)
+                             ? Surface->prevRenderTarget
+                             : Surface->renderTarget;
+
+            if (prevRenderTarget)
+            {
+                gcoSURF_ReferenceSurface(prevRenderTarget);
+            }
+
+            /* Reference previous depth buffer. */
+            prevDepth = Surface->depthBuffer;
+
+            if (prevDepth)
+            {
+                gcoSURF_ReferenceSurface(prevDepth);
             }
         }
 
@@ -637,97 +662,134 @@ EGLint veglResizeSurface(
         }
 
         /* Similar to eglMakeCurrent here. */
-        if (Surface->type & EGL_WINDOW_BIT)
+        /* Cancel window back buffer. */
+        if (Surface->backBuffer.surface != gcvNULL)
         {
-            /* Cancel window back buffer. */
-            if (Surface->backBuffer.surface != gcvNULL)
-            {
-                veglCancelWindowBackBuffer(Display, Surface, &Surface->backBuffer);
+            veglCancelWindowBackBuffer(Display, Surface, &Surface->backBuffer);
 
-                Surface->backBuffer.context = gcvNULL;
-                Surface->backBuffer.surface = gcvNULL;
-            }
+            Surface->backBuffer.context = gcvNULL;
+            Surface->backBuffer.surface = gcvNULL;
+        }
 
-            gcmASSERT(Surface->bound);
-            veglUnbindWindow(Display, Surface);
-            Surface->bound = EGL_FALSE;
+        gcmASSERT(Surface->bound);
+        veglUnbindWindow(Display, Surface);
+        Surface->bound = EGL_FALSE;
 
-            /* Re-bind window for rendering. */
-            if (!veglBindWindow(Display, Surface, &Surface->renderMode))
-            {
-                eglResult = EGL_BAD_NATIVE_WINDOW;
-                break;
-            }
+        /* Re-bind window for rendering. */
+        if (!veglBindWindow(Display, Surface, &Surface->renderMode))
+        {
+            eglResult = EGL_BAD_NATIVE_WINDOW;
+            break;
+        }
 
-            Surface->bound = EGL_TRUE;
+        Surface->bound = EGL_TRUE;
 
-            /* Must use new swap model for direct rendering. */
-            Surface->newSwapModel = (Surface->renderMode > 0);
+        /* Must use new swap model for direct rendering. */
+        Surface->newSwapModel = (Surface->renderMode > 0);
 
 #if defined(ANDROID)
-            /* Always use new swap model for android. */
-            Surface->newSwapModel = gcvTRUE;
+        /* Always use new swap model for android. */
+        Surface->newSwapModel = gcvTRUE;
 #endif
 
-            if (Surface->newSwapModel)
+        if (Surface->newSwapModel)
+        {
+            EGLBoolean result;
+
+            /* Get window back buffer for new swap model. */
+            result = veglGetWindowBackBuffer(Display, Surface, &Surface->backBuffer);
+
+            if (!result)
             {
-                EGLBoolean result;
+                /*
+                 * Do not break here. Need update drawable to client in
+                 * direct rendering mode. See below.
+                 */
+                eglResult = EGL_BAD_NATIVE_WINDOW;
+            }
+        }
 
-                /* Get window back buffer for new swap model. */
-                result = veglGetWindowBackBuffer(Display, Surface, &Surface->backBuffer);
+        if (Surface->renderMode > 0)
+        {
+            /* Get render target from window back buffer. */
+            Surface->renderTarget = Surface->backBuffer.surface;
 
-                if (!result)
-                {
-                    /*
-                     * Do not break here. Need update drawable to client in
-                     * direct rendering mode. See below.
-                     */
-                    eglResult = EGL_BAD_NATIVE_WINDOW;
-                }
+            if (Surface->renderTarget)
+            {
+                /* Reference external surface. */
+                gcoSURF_ReferenceSurface(Surface->renderTarget);
+
+                /* Set preserve flag. */
+                gcmVERIFY_OK(gcoSURF_SetFlags(
+                    Surface->renderTarget,
+                    gcvSURF_FLAG_CONTENT_PRESERVED,
+                    (Surface->swapBehavior == EGL_BUFFER_PRESERVED)
+                    ));
+
+                /* Reset content updated flag. */
+                gcmVERIFY_OK(gcoSURF_SetFlags(
+                    Surface->renderTarget,
+                    gcvSURF_FLAG_CONTENT_UPDATED,
+                    gcvFALSE
+                    ));
             }
 
-            if (Surface->renderMode > 0)
+            /* Sync drawable with renderTarget. */
+            Surface->drawable.rtHandle     = Surface->renderTarget;
+            Surface->drawable.prevRtHandle = gcvNULL;
+        }
+        else if (Surface->renderTarget == gcvNULL)
+        {
+            EGLBoolean success;
+
+            /* Create render target. */
+            success = veglCreateRenderTarget(thread, Surface);
+
+            if (success != EGL_TRUE)
             {
-                /* Get render target from window back buffer. */
-                Surface->renderTarget = Surface->backBuffer.surface;
-
-                if (Surface->renderTarget)
-                {
-                    /* Reference external surface. */
-                    gcoSURF_ReferenceSurface(Surface->renderTarget);
-
-                    /* Set preserve flag. */
-                    gcmVERIFY_OK(gcoSURF_SetFlags(
-                        Surface->renderTarget,
-                        gcvSURF_FLAG_CONTENT_PRESERVED,
-                        (Surface->swapBehavior == EGL_BUFFER_PRESERVED)
-                        ));
-
-                    /* Reset content updated flag. */
-                    gcmVERIFY_OK(gcoSURF_SetFlags(
-                        Surface->renderTarget,
-                        gcvSURF_FLAG_CONTENT_UPDATED,
-                        gcvFALSE
-                        ));
-                }
-
-                /* Sync drawable with renderTarget. */
-                Surface->drawable.rtHandle     = Surface->renderTarget;
-                Surface->drawable.prevRtHandle = gcvNULL;
+                /* Error creating render target. */
+                eglResult = EGL_BAD_ALLOC;
+                break;
             }
-            else if (Surface->renderTarget == gcvNULL)
+        }
+
+        if (prevRenderTarget)
+        {
+#if gcdENABLE_VG
+            if (Surface->openVG)
             {
-                EGLBoolean success;
+                gcoSURF_Copy(Surface->renderTarget, prevRenderTarget);
+            }
+            else
+#endif
+            {
+#if gcdENABLE_3D
+                /* Copy pixels from previous render target. */
+                gcsSURF_VIEW srcView = {prevRenderTarget, 0, 1};
+                gcsSURF_VIEW trgView = {Surface->renderTarget, 0, 1};
 
-                /* Create render target. */
-                success = veglCreateRenderTarget(thread, Surface);
+                gcoSURF_ResolveRect(&srcView, &trgView, gcvNULL);
+#endif
+            }
+        }
 
-                if (success != EGL_TRUE)
-                {
-                    /* Error creating render target. */
-                    eglResult = EGL_BAD_ALLOC;
-                    break;
-                }
+        if (prevDepth)
+        {
+#if gcdENABLE_VG
+            if (Surface->openVG)
+            {
+                gcoSURF_Copy(Surface->depthBuffer, prevDepth);
+            }
+            else
+#endif
+            {
+#if gcdENABLE_3D
+                /* Copy pixels from previous render target. */
+                gcsSURF_VIEW srcView = {prevDepth, 0, 1};
+                gcsSURF_VIEW trgView = {Surface->depthBuffer, 0, 1};
+
+                gcoSURF_ResolveRect(&srcView, &trgView, gcvNULL);
+#endif
             }
         }
 
@@ -751,6 +813,18 @@ EGLint veglResizeSurface(
         /* eglResult could be failure here. */
     }
     while (gcvFALSE);
+
+    if (prevRenderTarget)
+    {
+        /* Dereference previous render target. */
+        gcmVERIFY_OK(gcoSURF_Destroy(prevRenderTarget));
+    }
+
+    if (prevDepth)
+    {
+        /* Dereference previous depth. */
+        gcmVERIFY_OK(gcoSURF_Destroy(prevDepth));
+    }
 
     /* Return error code. */
     gcmFOOTER_ARG("return=%d", eglResult);
@@ -1015,6 +1089,7 @@ _InitializeSurface(
             &surface->renderTargetFormat,
             &surface->depthFormat
             );
+
 #if gcdENABLE_3D
 #if gcdDEBUG_OPTION && gcdDEBUG_OPTION_FORCE_16BIT_RENDER_TARGET
         if (surface->renderTargetFormat == gcvSURF_R5G6B5 && patchId == gcvPATCH_DEBUG)
@@ -1022,75 +1097,69 @@ _InitializeSurface(
             gcmPRINT(" The original format of render target is rgb565, transform is unnecessary!");
         }
 #endif
-#endif
-#if gcdENABLE_3D
-        if ((Config->bufferSize < 32) &&
+
+        if ((Config->bufferSize < 32)
 #if defined(ANDROID)
-            _ForceRenderTarget() &&
+            && _ForceRenderTarget()
 #endif
-            /* For 3DVG, dither is the same as es. */
 #if gcdENABLE_VG
-            !(Thread->openVGpipe && (Thread->api == EGL_OPENVG_API)) &&
+            /* For 3DVG, dither is the same as es. */
+            && !(Thread->openVGpipe && (Thread->api == EGL_OPENVG_API))
 #endif
-            ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PE_DITHER_FIX) != gcvTRUE) ||
-             (patchId == gcvPATCH_GTFES30)     ||
-             (patchId == gcvPATCH_TRIAL)
-            )
            )
         {
-            /* Use A8R8G8B8 for render target */
-            gceSURF_FORMAT rtFormat = gcvSURF_A8R8G8B8;
+            gctBOOL force32bitsRT = gcvFALSE;
 
-            switch (surface->renderTargetFormat)
+            if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PE_DITHER_FIX) != gcvTRUE) ||
+                (patchId == gcvPATCH_GTFES30) ||
+                (patchId == gcvPATCH_DEQP)    ||
+                (patchId == gcvPATCH_TRIAL)
+               )
             {
-            case gcvSURF_X4R4G4B4:
-            case gcvSURF_X1R5G5B5:
-            case gcvSURF_R5G6B5:
-            case gcvSURF_X8R8G8B8:
-                rtFormat = gcvSURF_X8R8G8B8;
-                break;
-
-            case gcvSURF_YUY2:
-                rtFormat = gcvSURF_YUY2;
-                break;
-
-            default:
-                break;
+                force32bitsRT = gcvTRUE;
+            }
+            else if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PE_DITHER_FIX2) != gcvTRUE) &&
+                     (Config->greenSize == 4 || Config->greenSize == 5)
+                    )
+            {
+                force32bitsRT = gcvTRUE;
             }
 
-            if (surface->renderTargetFormat != rtFormat)
+            if (force32bitsRT)
             {
-                surface->rtFormatChanged = gcvTRUE;
-                surface->renderTargetFormat = rtFormat;
-            }
-        }
-        else if (
-#if gcdENABLE_VG
-                !(Thread->openVGpipe && (Thread->api == EGL_OPENVG_API)) &&
-#endif
-                (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PE_DITHER_FIX2) != gcvTRUE) &&
-                 (Config->greenSize == 4 || Config->greenSize == 5))
-        {
-            switch (surface->renderTargetFormat)
-            {
-            case gcvSURF_X4R4G4B4:
-            case gcvSURF_X1R5G5B5:
-                surface->renderTargetFormat = gcvSURF_X8R8G8B8;
-                surface->rtFormatChanged = gcvTRUE;
-                break;
-            case gcvSURF_A4R4G4B4:
-                surface->renderTargetFormat = gcvSURF_A8R8G8B8;
-                surface->rtFormatChanged = gcvTRUE;
-                break;
-            case gcvSURF_A1R5G5B5:
-                if (patchId != gcvPATCH_DEQP)
+                gceSURF_FORMAT rtFormat = gcvSURF_UNKNOWN;
+
+                switch (surface->renderTargetFormat)
                 {
-                surface->renderTargetFormat = gcvSURF_A8R8G8B8;
-                surface->rtFormatChanged = gcvTRUE;
+                case gcvSURF_X4R4G4B4:
+                case gcvSURF_X1R5G5B5:
+                case gcvSURF_R5G6B5:
+                case gcvSURF_X8R8G8B8:
+                    rtFormat = gcvSURF_X8R8G8B8;
+                    break;
+
+                case gcvSURF_A4R4G4B4:
+                    rtFormat = gcvSURF_A8R8G8B8;
+                    break;
+
+                case gcvSURF_A1R5G5B5:
+                    rtFormat = (patchId == gcvPATCH_DEQP) ? gcvSURF_A1R5G5B5 : gcvSURF_A8R8G8B8;
+                    break;
+
+                case gcvSURF_YUY2:
+                    rtFormat = gcvSURF_YUY2;
+                    break;
+
+                default:
+                    gcmFATAL("Error: Unknow 16bpp format: %d", surface->renderTargetFormat);
+                    break;
                 }
-                break;
-            default:
-                break;
+
+                if (surface->renderTargetFormat != rtFormat)
+                {
+                    surface->rtFormatChanged = gcvTRUE;
+                    surface->renderTargetFormat = rtFormat;
+                }
             }
         }
 
@@ -1418,7 +1487,7 @@ _MapLockedBuffer(
         gcsSURF_VIEW lockView = {Surface->lockBuffer, 0, 1};
 
         /* Resolve color buffer to bitmap. */
-        status = gcoSURF_ResolveRect_v2(&rtView, &lockView, gcvNULL);
+        status = gcoSURF_ResolveRect(&rtView, &lockView, gcvNULL);
         if (gcmIS_ERROR(status))
         {
             veglSetEGLerror(Thread,  EGL_BAD_ACCESS);
@@ -1614,7 +1683,7 @@ veglCreateRenderTarget(
     }
     else
     {
-        type = gcvSURF_RENDER_TARGET | gcvSURF_CREATE_AS_DISPLAYBUFFER;
+        type = (samples > 1) ? gcvSURF_RENDER_TARGET : (gcvSURF_RENDER_TARGET | gcvSURF_CREATE_AS_DISPLAYBUFFER);
     }
 
     if (Surface->protectedContent)
@@ -1708,26 +1777,6 @@ OnError:
     }
 
     return EGL_FALSE;
-}
-
-void veglUpdateSurfaceAge(
-    IN VEGLDisplay dpy
-    )
-{
-    VEGLSurface sfstack;
-
-    VEGL_LOCK_DISPLAY_RESOURCE(dpy);
-    for (sfstack = dpy->surfaceStack;
-         sfstack != gcvNULL;
-         sfstack = (VEGLSurface)sfstack->resObj.next)
-    {
-        if (sfstack->bufferAge > 0)
-        {
-            sfstack->bufferAge += 1;
-        }
-    }
-
-    VEGL_UNLOCK_DISPLAY_RESOURCE(dpy);
 }
 
 static gcmINLINE EGLAttrib
@@ -1931,7 +1980,7 @@ eglCreatePlatformWindowSurface(
     const EGLAttrib *attrib_list
     )
 {
-    EGLSurface surface;
+    VEGLSurface surface;
 
     gcmHEADER_ARG("dpy=0x%x config=0x%x native_window=%d attrib_list=0x%x",
                     dpy, config, native_window, attrib_list);
@@ -1939,7 +1988,7 @@ eglCreatePlatformWindowSurface(
     VEGL_TRACE_API_PRE(CreatePlatformWindowSurface)(dpy, config, native_window, attrib_list);
 
     /* Call internal implmentation. */
-    surface = veglCreatePlatformWindowSurface(
+    surface = (VEGLSurface) veglCreatePlatformWindowSurface(
                 dpy, config, native_window, attrib_list, EGL_FALSE);
 
     VEGL_TRACE_API_POST(CreatePlatformWindowSurface)(dpy, config, native_window, attrib_list, surface);
@@ -1963,7 +2012,7 @@ eglCreateWindowSurface(
     const EGLint* attrib_list
     )
 {
-    EGLSurface surface;
+    VEGLSurface surface;
 
     gcmHEADER_ARG("dpy=0x%x config=0x%x window=%d attrib_list=0x%x",
                     dpy, config, window, attrib_list);
@@ -1971,7 +2020,7 @@ eglCreateWindowSurface(
     VEGL_TRACE_API_PRE(CreateWindowSurface)(dpy, config, window, attrib_list);
 
     /* Alias to eglCreatePlatformWindowSurface. */
-    surface = veglCreatePlatformWindowSurface(
+    surface = (VEGLSurface) veglCreatePlatformWindowSurface(
                 dpy, config, (void *) window, attrib_list, EGL_TRUE);
 
     VEGL_TRACE_API_POST(CreateWindowSurface)(dpy, config, window, attrib_list, surface);
@@ -3048,21 +3097,28 @@ eglQuerySurface(
         *value = _GetLockedBufferPixelChannelOffset(Surface, attribute);
         break;
 
+#ifdef ANDROID
     case EGL_BUFFER_AGE_EXT:
         if (thread->context && thread->context->draw == surface)
         {
-            if (surface->swapBehavior == EGL_BUFFER_PRESERVED)
+            if ((surface->swapBehavior == EGL_BUFFER_PRESERVED) ||
+                ((surface->renderTarget != gcvNULL) &&
+                 (surface->backBuffer.surface == gcvNULL)))
             {
-                surface->bufferAge = 1;
+                *value = 1;
+                break;
             }
-            *value = surface->bufferAge;
+
+            if (veglQueryBufferAge(dpy, surface, &surface->backBuffer, value))
+            {
+                break;
+            }
         }
-        else
-        {
-            veglSetEGLerror(thread, EGL_BAD_SURFACE);
-            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-        }
+
+        veglSetEGLerror(thread, EGL_BAD_SURFACE);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         break;
+#endif
 
     case EGL_PROTECTED_CONTENT_EXT:
         *value = surface->protectedContent;
@@ -3781,7 +3837,7 @@ eglUnlockSurfaceKHR(
             gcsSURF_VIEW rtView = {surface->renderTarget, 0, 1};
 
             /* Reflect mapped buffer to color buffer. */
-            status = gcoSURF_ResolveRect_v2(&lockView, &rtView, gcvNULL);
+            status = gcoSURF_ResolveRect(&lockView, &rtView, gcvNULL);
 
             if (gcmIS_ERROR(status))
             {

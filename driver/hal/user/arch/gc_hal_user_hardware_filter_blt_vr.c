@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -106,7 +106,7 @@ static gctFLOAT _SincFilter(
 **      gctUINT32 SrcSize
 **          The size in pixels of a source dimension (width or height).
 **
-**      gctUINT32 DestSize
+**      gctUINT32 DstSize
 **          The size in pixels of a destination dimension (width or height).
 **
 **  OUTPUT:
@@ -118,22 +118,22 @@ static gceSTATUS _CalculateSyncTable(
     IN gcoHARDWARE Hardware,
     IN gctUINT8 KernelSize,
     IN gctUINT32 SrcSize,
-    IN gctUINT32 DestSize,
+    IN gctUINT32 DstSize,
     OUT gcsFILTER_BLIT_ARRAY_PTR KernelInfo
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("Hardware=0x%x KernelSize=%u SrcSize=%u DestSize=%u "
+    gcmHEADER_ARG("Hardware=0x%x KernelSize=%u SrcSize=%u DstSize=%u "
                   "KernelInfo=0x%x",
-                  Hardware, KernelSize, SrcSize, DestSize, KernelInfo);
+                  Hardware, KernelSize, SrcSize, DstSize, KernelInfo);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
     gcmDEBUG_VERIFY_ARGUMENT(KernelInfo != gcvNULL);
     gcmDEBUG_VERIFY_ARGUMENT(KernelInfo->filterType == gcvFILTER_SYNC);
     gcmDEBUG_VERIFY_ARGUMENT(SrcSize != 0);
-    gcmDEBUG_VERIFY_ARGUMENT(DestSize != 0);
+    gcmDEBUG_VERIFY_ARGUMENT(DstSize != 0);
 
     do
     {
@@ -149,7 +149,7 @@ static gceSTATUS _CalculateSyncTable(
         gctPOINTER pointer = gcvNULL;
 
         /* Compute the scale factor. */
-        scaleFactor = gcoHARDWARE_GetStretchFactor(gcvFALSE, SrcSize, DestSize);
+        scaleFactor = gcoHARDWARE_GetStretchFactor(gcvFALSE, SrcSize, DstSize);
 
         /* Same kernel size and ratio as before? */
         if ((KernelInfo->kernelSize  == KernelSize) &&
@@ -175,7 +175,7 @@ static gceSTATUS _CalculateSyncTable(
         KernelInfo->scaleFactor = scaleFactor;
 
         /* Compute the scale factor. */
-        fScale = gcoMATH_DivideFromUInteger(DestSize, SrcSize);
+        fScale = gcoMATH_DivideFromUInteger(DstSize, SrcSize);
 
         /* Adjust the factor for magnification. */
         if (fScale > 1.0f)
@@ -327,7 +327,7 @@ static gceSTATUS _CalculateSyncTable(
 **      gctUINT32 SrcSize
 **          The size in pixels of a source dimension (width or height).
 **
-**      gctUINT32 DestSize
+**      gctUINT32 DstSize
 **          The size in pixels of a destination dimension (width or height).
 **
 **  OUTPUT:
@@ -339,22 +339,22 @@ static gceSTATUS _CalculateBlurTable(
     IN gcoHARDWARE Hardware,
     IN gctUINT8 KernelSize,
     IN gctUINT32 SrcSize,
-    IN gctUINT32 DestSize,
+    IN gctUINT32 DstSize,
     OUT gcsFILTER_BLIT_ARRAY_PTR KernelInfo
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("Hardware=0x%x KernelSize=%u SrcSize=%u DestSize=%u "
+    gcmHEADER_ARG("Hardware=0x%x KernelSize=%u SrcSize=%u DstSize=%u "
                   "KernelInfo=0x%x",
-                  Hardware, KernelSize, SrcSize, DestSize, KernelInfo);
+                  Hardware, KernelSize, SrcSize, DstSize, KernelInfo);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
     gcmDEBUG_VERIFY_ARGUMENT(KernelInfo != gcvNULL);
     gcmDEBUG_VERIFY_ARGUMENT(KernelInfo->filterType == gcvFILTER_BLUR);
     gcmDEBUG_VERIFY_ARGUMENT(SrcSize != 0);
-    gcmDEBUG_VERIFY_ARGUMENT(DestSize != 0);
+    gcmDEBUG_VERIFY_ARGUMENT(DstSize != 0);
 
     do
     {
@@ -366,7 +366,7 @@ static gceSTATUS _CalculateBlurTable(
         gctPOINTER pointer = gcvNULL;
 
         /* Compute the scale factor. */
-        scaleFactor = gcoHARDWARE_GetStretchFactor(gcvFALSE, SrcSize, DestSize);
+        scaleFactor = gcoHARDWARE_GetStretchFactor(gcvFALSE, SrcSize, DstSize);
 
         /* Same kernel size and ratio as before? */
         if ((KernelInfo->kernelSize  == KernelSize) &&
@@ -515,15 +515,23 @@ static gceSTATUS _LoadKernel(
 
 static gceSTATUS _CheckOPF(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR SrcSurface,
-    IN gcsSURF_INFO_PTR DstSurface,
+    IN gcoSURF SrcSurface,
+    IN gcoSURF DstSurface,
     IN gcs2D_State_PTR State,
-    OUT gctBOOL_PTR UseOPF
+    OUT gctBOOL_PTR UseOPF,
+    OUT gctBOOL_PTR Forced
     )
 {
     gctBOOL res = gcvFALSE;
+    gctBOOL forced = gcvFALSE;
 
-    if (SrcSurface->rotation != gcvSURF_0_DEGREE)
+    if (Hardware->features[gcvFEATURE_2D_V4COMPRESSION] &&
+        (DstSurface->tileStatusConfig & gcv2D_TSC_V4_COMPRESSED))
+    {
+        res = gcvTRUE;
+        forced = gcvTRUE;
+    }
+    else if (gcmGET_PRE_ROTATION(SrcSurface->rotation) != gcvSURF_0_DEGREE)
     {
         res = gcvFALSE;
     }
@@ -548,13 +556,16 @@ static gceSTATUS _CheckOPF(
     if (UseOPF != gcvNULL)
         *UseOPF = res;
 
+    if (Forced != gcvNULL)
+        *Forced = forced;
+
     return gcvSTATUS_OK;
 }
 
 static gceSTATUS _CheckOPFBlock(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR SrcSurface,
-    IN gcsSURF_INFO_PTR DstSurface,
+    IN gcoSURF SrcSurface,
+    IN gcoSURF DstSurface,
     IN gcs2D_State_PTR State,
     OUT gctBOOL_PTR UseOPFBlock
     )
@@ -637,8 +648,8 @@ static gceSTATUS _CheckOPFBlock(
 */
 static gceSTATUS _SetOPFBlockSize(
     IN gcoHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR SrcSurface,
-    IN gcsSURF_INFO_PTR DstSurface,
+    IN gcoSURF SrcSurface,
+    IN gcoSURF DstSurface,
     IN gcsRECT_PTR SrcRect,
     IN gcsRECT_PTR DstRect,
     IN gcsFILTER_BLIT_ARRAY_PTR HorKernel,
@@ -886,10 +897,10 @@ static gceSTATUS _StartVR(
     IN gceFILTER_BLIT_TYPE type,
     IN gcsFILTER_BLIT_ARRAY_PTR HorKernel,
     IN gcsFILTER_BLIT_ARRAY_PTR VerKernel,
-    IN gcsSURF_INFO_PTR SrcSurface,
+    IN gcoSURF SrcSurface,
     IN gcsRECT_PTR SrcRect,
     IN gcsPOINT_PTR SrcOrigin,
-    IN gcsSURF_INFO_PTR DstSurface,
+    IN gcoSURF DstSurface,
     IN gcsRECT_PTR DstRect,
     IN gctBOOL PrePass
     )
@@ -916,7 +927,8 @@ static gceSTATUS _StartVR(
             Hardware->hw2DCmdIndex += 16;
         }
 
-        if (Hardware->features[gcvFEATURE_2D_FC_SOURCE])
+        if (Hardware->features[gcvFEATURE_2D_FC_SOURCE]||
+            Hardware->features[gcvFEATURE_2D_V4COMPRESSION])
         {
             Hardware->hw2DCmdIndex += 10;
         }
@@ -1060,7 +1072,7 @@ static gceSTATUS _StartVR(
                 Hardware,
                 curSrc->horMirror,
                 curSrc->verMirror,
-                gcvTRUE
+                !(DstSurface->tileStatusConfig & gcv2D_TSC_V4_COMPRESSED)
                 ));
 
             /* Set multiply modes. */
@@ -1079,7 +1091,7 @@ static gceSTATUS _StartVR(
                 Hardware,
                 gcvFALSE,
                 gcvFALSE,
-                gcvTRUE
+                !(DstSurface->tileStatusConfig & gcv2D_TSC_V4_COMPRESSED)
                 ));
 
             /* Disable multiply. */
@@ -1608,23 +1620,23 @@ OnError:
 **      gcoHARDWARE Hardware
 **          Pointer to an gcoHARDWARE object.
 **
-**      gcsSURF_INFO_PTR SrcSurface
-**          Pointer to the source surface descriptor.
+**      gcoSURF SrcSurface
+**          Pointer to the source surface object.
 **
-**      gcsSURF_INFO_PTR DestSurface
-**          Pointer to the destination surface descriptor.
+**      gcoSURF DstSurface
+**          Pointer to the destination surface object.
 **
 **      gcsRECT_PTR SrcRect
 **          Coorinates of the entire source image.
 **
-**      gcsRECT_PTR DestRect
+**      gcsRECT_PTR DstRect
 **          Coorinates of the entire destination image.
 **
-**      gcsRECT_PTR DestSubRect
+**      gcsRECT_PTR DstSubRect
 **          Coordinates of a sub area within the destination to render.
 **          The coordinates are relative to the coordinates represented
-**          by DestRect. If DestSubRect is gcvNULL, the complete image will
-**          be rendered based on DestRect.
+**          by DstRect. If DstSubRect is gcvNULL, the complete image will
+**          be rendered based on DstRect.
 **
 **  OUTPUT:
 **
@@ -1634,17 +1646,17 @@ gceSTATUS
 gcoHARDWARE_SplitFilterBlit(
     IN gcoHARDWARE Hardware,
     IN gcs2D_State_PTR State,
-    IN gcsSURF_INFO_PTR SrcSurface,
-    IN gcsSURF_INFO_PTR DestSurface,
+    IN gcoSURF SrcSurface,
+    IN gcoSURF DstSurface,
     IN gcsRECT_PTR SrcRect,
-    IN gcsRECT_PTR DestRect,
-    IN gcsRECT_PTR DestSubRect
+    IN gcsRECT_PTR DstRect,
+    IN gcsRECT_PTR DstSubRect
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcs2D_MULTI_SOURCE_PTR curSrc;
-    gcsSURF_INFO_PTR srcSurf = gcvNULL;
-    gcsSURF_INFO_PTR dstSurf = gcvNULL;
+    gcoSURF srcSurf = gcvNULL;
+    gcoSURF dstSurf = gcvNULL;
     gcsRECT srcRect, dstRect, dsRect;
     gctINT32 srcWidth, srcHeight, dstWidth, dstHeight;
     gctUINT32 factorInt, i, power = 0;
@@ -1652,10 +1664,10 @@ gcoHARDWARE_SplitFilterBlit(
     gctBOOL alphaSave;
     gceSURF_ROTATION rotSave;
 
-    gcmHEADER_ARG("Hardware=0x%x SrcSurface=0x%x DestSurface=0x%x "
-                    "SrcRect=0x%x DestRect=0x%x DestSubRect=0x%x",
-                    Hardware, SrcSurface, DestSurface,
-                    SrcRect, DestRect, DestSubRect);
+    gcmHEADER_ARG("Hardware=0x%x SrcSurface=0x%x DstSurface=0x%x "
+                    "SrcRect=0x%x DstRect=0x%x DstSubRect=0x%x",
+                    Hardware, SrcSurface, DstSurface,
+                    SrcRect, DstRect, DstSubRect);
 
     gcmGETHARDWARE(Hardware);
 
@@ -1665,24 +1677,24 @@ gcoHARDWARE_SplitFilterBlit(
         return gcvSTATUS_TRUE;
     }
 
-    if (DestSubRect != gcvNULL)
+    if (DstSubRect != gcvNULL)
     {
-        if (DestSubRect->left >= DestRect->right
-            || DestSubRect->right > DestRect->right
-            || DestSubRect->top >= DestRect->bottom
-            || DestSubRect->bottom > DestRect->bottom)
+        if (DstSubRect->left >= DstRect->right
+            || DstSubRect->right > DstRect->right
+            || DstSubRect->top >= DstRect->bottom
+            || DstSubRect->bottom > DstRect->bottom)
         {
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
 
-        dsRect.left   = DestRect->left + DestSubRect->left;
-        dsRect.top    = DestRect->top  + DestSubRect->top;
-        dsRect.right  = dsRect.left + DestSubRect->right;
-        dsRect.bottom = dsRect.top  + DestSubRect->bottom;
+        dsRect.left   = DstRect->left + DstSubRect->left;
+        dsRect.top    = DstRect->top  + DstSubRect->top;
+        dsRect.right  = dsRect.left + DstSubRect->right;
+        dsRect.bottom = dsRect.top  + DstSubRect->bottom;
     }
     else
     {
-        dsRect = *DestRect;
+        dsRect = *DstRect;
     }
 
     gcmONERROR(gcsRECT_Width(SrcRect, &srcWidth));
@@ -1731,8 +1743,8 @@ gcoHARDWARE_SplitFilterBlit(
             Hardware,
             dstRect.right,
             dstRect.bottom,
-            DestSurface->format,
-            DestSurface->hints,
+            DstSurface->format,
+            DstSurface->hints,
             &dstSurf));
 
         gcmONERROR(gcoHARDWARE_FilterBlit(
@@ -1765,7 +1777,7 @@ gcoHARDWARE_SplitFilterBlit(
     /* Fill in the source structure. */
     SrcSurface                   = srcSurf;
     SrcSurface->type             = gcvSURF_BITMAP;
-    SrcSurface->format           = DestSurface->format;
+    SrcSurface->format           = DstSurface->format;
     SrcSurface->rotation         = rotSave;
     SrcSurface->tiling           = gcvLINEAR;
 
@@ -1780,10 +1792,10 @@ gcoHARDWARE_SplitFilterBlit(
         Hardware,
         State,
         SrcSurface,
-        DestSurface,
+        DstSurface,
         SrcRect,
-        DestRect,
-        DestSubRect
+        DstRect,
+        DstSubRect
         );
 
     Hardware->notAdjustRotation = gcvFALSE;
@@ -1810,23 +1822,23 @@ OnError:
 **      gcoHARDWARE Hardware
 **          Pointer to an gcoHARDWARE object.
 **
-**      gcsSURF_INFO_PTR SrcSurface
-**          Pointer to the source surface descriptor.
+**      gcoSURF SrcSurface
+**          Pointer to the source surface object.
 **
-**      gcsSURF_INFO_PTR DestSurface
-**          Pointer to the destination surface descriptor.
+**      gcoSURF DstSurface
+**          Pointer to the destination surface object.
 **
 **      gcsRECT_PTR SrcRect
 **          Coorinates of the entire source image.
 **
-**      gcsRECT_PTR DestRect
+**      gcsRECT_PTR DstRect
 **          Coorinates of the entire destination image.
 **
-**      gcsRECT_PTR DestSubRect
+**      gcsRECT_PTR DstSubRect
 **          Coordinates of a sub area within the destination to render.
 **          The coordinates are relative to the coordinates represented
-**          by DestRect. If DestSubRect is gcvNULL, the complete image will
-**          be rendered based on DestRect.
+**          by DstRect. If DstSubRect is gcvNULL, the complete image will
+**          be rendered based on DstRect.
 **
 **  OUTPUT:
 **
@@ -1835,21 +1847,21 @@ OnError:
 gceSTATUS gcoHARDWARE_FilterBlit(
     IN gcoHARDWARE Hardware,
     IN gcs2D_State_PTR State,
-    IN gcsSURF_INFO_PTR SrcSurface,
-    IN gcsSURF_INFO_PTR DestSurface,
+    IN gcoSURF SrcSurface,
+    IN gcoSURF DstSurface,
     IN gcsRECT_PTR SrcRect,
-    IN gcsRECT_PTR DestRect,
-    IN gcsRECT_PTR DestSubRect
+    IN gcsRECT_PTR DstRect,
+    IN gcsRECT_PTR DstSubRect
     )
 {
     gceSTATUS status;
-    gcsSURF_INFO_PTR tempSurf = gcvNULL;
+    gcoSURF tempSurf = gcvNULL;
     gcsPOINT srcRectSize;
     gcsPOINT destRectSize;
 
     gctBOOL horPass = gcvFALSE;
     gctBOOL verPass = gcvFALSE;
-    gctBOOL useOPF = gcvFALSE;
+    gctBOOL useOPF = gcvFALSE, OPFForced = gcvFALSE;
 
     gcsSURF_FORMAT_INFO_PTR srcFormat[2];
 
@@ -1861,19 +1873,19 @@ gceSTATUS gcoHARDWARE_FilterBlit(
     gceSURF_ROTATION srcBackRot = gcvSURF_0_DEGREE, dstBackRot = gcvSURF_0_DEGREE;
     gctBOOL rev = gcvFALSE, vMirror = gcvFALSE, hMirror = gcvFALSE;
 
-    gcmHEADER_ARG("Hardware=0x%x SrcSurface=0x%x DestSurface=0x%x "
-                    "SrcRect=0x%x DestRect=0x%x DestSubRect=0x%x",
-                    Hardware, SrcSurface, DestSurface,
-                    SrcRect, DestRect, DestSubRect);
+    gcmHEADER_ARG("Hardware=0x%x SrcSurface=0x%x DstSurface=0x%x "
+                    "SrcRect=0x%x DstRect=0x%x DstSubRect=0x%x",
+                    Hardware, SrcSurface, DstSurface,
+                    SrcRect, DstRect, DstSubRect);
 
     gcmGETHARDWARE(Hardware);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
     gcmDEBUG_VERIFY_ARGUMENT(SrcSurface != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(DestSurface != gcvNULL);
+    gcmDEBUG_VERIFY_ARGUMENT(DstSurface != gcvNULL);
     gcmDEBUG_VERIFY_ARGUMENT(SrcRect != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(DestRect != gcvNULL);
+    gcmDEBUG_VERIFY_ARGUMENT(DstRect != gcvNULL);
 
 /*----------------------------------------------------------------------------*/
 /*------------------- Verify the presence of 2D hardware. --------------------*/
@@ -1885,24 +1897,24 @@ gceSTATUS gcoHARDWARE_FilterBlit(
     }
 
     /* Determine final destination subrectangle. */
-    if (DestSubRect != gcvNULL)
+    if (DstSubRect != gcvNULL)
     {
-        if (DestSubRect->left >= DestRect->right
-            || (DestRect->left >= 0 && DestSubRect->right > DestRect->right)
-            || DestSubRect->top >= DestRect->bottom
-            || (DestRect->top >= 0 && DestSubRect->bottom > DestRect->bottom))
+        if (DstSubRect->left >= DstRect->right
+            || (DstRect->left >= 0 && DstSubRect->right > DstRect->right)
+            || DstSubRect->top >= DstRect->bottom
+            || (DstRect->top >= 0 && DstSubRect->bottom > DstRect->bottom))
         {
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
 
-        dsRect.left   = DestRect->left + DestSubRect->left;
-        dsRect.top    = DestRect->top  + DestSubRect->top;
-        dsRect.right  = DestRect->left + DestSubRect->right;
-        dsRect.bottom = DestRect->top  + DestSubRect->bottom;
+        dsRect.left   = DstRect->left + DstSubRect->left;
+        dsRect.top    = DstRect->top  + DstSubRect->top;
+        dsRect.right  = DstRect->left + DstSubRect->right;
+        dsRect.bottom = DstRect->top  + DstSubRect->bottom;
     }
     else
     {
-        dsRect = *DestRect;
+        dsRect = *DstRect;
     }
 
 /*----------------------------------------------------------------------------*/
@@ -1910,13 +1922,13 @@ gceSTATUS gcoHARDWARE_FilterBlit(
     /* Determine temporary surface format. */
     gcmONERROR(gcoSURF_QueryFormat(SrcSurface->format, srcFormat));
 
-    gcmONERROR(_CheckOPF(Hardware, SrcSurface, DestSurface, State, &useOPF));
+    gcmONERROR(_CheckOPF(Hardware, SrcSurface, DstSurface, State, &useOPF, &OPFForced));
 
     if (!Hardware->notAdjustRotation && !useOPF
         && Hardware->features[gcvFEATURE_2D_FILTERBLIT_FULLROTATION]
         && (Hardware->features[gcvFEATURE_2D_MIRROR_EXTENSION] ||
-            (gcmGET_PRE_ROTATION(DestSurface->rotation) != gcvSURF_FLIP_X
-            && gcmGET_PRE_ROTATION(DestSurface->rotation) != gcvSURF_FLIP_Y
+            (gcmGET_PRE_ROTATION(DstSurface->rotation) != gcvSURF_FLIP_X
+            && gcmGET_PRE_ROTATION(DstSurface->rotation) != gcvSURF_FLIP_Y
             && gcmGET_PRE_ROTATION(SrcSurface->rotation) != gcvSURF_FLIP_X
             && gcmGET_PRE_ROTATION(SrcSurface->rotation) != gcvSURF_FLIP_Y))
         && (State->newFilterType != gcvFILTER_USER))
@@ -1925,9 +1937,9 @@ gceSTATUS gcoHARDWARE_FilterBlit(
         gctUINT8 horKernelSize, verKernelSize;
         gceSURF_ROTATION dstRot, srcRot;
 
-        dstBackRot = DestSurface->rotation;
+        dstBackRot = DstSurface->rotation;
         srcBackRot = SrcSurface->rotation;
-        dstRot = gcmGET_PRE_ROTATION(DestSurface->rotation);
+        dstRot = gcmGET_PRE_ROTATION(DstSurface->rotation);
         srcRot = gcmGET_PRE_ROTATION(SrcSurface->rotation);
         hMirror = State->multiSrc[State->currentSrcIndex].horMirror;
         vMirror = State->multiSrc[State->currentSrcIndex].verMirror;
@@ -1937,37 +1949,37 @@ gceSTATUS gcoHARDWARE_FilterBlit(
         {
             gctINT32 temp;
 
-            dRect.left = DestSurface->alignedW - DestRect->right;
-            dRect.right = DestSurface->alignedW - DestRect->left;
-            dRect.top = DestRect->top;
-            dRect.bottom = DestRect->bottom;
+            dRect.left   = DstSurface->alignedW - DstRect->right;
+            dRect.right  = DstSurface->alignedW - DstRect->left;
+            dRect.top    = DstRect->top;
+            dRect.bottom = DstRect->bottom;
 
             temp = dsRect.left;
-            dsRect.left = DestSurface->alignedW - dsRect.right;
-            dsRect.right = DestSurface->alignedW - temp;
+            dsRect.left  = DstSurface->alignedW - dsRect.right;
+            dsRect.right = DstSurface->alignedW - temp;
 
             State->multiSrc[State->currentSrcIndex].horMirror = !State->multiSrc[State->currentSrcIndex].horMirror;
-            DestSurface->rotation = gcvSURF_0_DEGREE;
+            DstSurface->rotation = gcvSURF_0_DEGREE;
         }
         else if (dstRot == gcvSURF_FLIP_Y)
         {
             gctINT32 temp;
 
-            dRect.left = DestRect->left;
-            dRect.right = DestRect->right;
-            dRect.top = DestSurface->alignedH - DestRect->bottom;
-            dRect.bottom = DestSurface->alignedH - DestRect->top;
+            dRect.left   = DstRect->left;
+            dRect.right  = DstRect->right;
+            dRect.top    = DstSurface->alignedH - DstRect->bottom;
+            dRect.bottom = DstSurface->alignedH - DstRect->top;
 
             temp = dsRect.top;
-            dsRect.top = DestSurface->alignedH - dsRect.bottom;
-            dsRect.bottom = DestSurface->alignedH - temp;
+            dsRect.top = DstSurface->alignedH - dsRect.bottom;
+            dsRect.bottom = DstSurface->alignedH - temp;
 
             State->multiSrc[State->currentSrcIndex].verMirror = !State->multiSrc[State->currentSrcIndex].verMirror;
-            DestSurface->rotation = gcvSURF_0_DEGREE;
+            DstSurface->rotation = gcvSURF_0_DEGREE;
         }
         else
         {
-            dRect = *DestRect;
+            dRect = *DstRect;
         }
 
         if (srcRot == gcvSURF_FLIP_X)
@@ -2009,7 +2021,7 @@ gceSTATUS gcoHARDWARE_FilterBlit(
             verKernelSize = State->verSyncFilterKernel.kernelSize;
         }
 
-        rot2 = rot = DestSurface->rotation;
+        rot2 = rot = DstSurface->rotation;
         gcmONERROR(gcsRECT_RelativeRotation(SrcSurface->rotation, &rot));
         gcmONERROR(gcsRECT_RelativeRotation(rot, &rot2));
 
@@ -2028,7 +2040,7 @@ gceSTATUS gcoHARDWARE_FilterBlit(
         {
             rot = gcvSURF_0_DEGREE;
             rot2 = SrcSurface->rotation;
-            gcmONERROR(gcsRECT_RelativeRotation(DestSurface->rotation, &rot2));
+            gcmONERROR(gcsRECT_RelativeRotation(DstSurface->rotation, &rot2));
         }
 
         gcmONERROR(gcsRECT_Rotate(
@@ -2040,7 +2052,7 @@ gceSTATUS gcoHARDWARE_FilterBlit(
 
         SrcSurface->rotation = rot2;
 
-        rot2 = DestSurface->rotation;
+        rot2 = DstSurface->rotation;
         gcmONERROR(gcsRECT_RelativeRotation(rot, &rot2));
         if (rot2 == gcvSURF_90_DEGREE || rot2 == gcvSURF_270_DEGREE)
         {
@@ -2051,26 +2063,26 @@ gceSTATUS gcoHARDWARE_FilterBlit(
 
         gcmONERROR(gcsRECT_Rotate(
             &dRect,
-            DestSurface->rotation,
+            DstSurface->rotation,
             rot,
-            DestSurface->alignedW,
-            DestSurface->alignedH));
+            DstSurface->alignedW,
+            DstSurface->alignedH));
 
         gcmONERROR(gcsRECT_Rotate(
             &dsRect,
-            DestSurface->rotation,
+            DstSurface->rotation,
             rot,
-            DestSurface->alignedW,
-            DestSurface->alignedH));
+            DstSurface->alignedW,
+            DstSurface->alignedH));
 
-        DestSurface->rotation = rot;
+        DstSurface->rotation = rot;
 
-        DestSurface->rotation |= gcmGET_POST_ROTATION(dstBackRot);
+        DstSurface->rotation |= gcmGET_POST_ROTATION(dstBackRot);
         SrcSurface->rotation  |= gcmGET_POST_ROTATION(srcBackRot);
     }
     else
     {
-        dRect = *DestRect;
+        dRect = *DstRect;
         sRect = *SrcRect;
     }
 
@@ -2094,8 +2106,8 @@ gceSTATUS gcoHARDWARE_FilterBlit(
         {
             if(gcmGET_PRE_ROTATION(SrcSurface->rotation) == gcvSURF_90_DEGREE
                 || gcmGET_PRE_ROTATION(SrcSurface->rotation) == gcvSURF_270_DEGREE
-                || gcmGET_PRE_ROTATION(DestSurface->rotation) == gcvSURF_90_DEGREE
-                || gcmGET_PRE_ROTATION(DestSurface->rotation) == gcvSURF_270_DEGREE)
+                || gcmGET_PRE_ROTATION(DstSurface->rotation) == gcvSURF_90_DEGREE
+                || gcmGET_PRE_ROTATION(DstSurface->rotation) == gcvSURF_270_DEGREE)
             {
                 verPass = gcvTRUE;
             }
@@ -2340,11 +2352,11 @@ gceSTATUS gcoHARDWARE_FilterBlit(
              !State->dstEnGamma)
          && (!State->multiSrc[State->currentSrcIndex].enableAlpha
              || Hardware->features[gcvFEATURE_2D_OPF_YUV_OUTPUT]
-             || ((DestSurface->format != gcvSURF_UYVY) &&
-                 (DestSurface->format != gcvSURF_YUY2) &&
-                 (DestSurface->format != gcvSURF_VYUY) &&
-                 (DestSurface->format != gcvSURF_YVYU)))) ||
-        Hardware->features[gcvFEATURE_SEPARATE_SRC_DST]))
+             || ((DstSurface->format != gcvSURF_UYVY) &&
+                 (DstSurface->format != gcvSURF_YUY2) &&
+                 (DstSurface->format != gcvSURF_VYUY) &&
+                 (DstSurface->format != gcvSURF_YVYU)))) ||
+        Hardware->features[gcvFEATURE_SEPARATE_SRC_DST] || OPFForced))
     {
         /* Determine the source origin. */
         gcsPOINT srcOrigin;
@@ -2362,7 +2374,7 @@ gceSTATUS gcoHARDWARE_FilterBlit(
             SrcSurface,
             &sRect,
             &srcOrigin,
-            DestSurface,
+            DstSurface,
             &dsRect,
             gcvFALSE));
     }
@@ -2444,7 +2456,7 @@ gceSTATUS gcoHARDWARE_FilterBlit(
             }
             else
             {
-                gcmONERROR(gcoSURF_QueryFormat(DestSurface->format, tempFormat));
+                gcmONERROR(gcoSURF_QueryFormat(DstSurface->format, tempFormat));
             }
         }
         else
@@ -2465,7 +2477,7 @@ gceSTATUS gcoHARDWARE_FilterBlit(
             tempFormat[0]->fmtClass == gcvFORMAT_CLASS_YUV &&
             ((sRect.left & 0x1) || (sRect.right & 0x1)))
         {
-            gcmONERROR(gcoSURF_QueryFormat(DestSurface->format, tempFormat));
+            gcmONERROR(gcoSURF_QueryFormat(DstSurface->format, tempFormat));
 
             if (tempFormat[0]->fmtClass != gcvFORMAT_CLASS_RGBA)
             {
@@ -2507,7 +2519,7 @@ gceSTATUS gcoHARDWARE_FilterBlit(
             tmpBufRectSize.x,
             tmpBufRectSize.y,
             tempFormat[0]->format,
-            DestSurface->hints,
+            DstSurface->hints,
             &tempSurf
             ));
 
@@ -2543,8 +2555,8 @@ gceSTATUS gcoHARDWARE_FilterBlit(
         ** Program the second pass.
         */
         if (Hardware->features[gcvFEATURE_2D_FILTERBLIT_FULLROTATION] &&
-            ((gcmGET_PRE_ROTATION(DestSurface->rotation) == gcvSURF_90_DEGREE)
-            || (gcmGET_PRE_ROTATION(DestSurface->rotation) == gcvSURF_270_DEGREE)))
+            ((gcmGET_PRE_ROTATION(DstSurface->rotation) == gcvSURF_90_DEGREE)
+            || (gcmGET_PRE_ROTATION(DstSurface->rotation) == gcvSURF_270_DEGREE)))
         {
             gceSURF_ROTATION rot;
             gctBOOL tmp = State->multiSrc[State->currentSrcIndex].horMirror;
@@ -2553,7 +2565,7 @@ gceSTATUS gcoHARDWARE_FilterBlit(
             State->multiSrc[State->currentSrcIndex].verMirror = tmp;
 
             rot = tempSurf->rotation;
-            gcmONERROR(gcsRECT_RelativeRotation(DestSurface->rotation, &rot));
+            gcmONERROR(gcsRECT_RelativeRotation(DstSurface->rotation, &rot));
 
             gcmONERROR(gcsRECT_Rotate(
                 &tempRect,
@@ -2587,12 +2599,12 @@ gceSTATUS gcoHARDWARE_FilterBlit(
 
             gcmONERROR(gcsRECT_Rotate(
                 &dsRect,
-                DestSurface->rotation,
+                DstSurface->rotation,
                 gcvSURF_0_DEGREE,
-                DestSurface->alignedW,
-                DestSurface->alignedH));
+                DstSurface->alignedW,
+                DstSurface->alignedH));
 
-            DestSurface->rotation = gcvSURF_0_DEGREE | gcmGET_POST_ROTATION(DestSurface->rotation);
+            DstSurface->rotation = gcvSURF_0_DEGREE | gcmGET_POST_ROTATION(DstSurface->rotation);
 
             gcmONERROR(_StartVR(
                 Hardware,
@@ -2603,7 +2615,7 @@ gceSTATUS gcoHARDWARE_FilterBlit(
                 tempSurf,
                 &tempRect,
                 &tempOrigin,
-                DestSurface,
+                DstSurface,
                 &dsRect,
                 gcvFALSE));
         }
@@ -2618,7 +2630,7 @@ gceSTATUS gcoHARDWARE_FilterBlit(
                 tempSurf,
                 &tempRect,
                 &tempOrigin,
-                DestSurface,
+                DstSurface,
                 &dsRect,
                 gcvFALSE));
         }
@@ -2645,10 +2657,21 @@ gceSTATUS gcoHARDWARE_FilterBlit(
             SrcSurface,
             &sRect,
             &srcOrigin,
-            DestSurface,
+            DstSurface,
             &dsRect,
             gcvFALSE
             ));
+
+        if (Hardware->hw2DAppendCacheFlush &&
+            (SrcSurface->format == gcvSURF_NV12 ||
+             SrcSurface->format == gcvSURF_YV12 ||
+             SrcSurface->format == gcvSURF_I420 ||
+             SrcSurface->format == gcvSURF_NV21 ||
+             SrcSurface->format == gcvSURF_NV16 ||
+             SrcSurface->format == gcvSURF_NV61))
+        {
+            gcoHAL_Commit(gcvNULL, gcvFALSE);
+        }
     }
 /*----------------------------------------------------------------------------*/
 /*---------------------------- Should no be here. ----------------------------*/
@@ -2684,7 +2707,7 @@ OnError:
 
     if (rev)
     {
-        DestSurface->rotation = dstBackRot;
+        DstSurface->rotation = dstBackRot;
         SrcSurface->rotation = srcBackRot;
         State->multiSrc[State->currentSrcIndex].horMirror = hMirror;
         State->multiSrc[State->currentSrcIndex].verMirror = vMirror;
@@ -2698,44 +2721,44 @@ OnError:
 gceSTATUS gcoHARDWARE_SplitYUVFilterBlit(
     IN gcoHARDWARE Hardware,
     IN gcs2D_State_PTR State,
-    IN gcsSURF_INFO_PTR SrcSurface,
-    IN gcsSURF_INFO_PTR DestSurface,
+    IN gcoSURF SrcSurface,
+    IN gcoSURF DstSurface,
     IN gcsRECT_PTR SrcRect,
-    IN gcsRECT_PTR DestRect,
-    IN gcsRECT_PTR DestSubRect
+    IN gcsRECT_PTR DstRect,
+    IN gcsRECT_PTR DstSubRect
     )
 {
     gcsRECT srcRect, dstRect, subDstRect;
     gceSTATUS status = gcvSTATUS_OK;
     gceSURF_FORMAT srcFormat;
 
-    gcmHEADER_ARG("Hardware=0x%x SrcSurface=0x%x DestSurface=0x%x "
-            "SrcRect=0x%x DestRect=0x%x DestSubRect=0x%x",
-            Hardware, SrcSurface, DestSurface,
-            SrcRect, DestRect, DestSubRect);
+    gcmHEADER_ARG("Hardware=0x%x SrcSurface=0x%x DstSurface=0x%x "
+            "SrcRect=0x%x DstRect=0x%x DstSubRect=0x%x",
+            Hardware, SrcSurface, DstSurface,
+            SrcRect, DstRect, DstSubRect);
 
     gcmGETHARDWARE(Hardware);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
     gcmDEBUG_VERIFY_ARGUMENT(SrcSurface != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(DestSurface != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(DestRect != gcvNULL);
+    gcmDEBUG_VERIFY_ARGUMENT(DstSurface != gcvNULL);
+    gcmDEBUG_VERIFY_ARGUMENT(DstRect != gcvNULL);
 
     srcFormat = SrcSurface->format;
 
     /* Do A8 for Y channel */
     SrcSurface->format = gcvSURF_A8;
-    DestSurface->format = gcvSURF_A8;
+    DstSurface->format = gcvSURF_A8;
 
     status = gcoHARDWARE_FilterBlit(
             Hardware,
             State,
             SrcSurface,
-            DestSurface,
+            DstSurface,
             SrcRect,
-            DestRect,
-            DestSubRect
+            DstRect,
+            DstSubRect
             );
 
     Hardware->hw2DDoMultiDst = gcvTRUE;
@@ -2745,15 +2768,15 @@ gceSTATUS gcoHARDWARE_SplitYUVFilterBlit(
     srcRect.top = SrcRect->top;
     srcRect.right = srcRect.left + ((SrcRect->right - SrcRect->left) >> 1);
 
-    DestSurface->alignedW >>= 1;
-    dstRect.left = DestRect->left >> 1;
-    dstRect.top = DestRect->top;
-    dstRect.right = dstRect.left + ((DestRect->right - DestRect->left) >> 1);
+    DstSurface->alignedW >>= 1;
+    dstRect.left = DstRect->left >> 1;
+    dstRect.top = DstRect->top;
+    dstRect.right = dstRect.left + ((DstRect->right - DstRect->left) >> 1);
 
-    subDstRect.left = (DestSubRect == gcvNULL ? 0 : DestSubRect->left >> 1);
-    subDstRect.top = (DestSubRect == gcvNULL ? 0 : DestSubRect->top);
-    subDstRect.right = (DestSubRect == gcvNULL ? dstRect.right - dstRect.left:
-                            subDstRect.left + ((DestSubRect->right - DestSubRect->left) >> 1));
+    subDstRect.left = (DstSubRect == gcvNULL ? 0 : DstSubRect->left >> 1);
+    subDstRect.top = (DstSubRect == gcvNULL ? 0 : DstSubRect->top);
+    subDstRect.right = (DstSubRect == gcvNULL ? dstRect.right - dstRect.left:
+                            subDstRect.left + ((DstSubRect->right - DstSubRect->left) >> 1));
 
     if (srcFormat == gcvSURF_YV12 || srcFormat == gcvSURF_I420)
     {
@@ -2761,25 +2784,25 @@ gceSTATUS gcoHARDWARE_SplitYUVFilterBlit(
         srcRect.top >>= 1;
         srcRect.bottom = srcRect.top + ((SrcRect->bottom - SrcRect->top) >> 1);
 
-        DestSurface->alignedH >>= 1;
+        DstSurface->alignedH >>= 1;
         dstRect.top >>= 1;
-        dstRect.bottom = dstRect.top + ((DestRect->bottom - DestRect->top) >> 1);
+        dstRect.bottom = dstRect.top + ((DstRect->bottom - DstRect->top) >> 1);
         subDstRect.top >>= 1;
-        subDstRect.bottom = (DestSubRect == gcvNULL ? dstRect.bottom - dstRect.top:
-                                subDstRect.top + ((DestSubRect->bottom - DestSubRect->top) >> 1));
+        subDstRect.bottom = (DstSubRect == gcvNULL ? dstRect.bottom - dstRect.top:
+                                subDstRect.top + ((DstSubRect->bottom - DstSubRect->top) >> 1));
 
         /* Do A8 for U channel */
         gcsSURF_NODE_SetHardwareAddress(&SrcSurface->node, SrcSurface->node.physical2);
         SrcSurface->stride = SrcSurface->uStride;
 
-        gcsSURF_NODE_SetHardwareAddress(&DestSurface->node, DestSurface->node.physical2);
-        DestSurface->stride = DestSurface->uStride;
+        gcsSURF_NODE_SetHardwareAddress(&DstSurface->node, DstSurface->node.physical2);
+        DstSurface->stride = DstSurface->uStride;
 
         status = gcoHARDWARE_FilterBlit(
                 Hardware,
                 State,
                 SrcSurface,
-                DestSurface,
+                DstSurface,
                 &srcRect,
                 &dstRect,
                 &subDstRect
@@ -2789,14 +2812,14 @@ gceSTATUS gcoHARDWARE_SplitYUVFilterBlit(
         gcsSURF_NODE_SetHardwareAddress(&SrcSurface->node, SrcSurface->node.physical3);
         SrcSurface->stride = SrcSurface->vStride;
 
-        gcsSURF_NODE_SetHardwareAddress(&DestSurface->node, DestSurface->node.physical3);
-        DestSurface->stride = DestSurface->vStride;
+        gcsSURF_NODE_SetHardwareAddress(&DstSurface->node, DstSurface->node.physical3);
+        DstSurface->stride = DstSurface->vStride;
 
         status = gcoHARDWARE_FilterBlit(
                 gcvNULL,
                 State,
                 SrcSurface,
-                DestSurface,
+                DstSurface,
                 &srcRect,
                 &dstRect,
                 &subDstRect
@@ -2809,9 +2832,9 @@ gceSTATUS gcoHARDWARE_SplitYUVFilterBlit(
         gcsSURF_NODE_SetHardwareAddress(&SrcSurface->node, SrcSurface->node.physical2);
         SrcSurface->stride = SrcSurface->uStride;
 
-        DestSurface->format = gcvSURF_RG16;
-        gcsSURF_NODE_SetHardwareAddress(&DestSurface->node, DestSurface->node.physical2);
-        DestSurface->stride = DestSurface->uStride;
+        DstSurface->format = gcvSURF_RG16;
+        gcsSURF_NODE_SetHardwareAddress(&DstSurface->node, DstSurface->node.physical2);
+        DstSurface->stride = DstSurface->uStride;
 
         if (srcFormat == gcvSURF_NV12 ||
                 srcFormat == gcvSURF_NV21)
@@ -2820,26 +2843,26 @@ gceSTATUS gcoHARDWARE_SplitYUVFilterBlit(
             srcRect.top >>= 1;
             srcRect.bottom = srcRect.top + ((SrcRect->bottom - SrcRect->top) >> 1);
 
-            DestSurface->alignedH >>= 1;
+            DstSurface->alignedH >>= 1;
             dstRect.top >>= 1;
-            dstRect.bottom = dstRect.top + ((DestRect->bottom - DestRect->top) >> 1);
+            dstRect.bottom = dstRect.top + ((DstRect->bottom - DstRect->top) >> 1);
             subDstRect.top >>= 1;
-            subDstRect.bottom = (DestSubRect == gcvNULL ? dstRect.bottom - dstRect.top:
-                                    subDstRect.top + ((DestSubRect->bottom - DestSubRect->top) >> 1));
+            subDstRect.bottom = (DstSubRect == gcvNULL ? dstRect.bottom - dstRect.top:
+                                    subDstRect.top + ((DstSubRect->bottom - DstSubRect->top) >> 1));
         }
         else /* gcvSURF_NV16 & gcvSURF_NV61 */
         {
             srcRect.bottom = SrcRect->bottom;
-            dstRect.bottom = DestRect->bottom;
-            subDstRect.bottom = (DestSubRect == gcvNULL ? dstRect.bottom - dstRect.top:
-                                                          DestSubRect->bottom);
+            dstRect.bottom = DstRect->bottom;
+            subDstRect.bottom = (DstSubRect == gcvNULL ? dstRect.bottom - dstRect.top:
+                                                          DstSubRect->bottom);
         }
 
         status = gcoHARDWARE_FilterBlit(
                 gcvNULL,
                 State,
                 SrcSurface,
-                DestSurface,
+                DstSurface,
                 &srcRect,
                 &dstRect,
                 &subDstRect
@@ -2857,29 +2880,29 @@ OnError:
 gceSTATUS gcoHARDWARE_MultiPlanarYUVConvert(
     IN gcoHARDWARE Hardware,
     IN gcs2D_State_PTR State,
-    IN gcsSURF_INFO_PTR SrcSurface,
-    IN gcsSURF_INFO_PTR DestSurface,
-    IN gcsRECT_PTR DestRect
+    IN gcoSURF SrcSurface,
+    IN gcoSURF DstSurface,
+    IN gcsRECT_PTR DstRect
     )
 {
     gceSTATUS status;
     gcs2D_State state;
-    gcsSURF_INFO_PTR tempSurf = gcvNULL;
+    gcoSURF tempSurf = gcvNULL;
     gctUINT pass = 0;
     gcsRECT rect = {0, 0, 0, 0};
 
-    gcmHEADER_ARG("Hardware=0x%x SrcSurface=0x%x DestSurface=0x%x "
-                    "SrcRect=0x%x DestRect=0x%x DestSubRect=0x%x",
-                    SrcSurface, DestSurface,
-                    DestRect);
+    gcmHEADER_ARG("Hardware=0x%x SrcSurface=0x%x DstSurface=0x%x "
+                    "SrcRect=0x%x DstRect=0x%x DstSubRect=0x%x",
+                    SrcSurface, DstSurface,
+                    DstRect);
 
     gcmGETHARDWARE(Hardware);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
-    gcmDEBUG_VERIFY_ARGUMENT(SrcSurface != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(DestSurface != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(DestRect != gcvNULL);
+    gcmVERIFY_OBJECT(SrcSurface, gcvOBJ_SURF);
+    gcmVERIFY_OBJECT(DstSurface, gcvOBJ_SURF);
+    gcmDEBUG_VERIFY_ARGUMENT(DstRect != gcvNULL);
 
     /* Only supported with hardware 2D engine. */
     if (!Hardware->hw2DEngine || Hardware->sw2DEngine)
@@ -2887,7 +2910,7 @@ gceSTATUS gcoHARDWARE_MultiPlanarYUVConvert(
         gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
 
-    switch (DestSurface->format)
+    switch (DstSurface->format)
     {
     case gcvSURF_I420:
     case gcvSURF_YV12:
@@ -2908,14 +2931,14 @@ gceSTATUS gcoHARDWARE_MultiPlanarYUVConvert(
         gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
 
-    rect.right = rect.left = DestRect->left >> 1;
-    rect.top = DestRect->top;
-    rect.right += (DestRect->right - DestRect->left) >> 1;
-    rect.bottom = DestRect->bottom;
+    rect.right = rect.left = DstRect->left >> 1;
+    rect.top = DstRect->top;
+    rect.right += (DstRect->right - DstRect->left) >> 1;
+    rect.bottom = DstRect->bottom;
 
     gcoOS_MemCopy(&state, State, sizeof(state));
 
-    state.dstSurface = *DestSurface;
+    state.dstSurface = *DstSurface;
     state.currentSrcIndex = 0;
     state.srcMask = 1;
     state.multiSrc[0].enableAlpha = gcvFALSE;
@@ -2937,10 +2960,10 @@ gceSTATUS gcoHARDWARE_MultiPlanarYUVConvert(
         /* Allocate the temporary buffer. */
         gcmONERROR(gcoHARDWARE_Get2DTempSurface(
             Hardware,
-            DestSurface->alignedW,
-            DestSurface->alignedH,
+            DstSurface->alignedW,
+            DstSurface->alignedH,
             gcvSURF_R5G6B5,
-            DestSurface->hints,
+            DstSurface->hints,
             &tempSurf
             ));
 
@@ -3052,15 +3075,15 @@ gceSTATUS gcoHARDWARE_MultiPlanarYUVConvert(
 
         if (pass == 2)
         {
-            state.multiSrc[0].srcSurface = *DestSurface;
+            state.multiSrc[0].srcSurface = *DstSurface;
             state.multiSrc[0].srcSurface.format = gcvSURF_RG16;
             gcsSURF_NODE_SetHardwareAddress(&state.multiSrc[0].srcSurface.node, tempSurfAddress);
             state.multiSrc[0].srcSurface.stride = tempSurf->stride;
             state.multiSrc[0].srcSurface.alignedW >>= 1;
 
             state.dstSurface.format = gcvSURF_RG16;
-            gcsSURF_NODE_SetHardwareAddress(&state.dstSurface.node, DestSurface->node.physical2);
-            state.dstSurface.stride = DestSurface->uStride;
+            gcsSURF_NODE_SetHardwareAddress(&state.dstSurface.node, DstSurface->node.physical2);
+            state.dstSurface.stride = DstSurface->uStride;
             state.dstSurface.alignedW >>= 1;
             state.dstSurface.alignedH >>= 1;
 
@@ -3080,15 +3103,15 @@ gceSTATUS gcoHARDWARE_MultiPlanarYUVConvert(
         else
         {
             gctUINT32 srcSurfaceAddress;
-            state.multiSrc[0].srcSurface = *DestSurface;
+            state.multiSrc[0].srcSurface = *DstSurface;
             state.multiSrc[0].srcSurface.format = gcvSURF_A8;
             gcsSURF_NODE_SetHardwareAddress(&state.multiSrc[0].srcSurface.node, tempSurfAddress);
             state.multiSrc[0].srcSurface.stride = tempSurf->stride >> 1;
             state.multiSrc[0].srcSurface.alignedW >>= 1;
 
             state.dstSurface.format = gcvSURF_A8;
-            gcsSURF_NODE_SetHardwareAddress(&state.dstSurface.node, DestSurface->node.physical2);
-            state.dstSurface.stride = DestSurface->uStride;
+            gcsSURF_NODE_SetHardwareAddress(&state.dstSurface.node, DstSurface->node.physical2);
+            state.dstSurface.stride = DstSurface->uStride;
             state.dstSurface.alignedW >>= 1;
             state.dstSurface.alignedH >>= 1;
 
@@ -3112,8 +3135,8 @@ gceSTATUS gcoHARDWARE_MultiPlanarYUVConvert(
 
             state.multiSrc[0].srcSurface.stride = tempSurf->stride >> 1;
 
-            gcsSURF_NODE_SetHardwareAddress(&state.dstSurface.node, DestSurface->node.physical3);
-            state.dstSurface.stride = DestSurface->vStride;
+            gcsSURF_NODE_SetHardwareAddress(&state.dstSurface.node, DstSurface->node.physical3);
+            state.dstSurface.stride = DstSurface->vStride;
 
             gcmONERROR(_StartVR(
                 Hardware,
@@ -3348,7 +3371,8 @@ gceSTATUS gcoHARDWARE_End2DRender(
 
     /* Flush the Tile cache if available. */
     if ((Hardware->features[gcvFEATURE_2D_FC_SOURCE]
-        || Hardware->features[gcvFEATURE_2D_COMPRESSION]) &&
+        || Hardware->features[gcvFEATURE_2D_COMPRESSION]
+        || Hardware->features[gcvFEATURE_2D_V4COMPRESSION]) &&
         !Hardware->features[gcvFEATURE_TPC_COMPRESSION] &&
         !Hardware->features[gcvFEATURE_DEC_COMPRESSION])
     {

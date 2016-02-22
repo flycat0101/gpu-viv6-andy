@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -136,8 +136,7 @@ GLvoid __glFramebufferResetAttachpoint(__GLcontext *gc,
     attachState->level      = 0;
     attachState->face       = 0;
     attachState->layer      = 0;
-    attachState->chosenFace = 0;
-    attachState->chosenDepth = 0;
+    attachState->slice      = 0;
     attachState->layered    = GL_FALSE;
     attachState->cube       = GL_FALSE;
     attachState->isExtMode  = GL_FALSE;
@@ -255,8 +254,7 @@ GLvoid __glInitFramebufferObject(__GLcontext *gc, __GLframebufferObject *framebu
         framebuffer->attachPoint[i].face = 0;
         framebuffer->attachPoint[i].layer = 0;
         framebuffer->attachPoint[i].level = 0;
-        framebuffer->attachPoint[i].chosenFace = 0;
-        framebuffer->attachPoint[i].chosenDepth = 0;
+        framebuffer->attachPoint[i].slice = 0;
         framebuffer->attachPoint[i].layered = GL_FALSE;
         framebuffer->attachPoint[i].cube = GL_FALSE;
         framebuffer->attachPoint[i].seqNumber = 0;
@@ -283,6 +281,7 @@ GLvoid __glInitFramebufferObject(__GLcontext *gc, __GLframebufferObject *framebu
     framebuffer->defaultWidth = 0;
     framebuffer->defaultHeight = 0;
     framebuffer->defaultSamples = 0;
+    framebuffer->defaultSamplesUsed = 0;
     framebuffer->defaultFixedSampleLoc = GL_FALSE;
 }
 
@@ -817,13 +816,11 @@ GLvoid __glFramebufferTexture(__GLcontext *gc,
         attachPoint->level   = level;
         attachPoint->face    = face;
         attachPoint->layer   = layer;
+        attachPoint->slice   = face > 0 ? face : layer;
         attachPoint->samples = samples;
         attachPoint->layered = layered;
-        attachPoint->cube    = __GL_IS_TEXTURE_CUBE(texObj->targetIndex) ? GL_TRUE : GL_FALSE;
+        attachPoint->cube    = texObj->targetIndex == __GL_TEXTURE_CUBEMAP_INDEX ? GL_TRUE : GL_FALSE;
         attachPoint->isExtMode = isExtMode;
-
-        attachPoint->chosenFace  = __GL_IS_TEXTURE_ARRAY(texObj->targetIndex) ? layer : face;
-        attachPoint->chosenDepth = __GL_IS_TEXTURE_ARRAY(texObj->targetIndex) ? 0 : layer;
 
         /* Add fbo to texture obj's image userlist. */
         __glAddImageUser(gc, &texObj->fboList, framebufferObj);
@@ -840,9 +837,9 @@ GLvoid __glFramebufferTexture(__GLcontext *gc,
                                    attachIndex,
                                    texObj,
                                    level,
-                                   attachPoint->chosenFace,
+                                   face,
                                    samples,
-                                   attachPoint->chosenDepth,
+                                   layer,
                                    layered))
     {
         __GL_ERROR((*gc->dp.getError)(gc));
@@ -1730,7 +1727,7 @@ GLvoid GL_APIENTRY __gles_GetFramebufferAttachmentParameteriv(__GLcontext *gc, G
             {
                 __GL_ERROR_EXIT(GL_INVALID_ENUM);
             }
-            *params = attachPoint->cube ? GL_TEXTURE_CUBE_MAP_POSITIVE_X + attachPoint->face : 0;
+            *params = attachPoint->cube ? GL_TEXTURE_CUBE_MAP_POSITIVE_X + attachPoint->face : GL_NONE;
             __GL_EXIT();
 
         case GL_FRAMEBUFFER_ATTACHMENT_RED_SIZE:
@@ -2755,6 +2752,7 @@ GLvoid GL_APIENTRY __gles_FramebufferParameteri(__GLcontext *gc, GLenum target, 
             __GL_ERROR_EXIT(GL_INVALID_VALUE);
         }
         framebufferObj->defaultSamples = param;
+        framebufferObj->defaultSamplesUsed = param;
         break;
     case GL_FRAMEBUFFER_DEFAULT_FIXED_SAMPLE_LOCATIONS:
         framebufferObj->defaultFixedSampleLoc = (GLboolean)param;
@@ -2819,7 +2817,7 @@ GLvoid GL_APIENTRY __gles_GetFramebufferParameteriv(__GLcontext *gc, GLenum targ
         break;
 
     case GL_FRAMEBUFFER_DEFAULT_SAMPLES:
-        *params = framebufferObj->defaultSamples;
+        *params = framebufferObj->defaultSamplesUsed;
         break;
     case GL_FRAMEBUFFER_DEFAULT_FIXED_SAMPLE_LOCATIONS:
         *params = (GLint)framebufferObj->defaultFixedSampleLoc;

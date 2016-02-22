@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -64,5 +64,6 @@
 #undef eglBindWaylandDisplayWL
 #undef eglUnbindWaylandDisplayWL
 #undef eglQueryWaylandBufferWL
+#undef eglCreateWaylandBufferFromImageWL
 #endif /* _EGL_APPENDIX */
 #endif /* __eglunname_h_ */

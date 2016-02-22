@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -82,9 +82,7 @@ typedef struct __GLchipMipmapInfoRec
     /* An array with index of depth[zoffset], for indirect RTT */
     __GLchipResourceShadow *shadow;
 
-#if __GL_CHIP_STENCIL_TEST_OPT
-    __GLchipStencilOpt stencilOpt;
-#endif
+    __GLchipStencilOpt *stencilOpt;
 
     /* format mapping information */
     __GLchipFmtMapInfo *formatMapInfo;
@@ -105,7 +103,7 @@ typedef struct __GLchipTexureInfoRec
 
     /* Any sub-resource of the texture was ever rendered, but still not sync to texture surface? */
     GLboolean rendered;
-    __GLchipMipmapInfo **mipLevel;
+    __GLchipMipmapInfo *mipLevels;
 
     /* Save texDirectVIV info  */
     __GLchipDirectTexture direct;

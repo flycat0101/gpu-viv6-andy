@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2136,8 +2136,6 @@ clfFlushCommandQueue(
     /* Delete the used commit request */
     gcmVERIFY_OK(clfDeleteCommitRequest(commitRequest));
 
-    if (Stall) gcmONERROR(gcoCL_Flush(gcvTRUE));
-
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
@@ -2597,6 +2595,7 @@ clCreateCommandQueue(
     queue->previous             = gcvNULL;
     queue->nextEnqueueNo        = 0;
     queue->commitRequestList    = gcvNULL;
+    queue->privateBufList       = gcvNULL;
 
     /* Create a reference count object and set it to 1. */
     clmONERROR(gcoOS_AtomConstruct(gcvNULL, &queue->referenceCount),
@@ -2739,6 +2738,29 @@ clReleaseCommandQueue(
         clmRETURN_ERROR(CL_INVALID_COMMAND_QUEUE);
     }
     gcoCL_SetHardware();
+
+    if (CommandQueue->privateBufList)
+    {
+         clsPrivateBuffer_PTR privateBuf = gcvNULL;
+         clsPrivateBuffer_PTR tmpPrivateBuf = gcvNULL;
+
+         for (privateBuf = CommandQueue->privateBufList; privateBuf != gcvNULL; )
+         {
+             tmpPrivateBuf = privateBuf->next;
+             if (privateBuf->buffer)
+             {
+                 gcoCL_FreeMemory(privateBuf->buffer->physical,
+                                  privateBuf->buffer->logical,
+                                  privateBuf->buffer->allocatedSize,
+                                  privateBuf->buffer->node);
+                 gcoOS_Free(gcvNULL, privateBuf->buffer);
+             }
+             gcoOS_Free(gcvNULL, privateBuf);
+             privateBuf = tmpPrivateBuf;
+         }
+         CommandQueue->privateBufList = gcvNULL;
+    }
+
     gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, CommandQueue->referenceCount, &oldReference));
 
     if (oldReference == 1)

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -314,13 +314,13 @@ gctBOOL slsHTBL_Get(
             {
                 *HashNode = hashNode;
 
-                gcmFOOTER();
+                gcmFOOTER_NO();
                 return gcvTRUE;
             }
         }
     }
 
-    gcmFOOTER();
+    gcmFOOTER_NO();
     return gcvFALSE;
 }
 

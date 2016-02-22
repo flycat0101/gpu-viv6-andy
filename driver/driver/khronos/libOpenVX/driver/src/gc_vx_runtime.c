@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -306,7 +306,7 @@ VX_PRIVATE_API vx_uint64 vxGetPerfCount()
 #endif
 }
 
-/*unused function
+/* unused code
 VX_PRIVATE_API vx_uint64 vxGetPerfFreq()
 {
 #if defined(__linux__) || defined(__ANDROID__) || defined(__QNX__) || defined(__CYGWIN__)
@@ -324,7 +324,6 @@ VX_PRIVATE_API vx_uint64 vxGetPerfFreq()
 #endif
 }
 */
-
 #define NS_PER_MSEC  (1000000.0f)
 
 VX_INTERNAL_API vx_float64 vxConvertPerfCountToMS(vx_uint64 count)
@@ -345,7 +344,7 @@ VX_INTERNAL_API void vxoPerf_Begin(vx_perf perf)
 {
     vxmASSERT(perf);
 
-    perf->beg = vxGetPerfCount();
+    perf->beg = vxGetPerfCount() + 1;
 }
 
 VX_INTERNAL_API void vxoPerf_End(vx_perf perf)
@@ -430,8 +429,7 @@ VX_INTERNAL_API void vxoQueue_Deinitialize(vx_queue queue)
     vxmASSERT(queue->lock);
     vxDestroyMutex(queue->lock);
 }
-
-/* unused function
+/* unused code
 VX_PRIVATE_API vx_queue vxoQueue_Create()
 {
     vx_queue queue = (vx_queue)vxAllocateAndZeroMemory(sizeof(vx_queue_s));
@@ -442,7 +440,6 @@ VX_PRIVATE_API vx_queue vxoQueue_Create()
 
     return queue;
 }
-
 
 VX_PRIVATE_API void vxoQueue_Destroy(vx_queue_ptr queuePtr)
 {

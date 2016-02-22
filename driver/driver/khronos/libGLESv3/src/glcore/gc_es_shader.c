@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -341,7 +341,7 @@ GLboolean __glDeleteXfbObj(__GLcontext *gc, __GLxfbObject *xfbObj)
         if (!oldBufObj->bindCount && !oldBufObj->vaoList &&
             !oldBufObj->texList && (oldBufObj->flag & __GL_OBJECT_IS_DELETED))
         {
-            __glDeleteObject(gc, gc->bufferObject.shared, oldBufObj->name);
+            __glDeleteBufferObject(gc, oldBufObj);
         }
     }
 

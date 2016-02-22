@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -850,6 +850,9 @@ VDKS_BOOL VDKS_Init(vdkEGL * vdk_egl)
 	{
 		return VDKS_FALSE;
 	}
+
+	/* Adjust the window size to make sure these size values does not go beyound the screen limits. */
+    vdkGetWindowInfo((*vdk_egl).window, NULL, NULL, &VDKS_Val_WindowsWidth, &VDKS_Val_WindowsHeight, NULL, NULL);
 
 	return VDKS_TRUE;
 }

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -68,8 +68,6 @@ _dual16Req(
 {
     VIR_Operand * destOpnd = VIR_Inst_GetDest(Inst);
     VIR_Operand * src0Opnd = VIR_Inst_GetSource(Inst, 0);
-    VIR_Operand * src1Opnd = VIR_Inst_GetSource(Inst, 1);
-    VIR_Operand * src2Opnd = VIR_Inst_GetSource(Inst, 2);
     VIR_TypeId ty0 = VIR_Operand_GetType(destOpnd);
     VIR_TypeId ty1 = VIR_Operand_GetType(src0Opnd);
 
@@ -83,13 +81,6 @@ _dual16Req(
         (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISFLOAT)) ||
        ((VIR_GetTypeFlag(ty0) & VIR_TYFLAG_ISINTEGER) &&
         (VIR_GetTypeFlag(ty1) & VIR_TYFLAG_ISINTEGER)))
-    {
-        return gcvFALSE;
-    }
-
-    /* if dest and src1/src2 are same precision */
-    if (VIR_Operand_GetPrecision(destOpnd) == VIR_Operand_GetPrecision(src1Opnd) &&
-        VIR_Operand_GetPrecision(destOpnd) == VIR_Operand_GetPrecision(src2Opnd))
     {
         return gcvFALSE;
     }
@@ -173,12 +164,18 @@ _sameType(
 }
 
 static gctBOOL
-_notSameType(
+_notSameSizeType(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
     )
 {
-    return !_sameType(Context, Inst);
+    VIR_TypeId dstTyId = VIR_GetTypeComponentType(VIR_Operand_GetType(Inst->dest));
+    VIR_TypeId srcTyId = VIR_GetTypeComponentType(VIR_Operand_GetType(Inst->src[0]));
+
+    return (VIR_GetTypeSize(dstTyId) != VIR_GetTypeSize(srcTyId))
+        || (VIR_Operand_GetRoundMode(Inst->src[0]) != VIR_ROUND_DEFAULT)
+        || (VIR_Operand_GetModifier(Inst->src[0]) != VIR_MOD_NONE)
+        || (VIR_Operand_GetModifier(Inst->dest) != VIR_MOD_NONE);
 }
 
 static gctBOOL
@@ -342,6 +339,17 @@ _ConvType(
     default:
         return 0x0;
     }
+}
+
+static gctBOOL
+_setAbs(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+)
+{
+    VIR_Operand_SetModifier(Opnd, VIR_MOD_ABS);
+    return gcvTRUE;
 }
 
 static gctBOOL
@@ -563,7 +571,7 @@ static VIR_PatternReplaceInst _convRepInst3[] = {
 };
 
 static VIR_PatternMatchInst _convPatInst4[] = {
-    { VIR_OP_CONV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isI2I, _hasSHEnhancements2, _notSameType }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_CONV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isI2I, _hasSHEnhancements2, _notSameSizeType }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _convRepInst4[] = {
@@ -624,6 +632,19 @@ static VIR_Pattern _negPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
+static VIR_PatternMatchInst _absPatInst0[] = {
+    { VIR_OP_ABS, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isDstFloat }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _absRepInst0[] = {
+    { VIR_OP_ADD, -1, 0, { 1, 0, 2, 0 }, { 0, VIR_Lower_SetZero, _setAbs } }
+};
+
+static VIR_Pattern _absPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_abs, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
 static VIR_PatternMatchInst _mulhiSclPatInst0[] = {
     { VIR_OP_MULHI, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
 };
@@ -677,7 +698,7 @@ static VIR_Pattern _mulsatSclPattern[] = {
 };
 
 static VIR_PatternMatchInst _addSclPatInst0[] = {
-    { VIR_OP_ADD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isDstInteger }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_ADD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { isDstInt32, _isCL_X }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _addSclRepInst0[] = {
@@ -1157,6 +1178,8 @@ _GetPattern1(
         return _setPattern;
     case VIR_OP_NEG:
         return _negPattern;
+    case VIR_OP_ABS:
+        return _absPattern;
     default:
         break;
     }

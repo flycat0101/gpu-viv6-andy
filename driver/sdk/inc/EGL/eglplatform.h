@@ -35,7 +35,6 @@
  */
 
 #include <KHR/khrplatform.h>
-#include <EGL/eglvivante.h>
 
 /* Macros used in EGL function prototype declarations.
  *
@@ -67,6 +66,95 @@
  * portability of applications using EGL running on different EGL
  * implementations.
  */
+#if defined(_WIN32) || defined(__VC32__) && !defined(__CYGWIN__) && !defined(__SCITECH_SNAP__)
+#ifndef WIN32_LEAN_AND_MEAN
+/* #define WIN32_LEAN_AND_MEAN 1 */
+#endif
+#include <windows.h>
+
+typedef HDC     EGLNativeDisplayType;
+typedef HWND    EGLNativeWindowType;
+typedef HBITMAP EGLNativePixmapType;
+
+#elif /* defined(__APPLE__) || */ defined(__WINSCW__) || defined(__SYMBIAN32__)  /* Symbian */
+
+typedef int   EGLNativeDisplayType;
+typedef void *EGLNativeWindowType;
+typedef void *EGLNativePixmapType;
+
+#elif defined(WL_EGL_PLATFORM) /* Wayland */
+
+typedef struct wl_display *   EGLNativeDisplayType;
+typedef struct wl_egl_window *EGLNativeWindowType;
+typedef struct wl_egl_pixmap *EGLNativePixmapType;
+
+#elif defined(__GBM__) /* GBM */
+
+typedef struct gbm_device *EGLNativeDisplayType;
+typedef struct gbm_bo *    EGLNativePixmapType;
+typedef void *             EGLNativeWindowType;
+
+#elif defined(__ANDROID__) || defined(ANDROID)
+
+#include <android/native_window.h>
+
+struct egl_native_pixmap_t;
+
+typedef struct ANativeWindow *      EGLNativeWindowType;
+typedef struct egl_native_pixmap_t *EGLNativePixmapType;
+typedef void *                      EGLNativeDisplayType;
+
+#elif defined(MIR_EGL_PLATFORM) /* Mir */
+
+#include <mir_toolkit/mir_client_library.h>
+typedef MirEGLNativeDisplayType EGLNativeDisplayType;
+typedef void                   *EGLNativePixmapType;
+typedef MirEGLNativeWindowType  EGLNativeWindowType;
+
+#elif defined(__QNXNTO__) /* QNX */
+
+#include <screen/screen.h>
+typedef int             EGLNativeDisplayType;
+typedef screen_window_t EGLNativeWindowType;
+typedef screen_pixmap_t EGLNativePixmapType;
+
+#elif defined(__unix__) || defined(__APPLE__)
+
+#if defined(EGL_API_DFB)
+
+/* Vivante DFB */
+#include <directfb.h>
+
+typedef IDirectFB *        EGLNativeDisplayType;
+typedef IDirectFBWindow *  EGLNativeWindowType;
+typedef struct _DFBPixmap *EGLNativePixmapType;
+
+#elif defined(EGL_API_FB)
+
+/* Vivante FBDEV */
+struct _FBDisplay;
+struct _FBWindow;
+struct _FBPixmap;
+
+typedef struct _FBDisplay *EGLNativeDisplayType;
+typedef struct _FBWindow * EGLNativeWindowType;
+typedef struct _FBPixmap * EGLNativePixmapType;
+
+#else
+
+/* X11 (tentative) */
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+
+typedef Display *EGLNativeDisplayType;
+typedef Window   EGLNativeWindowType;
+typedef Pixmap   EGLNativePixmapType;
+
+#endif
+
+#else
+#error "Platform not recognized"
+#endif
 
 /* EGL 1.2 types, renamed for consistency in EGL 1.3 */
 typedef EGLNativeDisplayType NativeDisplayType;
@@ -83,6 +171,7 @@ typedef EGLNativeWindowType  NativeWindowType;
  */
 typedef khronos_int32_t EGLint;
 
+#include <EGL/eglvivante.h>
 #include <EGL/eglrename.h>
 
 #endif /* __eglplatform_h */

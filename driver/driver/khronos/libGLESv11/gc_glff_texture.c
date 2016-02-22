@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1656,7 +1656,7 @@ static gceSTATUS _GenerateMipMap(
             &lod1
             ));
 
-        gcmERR_BREAK(gcoSURF_Resample_v2(lod0, lod1));
+        gcmERR_BREAK(gcoSURF_Resample(lod0, lod1));
 
 #if gcdSYNC
         gcmVERIFY_OK(gcoSURF_SetSharedLock(lod1, Context->texture.textureList->sharedLock));
@@ -2886,7 +2886,7 @@ gceSTATUS glfResolveDrawToTempBitmap(
             ));
 
         tmpView.surf = Context->tempBitmap;
-        gcmERR_BREAK(gcoSURF_ResolveRect_v2(&srcView, &tmpView, &rlvArgs));
+        gcmERR_BREAK(gcoSURF_ResolveRect(&srcView, &tmpView, &rlvArgs));
 
         /* Make sure the operation is complete. */
         gcmERR_BREAK(gcoHAL_Commit(Context->hal, gcvTRUE));
@@ -4469,7 +4469,7 @@ gceSTATUS glfUpdateTextureStates(
 #endif
 
                         /* Use resolve to upload texture. */
-                        status = gcoSURF_ResolveRect_v2(&srcView, &mipView,  gcvNULL);
+                        status = gcoSURF_ResolveRect(&srcView, &mipView,  gcvNULL);
 
                         if (gcmIS_ERROR(status))
                         {
@@ -8208,7 +8208,7 @@ GL_API void GL_APIENTRY glCopyTexImage2D(
                 blitArgs.srcRect.top = (context->drawHeight - (Y + Height));
                 blitArgs.srcRect.bottom = (context->drawHeight - Y);
             }
-            status = gcoSURF_DrawBlit_v2(&srcView, &texView, &blitArgs);
+            status = gcoSURF_DrawBlit(&srcView, &texView, &blitArgs);
         }
         else
         {
@@ -8580,7 +8580,7 @@ GL_API void GL_APIENTRY glCopyTexSubImage2D(
                 blitArgs.srcRect.bottom = (context->drawHeight - Y);
             }
 
-            status = gcoSURF_DrawBlit_v2(&srcView, &texView, &blitArgs);
+            status = gcoSURF_DrawBlit(&srcView, &texView, &blitArgs);
         }
         else
         {
@@ -9517,7 +9517,7 @@ glfBindTexImage(
 
 
         /* Copy render target to texture without flip. */
-        gcmERR_BREAK(gcoSURF_ResolveRect_v2(&surfView, &mipView, gcvNULL));
+        gcmERR_BREAK(gcoSURF_ResolveRect(&surfView, &mipView, gcvNULL));
 
         /* Reset texture orientation. */
         gcmVERIFY_OK(gcoSURF_SetOrientation(
@@ -9688,7 +9688,7 @@ GL_API void GL_APIENTRY glTexDirectVIV(
     glmENTER5(glmARGENUM, Target, glmARGINT, Width,
               glmARGINT, Height, glmARGENUM, Format, glmARGPTR, Pixels)
     {
-        gceSTATUS status;
+        gceSTATUS status = gcvSTATUS_OK;
         gctBOOL tilerAvailable;
         gctBOOL sourceYuv;
         gctBOOL planarYuv;
@@ -9745,95 +9745,113 @@ GL_API void GL_APIENTRY glTexDirectVIV(
         ** Validate the format.
         */
 
-        if (Format == GL_VIV_YV12)
+        switch (Format)
         {
+        case GL_VIV_YV12:
             sourceFormat = gcvSURF_YV12;
             textureFormat = gcvSURF_YUY2;
             sourceYuv = gcvTRUE;
             planarYuv = gcvTRUE;
-        }
+            break;
 
-        else if (Format == GL_VIV_I420)
-        {
+        case GL_VIV_I420:
             sourceFormat = gcvSURF_I420;
             textureFormat = gcvSURF_YUY2;
             sourceYuv = gcvTRUE;
             planarYuv = gcvTRUE;
-        }
+            break;
 
-        else if (Format == GL_VIV_NV12)
-        {
+        case GL_VIV_NV12:
             sourceFormat = gcvSURF_NV12;
             textureFormat = gcvSURF_YUY2;
             sourceYuv = gcvTRUE;
             planarYuv = gcvTRUE;
-        }
+            break;
 
-        else if (Format == GL_VIV_NV21)
-        {
+        case GL_VIV_NV21:
             sourceFormat = gcvSURF_NV21;
             textureFormat = gcvSURF_YUY2;
             sourceYuv = gcvTRUE;
             planarYuv = gcvTRUE;
-        }
+            break;
 
-        else if (Format == GL_VIV_YUY2)
-        {
+        case GL_VIV_YUY2:
             sourceFormat = gcvSURF_YUY2;
             textureFormat = gcvSURF_YUY2;
             sourceYuv = gcvTRUE;
             planarYuv = gcvFALSE;
-        }
+            break;
 
-        else if (Format == GL_VIV_UYVY)
-        {
+        case GL_VIV_UYVY:
             sourceFormat = gcvSURF_UYVY;
             textureFormat = gcvSURF_UYVY;
             sourceYuv = gcvTRUE;
             planarYuv = gcvFALSE;
-        }
+            break;
 
-        else if (Format == GL_RGBA)
-        {
+        case GL_VIV_YUV420_10_ST:
+            sourceFormat  = gcvSURF_YUV420_10_ST;
+            textureFormat = gcvSURF_YUV420_10_ST;
+            sourceYuv = gcvTRUE;
+            planarYuv = gcvTRUE;
+            break;
+
+        case GL_VIV_YUV420_TILE_ST:
+            sourceFormat  = gcvSURF_YUV420_TILE_ST;
+            textureFormat = gcvSURF_YUV420_TILE_ST;
+            sourceYuv = gcvTRUE;
+            planarYuv = gcvTRUE;
+            break;
+
+        case GL_VIV_YUV420_TILE_10_ST:
+            sourceFormat  = gcvSURF_YUV420_TILE_10_ST;
+            textureFormat = gcvSURF_YUV420_TILE_10_ST;
+            sourceYuv = gcvTRUE;
+            planarYuv = gcvTRUE;
+            break;
+
+        case GL_RGBA:
             sourceFormat = gcvSURF_A8B8G8R8;
             gcoTEXTURE_GetClosestFormat(gcvNULL,
                                         sourceFormat,
                                         &textureFormat);
             sourceYuv = gcvFALSE;
             planarYuv = gcvFALSE;
-        }
+            break;
 
-        else if (Format == GL_RGB)
-        {
+        case GL_RGB:
             sourceFormat = gcvSURF_X8R8G8B8;
             gcoTEXTURE_GetClosestFormat(gcvNULL,
                                         sourceFormat,
                                         &textureFormat);
             sourceYuv = gcvFALSE;
             planarYuv = gcvFALSE;
-        }
+            break;
 
-        else if (Format == GL_BGRA_EXT)
-        {
+        case GL_BGRA_EXT:
             sourceFormat = gcvSURF_A8R8G8B8;
             gcoTEXTURE_GetClosestFormat(gcvNULL,
                                         sourceFormat,
                                         &textureFormat);
             sourceYuv = gcvFALSE;
             planarYuv = gcvFALSE;
-        }
+            break;
 
-        else if (Format == GL_RGB565_OES)
-        {
+        case GL_RGB565_OES:
             sourceFormat = gcvSURF_R5G6B5;
             gcoTEXTURE_GetClosestFormat(gcvNULL,
                                         sourceFormat,
                                         &textureFormat);
             sourceYuv = gcvFALSE;
             planarYuv = gcvFALSE;
+            break;
+
+        default:
+            status = gcvSTATUS_INVALID_ARGUMENT;
+            break;
         }
 
-        else
+        if (gcmIS_ERROR(status))
         {
             glmERROR(GL_INVALID_ENUM);
             break;
@@ -9843,10 +9861,26 @@ GL_API void GL_APIENTRY glTexDirectVIV(
         ** Check whether the source can be handled.
         */
 
-        if (sourceYuv && planarYuv && !tilerAvailable)
+        if (sourceYuv)
         {
-            glmERROR(GL_INVALID_OPERATION);
-            break;
+            /*
+             * Planar YUV requires 420tiler (422 not supported)
+             * or yuv-assembler.
+             */
+            if (planarYuv && !context->hasYuvAssembler && !tilerAvailable)
+            {
+                glmERROR(GL_INVALID_OPERATION);
+                break;
+            }
+
+            if ((Format == GL_VIV_YUV420_10_ST
+                || Format == GL_VIV_YUV420_TILE_ST
+                || Format == GL_VIV_YUV420_TILE_10_ST)
+            && (!context->hasYuvAssembler10bit))
+            {
+                glmERROR(GL_INVALID_OPERATION);
+                break;
+            }
         }
 
         /***********************************************************************
@@ -9950,6 +9984,9 @@ GL_API void GL_APIENTRY glTexDirectVIV(
 
         case GL_VIV_NV12:
         case GL_VIV_NV21:
+        case GL_VIV_YUV420_10_ST:
+        case GL_VIV_YUV420_TILE_ST:
+        case GL_VIV_YUV420_TILE_10_ST:
             /* Y plane, UV (VU) plane. */
             Pixels[0] = pixels[0];
             Pixels[1] = pixels[1];

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -36,38 +36,39 @@ slsEXTENSION_INFO;
 static slsEXTENSION_INFO _DefinedExtensions[] =
 {
     {"all",   slvEXTENSION_ALL, gcvFALSE, gcvTRUE, gcvTRUE, gcvFALSE, 0, gcvNULL},
-    {"GL_KHR_blend_equation_advanced", slvEXTENSION_BLEND_EQUATION_ADVANCED, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, sldES_31_LanguageVersion, gcvNULL},
+    {"GL_KHR_blend_equation_advanced", slvEXTENSION_BLEND_EQUATION_ADVANCED, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
 
     {"GL_OES_standard_derivatives", slvEXTENSION_STANDARD_DERIVATIVES, gcvTRUE, gcvTRUE, gcvFALSE, gcvTRUE, 0, gcvNULL},
     {"GL_OES_texture_3D", slvEXTENSION_TEXTURE_3D, gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, 0, gcvNULL},
     {"GL_OES_EGL_image_external", slvEXTENSION_EGL_IMAGE_EXTERNAL, gcvTRUE, gcvTRUE, gcvFALSE, gcvTRUE, 0, gcvNULL},
-    {"GL_OES_texture_storage_multisample_2d_array", slvEXTENSION_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, sldES_31_LanguageVersion, gcvNULL},
-    {"GL_OES_shader_image_atomic", slvEXTENSION_IMAGE_ATOMIC, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, sldES_31_LanguageVersion, gcvNULL},
+    {"GL_OES_texture_storage_multisample_2d_array", slvEXTENSION_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
+    {"GL_OES_shader_image_atomic", slvEXTENSION_IMAGE_ATOMIC, gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
     /* sample shading extension. */
-    {"GL_OES_sample_variables", slvEXTENSION_SAMPLE_VARIABLES, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, sldHaltiLanguageVersion, gcvNULL},
-    {"GL_OES_shader_multisample_interpolation", slvEXTENSION_SHADER_MULTISAMPLE_INTERPOLATION, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, sldHaltiLanguageVersion, gcvNULL},
+    {"GL_OES_sample_variables", slvEXTENSION_SAMPLE_VARIABLES, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_HALTI_VERSION, gcvNULL},
+    {"GL_OES_shader_multisample_interpolation", slvEXTENSION_SHADER_MULTISAMPLE_INTERPOLATION, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_HALTI_VERSION, gcvNULL},
 
     {"GL_EXT_texture_array", slvEXTENSION_TEXTURE_ARRAY, gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, 0, gcvNULL},
     {"GL_EXT_frag_depth", slvEXTENSION_FRAG_DEPTH, gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, 0, gcvNULL},
     {"GL_EXT_shadow_samplers", slvEXTENSION_SHADOW_SAMPLER, gcvFALSE, gcvTRUE, gcvFALSE, gcvTRUE, 0, gcvNULL},
     /* cube array extension. */
-    {"GL_EXT_texture_cube_map_array", slvEXTENSION_TEXTURE_CUBE_MAP_ARRAY, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, sldES_31_LanguageVersion, "GL_OES_texture_cube_map_array"},
+    {"GL_EXT_texture_cube_map_array", slvEXTENSION_TEXTURE_CUBE_MAP_ARRAY, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_texture_cube_map_array"},
     /* TS extension. */
-    {"GL_EXT_tessellation_shader", slvEXTENSION_TESSELLATION_SHADER, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, sldES_31_LanguageVersion, "GL_OES_tessellation_shader"},
-    {"GL_EXT_tessellation_point_size", slvEXTENSION_TESSELLATION_POINT_SIZE, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, sldES_31_LanguageVersion, "GL_OES_tessellation_point_size",},
+    {"GL_EXT_tessellation_shader", slvEXTENSION_TESSELLATION_SHADER, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_tessellation_shader"},
+    {"GL_EXT_tessellation_point_size", slvEXTENSION_TESSELLATION_POINT_SIZE, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_tessellation_point_size",},
     /* GS extension. */
-    {"GL_EXT_geometry_shader", slvEXTENSION_EXT_GEOMETRY_SHADER, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, sldES_31_LanguageVersion, "GL_OES_geometry_shader"},
-    {"GL_EXT_geometry_point_size", slvEXTENSION_EXT_GEOMETRY_POINT_SIZE, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, sldES_31_LanguageVersion, "GL_OES_geometry_point_size"},
+    {"GL_EXT_geometry_shader", slvEXTENSION_EXT_GEOMETRY_SHADER, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_geometry_shader"},
+    {"GL_EXT_geometry_point_size", slvEXTENSION_EXT_GEOMETRY_POINT_SIZE, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_geometry_point_size"},
     /* IO block extension. */
-    {"GL_EXT_shader_io_blocks", slvEXTENSION_IO_BLOCKS, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, sldES_31_LanguageVersion, "GL_OES_shader_io_blocks"},
+    {"GL_EXT_shader_io_blocks", slvEXTENSION_IO_BLOCKS, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_shader_io_blocks"},
     /* GPU_Shader5 extension. */
-    {"GL_EXT_gpu_shader5", slvEXTENSION_GPU_SHADER5, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, sldES_31_LanguageVersion, "GL_OES_gpu_shader5"},
+    {"GL_EXT_gpu_shader5", slvEXTENSION_GPU_SHADER5, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_gpu_shader5"},
     /* shader implicit conversions extension. */
-    {"GL_EXT_shader_implicit_conversions", slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS, gcvTRUE, gcvFALSE, gcvFALSE, gcvTRUE, sldES_31_LanguageVersion, gcvNULL},
+    {"GL_EXT_shader_implicit_conversions", slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS, gcvTRUE, gcvFALSE, gcvFALSE, gcvTRUE, _SHADER_ES31_VERSION, gcvNULL},
     /* texture buffer extension. */
-    {"GL_EXT_texture_buffer", slvEXTENSION_EXT_TEXTURE_BUFFER, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, sldES_31_LanguageVersion, "GL_OES_texture_buffer"},
+    {"GL_EXT_texture_buffer", slvEXTENSION_EXT_TEXTURE_BUFFER, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_texture_buffer"},
     /* primitive bounding box extension. */
-    {"GL_EXT_primitive_bounding_box", slvEXTENSION_EXT_PRIMITIVE_BOUNDING_BOX, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, sldES_31_LanguageVersion, gcvNULL},
+    {"GL_EXT_primitive_bounding_box", slvEXTENSION_EXT_PRIMITIVE_BOUNDING_BOX, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, gcvNULL},
+
 
     {"GL_VIV_asm", slvEXTENSION_VASM, gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, 0, gcvNULL }, /* It is a internal option. */
 };
@@ -146,6 +147,10 @@ gceSTATUS ppoPREPROCESSOR_InitExtensionTable(ppoPREPROCESSOR PP)
 
         case slvEXTENSION_SAMPLE_VARIABLES:
         case slvEXTENSION_SHADER_MULTISAMPLE_INTERPOLATION:
+            _AddExtensionMacro(PP, &_DefinedExtensions[i]);
+            break;
+
+        case slvEXTENSION_IMAGE_ATOMIC:
             _AddExtensionMacro(PP, &_DefinedExtensions[i]);
             break;
 
@@ -1484,6 +1489,10 @@ gceSTATUS ppoPREPROCESSOR_Version(ppoPREPROCESSOR PP)
                 {
                     langVersion = 310;
                 }
+                else if(gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "320")))
+                {
+                    langVersion = 320;
+                }
             }
 
             if(langVersion) {
@@ -2173,16 +2182,17 @@ ppoPREPROCESSOR_Undef(ppoPREPROCESSOR PP)
     gceSTATUS            status  = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
     gctBOOL                doWeInValidArea    = PP->doWeInValidArea;
 
-    if(doWeInValidArea == gcvFALSE)
+    if (doWeInValidArea == gcvFALSE)
     {
         return ppoPREPROCESSOR_ToEOL(PP);
     }
     status = PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace);
-    if(status != gcvSTATUS_OK)
+    if (status != gcvSTATUS_OK)
     {
         return status;
     }
-    if(ntoken->type != ppvTokenType_ID){
+    if (ntoken->type != ppvTokenType_ID)
+    {
         ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
             "Error(%d,%d) : #undef should followed by id.", PP->currentSourceFileStringNumber, PP->currentSourceFileLineNumber);
 
@@ -2191,9 +2201,9 @@ ppoPREPROCESSOR_Undef(ppoPREPROCESSOR PP)
         return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
     }
 
-    if(ntoken->poolString == PP->keyword->gl_es   ||
-        ntoken->poolString == PP->keyword->_line_ ||
-        ntoken->poolString == PP->keyword->_file_ ||
+    if (ntoken->poolString == PP->keyword->gl_es   ||
+        ntoken->poolString == PP->keyword->_line_  ||
+        ntoken->poolString == PP->keyword->_file_  ||
         ntoken->poolString == PP->keyword->_version_)
     {
         ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
@@ -2217,7 +2227,7 @@ ppoPREPROCESSOR_Undef(ppoPREPROCESSOR PP)
         &ms)
         );
 
-    if(!ms || ms->undefined == gcvTRUE)
+    if (!ms || ms->undefined == gcvTRUE)
     {
         ppoPREPROCESSOR_Report(
             PP,
@@ -2273,49 +2283,53 @@ ppoPREPROCESSOR_Define(ppoPREPROCESSOR PP)
     ppoTOKEN            ntokenNext    = gcvNULL;
     ppoTOKEN            mstokenNext    = gcvNULL;
 
-    if(doWeInValidArea == gcvFALSE)
+    if (doWeInValidArea == gcvFALSE)
     {
         return ppoPREPROCESSOR_ToEOL(PP);
     }
 
     gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace));
 
-
-    if(ntoken->type != ppvTokenType_ID){
+    if (ntoken->type != ppvTokenType_ID)
+    {
         ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
             "Error(%d,%d) : #define should followed by id.",
             PP->currentSourceFileStringNumber,
             PP->currentSourceFileLineNumber);
 
         gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
-
         return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
     }
 
     /*01 name*/
-
     name = ntoken->poolString;
 
     gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
     ntoken = gcvNULL;
 
-    if(    name == PP->keyword->_line_ ||
-        name == PP->keyword->_version_ ||
-        name == PP->keyword->_file_)
+    if (name == PP->keyword->_line_     ||
+        name == PP->keyword->_version_  ||
+        name == PP->keyword->_file_     ||
+        name == PP->keyword->gl_es)
     {
-        ppoPREPROCESSOR_Report(PP,slvREPORT_WARN,
-            "No Effect with re-defining of %s.",
+        ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
+            "Error(%d,%d) : Can not #redefine a builtin marcro %s.",
+            PP->currentSourceFileStringNumber,
+            PP->currentSourceFileLineNumber,
             name);
-        return ppoPREPROCESSOR_ToEOL(PP);
+        return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
     }
 
     /*check if preceded by GL_ or __*/
-    if(!gcoOS_StrNCmp(name , "GL_",3))
+    if (!gcoOS_StrNCmp(name , "GL_",3))
     {
         ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
             "GL_ is reserved to used by feature.");
+        return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
     }
-    if(!gcoOS_StrNCmp(name , "__",2))
+
+    if (sloCOMPILER_IsES31VersionOrAbove(PP->compiler) &&
+        !gcoOS_StrNCmp(name , "__",2))
     {
         ppoPREPROCESSOR_Report(PP,slvREPORT_WARN,
             "__ is reserved to used by the compiler.");
@@ -2325,14 +2339,14 @@ ppoPREPROCESSOR_Define(ppoPREPROCESSOR PP)
         ppoMACRO_MANAGER_GetMacroSymbol(PP, PP->macroManager, name, &ms)
         );
 
-    if(ms != gcvNULL)
+    if (ms != gcvNULL)
     {
         redefined = gcvTRUE;
     }
 
     gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, ppvICareWhiteSpace));
 
-    if(ntoken->poolString == PP->keyword->lpara)
+    if (ntoken->poolString == PP->keyword->lpara)
     {
         /*macro with (arguments-opt)*/
 
@@ -2342,15 +2356,14 @@ ppoPREPROCESSOR_Define(ppoPREPROCESSOR PP)
         ntoken = gcvNULL;
 
         gcmONERROR(ppoPREPROCESSOR_Define_BufferArgs(PP, &argv, &argc));
-        if(argc == 0)
+        if (argc == 0)
         {
             ppoPREPROCESSOR_Report(PP,slvREPORT_WARN, "No argument in () of macro.");
-            gcmASSERT(argv);
         }
     }
-    else if(ntoken->type != ppvTokenType_WS)
+    else if (ntoken->type != ppvTokenType_WS)
     {
-        if(ntoken->type != ppvTokenType_NL)
+        if (ntoken->type != ppvTokenType_NL)
         {
             gcePATCH_ID patchId = sloCOMPILER_GetPatchID(PP->compiler);
 
@@ -2383,9 +2396,9 @@ ppoPREPROCESSOR_Define(ppoPREPROCESSOR PP)
         ppoPREPROCESSOR_Define_BufferReplacementList(PP, &rlst)
         );
 
-    if(redefined)
+    if (redefined)
     {
-        if( argc != ms->argc)
+        if (argc != ms->argc)
         {
             ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
                                 "Can not redefine defined macro %s.",name);
@@ -2393,12 +2406,12 @@ ppoPREPROCESSOR_Define(ppoPREPROCESSOR PP)
         }
         else
         {
-                ntokenNext = rlst;
-                mstokenNext = ms->replacementList;
+            ntokenNext = rlst;
+            mstokenNext = ms->replacementList;
 
-                while(ntokenNext || mstokenNext)
-                {
-                    if(/* One of token is NULL */
+            while(ntokenNext || mstokenNext)
+            {
+                if (/* One of token is NULL */
                     (ntokenNext != mstokenNext && (mstokenNext == gcvNULL || ntokenNext == gcvNULL)) ||
                     /* Different replacement list */
                     (!gcmIS_SUCCESS(gcoOS_StrCmp(ntokenNext->poolString,mstokenNext->poolString))))
@@ -2414,22 +2427,24 @@ ppoPREPROCESSOR_Define(ppoPREPROCESSOR PP)
             }
         }
 
-        while(argv)
+        while (argv)
         {
             ntokenNext = (ppoTOKEN)argv->inputStream.base.node.prev;
             gcmONERROR(ppoTOKEN_Destroy(PP, argv));
             argv = ntokenNext;
         }
 
-        while(rlst)
+        while (rlst)
         {
             ntokenNext = (ppoTOKEN)rlst->inputStream.base.node.prev;
             gcmONERROR(ppoTOKEN_Destroy(PP, rlst));
             rlst = ntokenNext;
         }
 
-        if(redefError)
+        if (redefError)
+        {
             return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+        }
 
         return gcvSTATUS_OK;
     }

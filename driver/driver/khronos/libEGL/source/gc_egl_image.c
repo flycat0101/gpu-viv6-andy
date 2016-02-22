@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -31,6 +31,7 @@
 
 #if defined(WL_EGL_PLATFORM)
 #include "wayland-server.h"
+#include "gc_wayland_protocol.h"
 #endif
 
 #ifdef LINUX
@@ -1127,7 +1128,7 @@ _CreateImageWL(
     if (Ctx != gcvNULL)
     {
         veglSetEGLerror(Thread,  EGL_BAD_CONTEXT);
-        return EGL_NO_IMAGE;
+        return EGL_NO_IMAGE_KHR;
     }
 
     /* Initialize an image struct. */
@@ -1137,6 +1138,8 @@ _CreateImageWL(
     image->image.type    = KHR_IMAGE_WAYLAND_BUFFER;
 
     image->image.surface = buffer->surface;
+    image->image.u.wlbuffer.width =  buffer->width;
+    image->image.u.wlbuffer.height = buffer->height;
 #endif
 
     return image;
@@ -1191,21 +1194,17 @@ _FormatTable[] =
     /* 24 bpp RGB not supported */
 
     /* 32 bpp RGB */
-/*
-    {DRM_FORMAT_XRGB8888, gcvSURF_B8G8R8X8},
-    {DRM_FORMAT_XBGR8888, gcvSURF_R8G8B8X8},
- */
+    {DRM_FORMAT_XRGB8888, gcvSURF_X8R8G8B8},
+    {DRM_FORMAT_XBGR8888, gcvSURF_X8B8G8R8},
 
-    {DRM_FORMAT_RGBX8888, gcvSURF_X8B8G8R8},
-    {DRM_FORMAT_BGRA8888, gcvSURF_X8R8G8B8},
+    {DRM_FORMAT_RGBX8888, gcvSURF_R8G8B8X8},
+    {DRM_FORMAT_BGRA8888, gcvSURF_B8G8R8A8},
 
-/*
-    {DRM_FORMAT_ARGB8888, gcvSURF_B8G8R8A8},
-    {DRM_FORMAT_ABGR8888, gcvSURF_R8G8B8A8},
- */
+    {DRM_FORMAT_ARGB8888, gcvSURF_A8R8G8B8},
+    {DRM_FORMAT_ABGR8888, gcvSURF_A8B8G8R8},
 
-    {DRM_FORMAT_RGBA8888, gcvSURF_A8B8G8R8},
-    {DRM_FORMAT_BGRA8888, gcvSURF_A8R8G8B8},
+    {DRM_FORMAT_RGBA8888, gcvSURF_R8G8B8A8},
+    {DRM_FORMAT_BGRA8888, gcvSURF_B8G8R8A8},
 
     /* 32 bpp 2-10-10-10 format not supported */
 
@@ -1946,4 +1945,119 @@ eglDestroyImageKHR(
     gcmFOOTER_ARG("return=%d", result);
     return result;
 }
+
+#if (defined EGL_WAYLAND_BUFFER_WL && defined EGL_API_WL)
+struct wl_buffer *eglCreateWaylandBufferFromImageWL(EGLDisplay Dpy, EGLImageKHR Image)
+{
+    VEGLThreadData  thread;
+    VEGLDisplay     dpy;
+    VEGLImage       image;
+    gceSTATUS status;
+    struct wl_buffer* wl_buffer = gcvNULL;
+
+    gcmHEADER_ARG("Dpy=0x%x Image=0x%x", Dpy, Image);
+
+    /* Get thread data. */
+    thread = veglGetThreadData();
+    if (thread == gcvNULL)
+    {
+        gcmTRACE(
+            gcvLEVEL_ERROR,
+            "%s(%d): veglGetThreadData failed.",
+            __FUNCTION__, __LINE__
+            );
+
+        gcmFOOTER_ARG("return=%d", EGL_FALSE);
+        return gcvNULL;
+    }
+    /* Test for valid EGLDisplay structure. */
+    dpy = veglGetDisplay(Dpy);
+    if (dpy == gcvNULL)
+    {
+        /* Bad display. */
+        veglSetEGLerror(thread,  EGL_BAD_DISPLAY);
+
+        gcmFOOTER_ARG("return=%d", EGL_FALSE);
+        return gcvNULL;
+    }
+    /* Test if EGLDisplay structure has been initialized. */
+    if (!dpy->initialized)
+    {
+        /* Not initialized. */
+        veglSetEGLerror(thread,  EGL_NOT_INITIALIZED);;
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    /* Get shortcut of the eglImage. */
+    image = VEGL_IMAGE(Image);
+    /* Test if eglImage is valid. */
+    if ((image == gcvNULL) ||
+        (image->signature != EGL_IMAGE_SIGNATURE))
+    {
+        veglSetEGLerror(thread,  EGL_BAD_PARAMETER);;
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+    /*Currently KHR_IMAGE_WAYLAND_BUFFER is needed for subsurface */
+    if(image->image.type != KHR_IMAGE_WAYLAND_BUFFER)
+    {
+        veglSetEGLerror(thread,  EGL_BAD_MATCH);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    VEGL_LOCK_DISPLAY_RESOURCE(dpy);
+    {
+        gcsWL_EGL_DISPLAY* display = ((gcsWL_EGL_DISPLAY*)dpy->localInfo);
+        gcsWL_EGL_BUFFER* egl_buffer;
+
+        gcoOS_AllocateMemory(gcvNULL, sizeof(struct _gcsWL_EGL_BUFFER),
+                            (gctPOINTER) &egl_buffer);
+        gcoOS_ZeroMemory( egl_buffer, sizeof(struct _gcsWL_EGL_BUFFER));
+
+        egl_buffer->info.width = image->image.u.wlbuffer.width;
+        egl_buffer->info.height = image->image.u.wlbuffer.height;
+        gcmONERROR(
+                gcoSURF_GetAlignedSize(
+                    image->image.surface,
+                    gcvNULL,
+                    gcvNULL,
+                    &egl_buffer->info.stride
+                    ));
+
+        gcmONERROR(
+               gcoSURF_QueryVidMemNode(
+                    image->image.surface,
+                    (gctUINT32 *)&egl_buffer->info.node,
+                    &egl_buffer->info.pool,
+                    &egl_buffer->info.bytes
+                    ));
+        gcmONERROR(
+                gcoSURF_GetFormat(
+                    image->image.surface,
+                    &egl_buffer->info.type,
+                    &egl_buffer->info.format
+                    ));
+
+        gcmONERROR(
+                gcoHAL_NameVideoMemory((gctUINT32)egl_buffer->info.node,
+                                       (gctUINT32 *)&egl_buffer->info.node));
+
+
+        gcoWL_CreateGhostBuffer(display, egl_buffer);
+        wl_buffer = egl_buffer->wl_buffer;
+        /*egl_buffer is no longer required. wl_buffer will be destoryed by application, look weston nested.c*/
+        gcoOS_FreeMemory(gcvNULL, egl_buffer);
+        egl_buffer = gcvNULL;
+
+    }
+
+    VEGL_UNLOCK_DISPLAY_RESOURCE(dpy);
+    /* Success. */
+    veglSetEGLerror(thread,  EGL_SUCCESS);
+
+    return wl_buffer;
+OnError:
+    return gcvNULL;
+
+}
+#endif
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -51,7 +51,7 @@ gcsVG_HWRECT;
 
 static gceSTATUS
 _GetVgFormat(
-    IN gcsSURF_INFO_PTR Surface,
+    IN gcoSURF Surface,
     OUT gctUINT32_PTR Format,
     OUT gctUINT32_PTR Swizzle
     )
@@ -169,9 +169,16 @@ _GetVgFormat(
 
 static gceSTATUS
 _ConvertFormat(
+#if gcdVG_ONLY
+    IN gceSURF_FORMAT Format,
+    OUT gctUINT32_PTR ImageFormat,
+    OUT gctUINT32_PTR Swizzle,
+    OUT gctUINT32_PTR IndexFormat
+#else
     IN gceSURF_FORMAT Format,
     OUT gctUINT32_PTR ImageFormat,
     OUT gctUINT32_PTR Swizzle
+#endif
     )
 {
     switch (Format)
@@ -221,9 +228,48 @@ _ConvertFormat(
         *ImageFormat = 0x7;
         break;
 
+#if gcdVG_ONLY
+    /* Index Color states. */
+        /* Index format does not stay in regular format register. */
+    case gcvSURF_INDEX1:
+    case gcvSURF_INDEX2:
+    case gcvSURF_INDEX4:
+    case gcvSURF_INDEX8:
+        *ImageFormat = 0;
+        break;
+#endif
+
     default:
         return gcvSTATUS_NOT_SUPPORTED;
     }
+
+#if gcdVG_ONLY
+    /* Index Color states. */
+    if (IndexFormat != gcvNULL)
+    {
+        switch (Format)
+        {
+            case gcvSURF_INDEX1:
+                *IndexFormat = 0x1;
+                break;
+
+            case gcvSURF_INDEX2:
+                *IndexFormat = 0x2;
+                break;
+
+            case gcvSURF_INDEX4:
+                *IndexFormat = 0x3;
+                break;
+
+            case gcvSURF_INDEX8:
+                *IndexFormat = 0x4;
+                break;
+            default:
+                *IndexFormat = 0x0;
+                break;
+        }
+    }
+#endif
 
     switch (Format)
     {
@@ -260,6 +306,15 @@ _ConvertFormat(
         *Swizzle = 0x3;
         break;
 
+#if gcdVG_ONLY
+        /* Index Color states */
+    case gcvSURF_INDEX1:
+    case gcvSURF_INDEX2:
+    case gcvSURF_INDEX4:
+    case gcvSURF_INDEX8:
+        break;
+#endif
+
     default:
         return gcvSTATUS_NOT_SUPPORTED;
     }
@@ -271,7 +326,7 @@ static gceSTATUS
 _SetSampler(
     IN gcoVGHARDWARE Hardware,
     IN gctUINT Sampler,
-    IN gcsSURF_INFO_PTR Image,
+    IN gcoSURF Image,
     IN gceTILE_MODE TileMode,
     IN gctBOOL Mask,
     IN gceIMAGE_FILTER BilinearFilter,
@@ -310,8 +365,8 @@ _SetSampler(
     gcmHEADER_ARG("Hardware=0x%x", Hardware);
 
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
+    gcmVERIFY_OBJECT(Image, gcvOBJ_SURF);
     gcmVERIFY_ARGUMENT(Sampler < 2);
-    gcmVERIFY_ARGUMENT(Image != gcvNULL);
     gcmVERIFY_ARGUMENT(gcmIS_VALID_INDEX(TileMode, _tileMode));
     gcmVERIFY_ARGUMENT(gcmIS_VALID_INDEX(Mask, _mask));
     gcmVERIFY_ARGUMENT(gcmIS_VALID_INDEX(BilinearFilter, _filter));
@@ -330,10 +385,16 @@ _SetSampler(
         gcePOOL pool;
         gctUINT32 offset;
         gctUINT32 address;
+#if gcdVG_ONLY
+        gctUINT32 indexFormat;
+#endif
 
+#if gcdVG_ONLY
         /* Convert the image format. */
+        gcmERR_BREAK(_ConvertFormat(Image->format, &format, &swizzle, &indexFormat));
+#else
         gcmERR_BREAK(_ConvertFormat(Image->format, &format, &swizzle));
-
+#endif
         /* Determine the filter value. */
         filter = _filter[BilinearFilter];
 
@@ -402,7 +463,15 @@ _SetSampler(
  28:28) - (0 ? 28:28) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 28:28) - (0 ? 28:28) + 1))))))) << (0 ?
  28:28))) | (((gctUINT32) ((gctUINT32) (coordType) & ((gctUINT32) ((((1 ?
  28:28) - (0 ? 28:28) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 28:28) - (0 ? 28:28) + 1))))))) << (0 ?
- 28:28)));
+ 28:28)))
+#if gcdVG_ONLY
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 11:9) - (0 ? 11:9) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 11:9) - (0 ? 11:9) + 1))))))) << (0 ?
+ 11:9))) | (((gctUINT32) ((gctUINT32) (indexFormat) & ((gctUINT32) ((((1 ?
+ 11:9) - (0 ? 11:9) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 11:9) - (0 ? 11:9) + 1))))))) << (0 ?
+ 11:9)))
+#endif
+            ;
 
         stride = (SizeY == 0)
             ? 0
@@ -1339,7 +1408,7 @@ gcoVGHARDWARE_WaitCompletion(
 gceSTATUS
 gcoVGHARDWARE_SetVgTarget(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Target
+    IN gcoSURF Target
     )
 {
     gceSTATUS status;
@@ -1656,7 +1725,7 @@ gcoVGHARDWARE_VgClear(
 gceSTATUS
 gcoVGHARDWARE_DrawImage(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Image,
+    IN gcoSURF Image,
     IN gcsVG_RECT_PTR SrcRect,
     IN gcsVG_RECT_PTR TrgRect,
     IN gceIMAGE_FILTER Filter,
@@ -1833,7 +1902,7 @@ gceSTATUS
 gcoVGHARDWARE_TesselateImage(
     IN gcoVGHARDWARE Hardware,
     IN gctBOOL SoftwareTesselation,
-    IN gcsSURF_INFO_PTR Image,
+    IN gcoSURF Image,
     IN gcsVG_RECT_PTR Rectangle,
     IN gceIMAGE_FILTER Filter,
     IN gctBOOL Mask,
@@ -2342,7 +2411,7 @@ gcoVGHARDWARE_TesselateImage(
 gceSTATUS
 gcoVGHARDWARE_DrawSurfaceToImage(
     IN gcoVGHARDWARE Hardware,
-    IN const gcsSURF_INFO_PTR Image,
+    IN const gcoSURF Image,
     IN const gcsVG_RECT_PTR SrcRectangle,
     IN const gcsVG_RECT_PTR DstRectangle,
     IN gceIMAGE_FILTER Filter,
@@ -2519,8 +2588,8 @@ gcoVGHARDWARE_DrawSurfaceToImage(
 gceSTATUS
 gcoVGHARDWARE_VgBlit(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Source,
-    IN gcsSURF_INFO_PTR Target,
+    IN gcoSURF Source,
+    IN gcoSURF Target,
     IN gcsVG_RECT_PTR SrcRect,
     IN gcsVG_RECT_PTR TrgRect,
     IN gceIMAGE_FILTER Filter,
@@ -2544,7 +2613,7 @@ gcoVGHARDWARE_VgBlit(
         gceVG_BLEND prevBlendMode;
         gcsVG_RECT tempRect;
         gctBOOL overlap;
-        gcsSURF_INFO_PTR prevTarget;
+        gcoSURF prevTarget;
 
 
         /***********************************************************************
@@ -3903,7 +3972,7 @@ gcoVGHARDWARE_SetPaintPattern(
 gceSTATUS
 gcoVGHARDWARE_SetPaintImage(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Image,
+    IN gcoSURF Image,
     IN gceTILE_MODE TileMode,
     IN gceIMAGE_FILTER Filter,
     IN gctUINT32 FillColor
@@ -3988,7 +4057,7 @@ gcoVGHARDWARE_SetPaintImage(
 gceSTATUS
 gcoVGHARDWARE_SetVgMask(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Mask
+    IN gcoSURF Mask
     )
 {
     gceSTATUS status;
@@ -4621,7 +4690,7 @@ static gctBOOL
 _IsFilterSupported(
     IN gcoVGHARDWARE Hardware,
     IN gceCHANNEL ColorChannels,
-    IN gcsSURF_INFO_PTR Target,
+    IN gcoSURF Target,
     IN gcsPOINT_PTR TargetOrigin
     )
 {
@@ -4794,8 +4863,8 @@ _SetFilterScale(
 gceSTATUS
 gcoVGHARDWARE_ColorMatrixSinglePass(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Source,
-    IN gcsSURF_INFO_PTR Target,
+    IN gcoSURF Source,
+    IN gcoSURF Target,
     IN gctINT16_PTR Matrix,
     IN gceCHANNEL ColorChannels,
     IN gctBOOL FilterLinear,
@@ -4974,9 +5043,9 @@ gcoVGHARDWARE_ColorMatrixSinglePass(
 gceSTATUS
 gcoVGHARDWARE_ColorMatrixMultiPass(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Source,
-    IN gcsSURF_INFO_PTR Temp,
-    IN gcsSURF_INFO_PTR Target,
+    IN gcoSURF Source,
+    IN gcoSURF Temp,
+    IN gcoSURF Target,
     IN gctINT16_PTR Matrix,
     IN gctUINT ColorChannels,
     IN gctBOOL FilterLinear,
@@ -5263,8 +5332,8 @@ gcoVGHARDWARE_ColorMatrixMultiPass(
 gceSTATUS
 gcoVGHARDWARE_ColorMatrix(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Source,
-    IN gcsSURF_INFO_PTR Target,
+    IN gcoSURF Source,
+    IN gcoSURF Target,
     IN const gctFLOAT * Matrix,
     IN gceCHANNEL ColorChannels,
     IN gctBOOL FilterLinear,
@@ -5428,8 +5497,8 @@ gcsCONVOLVE;
 static gceSTATUS
 _SeparableConvolve(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Source,
-    IN gcsSURF_INFO_PTR Target,
+    IN gcoSURF Source,
+    IN gcoSURF Target,
     IN gctINT KernelWidth,
     IN gctINT KernelHeight,
     IN gcsCONVOLVE_PTR Info,
@@ -5833,8 +5902,8 @@ _SeparableConvolve(
 gceSTATUS
 gcoVGHARDWARE_SeparableConvolve(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Source,
-    IN gcsSURF_INFO_PTR Target,
+    IN gcoSURF Source,
+    IN gcoSURF Target,
     IN gctINT KernelWidth,
     IN gctINT KernelHeight,
     IN gctINT ShiftX,
@@ -5959,8 +6028,8 @@ gcoVGHARDWARE_SeparableConvolve(
 gceSTATUS
 gcoVGHARDWARE_GaussianBlur(
     IN gcoVGHARDWARE Hardware,
-    IN gcsSURF_INFO_PTR Source,
-    IN gcsSURF_INFO_PTR Target,
+    IN gcoSURF Source,
+    IN gcoSURF Target,
     IN gctFLOAT StdDeviationX,
     IN gctFLOAT StdDeviationY,
     IN gceTILE_MODE TilingMode,
@@ -6516,6 +6585,7 @@ gcoVGHARDWARE_Construct(
         gcmCHECK_STATUS(gcoOS_Free(os, hardware));
     }
 
+	*Hardware = gcvNULL;
     gcmFOOTER();
     /* Return the status. */
     return status;
@@ -11743,6 +11813,24 @@ gceSTATUS gcoVGHARDWARE_ConvertFormat(
         bytesPerTile  = (4 * 4 * 4) / 8;
         break;
 
+#if gcdVG_ONLY
+        /* Index Color states. */
+    case gcvSURF_INDEX1:
+        bitsPerPixel = 1;
+        bytesPerTile = (bitsPerPixel * 4 * 4) / 8;
+        break;
+
+    case gcvSURF_INDEX2:
+        bitsPerPixel = 2;
+        bytesPerTile = (bitsPerPixel * 4 * 4) / 8;
+        break;
+
+    case gcvSURF_INDEX4:
+        bitsPerPixel = 4;
+        bytesPerTile = (bitsPerPixel * 4 * 4) / 8;
+        break;
+#endif
+
     case gcvSURF_INDEX8:
     case gcvSURF_A8:
     case gcvSURF_L8:
@@ -11783,6 +11871,9 @@ gceSTATUS gcoVGHARDWARE_ConvertFormat(
 
     case gcvSURF_A8L8:
     case gcvSURF_YUY2:
+#if gcdVG_ONLY
+    case gcvSURF_NV16:
+#endif
     case gcvSURF_UYVY:
     case gcvSURF_D16:
         /* 16-bpp format. */
@@ -11818,6 +11909,24 @@ gceSTATUS gcoVGHARDWARE_ConvertFormat(
         bitsPerPixel = 4;
         bytesPerTile = (4 * 4 * 4) / 8;
         break;
+
+#if gcdVG_ONLY
+    case gcvSURF_NV12:
+        bitsPerPixel = 12;
+        bytesPerTile = (bitsPerPixel * 4 * 4) / 8;
+        break;
+
+    case gcvSURF_AYUY2:
+    case gcvSURF_ANV16:
+        bitsPerPixel = 24;
+        bytesPerTile = (bitsPerPixel * 4 * 4) / 8;
+        break;
+
+    case gcvSURF_ANV12:
+        bitsPerPixel = 20;
+        bytesPerTile = (bitsPerPixel * 4 * 4) / 8;
+        break;
+#endif
 
     default:
         /* Invalid format. */
@@ -11918,6 +12027,390 @@ gceSTATUS gcoVGHARDWARE_QueryTileSize(
     /* Success. */
     return gcvSTATUS_OK;
 }
+
+
+#if gcdVG_ONLY
+/* Color Key States. */
+gceSTATUS
+gcoVGHARDWARE_SetColorKey(
+    IN gcoVGHARDWARE Hardware,
+    IN gctUINT32     Values[28],
+    IN gctBOOL       Enables[4]
+    )
+{
+    gctINT i;
+    gctUINT32 value_low = 0;
+    gctUINT32 value_high = 0;
+    gctUINT32 r, g, b, a, e;
+
+    gcmHEADER_ARG("Hardware = 0x%x, Values = %p, Enables = %p", Hardware, Values, Enables);
+    gcmGETVGHARDWARE(Hardware);
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
+
+    /* Set color key states. */
+    /* There are 4 groups of color key states.
+        rgb_hi_0, rgb_lo_0, alpha_0, enable_0;
+        rgb_hi_1, rgb_lo_1, alpha_1, enable_1;
+        rgb_hi_2, rgb_lo_2, alpha_2, enable_2;
+        rgb_hi_3, rgb_lo_3, alpha_3, enable_3;
+    */
+    for (i = 0; i < 4; i++)
+    {
+        /* Set gcregVGPEColorKeyLow. Layout "E/R/G/B". */
+        r = Values[i * 7 + 3];
+        g = Values[i * 7 + 4];
+        b = Values[i * 7 + 5];
+        e = Enables[i];
+        value_low = (e << 24) | (r << 16) | (g << 8) | b;
+        gcoVGHARDWARE_SetState(
+            Hardware,
+            (0x02A40 >> 2) + i,
+            value_low,
+            gcvTRUE
+            );
+
+        /* Set gcregVGPEColorKeyHigh. Layout "A/R/G/B". */
+        r = Values[i * 7 + 0];
+        g = Values[i * 7 + 1];
+        b = Values[i * 7 + 2];
+        a = Values[i * 7 + 6];
+        value_high = (a << 24) | (r << 16) | (g << 8) | b;
+        gcoVGHARDWARE_SetState(
+            Hardware,
+            (0x02A50 >> 2) + i,
+            value_high,
+            gcvTRUE
+            );
+    }
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+/* Index Color (Look up table) States. */
+gceSTATUS
+gcoVGHARDWARE_SetColorIndexTable(
+    IN gcoVGHARDWARE Hardware,
+    IN gctUINT32     *Values,
+    IN gctINT32      Count
+    )
+{
+    gcmHEADER_ARG("Hardware = 0x%x, Values = %p", Hardware, Values);
+    gcmGETVGHARDWARE(Hardware);
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
+
+    gcoVGHARDWARE_SetStates(
+        Hardware,
+        (0x02C00 >> 2),
+        Count,
+        Values
+        );
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+
+/* VG RS feature. */
+gceSTATUS
+gcoVGHARDWARE_ResolveRect(
+    IN gcoVGHARDWARE    Hardware,
+    IN gcoSURF          Source,
+    IN gcoSURF          Target,
+    IN gctINT32         SX,
+    IN gctINT32         SY,
+    IN gctINT32         DX,
+    IN gctINT32         DY,
+    IN gctINT32         Width,
+    IN gctINT32         Height,
+    IN gctINT32         Src_uv,
+    IN gctINT32         Src_standard,
+    IN gctINT32         Dst_uv,
+    IN gctINT32         Dst_standard,
+    IN gctINT32         Dst_alpha
+    )
+{
+    gctUINT32   src_format;
+    gctUINT32   argb_swizzle;
+    gctUINT32   src_address;
+    gctUINT32   src_xy;
+    gctUINT32   src_size;
+    gctUINT32   src_stride;
+
+    gctUINT32   dst_format;
+
+    gctUINT32   dst_xy;
+    gctUINT32   dst_address[3];
+    gctUINT32   dst_stride[3];
+    gctUINT32   dst_size;
+    gctUINT32   rect_size;
+    gctUINT32   rs_command;
+
+    gctUINT32   data;
+
+    gcmHEADER_ARG("Hardware=0x%x Source=%p Target=%p SX=%d SY=%d DX=%d DY=%d Width=%d Height=%d",
+        Hardware, Source, Target, SX, SY, DX, DY, Width, Height);
+    gcmGETVGHARDWARE(Hardware);
+
+     /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
+
+    /* Currently only supports the same resolve orig. */
+    DX = SX;
+    DY = SY;
+
+    /* Determine the format value. */
+    if (Source->format == gcvSURF_YUY2)
+    {
+        /* TODO: UV swizzle not handled. */
+        src_format = 0x0;
+    }
+    else
+    {   /* Reuse existing code. */
+        _ConvertFormat(Source->format, &src_format, &argb_swizzle, gcvNULL);
+        switch (src_format)
+        {
+        case 0x5:
+            src_format = 0x3;
+            break;
+
+        case 0x3:
+            src_format = 0x4;
+            break;
+
+        case 0x4:
+            src_format = 0x5;
+            break;
+
+        case 0x6:
+            src_format = 0x6;
+            break;
+
+        case 0x7:
+            src_format = 0x7;
+            break;
+
+        case 0x8:
+            src_format = 0x0;
+            break;
+
+        default:
+            gcmASSERT(0);
+            return gcvSTATUS_INVALID_ARGUMENT;
+            break;
+        }
+
+        switch (argb_swizzle)
+        {
+        case 0x0:
+            argb_swizzle = 0x0;
+            break;
+
+        case 0x1:
+            argb_swizzle = 0x1;
+            break;
+
+        case 0x2:
+            argb_swizzle = 0x2;
+            break;
+
+        case 0x3:
+            argb_swizzle = 0x3;
+            break;
+
+        default:
+            gcmASSERT(0);
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
+    }
+
+    src_address = Source->node.hardwareAddresses[gcvHARDWARE_VG];
+    src_stride = Source->stride & 0x0003ffff;
+    src_xy = (SX & 0x0000ffff) | ((SY & 0x0000ffff) << 16);
+    src_size = (Source->alignedW & 0x0000ffff) | ((Source->alignedH & 0x0000ffff) << 16);
+
+    /* Target Config. */
+    switch (Target->format)
+    {
+    case gcvSURF_YUY2:
+    case gcvSURF_AYUY2:
+        dst_format = 0x0;
+        break;
+
+    case gcvSURF_NV12:
+    case gcvSURF_ANV12:
+        dst_format = 0x1;
+        break;
+
+    case gcvSURF_NV16:
+    case gcvSURF_ANV16:
+        dst_format = 0x2;
+        break;
+
+    default:
+        gcmASSERT(0);
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    dst_xy = (DX & 0x0000ffff) | ((DX & 0x0000ffff) << 16);
+
+    /*TODO: Actually the following is not correct for YUV with alpha.
+      Need to refine in many other places to support alpha output. */
+    dst_address[0] = Target->node.hardwareAddresses[gcvHARDWARE_VG];
+    dst_address[1] = dst_address[0] + Target->uOffset;
+    dst_address[2] = dst_address[0] + Target->aOffset;
+    dst_stride[0]  = Target->stride;
+    dst_stride[1]  = Target->uStride;
+    dst_stride[2]  = Target->aStride;
+
+    dst_size = (Target->alignedW & 0x0000ffff) | ((Target->alignedH & 0x0000ffff) << 16);
+    rect_size = (Width & 0x0000ffff) | ((Height & 0x0000ffff) << 16);
+
+    /* VG RS command only supports BLT yet. */
+    rs_command = 0x1;
+
+    /* Setup registers. */
+    data = (src_format) |
+           (Src_uv  << 8) |
+           (argb_swizzle    << 9) |
+           (Src_standard << 11);
+    gcoVGHARDWARE_SetState(
+        Hardware,
+        (0x02978 >> 2),
+        data,
+        gcvTRUE
+        );
+
+    data = src_xy;
+    gcoVGHARDWARE_SetState(
+        Hardware,
+        (0x0297C >> 2),
+        data,
+        gcvTRUE
+        );
+
+    data = src_address;
+    gcoVGHARDWARE_SetState(
+        Hardware,
+        (0x029E4 >> 2),
+        data,
+        gcvTRUE
+        );
+
+    data = src_stride;
+    gcoVGHARDWARE_SetState(
+        Hardware,
+        (0x029E8 >> 2),
+        data,
+        gcvTRUE
+        );
+
+    data = src_size;
+    gcoVGHARDWARE_SetState(
+        Hardware,
+        (0x029EC >> 2),
+        data,
+        gcvTRUE
+        );
+
+    /* Setup Target Registers. */
+    data = (dst_format) |
+           (Dst_uv  << 8)   |
+           (Dst_standard << 11)  |
+           (Dst_alpha   << 12);
+    gcoVGHARDWARE_SetState(
+        Hardware,
+        (0x029FC >> 2),
+        data,
+        gcvTRUE
+        );
+
+    data = dst_xy;
+    gcoVGHARDWARE_SetState(
+        Hardware,
+        (0x02A0C >> 2),
+        data,
+        gcvTRUE
+        );
+
+    data = dst_address[0];
+    gcoVGHARDWARE_SetState(
+        Hardware,
+        (0x02A20 >> 2) + 0,
+        data,
+        gcvTRUE
+        );
+    data = dst_address[1];
+    gcoVGHARDWARE_SetState(
+        Hardware,
+        (0x02A20 >> 2) + 1,
+        data,
+        gcvTRUE
+        );
+    data = dst_address[2];
+    gcoVGHARDWARE_SetState(
+        Hardware,
+        (0x02A20 >> 2) + 2,
+        data,
+        gcvTRUE
+        );
+
+    data = dst_stride[0];
+    gcoVGHARDWARE_SetState(
+        Hardware,
+        (0x02A30 >> 2),
+        data,
+        gcvTRUE
+        );
+    data = dst_stride[1];
+    gcoVGHARDWARE_SetState(
+        Hardware,
+        (0x02A30 >> 2) + 1,
+        data,
+        gcvTRUE
+        );
+    data = dst_stride[2];
+    gcoVGHARDWARE_SetState(
+        Hardware,
+        (0x02A30 >> 2) + 2,
+        data,
+        gcvTRUE
+        );
+
+    data = dst_size;
+    gcoVGHARDWARE_SetState(
+        Hardware,
+        (0x02A1C >> 2),
+        data,
+        gcvTRUE
+        );
+
+    data = rect_size;
+    gcoVGHARDWARE_SetState(
+        Hardware,
+        (0x02A2C >> 2),
+        data,
+        gcvTRUE
+        );
+
+    data = rs_command;
+    gcoVGHARDWARE_SetState(
+        Hardware,
+        (0x02A3C >> 2),
+        data,
+        gcvTRUE
+        );
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+#endif  /* gcVG_ONLY */
+
 #endif /* gcdENABLE_VG */
 
 

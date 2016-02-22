@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -222,6 +222,7 @@ _FlushPipe(
     gctBOOL iCacheInvalidate;
     gctBOOL halti5;
     gctBOOL snapPages;
+    gctBOOL hwTFB;
 
     txCacheFix
         = gckHARDWARE_IsFeatureAvailable(Context->hardware, gcvFEATURE_TEX_CACHE_FLUSH_FIX);
@@ -235,7 +236,13 @@ _FlushPipe(
     halti5
         = gckHARDWARE_IsFeatureAvailable(Context->hardware, gcvFEATURE_HALTI5);
 
-    snapPages = gckHARDWARE_IsFeatureAvailable(Context->hardware, gcvFEATURE_SNAPPAGE_CMD_FIX);
+    snapPages
+        = gckHARDWARE_IsFeatureAvailable(Context->hardware, gcvFEATURE_SNAPPAGE_CMD_FIX) &&
+          gckHARDWARE_IsFeatureAvailable(Context->hardware, gcvFEATURE_SNAPPAGE_CMD);
+
+
+    hwTFB
+        = gckHARDWARE_IsFeatureAvailable(Context->hardware, gcvFEATURE_HW_TFB);
 
     flushSlots = 6;
 
@@ -262,7 +269,7 @@ _FlushPipe(
         flushSlots += 12;
     }
 
-    if (halti5)
+    if (hwTFB)
     {
         flushSlots += 2;
     }
@@ -375,7 +382,7 @@ _FlushPipe(
  11:11))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 11:11) - (0 ? 11:11) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 11:11) - (0 ? 11:11) + 1))))))) << (0 ? 11:11)));
 
-        if (halti5)
+        if (hwTFB)
         {
              *buffer++
                  = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -1042,7 +1049,10 @@ _InitializeContextBuffer(
     gctBOOL hasICache;
     gctBOOL hasICachePrefetch;
     gctUINT numRT = 0;
+    gctUINT numSamplers = 32;
     gctBOOL hasTXdesc;
+    gctBOOL hasSecurity;
+    gctBOOL hasRobustness;
 #endif
 
     gckHARDWARE hardware;
@@ -1084,11 +1094,9 @@ _InitializeContextBuffer(
     genericAttrib = gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_GENERIC_ATTRIB);
     hasICache = gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_SHADER_HAS_INSTRUCTION_CACHE);
     hasTXdesc = gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_TX_DESCRIPTOR);
-
-    /* After we have I$ prefetch, all clients uses I$, hence remove all
-    ** instruction registers in state map
-    */
-    hasICachePrefetch = halti3;
+    hasSecurity = gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_SECURITY);
+    hasRobustness = gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_ROBUSTNESS);
+    hasICachePrefetch = gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_SH_INSTRUCTION_PREFETCH);
 
     /* Multi render target. */
     if (halti2 ||
@@ -1104,6 +1112,11 @@ _InitializeContextBuffer(
     else
     {
         numRT = 1;
+    }
+
+    if (hasGS && hasTS)
+    {
+        numSamplers = 80;
     }
 
     /* Query how many uniforms can support. */
@@ -1164,6 +1177,11 @@ if (halti5){    vsConstBase  = 0xD000;
     index += _FlushPipe(Context, index, gcvPIPE_3D);
 
     /* Global states. */
+    if (hasSecurity)
+    {
+        index += _State(Context, index, 0x03900 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);
+        index += _State(Context, index, 0x03904 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);
+    }
 
     index += _State(Context, index, 0x03814 >> 2, 0x00000001, 1, gcvFALSE, gcvFALSE);
     index += _CLOSE_RANGE();
@@ -1247,9 +1265,17 @@ if (halti5){    vsConstBase  = 0xD000;
     index += _State(Context, index, 0x00644 >> 2, 0x00000000, 1, gcvFALSE, gcvTRUE);
     index += _State(Context, index, 0x00648 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);
     index += _State(Context, index, 0x00674 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);
-    index += _State(Context, index, 0x00670 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);
     index += _State(Context, index, 0x00678 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);
     index += _State(Context, index, 0x0067C >> 2, 0xFFFFFFFF, 1, gcvFALSE, gcvFALSE);
+    index += _CLOSE_RANGE();
+
+    if (hasRobustness)
+    {
+        index += _State(Context, index, 0x146C0 >> 2, 0x00000000, 16, gcvFALSE, gcvTRUE);
+        index += _CLOSE_RANGE();
+        index += _State(Context, index, 0x007F8 >> 2, 0x00000000, 1, gcvFALSE, gcvTRUE);
+        index += _CLOSE_RANGE();
+    }
 
     if (halti5)
     {
@@ -1374,7 +1400,7 @@ if (halti5){    vsConstBase  = 0xD000;
     index += _CLOSE_RANGE();
 
     /* TFB */
-    if (halti5)
+    if (gckHARDWARE_IsFeatureAvailable(Context->hardware, gcvFEATURE_HW_TFB))
     {
         index += _State(Context, index, 0x1C000 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);
         index += _State(Context, index, 0x1C008 >> 2, 0x00000000, 1, gcvFALSE, gcvTRUE);
@@ -1495,24 +1521,24 @@ if (halti5){    vsConstBase  = 0xD000;
         /* Texture descriptor states */
         index += _State(Context, index, 0x14C40 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);
 
-        index += _State(Context, index, 0x16C00 >> 2, 0x00000000, 80, gcvFALSE, gcvFALSE);
-        index += _State(Context, index, 0x16E00 >> 2, 0x00000000, 80, gcvFALSE, gcvFALSE);
-        index += _State(Context, index, 0x17000 >> 2, 0x00000000, 80, gcvFALSE, gcvFALSE);
-        index += _State(Context, index, 0x17200 >> 2, 0x00000000, 80, gcvFALSE, gcvFALSE);
-        index += _State(Context, index, 0x17400 >> 2, 0x00000000, 80, gcvFALSE, gcvFALSE);
+        index += _State(Context, index, 0x16C00 >> 2, 0x00000000, numSamplers, gcvFALSE, gcvFALSE);
+        index += _State(Context, index, 0x16E00 >> 2, 0x00000000, numSamplers, gcvFALSE, gcvFALSE);
+        index += _State(Context, index, 0x17000 >> 2, 0x00000000, numSamplers, gcvFALSE, gcvFALSE);
+        index += _State(Context, index, 0x17200 >> 2, 0x00000000, numSamplers, gcvFALSE, gcvFALSE);
+        index += _State(Context, index, 0x17400 >> 2, 0x00000000, numSamplers, gcvFALSE, gcvFALSE);
 
-        index += _State(Context, index, (0x15C00 >> 2) + (0 << 0), 0x00000000, 80, gcvFALSE, gcvTRUE);
-        index += _State(Context, index, 0x15E00 >> 2, 0x00000000, 80, gcvFALSE, gcvFALSE);
+        index += _State(Context, index, (0x15C00 >> 2) + (0 << 0), 0x00000000, numSamplers, gcvFALSE, gcvTRUE);
+        index += _State(Context, index, 0x15E00 >> 2, 0x00000000, numSamplers, gcvFALSE, gcvFALSE);
 
         index += _CLOSE_RANGE();
 
-        _StateMirror(Context, 0x16000 >> 2, 80 , 0x16C00 >> 2);
-        _StateMirror(Context, 0x16200 >> 2, 80 , 0x16E00 >> 2);
-        _StateMirror(Context, 0x16400 >> 2, 80 , 0x17000 >> 2);
-        _StateMirror(Context, 0x16600 >> 2, 80 , 0x17200 >> 2);
-        _StateMirror(Context, 0x16800 >> 2, 80 , 0x17400 >> 2);
-        _StateMirror(Context, 0x15800 >> 2, 80 , 0x15C00 >> 2);
-        _StateMirror(Context, 0x15A00 >> 2, 80 , 0x15E00 >> 2);
+        _StateMirror(Context, 0x16000 >> 2, numSamplers , 0x16C00 >> 2);
+        _StateMirror(Context, 0x16200 >> 2, numSamplers , 0x16E00 >> 2);
+        _StateMirror(Context, 0x16400 >> 2, numSamplers , 0x17000 >> 2);
+        _StateMirror(Context, 0x16600 >> 2, numSamplers , 0x17200 >> 2);
+        _StateMirror(Context, 0x16800 >> 2, numSamplers , 0x17400 >> 2);
+        _StateMirror(Context, 0x15800 >> 2, numSamplers , 0x15C00 >> 2);
+        _StateMirror(Context, 0x15A00 >> 2, numSamplers , 0x15E00 >> 2);
     }
     else
     {
@@ -1835,8 +1861,12 @@ if (halti5){    vsConstBase  = 0xD000;
     index += _State(Context, index, 0x014A0 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);
     index += _State(Context, index, 0x014A8 >> 2, 0xFFFFFFFF, 1, gcvFALSE, gcvFALSE);
     index += _State(Context, index, 0x014AC >> 2, 0xFFFFFFFF, 1, gcvFALSE, gcvFALSE);
-    index += _State(Context, index, 0x014B0 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);
-    index += _State(Context, index, 0x014B4 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);
+
+    if(gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_HALF_FLOAT_PIPE) )
+    {
+        index += _State(Context, index, 0x014B0 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);
+        index += _State(Context, index, 0x014B4 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);
+    }
     index += _State(Context, index, 0x014A4 >> 2, 0x000E400C, 1, gcvFALSE, gcvFALSE);
     index += _State(Context, index, 0x01580 >> 2, 0x00000000, 3, gcvFALSE, gcvFALSE);
     index += _State(Context, index, 0x014B8 >> 2, 0x00000000, 1, gcvFALSE, gcvFALSE);
@@ -1901,6 +1931,12 @@ if (halti5){    vsConstBase  = 0xD000;
         index += _State(Context, index, 0x149A0 >> 2, 0x00000000, 7, gcvFALSE, gcvFALSE);
     }
 
+    if (hasRobustness)
+    {
+        index += _State(Context, index, 0x149C0 >> 2, 0x00000000, 8, gcvFALSE, gcvTRUE);
+        index += _State(Context, index, 0x014C4 >> 2, 0x00000000, 1, gcvFALSE, gcvTRUE);
+    }
+
     /* Memory Controller */
     index += _State(Context, index, 0x01654 >> 2, 0x00200000, 1, gcvFALSE, gcvFALSE);
 
@@ -1945,6 +1981,15 @@ if (halti5){    vsConstBase  = 0xD000;
     {
         index += _State(Context, index, 0x01A80 >> 2, 0x00000000, 8, gcvFALSE, gcvTRUE);
         index += _CLOSE_RANGE();
+    }
+
+    if (hasSecurity || hasRobustness)
+    {
+        index += _State(Context, index, 0x001AC >> 2, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 16:16) - (0 ? 16:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ?
+ 16:16))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 16:16) - (0 ? 16:16) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ? 16:16))), 1,
+ gcvFALSE, gcvFALSE);
     }
 
     /* Semaphore/stall. */
@@ -2117,6 +2162,63 @@ OnError:
     return status;
 }
 
+#if (gcdENABLE_3D || gcdENABLE_2D)
+static gceSTATUS
+_AllocateContextBuffer(
+    IN gckCONTEXT Context,
+    IN gcsCONTEXT_PTR Buffer
+    )
+{
+    gceSTATUS status;
+    gctPOINTER pointer;
+    gctUINT32 address;
+    gctSIZE_T totalSize = Context->totalSize;
+
+    if (Context->hardware->kernel->virtualCommandBuffer)
+    {
+        gcmkONERROR(gckKERNEL_AllocateVirtualCommandBuffer(
+            Context->hardware->kernel,
+            gcvFALSE,
+            &totalSize,
+            &Buffer->physical,
+            &pointer
+            ));
+
+        gcmkONERROR(gckKERNEL_GetGPUAddress(
+            Context->hardware->kernel,
+            pointer,
+            gcvFALSE,
+            Buffer->physical,
+            &address
+            ));
+    }
+    else
+    {
+        gcmkONERROR(gckOS_AllocateContiguous(
+            Context->os,
+            gcvFALSE,
+            &totalSize,
+            &Buffer->physical,
+            &pointer
+            ));
+
+        gcmkONERROR(gckHARDWARE_ConvertLogical(
+            Context->hardware,
+            pointer,
+            gcvFALSE,
+            &address
+            ));
+    }
+
+    Buffer->logical = pointer;
+    Buffer->address = address;
+
+    return gcvSTATUS_OK;
+
+OnError:
+    return status;
+}
+#endif
 
 /******************************************************************************\
 **************************** Context Management API ****************************
@@ -2159,7 +2261,6 @@ gckCONTEXT_Construct(
     gctUINT32 allocationSize;
     gctUINT i;
     gctPOINTER pointer = gcvNULL;
-    gctUINT32 address;
 
     gcmkHEADER_ARG("Os=0x%08X Hardware=0x%08X", Os, Hardware);
 
@@ -2268,8 +2369,6 @@ gckCONTEXT_Construct(
         /* Allocate a context buffer. */
         gcsCONTEXT_PTR buffer;
 
-        gctSIZE_T totalSize = context->totalSize;
-
         /* Allocate the context buffer structure. */
         gcmkONERROR(gckOS_Allocate(
             Os,
@@ -2312,44 +2411,9 @@ gckCONTEXT_Construct(
             ));
 
         /* Create a new physical context buffer. */
-        if (context->hardware->kernel->virtualCommandBuffer)
-        {
-            gcmkONERROR(gckKERNEL_AllocateVirtualCommandBuffer(
-                context->hardware->kernel,
-                gcvFALSE,
-                &totalSize,
-                &buffer->physical,
-                &pointer
-                ));
-
-            gcmkONERROR(gckKERNEL_GetGPUAddress(
-                context->hardware->kernel,
-                pointer,
-                gcvFALSE,
-                buffer->physical,
-                &address
-                ));
-        }
-        else
-        {
-            gcmkONERROR(gckOS_AllocateContiguous(
-                Os,
-                gcvFALSE,
-                &totalSize,
-                &buffer->physical,
-                &pointer
-                ));
-
-            gcmkONERROR(gckHARDWARE_ConvertLogical(
-                context->hardware,
-                pointer,
-                gcvFALSE,
-                &address
-                ));
-        }
-
-        buffer->logical = pointer;
-        buffer->address = address;
+        gcmkONERROR(_AllocateContextBuffer(
+            context, buffer
+            ));
 
         /* Set gckEVENT object pointer. */
         buffer->eventObj = Hardware->kernel->eventObj;
@@ -2935,7 +2999,7 @@ gckCONTEXT_MapBuffer(
         if (kernel->virtualCommandBuffer)
         {
             commandBuffer = (gckVIRTUAL_COMMAND_BUFFER_PTR)buffer->physical;
-            physical = commandBuffer->physical;
+            physical = commandBuffer->virtualBuffer.physical;
 
             gcmkONERROR(gckOS_CreateUserVirtualMapping(
                 kernel->os,

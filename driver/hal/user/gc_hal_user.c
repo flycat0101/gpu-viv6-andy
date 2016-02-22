@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -253,13 +253,13 @@ _FillInOptions(
     gcOptions[gcvOPTION_PREFER_GUARDBAND] = gcvFALSE;
     gcOptions[gcvOPTION_PREFER_TILED_DISPLAY_BUFFER] = gcvFALSE;
     gcOptions[gcvOPTION_PREFER_TPG_TRIVIALMODEL] = gcvFALSE;
-    gcOptions[gcvOPTION_PREFER_RA_DEPTH_WRITE] = gcvFALSE;
+    gcOptions[gcvOPTION_PREFER_RA_DEPTH_WRITE] = gcvTRUE;
     gcOptions[gcvOPTION_PREFER_USC_RECONFIG] = gcvFALSE;
 
 
     gcOptions[gcvOPTION_KERNEL_FENCE] = gcvFALSE;
     gcOptions[gcvOPTION_ASYNC_BLT] = gcvFALSE;
-    gcOptions[gcvOPTION_GPU_TEX_UPLOAD] = gcvFALSE;
+    gcOptions[gcvOPTION_GPU_TEX_UPLOAD] = gcvTRUE;
 
 
     gcOptions[gcvOPTION_FBO_PREFER_MEM] = gcvFALSE;
@@ -477,6 +477,7 @@ gcoHAL_ConstructEx(
         for (i = 0; i < hal->chipCount; i++)
         {
             hal->chipTypes[i] = iface.u.ChipInfo.types[i];
+            hal->chipIDs[i] = iface.u.ChipInfo.ids[i];
 
             switch (hal->chipTypes[i])
             {
@@ -3165,7 +3166,8 @@ OnError:
 
 gceSTATUS
 gcoHAL_QueryResetTimeStamp(
-    OUT gctUINT64_PTR ResetTimeStamp
+    OUT gctUINT64_PTR ResetTimeStamp,
+    OUT gctUINT64_PTR ContextID
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -3181,6 +3183,11 @@ gcoHAL_QueryResetTimeStamp(
     gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
 
     *ResetTimeStamp = iface.u.QueryResetTimeStamp.timeStamp;
+
+    if (ContextID)
+    {
+        *ContextID = iface.u.QueryResetTimeStamp.contextID;
+    }
 
 OnError:
     gcmFOOTER();

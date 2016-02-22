@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -126,7 +126,7 @@ veglCreateContext(
         }
 
         /* Create gco3D object pointer. */
-        gcmERR_BREAK(gco3D_Construct(hal, &engine));
+        gcmERR_BREAK(gco3D_Construct(hal, gcvFALSE, &engine));
 
         context->os     = os;
         context->hal    = hal;
@@ -443,7 +443,7 @@ veglSetContext(
             clearArgs.flags = gcvCLEAR_DEPTH | gcvCLEAR_STENCIL;
 
 
-            gcmERR_BREAK(gcoSURF_Clear_v2(&dView, &clearArgs));
+            gcmERR_BREAK(gcoSURF_Clear(&dView, &clearArgs));
         }
 
         /* succeed to set context */
@@ -816,6 +816,7 @@ FindAllImageDescents(
 
 static EGLenum
 veglCreateImageParentImage(
+    void * Context,
     unsigned int vgImage,
     void ** Images,
     int * Count
@@ -829,11 +830,9 @@ veglCreateImageParentImage(
     int             i;
     gctINT32        referenceCount = 0;
 
-    _VGContext* context;
+    _VGContext* context = (_VGContext*) Context;
     gcmHEADER_ARG("vgImage=%d Images=0x%x Count=0x%x",
                   vgImage, Images, Count);
-
-    OVG_GET_CONTEXT(0);
 
     /* Test for VgImage validation. */
     vgimage_obj = (_VGImage*)GetVGObject(context, VGObject_Image, vgImage);

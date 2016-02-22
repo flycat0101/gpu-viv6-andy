@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -40,8 +40,6 @@ lookup;
 #include "gc_glsl_util.h"
 #include "gc_glsl_precompiled_shaders.h"
 #endif
-
-#define gcdDUMP_SHADER  0  /* use VC_DUMP_SHADER_SOURCE=1 env variable to dump shader source */
 
 gctCONST_STRING
 gcmShaderName(
@@ -152,14 +150,6 @@ gcCompileShader(
     gctCONST_STRING theSource = Source;
     gctINT shaderId = (gctINT)gcSHADER_NextId();
     gctUINT stringId = 0;
-
-    gctBOOL dumpShader =
-#if gcdDUMP_SHADER
-                                 gcvTRUE;
-#else
-                                 gcvFALSE;
-#endif
-    static gctBOOL firstTime = 1;
     gceAPI apiVersion = gcvAPI_OPENGL_ES20;
     /* fake a shader to have desired shaderId */
     struct _gcSHADER shader_;
@@ -188,23 +178,6 @@ gcCompileShader(
         gcmONERROR(gcSHADER_Destroy(*Binary));
     }
 
-    if (firstTime)
-    {
-        /* check environment variable VC_DUMP_SHADER_SOURCE */
-        char* p = gcvNULL;
-        gcoOS_GetEnv(gcvNULL, "VC_DUMP_SHADER_SOURCE", &p);
-        if (p)
-        {
-            if (gcmIS_SUCCESS(gcoOS_StrCmp(p, "1")) ||
-                gcmIS_SUCCESS(gcoOS_StrCmp(p, "on")) ||
-                gcmIS_SUCCESS(gcoOS_StrCmp(p, "ON")) )
-            {
-                gcmOPT_SET_DUMP_SHADER_SRC(gcvTRUE);
-            }
-        }
-        firstTime = 0;
-    }
-
     /* check if the current shader source is replaced by
        VC_OPTION=-SHADER option
     */
@@ -224,7 +197,7 @@ gcCompileShader(
             srcList = srcList->next;
         }
     }
-    if (dumpShader || gcSHADER_DumpSource(&shader_))
+    if (gcSHADER_DumpSource(&shader_))
     {
         gctCHAR buffer[512];
         gctUINT offset = 0;

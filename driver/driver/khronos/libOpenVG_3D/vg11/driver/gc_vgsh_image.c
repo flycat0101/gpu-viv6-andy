@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -830,15 +830,6 @@ _VGuint32 PackColor(_VGColor * srcColor, _VGColorDesc  *outputDesc)
             }\
         }\
     }while(0)
-
-
-#define WRITE_SURFACE_PIXEL(Surface, Memory, X, Y, Format, PixelValue) \
-        gcmVERIFY_OK(gcoSURF_WritePixel(Surface, Memory, X, Y,  Format, PixelValue));
-
-#define READ_SURFACE_PIXEL(Surface, Memory, X, Y, Format, PixelValue) \
-        gcmVERIFY_OK(gcoSURF_ReadPixel(Surface, Memory, X, Y,  Format, PixelValue));
-
-
 
 void _VGImageCtor(gcoOS os, _VGImage *image)
 {
@@ -2145,7 +2136,7 @@ void DoReadDataPixels(_VGContext *context,
     rlvArgs.uArgs.v2.rectSize.y  = height;
     rlvArgs.uArgs.v2.numSlices   = 1;
     rlvArgs.uArgs.v2.dump        = gcvTRUE;
-    gcmVERIFY_OK(gcoSURF_CopyPixels_v2(&srcView, &tmpView, &rlvArgs));
+    gcmVERIFY_OK(gcoSURF_CopyPixels(&srcView, &tmpView, &rlvArgs));
 
     /* Walk all lines. */
     for (y = 0; y < height; y++)
@@ -2229,7 +2220,7 @@ void DoWriteData(_VGContext *context,
     rlvArgs.uArgs.v2.rectSize.y  = height;
     rlvArgs.uArgs.v2.numSlices   = 1;
     rlvArgs.uArgs.v2.dump        = gcvTRUE;
-    gcmVERIFY_OK(gcoSURF_CopyPixels_v2(&tmpView, &dstView, &rlvArgs));
+    gcmVERIFY_OK(gcoSURF_CopyPixels(&tmpView, &dstView, &rlvArgs));
 
     gcmVERIFY_OK(gcoSURF_Unlock(tmpView.surf, memory[0]));
     gcmVERIFY_OK(gcoSURF_Destroy(tmpView.surf));
@@ -3851,5 +3842,3 @@ vgCreateEGLImageTargetKHR(VGeglImageKHR inImage)
     gcmFOOTER_ARG("return=%d", image->object.name);
     return (VGImage)image->object.name;
 }
-
-

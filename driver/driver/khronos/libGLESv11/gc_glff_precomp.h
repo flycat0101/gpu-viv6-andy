@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -35,10 +35,12 @@
 #endif
 #endif
 
-#ifdef gcdES11_CORE_WITH_EGL
-#if !defined(__EGL_EXPORTS)
-#  define __EGL_EXPORTS
-# endif
+#if defined(gcdES11_CORE_WITH_EGL) && !defined(EGLAPI)
+#if defined(_WIN32) && !defined(__SCITECH_SNAP__)
+#    define EGLAPI    __declspec(dllexport)
+#  else
+#    define EGLAPI
+#  endif
 #endif
 
 /* Use renaming trick to add the dispatching to all APIs. */
@@ -51,7 +53,7 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
-#if defined(LINUX) && !defined(EGL_API_FB)
+#if defined(_X11_XLIB_H_)
 /* Rename some badly named X defines. */
 #ifdef Status
 #   define XStatus      int

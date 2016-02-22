@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -165,7 +165,7 @@ gcOPTIMIZER_OPTION theOptimizerOption =
              2:  inline functions be called less than 5 times or medium size function
              3:  inline everything possible
      */
-    2, /* inlineLevel; */
+    GC_DEFAULT_INLINE_LEVEL, /* inlineLevel; */
 
     /* inline recompilation functions for depth comparison if inline level is not 0.
 
@@ -199,6 +199,25 @@ gcOPTIMIZER_OPTION theOptimizerOption =
     DUAL16_AUTO_BENCH, /* dual16Mode; */
     0, /* _dual16Start; */
     0x7fffffff, /* _dual16End */
+
+    /* dual 16 highp rule
+    *
+    *    VC_OPTION=-HPDUAL16:[0-x]
+    *       0: no dual16 highp rules applied
+    *       1: Dual16_PrecisionRule_TEXLD_COORD_HP
+    *       2: Dual16_PrecisionRule_RCP_HP
+    *       4: Dual16_PrecisionRule_FRAC_HP
+    *       8: Dual16_PrecisionRule_IMMED_HP
+    *       default is Dual16_PrecisionRule_FULL
+    *           (which is Dual16_PrecisionRule_TEXLD_COORD_HP |
+    *                     Dual16_PrecisionRule_RCP_HP         |
+    *                     Dual16_PrecisionRule_FRAC_HP        |
+    *                     Dual16_PrecisionRule_IMMED_HP)
+    */
+    Dual16_PrecisionRule_DEFAULT, /* dual16PrecisionRule; */
+
+    /* whether the user set dual16PrecisionRule */
+    gcvFALSE, /* dual16PrecisionRuleFromEnv; */
 
     /* force inline or not inline a function
      *
@@ -237,11 +256,9 @@ gcOPTIMIZER_OPTION theOptimizerOption =
      *    T-m,n: turn off VIRCG for shader id is in range of [m, n]
      *
      */
-#if VSC_BUILD
+
     VIRCG_WITH_TREECG, /* useVIRCodeGen; */
-#else
-    VIRCG_None, /* useVIRCodeGen; */
-#endif
+
     0, /* _vircgStart; */
     0x7fffffff, /* _vircgEnd */
 
@@ -264,7 +281,21 @@ gcOPTIMIZER_OPTION theOptimizerOption =
      *   VC_OPTION=-OCLUSENEG:0|1
      *
      */
-    gcvFALSE, /* oclUseNeg; */
+    gcvTRUE, /* oclUseNeg; */
+
+    /*  USE img intrinsic query function for OCL
+     *
+     *   VC_OPTION=-OCLUSEIMG_INTRINSIC_QUERY:0|1
+     *
+     */
+    gcvTRUE, /* oclUseImgIntrinsicQuery; */
+
+    /*  Pass kernel struct arguments by value in OCL
+     *
+     *   VC_OPTION=-OCLPASS_KERNEL_STRUCT_ARG_BY_VALUE:0|1
+     *
+     */
+    gcvFALSE, /* oclPassKernelStructArgByValue */
 
     /* Specify the log file name
      *
@@ -300,7 +331,7 @@ gcOPTIMIZER_OPTION theOptimizerOption =
      *    T-m:   turn off VIRCG for OCL shader id m
      *    T-m,n: turn off VIRCG for OCL shader id is in range of [m, n]
      */
-    gcvFALSE, /* CLUseVIRCodeGen; */
+    gcvTRUE, /* CLUseVIRCodeGen; */
 
 };
 
@@ -335,8 +366,7 @@ _MemPoolInit(
 
     gcmERR_RETURN(gcfMEM_InitAFSMemPool(&Optimizer->codeArrayMemPool, os, 300, sizeof(struct _gcOPT_CODE)));
     gcmERR_RETURN(gcfMEM_InitAFSMemPool(&Optimizer->functionArrayMemPool, os, 10, sizeof(struct _gcOPT_FUNCTION)));
-    gcmERR_RETURN(gcfMEM_InitAFSMemPool(&Optimizer->tempArrayMemPool, os, 100, sizeof(struct _gcOPT_TEMP)));
-    gcmERR_RETURN(gcfMEM_InitAFSMemPool(&Optimizer->tempDefineArrayMemPool, os, 100, sizeof(struct _gcOPT_TEMP_DEFINE)));
+    gcmERR_RETURN(gcfMEM_InitAFSMemPool(&Optimizer->tempDefineArrayMemPool, os, 500, sizeof(struct _gcOPT_TEMP_DEFINE)));
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -355,7 +385,6 @@ _MemPoolCleanup(
 
     gcfMEM_FreeAFSMemPool(&Optimizer->codeArrayMemPool);
     gcfMEM_FreeAFSMemPool(&Optimizer->functionArrayMemPool);
-    gcfMEM_FreeAFSMemPool(&Optimizer->tempArrayMemPool);
     gcfMEM_FreeAFSMemPool(&Optimizer->tempDefineArrayMemPool);
 
     gcmFOOTER_NO();
@@ -664,13 +693,9 @@ gctINT gcSHADER_getEffectiveShaderId(
     }
     else
     {
-#if VSC_BUILD
         VIR_Shader * vShader;
         vShader = (VIR_Shader *)Shader;
         return vShader->_id;
-#else
-        return 0;
-#endif
     }
 }
 
@@ -689,12 +714,30 @@ gcOPT_doVaryingPackingForShader(
 gctBOOL
 gcSHADER_GoVIRPass(gcSHADER Shader)
 {
-    if ((GetShaderType(Shader) == gcSHADER_TYPE_CL && gcmOPT_CLUseVIRCodeGen()) ||
-        (GetShaderType(Shader) != gcSHADER_TYPE_CL && (gcmOPT_UseVIRCodeGen() != VIRCG_None)))
+    if (GetShaderType(Shader) == gcSHADER_TYPE_CL)
     {
-        gctINT   startId = gcmOPT_VIRCGStart();
-        gctINT   endId   = gcmOPT_VIRCGEnd();
-        return gcDoTriageForShaderId(gcSHADER_getEffectiveShaderId(Shader), startId, endId);
+        /*
+        ** Turn on VIRCG for OpenCL only if:
+        ** 1) OpenCL has no int64 in the shader.
+        ** 2) This chip can support HALTI2.
+        */
+        if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI2) &&
+            gcmOPT_CLUseVIRCodeGen() &&
+            !gcShaderHasInt64(Shader))
+        {
+            gctINT   startId = gcmOPT_VIRCGStart();
+            gctINT   endId   = gcmOPT_VIRCGEnd();
+            return gcDoTriageForShaderId(gcSHADER_getEffectiveShaderId(Shader), startId, endId);
+        }
+    }
+    else
+    {
+        if (gcmOPT_UseVIRCodeGen() != VIRCG_None)
+        {
+            gctINT   startId = gcmOPT_VIRCGStart();
+            gctINT   endId   = gcmOPT_VIRCGEnd();
+            return gcDoTriageForShaderId(gcSHADER_getEffectiveShaderId(Shader), startId, endId);
+        }
     }
     return gcvFALSE;
 }
@@ -1213,90 +1256,6 @@ gcOpt_hasMultipleDependencyForSameTemp(
     return gcvFALSE;
 } /* gcOpt_hasMultipleDependencyForSameTemp */
 
-gctBOOL
-gcOpt_IsTempFunctionArgument(
-    IN  gcOPTIMIZER      Optimizer,
-    IN  gcOPT_FUNCTION   Function,
-    IN  gctUINT          Index,
-    IN  gctUINT          InputOrOutputOrAll,
-    OUT gctUINT *        ArgIndex,
-    OUT gcOPT_FUNCTION * ArgFunction
-    )
-{
-    gctUINT     i, j, argIndex = 0;
-    gctBOOL     specFunc = (Function == gcvNULL) ? gcvFALSE : gcvTRUE, found = gcvFALSE;
-    gcOPT_FUNCTION  argFunction = gcvNULL;
-
-    for (i = 0; i < Optimizer->functionCount; i++)
-    {
-        gcOPT_FUNCTION function;
-
-        if (specFunc)
-            function = Function;
-        else
-            function = Optimizer->functionArray + i;
-
-        for (j = 0; j < function->argumentCount; j++)
-        {
-            gcsFUNCTION_ARGUMENT_PTR argument = function->arguments + j;
-
-            if (InputOrOutputOrAll == 0)
-            {
-                if (argument->qualifier == gcvFUNCTION_INPUT ||
-                    argument->qualifier == gcvFUNCTION_INOUT)
-                {
-                    if (argument->index == Index)
-                    {
-                        argFunction = function;
-                        argIndex = j;
-                        found = gcvTRUE;
-                        break;
-                    }
-                }
-            }
-            else if (InputOrOutputOrAll == 1)
-            {
-                if (argument->qualifier == gcvFUNCTION_OUTPUT ||
-                    argument->qualifier == gcvFUNCTION_INOUT)
-                {
-                    if (argument->index == Index)
-                    {
-                        argFunction = function;
-                        argIndex = j;
-                        found = gcvTRUE;
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                if (argument->index == Index)
-                {
-                    argFunction = function;
-                    argIndex = j;
-                    found = gcvTRUE;
-                    break;
-                }
-            }
-        }
-
-        if (specFunc || found)
-            break;
-    }
-
-    if (ArgIndex)
-    {
-        *ArgIndex = argIndex;
-    }
-
-    if (Function == gcvNULL && ArgFunction)
-    {
-        *ArgFunction = argFunction;
-    }
-
-    return found;
-}
-
 #if _DEBUG_FOR_MEMORY_CORRUPTION_
 static void
 _CheckList(
@@ -1763,6 +1722,110 @@ gcOpt_AddListToList(
     return gcvSTATUS_OK;
 }
 
+static void
+_UpdateTempRegState(
+    gcOPTIMIZER         Optimizer,
+    gcOPT_TEMP          TempReg,
+    gcOPT_FUNCTION      Function,
+    gcSL_FORMAT         Format
+    )
+{
+    gctINT              i;
+#if _SUPPORT_LONG_ULONG_DATA_TYPE
+    gctBOOL             is64Bit = isFormat64bit(TempReg->format) || isFormat64bit(Format);
+#else
+    gctBOOL             is64Bit = gcvFALSE;
+#endif
+    gctINT              stride = is64Bit ? 2 : 1;
+    gcOPT_TEMP          tempReg;
+
+#if _SUPPORT_LONG_ULONG_DATA_TYPE
+    /* Update format. */
+    if (isFormat64bit(Format) && !isFormat64bit(TempReg->format))
+    {
+        gcmASSERT(TempReg->format == -1);
+        TempReg->format = Format;
+    }
+    if (is64Bit)
+    {
+        tempReg = TempReg + 1;
+        if (TempReg->argument)
+        {
+            tempReg->function = TempReg->function;
+            tempReg->argument = TempReg->argument;
+            tempReg->precision = TempReg->precision;
+            tempReg->arrayVariable = TempReg->arrayVariable;
+        }
+        else if (TempReg->isGlobal)
+        {
+            tempReg->isGlobal = gcvTRUE;
+            tempReg->function = gcvNULL;
+        }
+    }
+#endif
+
+    /* If this register is not a global var or a argument, we need to update it. */
+    if (TempReg->argument == gcvNULL && !TempReg->isGlobal)
+    {
+        /* If this register is not used in any function before, save the current function. */
+        if (!TempReg->setFunction)
+        {
+            TempReg->function = Function;
+            TempReg->setFunction = gcvTRUE;
+
+            if (is64Bit)
+            {
+                tempReg = TempReg + 1;
+                tempReg->function = Function;
+                tempReg->setFunction = gcvTRUE;
+                tempReg->format = Format;
+            }
+
+            if (TempReg->arrayVariable != gcvNULL && TempReg->arrayVariable->arraySize > 1)
+            {
+                for (i = 0; i < TempReg->arrayVariable->arraySize * stride; i++)
+                {
+                    tempReg = TempReg + i;
+                    tempReg->function = Function;
+                    tempReg->setFunction = gcvTRUE;
+                    if (is64Bit)
+                    {
+                        tempReg->format = Format;
+                    }
+                }
+            }
+        }
+        /* If this register is used in two different functions, then mark it as global. */
+        else if (TempReg->function != Function)
+        {
+            TempReg->isGlobal = gcvTRUE;
+            TempReg->function = gcvNULL;
+
+            if (is64Bit)
+            {
+                tempReg = TempReg + 1;
+                tempReg->isGlobal = gcvTRUE;
+                tempReg->function = gcvNULL;
+                tempReg->format = Format;
+            }
+
+            if (TempReg->arrayVariable != gcvNULL && TempReg->arrayVariable->arraySize > 1)
+            {
+                for (i = 0; i < TempReg->arrayVariable->arraySize * stride; i++)
+                {
+                    tempReg = TempReg + i;
+                    tempReg->isGlobal = gcvTRUE;
+                    tempReg->function = gcvNULL;
+                    if (is64Bit)
+                    {
+                        tempReg->format = Format;
+                    }
+                }
+            }
+        }
+    }
+}
+
 /*******************************************************************************
 **                               gcOpt_InitializeTempArray
 ********************************************************************************
@@ -1808,7 +1871,6 @@ gcOpt_InitializeTempArray(
         temp->isGlobal = gcvFALSE;
         temp->usage = 0;
         temp->isIndex = gcvFALSE;
-        temp->temp = (gctPOINTER) -1;
         temp->format = -1;
     }
 
@@ -1830,239 +1892,6 @@ gcOpt_InitializeTempArray(
                 continue;
 
             tempArray[Optimizer->outputs[i]->tempIndex].isGlobal = gcvTRUE;
-        }
-    }
-
-    /* Set usage and isGlobal. */
-    for (code = Optimizer->codeHead; code; code = code->next)
-    {
-        gcSL_OPCODE opcode = (gcSL_OPCODE)gcmSL_OPCODE_GET(code->instruction.opcode, Opcode);
-
-        switch (opcode)
-        {
-        case gcSL_STORE:
-        case gcSL_IMAGE_WR:
-        case gcSL_IMAGE_WR_3D:
-        case gcSL_ATTR_ST:
-            /* Skip store instructions. */
-            temp = gcvNULL;
-            break;
-
-        default:
-            if (gcSL_isOpcodeHaveNoTarget(opcode))
-            {
-                temp = gcvNULL;
-                break;
-            }
-
-            if (opcode == gcSL_SET)
-            {
-                /* Skip specail SET.Z for select/cmp. */
-                if (gcmSL_TARGET_GET(code->instruction.temp, Condition) == gcSL_ZERO)
-                {
-                    temp = gcvNULL;
-                    break;
-                }
-            }
-
-            /* Get gcSL_TARGET field. */
-            target = code->instruction.temp;
-
-            /* Get pointer to temporary register. */
-            temp = tempArray + code->instruction.tempIndex;
-
-            /* Update register usage. */
-            temp->usage |= gcmSL_TARGET_GET(target, Enable);
-
-            if (needToCheckGlobal && temp->function == gcvNULL && !temp->isGlobal)
-            {
-                /* Check if the register is global. */
-                if (temp->temp != (gctPOINTER) code->function)
-                {
-                    if (temp->temp == (gctPOINTER) -1)
-                    {
-                        temp->temp = (gctPOINTER) code->function;
-                    }
-                    else
-                    {
-                        temp->isGlobal = gcvTRUE;
-                    }
-                }
-            }
-            break;
-        }
-
-        /* If isIndex is needed, comment out the next line. */
-        if (!needToCheckGlobal) continue;
-
-        /* Determine usage of source0. */
-        source = code->instruction.source0;
-
-        if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
-        {
-            /* Get pointer to temporary register. */
-            temp = tempArray + code->instruction.source0Index;
-
-            if (temp->function == gcvNULL && !temp->isGlobal)
-            {
-                /* Check if the register is global. */
-                if (temp->temp != (gctPOINTER) code->function)
-                {
-                    if (temp->temp == (gctPOINTER) -1)
-                    {
-                        temp->temp = (gctPOINTER) code->function;
-                    }
-                    else
-                    {
-                        temp->isGlobal = gcvTRUE;
-                    }
-                }
-            }
-        }
-
-        if (gcmSL_TARGET_GET(code->instruction.temp, Indexed) != gcSL_NOT_INDEXED)
-        {
-            index = code->instruction.tempIndexed;
-
-            /* Get pointer to temporary register. */
-            temp = tempArray + gcmSL_INDEX_GET(index, Index);
-
-            /* Mark the temporary register is used as an index. */
-            temp->isIndex = gcvTRUE;
-
-            if (temp->function == gcvNULL && !temp->isGlobal)
-            {
-                /* Check if the register is global. */
-                if (temp->temp != (gctPOINTER) code->function)
-                {
-                    if (temp->temp == (gctPOINTER) -1)
-                    {
-                        temp->temp = (gctPOINTER) code->function;
-                    }
-                    else
-                    {
-                        temp->isGlobal = gcvTRUE;
-                    }
-                }
-            }
-        }
-
-        /* Determine usage of source1. */
-        source = code->instruction.source1;
-
-        if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
-        {
-            /* Get pointer to temporary register. */
-            temp = tempArray + code->instruction.source1Index;
-
-            if (temp->function == gcvNULL && !temp->isGlobal)
-            {
-                /* Check if the register is global. */
-                if (temp->temp != (gctPOINTER) code->function)
-                {
-                    if (temp->temp == (gctPOINTER) -1)
-                    {
-                        temp->temp = (gctPOINTER) code->function;
-                    }
-                    else
-                    {
-                        temp->isGlobal = gcvTRUE;
-                    }
-                }
-            }
-        }
-
-        if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED)
-        {
-            index = code->instruction.source1Indexed;
-
-            /* Get pointer to temporary register. */
-            temp = tempArray + gcmSL_INDEX_GET(index, Index);
-
-            /* Mark the temporary register is used as an index. */
-            temp->isIndex = gcvTRUE;
-
-            if (temp->function == gcvNULL && !temp->isGlobal)
-            {
-                /* Check if the register is global. */
-                if (temp->temp != (gctPOINTER) code->function)
-                {
-                    if (temp->temp == (gctPOINTER) -1)
-                    {
-                        temp->temp = (gctPOINTER) code->function;
-                    }
-                    else
-                    {
-                        temp->isGlobal = gcvTRUE;
-                    }
-                }
-            }
-        }
-        if (opcode == gcSL_STORE || opcode == gcSL_ATTR_ST)
-        {
-            /* STORE's target is the value to be stored */
-
-            temp = tempArray + code->instruction.tempIndex;
-
-            if (temp->function == gcvNULL && !temp->isGlobal)
-            {
-                /* Check if the register is global. */
-                if (temp->temp != (gctPOINTER) code->function)
-                {
-                    if (temp->temp == (gctPOINTER) -1)
-                    {
-                        temp->temp = (gctPOINTER) code->function;
-                    }
-                    else
-                    {
-                        temp->isGlobal = gcvTRUE;
-                    }
-                }
-            }
-            if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED)
-            {
-                index = code->instruction.source0Indexed;
-
-                /* Get pointer to temporary register. */
-                temp = tempArray + gcmSL_INDEX_GET(index, Index);
-
-                /* Mark the temporary register is used as an index. */
-                temp->isIndex = gcvTRUE;
-
-                if (temp->function == gcvNULL && !temp->isGlobal)
-                {
-                    /* Check if the register is global. */
-                    if (temp->temp != (gctPOINTER) code->function)
-                    {
-                        if (temp->temp == (gctPOINTER) -1)
-                        {
-                            temp->temp = (gctPOINTER) code->function;
-                        }
-                        else
-                        {
-                            temp->isGlobal = gcvTRUE;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    if (needToCheckGlobal)
-    {
-        /* Add global temp registers to global list. */
-        temp = tempArray;
-        for (i = 0; i < tempCount; i++, temp++)
-        {
-            if (temp->isGlobal)
-            {
-                gcOPT_LIST list;
-                gcmERR_RETURN(_CAllocateList(Optimizer->listMemPool, &list));
-
-                /* Add to global variable list. */
-                list->index = i;
-                list->next = Optimizer->global;
-                Optimizer->global = list;
-            }
         }
     }
 
@@ -2094,8 +1923,126 @@ gcOpt_InitializeTempArray(
                 for (j = 0; j < size; j++, temp++)
                 {
                     temp->arrayVariable = variable;
-                    temp->precision = variable->precision;
                 }
+            }
+        }
+    }
+
+    /* Set usage and isGlobal. */
+    for (code = Optimizer->codeHead; code; code = code->next)
+    {
+        gcSL_OPCODE opcode = (gcSL_OPCODE)gcmSL_OPCODE_GET(code->instruction.opcode, Opcode);
+
+        if (gcSL_isOpcodeTargetInvalid(opcode) ||  gcSL_isOpcodeHaveNoTarget(opcode) ||
+            (opcode == gcSL_SET  && gcmSL_TARGET_GET(code->instruction.temp, Condition) == gcSL_ZERO))
+        {
+            temp = gcvNULL;
+        }
+        else
+        {
+            /* Get gcSL_TARGET field. */
+            target = code->instruction.temp;
+
+            /* Get pointer to temporary register. */
+            temp = tempArray + code->instruction.tempIndex;
+
+            /* Update register usage. */
+            temp->usage |= gcmSL_TARGET_GET(target, Enable);
+
+            if (needToCheckGlobal)
+            {
+                _UpdateTempRegState(Optimizer, temp, code->function, gcmSL_TARGET_GET(code->instruction.temp, Format));
+            }
+        }
+
+        /* If isIndex is needed, comment out the next line. */
+        if (!needToCheckGlobal) continue;
+
+        /* Determine usage of source0. */
+        source = code->instruction.source0;
+
+        if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
+        {
+            /* Get pointer to temporary register. */
+            temp = tempArray + code->instruction.source0Index;
+
+            _UpdateTempRegState(Optimizer, temp, code->function, gcmSL_SOURCE_GET(code->instruction.source0, Format));
+        }
+
+        if (gcmSL_TARGET_GET(code->instruction.temp, Indexed) != gcSL_NOT_INDEXED)
+        {
+            index = code->instruction.tempIndexed;
+
+            /* Get pointer to temporary register. */
+            temp = tempArray + gcmSL_INDEX_GET(index, Index);
+
+            /* Mark the temporary register is used as an index. */
+            temp->isIndex = gcvTRUE;
+
+            _UpdateTempRegState(Optimizer, temp, code->function, 0);
+        }
+
+        /* Determine usage of source1. */
+        source = code->instruction.source1;
+
+        if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
+        {
+            /* Get pointer to temporary register. */
+            temp = tempArray + code->instruction.source1Index;
+
+            _UpdateTempRegState(Optimizer, temp, code->function, gcmSL_SOURCE_GET(code->instruction.source1, Format));
+        }
+
+        if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED)
+        {
+            index = code->instruction.source1Indexed;
+
+            /* Get pointer to temporary register. */
+            temp = tempArray + gcmSL_INDEX_GET(index, Index);
+
+            /* Mark the temporary register is used as an index. */
+            temp->isIndex = gcvTRUE;
+
+            _UpdateTempRegState(Optimizer, temp, code->function, 0);
+        }
+        if (gcSL_isOpcodeTargetInvalid(opcode))
+        {
+            /* STORE's target is the value to be stored */
+
+            temp = tempArray + code->instruction.tempIndex;
+
+            _UpdateTempRegState(Optimizer, temp, code->function, 0);
+
+            if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED)
+            {
+                index = code->instruction.source0Indexed;
+
+                /* Get pointer to temporary register. */
+                temp = tempArray + gcmSL_INDEX_GET(index, Index);
+
+                /* Mark the temporary register is used as an index. */
+                temp->isIndex = gcvTRUE;
+
+                _UpdateTempRegState(Optimizer, temp, code->function, 0);
+            }
+        }
+    }
+
+    if (needToCheckGlobal)
+    {
+        /* Add global temp registers to global list. */
+        temp = tempArray;
+        for (i = 0; i < tempCount; i++, temp++)
+        {
+            if (temp->isGlobal)
+            {
+                gcOPT_LIST list;
+                gcmERR_RETURN(_CAllocateList(Optimizer->listMemPool, &list));
+
+                /* Add to global variable list. */
+                list->index = i;
+                list->next = Optimizer->global;
+                Optimizer->global = list;
             }
         }
     }
@@ -2105,7 +2052,78 @@ gcOpt_InitializeTempArray(
 }
 
 /*******************************************************************************
-**                               _BuildTempArray
+**                         gcOpt_InitializeTempIndexForFunctions
+********************************************************************************
+**
+**    Initialize temp register start index, end index and count for functions.
+**
+**    INPUT:
+**
+**        gcOPTIMIZER Optimizer
+**            Pointer to a gcOPTIMIZER structure.
+*/
+gceSTATUS
+gcOpt_InitializeTempIndexForFunctions(
+    IN gcOPTIMIZER      Optimizer
+    )
+{
+    gceSTATUS               status = gcvSTATUS_OK;
+    gctUINT32               i;
+
+    gcmHEADER_ARG("Optimizer=%p", Optimizer);
+
+#if _REMAP_TEMP_INDEX_FOR_FUNCTION_
+    for (i = 0; i < Optimizer->tempCount; i++)
+    {
+        gcOPT_TEMP          tempArray = Optimizer->tempArray;
+        gcOPT_TEMP          temp;
+        temp = tempArray + i;
+
+        if (temp && !temp->isGlobal && temp->function)
+        {
+            temp->function->tempIndexCount++;
+
+            if (temp->function->tempIndexStart == (gctUINT32)-1 ||
+                temp->function->tempIndexStart > i)
+            {
+                temp->function->tempIndexStart = i;
+            }
+
+            if (temp->function->tempIndexEnd == (gctUINT32)-1 ||
+                temp->function->tempIndexEnd < i)
+            {
+                temp->function->tempIndexEnd = i;
+            }
+        }
+    }
+#else
+    for (i = 0; i < Optimizer->functionCount; i++)
+    {
+        gcOPT_FUNCTION      function = Optimizer->functionArray + i;
+
+        if (function->shaderFunction)
+        {
+            function->tempIndexStart    = function->shaderFunction->tempIndexStart;
+            function->tempIndexEnd      = function->shaderFunction->tempIndexEnd;
+            function->tempIndexCount    = function->shaderFunction->tempIndexCount;
+        }
+        else
+        {
+            gcmASSERT(function->kernelFunction);
+
+            function->tempIndexStart    = function->kernelFunction->tempIndexStart;
+            function->tempIndexEnd      = function->kernelFunction->tempIndexEnd;
+            function->tempIndexCount    = function->kernelFunction->tempIndexCount;
+        }
+    }
+#endif
+
+    gcmFOOTER();
+    return status;
+}
+
+/*******************************************************************************
+**                               gcOpt_BuildTempArray
 ********************************************************************************
 **
 **    Build optimizer's temp register array.
@@ -2115,14 +2133,15 @@ gcOpt_InitializeTempArray(
 **        gcOPTIMIZER Optimizer
 **            Pointer to a gcOPTIMIZER structure.
 */
-static gceSTATUS
-_BuildTempArray(
+gceSTATUS
+gcOpt_BuildTempArray(
     IN gcOPTIMIZER      Optimizer
     )
 {
     gceSTATUS           status = gcvSTATUS_OK;
     gctUINT             i, tempCount;
     gcOPT_TEMP          tempArray = gcvNULL;
+    gctPOINTER          pointer = gcvNULL;
 
     gcmHEADER_ARG("Optimizer=%p", Optimizer);
 
@@ -2133,7 +2152,9 @@ _BuildTempArray(
     {
         if (tempCount > 0)
         {
-            gcmERR_RETURN(_CAllocateTempArray(Optimizer->tempArrayMemPool, &tempArray, tempCount));
+            gcmERR_RETURN(gcoOS_Allocate(gcvNULL, tempCount * gcmSIZEOF(struct _gcOPT_TEMP), &pointer));
+            gcoOS_ZeroMemory(pointer, tempCount * gcmSIZEOF(struct _gcOPT_TEMP));
+            tempArray = (gcOPT_TEMP)pointer;
             Optimizer->tempArray = tempArray;
         }
         Optimizer->tempCount = tempCount;
@@ -2153,6 +2174,9 @@ _BuildTempArray(
             return status;
         }
 
+        function->tempIndexStart = function->tempIndexEnd = (gctUINT32)-1;
+        function->tempIndexCount = 0;
+
         argument = function->arguments;
         for (j = 0; j < function->argumentCount; j++, argument++)
         {
@@ -2161,19 +2185,20 @@ _BuildTempArray(
             gcmASSERT(tempArray[index].function == gcvNULL);
             tempArray[index].function = function;
             tempArray[index].argument = argument;
-            tempArray[index].precision = (gcSHADER_PRECISION)argument->precision;
 
             if (argument->variableIndex != 0xffff)
             {
                 gcmASSERT(argument->variableIndex < Optimizer->shader->variableCount);
                 tempArray[index].arrayVariable = Optimizer->shader->variables[argument->variableIndex];
-                tempArray[index].precision = tempArray[index].arrayVariable->precision;
             }
         }
     }
 
     /* Initialize temp registers' flags. */
     gcmERR_RETURN(gcOpt_InitializeTempArray(Optimizer));
+
+    /* Initialize temp register start index, end index and count for functions. */
+    gcmERR_RETURN(gcOpt_InitializeTempIndexForFunctions(Optimizer));
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -2218,7 +2243,7 @@ gcOpt_ClearTempArray(
 }
 
 /*******************************************************************************
-**                               _DestroyTempArray
+**                               gcOpt_DestroyTempArray
 ********************************************************************************
 **
 **    Destroy optimizer's temp register array.
@@ -2228,25 +2253,58 @@ gcOpt_ClearTempArray(
 **        gcOPTIMIZER Optimizer
 **            Pointer to a gcOPTIMIZER structure.
 */
-static gceSTATUS
-_DestroyTempArray(
+gceSTATUS
+gcOpt_DestroyTempArray(
     IN gcOPTIMIZER      Optimizer
     )
 {
     gceSTATUS           status = gcvSTATUS_OK;
-    gcOPT_TEMP          tempArray = Optimizer->tempArray;
 
     gcmHEADER_ARG("Optimizer=%p", Optimizer);
 
-    if (tempArray == gcvNULL)
+    if (Optimizer->tempArray == gcvNULL)
     {
         gcmFOOTER_NO();
         return gcvSTATUS_OK;
     }
 
-    gcmVERIFY_OK(_FreeTempArray(Optimizer->tempArrayMemPool, Optimizer->tempArray));
-    Optimizer->tempArray = gcvNULL;
+    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Optimizer->tempArray));
 
+    /* Free global variable list. */
+    if (Optimizer->global)
+    {
+        gcmVERIFY_OK(gcOpt_DestroyList(Optimizer, &Optimizer->global));
+        Optimizer->global = gcvNULL;
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+/*******************************************************************************
+**                               gcOpt_RebuildTempArray
+********************************************************************************
+**
+**    Rebuild optimizer's temp register array.
+**
+**    INPUT:
+**
+**        gcOPTIMIZER Optimizer
+**            Pointer to a gcOPTIMIZER structure.
+*/
+gceSTATUS
+gcOpt_RebuildTempArray(
+    IN gcOPTIMIZER      Optimizer
+    )
+{
+    gceSTATUS           status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Optimizer=%p", Optimizer);
+
+    gcmONERROR(gcOpt_DestroyTempArray(Optimizer));
+    gcmONERROR(gcOpt_BuildTempArray(Optimizer));
+
+OnError:
     gcmFOOTER();
     return status;
 }
@@ -2350,10 +2408,7 @@ _BuildGlobalUsage(
 
                 if (temp->isGlobal)
                 {
-                    if (gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) != gcSL_STORE &&
-                        gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) != gcSL_IMAGE_WR &&
-                        gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) != gcSL_IMAGE_WR_3D &&
-                        gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) != gcSL_ATTR_ST)
+                    if (!gcSL_isOpcodeTargetInvalid(gcmSL_OPCODE_GET(code->instruction.opcode, Opcode)))
                     {
                         if (temp->tempInt == -1)
                         {
@@ -2750,7 +2805,7 @@ gcOpt_IsCodeBelongToFunc(
 
         if (function == gcvNULL) continue;
 
-        for (code = function->codeHead; code != function->codeTail->next; code = code->next)
+        for (code = function->codeHead; code && (code != function->codeTail->next); code = code->next)
         {
             if (code == Code)
             {
@@ -2897,9 +2952,38 @@ gcOpt_MoveCodeListAfter(
     IN gcOPTIMIZER      Optimizer,
     IN gcOPT_CODE       SrcCodeHead,
     IN gcOPT_CODE       SrcCodeTail,
-    IN gcOPT_CODE       DestCode
+    IN gcOPT_CODE       DestCode,
+    IN gctBOOL          MergeToUpper
     )
 {
+    gcOPT_CODE          codeIter;
+    gcOPT_FUNCTION      function;
+
+    /* Update function. */
+    if (MergeToUpper)
+    {
+        function = DestCode->function;
+
+        if (function && function->codeTail == DestCode)
+        {
+            function->codeTail = SrcCodeTail;
+        }
+    }
+    else
+    {
+        function = DestCode->next ? DestCode->next->function : gcvNULL;
+
+        if (function && function->codeHead == DestCode)
+        {
+            function->codeHead = SrcCodeHead;
+        }
+    }
+
+    for (codeIter = SrcCodeHead; codeIter != SrcCodeTail->next; codeIter = codeIter->next)
+    {
+        codeIter->function = function;
+    }
+
     /* Unlink the list from the original place. */
     if (SrcCodeTail->next)
     {
@@ -3410,6 +3494,8 @@ _BuildFunctionArray(
             function->maxDepthFunc = gcvNULL;
             function->hasEmitCode = gcvFALSE;
 
+            function->tempIndexStart = function->tempIndexEnd = (gctUINT32)-1;
+
             /* At beginning, codeHead is sequential in an array. */
             function->codeHead = codeHead + shaderFunction->codeStart;
             function->codeTail = codeHead + shaderFunction->codeStart + shaderFunction->codeCount - 1;
@@ -3459,6 +3545,8 @@ _BuildFunctionArray(
                 function->maxDepthFunc = gcvNULL;
                 function->hasEmitCode = gcvFALSE;
 
+                function->tempIndexStart = function->tempIndexEnd = (gctUINT32)-1;
+
                 /* At beginning, codeHead is sequential in an array. */
                 function->codeHead = codeHead + kernelFunction->codeStart;
                 function->codeTail = codeHead + kernelFunction->codeEnd - 1;
@@ -3502,7 +3590,6 @@ _DestroyFunctionArray(
     )
 {
     gceSTATUS           status = gcvSTATUS_OK;
-    gcOPT_TEMP          tempArray = Optimizer->tempArray;
     gcOPT_FUNCTION      functionArray = Optimizer->functionArray;
     gcOPT_FUNCTION      function;
 
@@ -3532,23 +3619,6 @@ _DestroyFunctionArray(
             function->globalUsage = usage->next;
             gcmVERIFY_OK(_FreeGlobalUsage(Optimizer->usageMemPool, usage));
         }
-
-        if (tempArray)
-        {
-            gcsFUNCTION_ARGUMENT_PTR argument;
-            gctUINT i;
-
-            /* Update temps' function for function arguments. */
-            argument = function->arguments;
-            for (i = 0; i < function->argumentCount; i++, argument++)
-            {
-                gctUINT index = argument->index;
-
-                gcmASSERT(tempArray[index].function == function);
-                tempArray[index].function = gcvNULL;
-                tempArray[index].argument = gcvNULL;
-            }
-        }
     }
 
     gcmVERIFY_OK(_FreeFunctionArray(Optimizer->functionArrayMemPool, functionArray));
@@ -3573,7 +3643,7 @@ _DestroyFunctionArray(
 **        gcOPT_FUNCTION Function
 **            Pointer to a gcOPT_FUNCTION structure to be deleted.
 **
-**        gctBOOL        RebiuldDF
+**        gctBOOL        RebuildDF
 **            rebuild data flow if true, otherwise delay the rebuild
 **
 */
@@ -3581,7 +3651,7 @@ gceSTATUS
 gcOpt_DeleteFunction(
     IN gcOPTIMIZER      Optimizer,
     IN gcOPT_FUNCTION   Function,
-    IN gctBOOL          RebiuldDF,
+    IN gctBOOL          RebuildDF,
     IN gctBOOL          DeleteVariable
     )
 {
@@ -3646,13 +3716,11 @@ gcOpt_DeleteFunction(
             gcmASSERT(tempArray[index].function == functionArray + j + 1);
             tempArray[index].function = functionArray + j;
             tempArray[index].argument = argument;
-            tempArray[index].precision = (gcSHADER_PRECISION)argument->precision;
 
             if (argument->variableIndex != 0xffff)
             {
                 gcmASSERT(argument->variableIndex < Optimizer->shader->variableCount);
                 tempArray[index].arrayVariable = Optimizer->shader->variables[argument->variableIndex];
-                tempArray[index].precision = tempArray[index].arrayVariable->precision;
             }
         }
 
@@ -3678,7 +3746,7 @@ gcOpt_DeleteFunction(
         Optimizer->functionArray = gcvNULL;
     }
 
-    if (RebiuldDF)
+    if (RebuildDF)
     {
         /* Rebuild flow graph. */
         gcmVERIFY_OK(gcOpt_RebuildFlowGraph(Optimizer));
@@ -3958,7 +4026,7 @@ gcOpt_CopyOutShader(
     gcOPT_CODE          srcCode;
     gcSL_INSTRUCTION    code;
     gctUINT             pc;
-    gctUINT             i;
+    gctUINT             i, j;
 
     gcmHEADER_ARG("Optimizer=%p Shader=%p", Optimizer, Shader);
 
@@ -4018,7 +4086,17 @@ gcOpt_CopyOutShader(
 
             gcmASSERT(Optimizer->isMainMergeWithKerenel);
 
-            /* All functions are expanded except the main kernel function. */
+            /*
+            ** After optimizer, the kernel function may be changed.
+            ** E.g, there are two kernel functions, A and B, in this shader,
+            ** and function A is current function and it used function B,
+            ** so we save the arguments of function A into shader uniforms.
+            ** After optimizer, the kernel function may be changed to function B,
+            ** we need to change it to function A.
+            */
+
+            Optimizer->main->kernelFunction = Shader->currentKernelFunction;
+
             for (i = 0; i < Shader->kernelFunctionCount; i++)
             {
                 kernelFunction = Shader->kernelFunctions[i];
@@ -4028,12 +4106,70 @@ gcOpt_CopyOutShader(
                     continue;
                 }
 
-                if (kernelFunction->arguments)
+                /* Free the gcSHADER_FUNCTION_ARGUMENT structure. */
+                if (kernelFunction->arguments != gcvNULL)
                 {
-                    /* Free argument array. */
-                    gcmVERIFY_OK(gcmOS_SAFE_FREE(os, kernelFunction->arguments));
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->arguments));
+                    kernelFunction->argumentArrayCount = 0;
+                    kernelFunction->argumentCount = 0;
                 }
-                gcmVERIFY_OK(gcmOS_SAFE_FREE(os, kernelFunction));
+
+                /* Free any uniforms. */
+                if (kernelFunction->uniformArguments != gcvNULL)
+                {
+                    for (j = 0; j < kernelFunction->uniformArgumentCount; j++)
+                    {
+                        /* Free the gcUNIFORM structure. */
+                        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->uniformArguments[j]));
+                    }
+
+                    /* Free the array of gcUNIFORM pointers. */
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->uniformArguments));
+                    kernelFunction->uniformArgumentArrayCount = 0;
+                    kernelFunction->uniformArgumentCount = 0;
+                }
+
+                /* Free any variables. */
+                if (kernelFunction->localVariables != gcvNULL)
+                {
+                    for (j = 0; j < Shader->kernelFunctions[j]->localVariableCount; j++)
+                    {
+                        /* Free the gcVARIABLE structure. */
+                        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->localVariables[j]));
+                    }
+
+                    /* Free the array of gcVARIABLE pointers. */
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->localVariables));
+                    kernelFunction->localVariableCount = 0;
+                }
+
+                /* Free any image samplers. */
+                if (kernelFunction->imageSamplers != gcvNULL)
+                {
+                     /* Free the array of gcsIMAGE_SAMPLER pointers. */
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->imageSamplers));
+                    kernelFunction->imageSamplerArrayCount = 0;
+                    kernelFunction->imageSamplerCount = 0;
+                }
+
+                /* Free any properties. */
+                if (kernelFunction->properties != gcvNULL)
+                {
+                    /* Free the gcKERNEL_FUNCTION_PROPERTY structure. */
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->properties));
+                    kernelFunction->propertyArrayCount = 0;
+                    kernelFunction->propertyCount = 0;
+                }
+
+                /* Free any property values. */
+                if (kernelFunction->propertyValues != gcvNULL)
+                {
+                    /* Free the gctUINT array. */
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction->propertyValues));
+                    kernelFunction->propertyValueArrayCount = 0;
+                    kernelFunction->propertyValueCount = 0;
+                }
+                gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, kernelFunction));
             }
 
             /* Free the function array. */
@@ -4325,7 +4461,7 @@ _PackMainProgram(
     gctUINT             i;
     gctINT              k;
     gctBOOL             changeCode = gcvFALSE;
-    gctBOOL             functionRemoved;
+    gctBOOL             functionRemoved = gcvFALSE;
 
     gcmHEADER_ARG("Optimizer=%p", Optimizer);
 
@@ -4522,13 +4658,11 @@ _PackMainProgram(
                         gcmASSERT(tempArray[index].function == functionArray + j + 1);
                         tempArray[index].function = functionArray + j;
                         tempArray[index].argument = argument;
-                        tempArray[index].precision = (gcSHADER_PRECISION)argument->precision;
 
                         if (argument->variableIndex != 0xffff)
                         {
                             gcmASSERT(argument->variableIndex < Optimizer->shader->variableCount);
                             tempArray[index].arrayVariable = Optimizer->shader->variables[argument->variableIndex];
-                            tempArray[index].precision = tempArray[index].arrayVariable->precision;
                         }
                     }
                 }
@@ -4650,6 +4784,64 @@ _PackMainProgram(
     }
 
     gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcOpt_RemapTempIndex(
+    INOUT gcOPTIMIZER * OptimizerPtr
+    )
+{
+    gceSTATUS           status = gcvSTATUS_OK;
+    gcOPTIMIZER         optimizer = *OptimizerPtr;
+    gcOPT_FUNCTION      function;
+    gctBOOL             reBuildTempArray = gcvFALSE;
+    gctUINT             i;
+    gctINT              newTempIndexStart;
+
+    gcmHEADER_ARG("Optimizer=%p", optimizer);
+
+    /* We need to make sure that the temp index of function local variables are continuous. */
+    for (i = 0; i < optimizer->functionCount; i++)
+    {
+        function = optimizer->functionArray + i;
+
+        if (function == gcvNULL ||
+            (function->shaderFunction != gcvNULL && IsFunctionRecompilerStub(function->shaderFunction)))
+        {
+            continue;
+        }
+
+        gcmASSERT(function->tempIndexEnd >= function->tempIndexStart);
+
+        if ((function->tempIndexEnd - function->tempIndexStart +1) ==
+            (function->tempIndexCount))
+        {
+            continue;
+        }
+
+        gcmASSERT((function->tempIndexEnd - function->tempIndexStart + 1) >
+                  (function->tempIndexCount));
+
+        /* The temp indexes are not continuous, remap them. */
+        newTempIndexStart = gcSHADER_NewTempRegs(optimizer->shader,
+                                                 function->tempIndexCount,
+                                                 gcSHADER_FLOAT_X1);
+
+        gcmONERROR(gcOpt_RemapTempIndexForFunction(optimizer,
+                                                   function,
+                                                   newTempIndexStart));
+        reBuildTempArray = gcvTRUE;
+    }
+
+    if (reBuildTempArray)
+    {
+        /* Reconstruct optimizer. */
+        gcmONERROR(gcOpt_ReconstructOptimizer(optimizer->shader, OptimizerPtr));
+    }
+
+OnError:
+    gcmFOOTER_NO();
     return status;
 }
 
@@ -5489,7 +5681,7 @@ _InsertInitializerInstForOutput(
     gceSTATUS        status = gcvSTATUS_OK;
     gctUINT32        i;
 
-    if (Optimizer->shader->type == gcSHADER_TYPE_FRAGMENT && !gctOPT_hasFeature(FB_ENABLE_FS_OUT_INIT))
+    if (Optimizer->shader->type == gcSHADER_TYPE_FRAGMENT && !gcmOPT_hasFeature(FB_ENABLE_FS_OUT_INIT))
     {
         /* 15.2.1 Selecting Buffers for Writing
          * If a fragment shader writes to none of gl_FragColor, gl_FragData,
@@ -5802,10 +5994,10 @@ _BuildDataFlowForCode(
         break;
 
     case gcSL_STORE1:
+    case gcSL_STORE_L:
         /* Add output usage. */
         gcmERR_RETURN(gcOpt_AddIndexToList(Optimizer, &Code->users, gcvOPT_OUTPUT_REGISTER));
         break;
-
     case gcSL_ATOMADD:
     case gcSL_ATOMSUB:
     case gcSL_ATOMXCHG:
@@ -5926,7 +6118,8 @@ _BuildDataFlowForCode(
                             _needSuccessiveReg(Optimizer, code->source0Index)));
     }
 
-    if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED)
+    if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED ||
+        opcode == gcSL_COPY)
     {
         gctUINT enable = 0;
 
@@ -6015,7 +6208,7 @@ _BuildDataFlowForCode(
                             _needSuccessiveReg(Optimizer, code->source1Index)));
     }
 
-    if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED)
+    if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED || opcode == gcSL_COPY)
     {
         gctUINT enable = 0;
 
@@ -6071,7 +6264,7 @@ _BuildDataFlowForCode(
             }
             else
             {
-                gcmASSERT(Optimizer->tempArray[code->source1Index].arrayVariable);
+                gcmASSERT(Optimizer->tempArray[code->source1Index].arrayVariable || opcode == gcSL_COPY);
             }
         }
     }
@@ -6139,7 +6332,7 @@ _BuildFunctionFlowGraph(
 
     /* Build data flow. */
     for (code = Function->codeHead;
-         code != Function->codeTail->next;
+         code && (code != Function->codeTail->next);
          code = code->next)
     {
         if(lastBackwardCallee && code->id == lastBackwardCallee->id)
@@ -6193,8 +6386,6 @@ _BuildFunctionFlowGraph(
         if (gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) == gcSL_JMP)
         {
             gcOPT_CODE codeDest = code->callee;
-            gctINT codeID = code->id;
-            gcSL_CONDITION condition = gcmSL_TARGET_GET(code->instruction.temp, Condition);
 
             if (! code->backwardJump)
             {
@@ -6216,14 +6407,10 @@ _BuildFunctionFlowGraph(
                     }
                 }
 
-                /* If there is a for loop, we need to add dependencies for the condition code. */
-                if (gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) == gcSL_JMP
-                    && condition != gcSL_ALWAYS
-                    && code->instruction.tempIndex == codeID + 1)
+                if (!code)
                 {
-                    code = code->prev;
+                    break;
                 }
-
                 continue;
             }
 
@@ -6249,12 +6436,7 @@ _BuildFunctionFlowGraph(
          code != gcvNULL && code != Function->codeTail->next;
          code = code->next)
     {
-        if (code->tempDefine)
-        {
-            gcmVERIFY_OK(gcOpt_ClearTempArray(Optimizer, code->tempDefine));
-            gcmVERIFY_OK(_FreeTempDefineArray(Optimizer->tempDefineArrayMemPool, code->tempDefine));
-            code->tempDefine = gcvNULL;
-        }
+        gcmASSERT (code->tempDefine == gcvNULL);
     }
 
     gcmFOOTER();
@@ -6274,7 +6456,7 @@ _CheckFuncCallHasEmit(
     if (function->hasEmitCode)
         return gcvTRUE;
 
-    for (code = function->codeHead; code != function->codeTail->next; code = code->next)
+    for (code = function->codeHead; code && (code != function->codeTail->next); code = code->next)
     {
         if (gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) != gcSL_CALL)
             continue;
@@ -6305,7 +6487,7 @@ _BuildEmitOutputUsageForCode(
     gctBOOL             checkOutput, callHasEmit;
 
     /* Search this function. */
-    for (code = Function->codeHead; code != Function->codeTail->next; code = code->next)
+    for (code = Function->codeHead; code && (code != Function->codeTail->next); code = code->next)
     {
         if (!code) continue;
         opcode = gcmSL_OPCODE_GET(code->instruction.opcode, Opcode);
@@ -6340,6 +6522,7 @@ _BuildEmitOutputUsageForCode(
             {
             case gcSL_STORE:
             case gcSL_STORE1:
+            case gcSL_STORE_L:
             case gcSL_IMAGE_WR:
             case gcSL_IMAGE_WR_3D:
             case gcSL_RET:
@@ -6772,7 +6955,7 @@ gcOpt_RebuildFlowGraph(
     /* Update code id. */
     gcOpt_UpdateCodeId(Optimizer);
 
-    /* Rebuild flow graph. */
+    /* Rebuild temp array. */
     gcmONERROR(gcOpt_BuildFlowGraph(Optimizer));
 
     /* DUMP_OPTIMIZER("Update the flow graph of the shader", Optimizer); */
@@ -6825,6 +7008,8 @@ gcOpt_ConstructOptimizer(
 
     gcoOS_ZeroMemory(optimizer, gcmSIZEOF(struct _gcOPTIMIZER));
 
+    gcoHAL_GetPatchID(gcvNULL, &optimizer->patchID);
+
     optimizer->globalOptions = &theOptimizerOption;
     optimizer->option = Shader->optimizationOption;
 
@@ -6852,7 +7037,7 @@ gcOpt_ConstructOptimizer(
     optimizer->isCTSInline = gcvFALSE;
 
     /* Build temp register array. */
-    gcmONERROR(_BuildTempArray(optimizer));
+    gcmONERROR(gcOpt_BuildTempArray(optimizer));
 
     /* Pack main program if necessary. */
     gcmONERROR(_PackMainProgram(optimizer));
@@ -6948,7 +7133,7 @@ gcOpt_DestroyOptimizer(
     gcmVERIFY_OK(_DestroyFunctionArray(Optimizer));
 
     /* Free temp reg array. */
-    gcmVERIFY_OK(_DestroyTempArray(Optimizer));
+    gcmVERIFY_OK(gcOpt_DestroyTempArray(Optimizer));
 
     /* Free global variable list. */
     if (Optimizer->global)
@@ -7114,8 +7299,6 @@ gcOpt_RemoveNOP(
 
     /* Update code id. */
     gcOpt_UpdateCodeId(Optimizer);
-
-    DUMP_OPTIMIZER("Removed NOP instructions from the shader", Optimizer);
     gcmFOOTER();
     return status;
 }
@@ -7264,6 +7447,345 @@ gcOpt_ChangeCodeToNOP(
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
+}
+
+static gctBOOL
+_isTempRegLocal(
+    IN gcOPTIMIZER    Optimizer,
+    IN gcOPT_FUNCTION Function,
+    IN gctINT         TempIndex
+    )
+{
+    gcOPT_TEMP  temp;
+
+    /* This temp index is already mapped. */
+    if (TempIndex >= (gctINT)Optimizer->tempCount)
+    {
+        return gcvFALSE;
+    }
+
+    temp = &Optimizer->tempArray[TempIndex];
+
+    gcmASSERT(TempIndex >= 0 && TempIndex < (gctINT)Optimizer->tempCount);
+
+    if (temp && !temp->isGlobal && temp->function == Function)
+    {
+        return gcvTRUE;
+    }
+
+    return gcvFALSE;
+}
+
+gctBOOL
+gcOpt_UpdateIndex(
+    IN gcOPTIMIZER    Optimizer,
+    IN gcOPT_FUNCTION Function,
+    IN gctINT*        TempIndexMappingArray,
+    IN gctINT*        CurrentTempIndex,
+    OUT gctUINT16 *   IndexPtr
+    )
+{
+    gctINT oldTempIndex = (gctINT)(*IndexPtr);
+
+    if (_isTempRegLocal(Optimizer, Function, oldTempIndex))
+    {
+        gcmASSERT(oldTempIndex >= (gctINT)Function->tempIndexStart);
+
+        /* If we haven't remapped this temp, map one. */
+        if (TempIndexMappingArray[oldTempIndex - Function->tempIndexStart] == -1)
+        {
+            TempIndexMappingArray[oldTempIndex - Function->tempIndexStart] = *CurrentTempIndex;
+            *CurrentTempIndex = *CurrentTempIndex +1;
+
+#if _SUPPORT_LONG_ULONG_DATA_TYPE
+            if (isFormat64bit(Optimizer->tempArray[oldTempIndex].format))
+            {
+                TempIndexMappingArray[oldTempIndex - Function->tempIndexStart + 1] = *CurrentTempIndex;
+                *CurrentTempIndex = *CurrentTempIndex +1;
+            }
+#endif
+        }
+
+        *IndexPtr = (gctUINT16)TempIndexMappingArray[oldTempIndex - Function->tempIndexStart];
+        return gcvTRUE;
+    }
+    return gcvFALSE;
+}
+
+/*******************************************************************************
+**                            gcOpt_RemapTempIndexForCode
+********************************************************************************
+**
+**    Remap the temp index for a code.
+**
+**    INPUT:
+**
+**        gcOPTIMIZER      Optimizer
+**            Pointer to a gcOPTIMIZER structure.
+**
+**        gcOPT_FUNCTION   Function
+**            Pointer to a gcOPT_FUNCTION structure.
+**
+**        gctINT*        TempIndexMappingArray
+**            The temp index mapping array.
+**
+**        gctINT*        CurrentTempIndex
+**            The current new temp index.
+*/
+gctBOOL
+gcOpt_RemapTempIndexForCode(
+    IN gcOPTIMIZER    Optimizer,
+    IN gcOPT_CODE     Code,
+    IN gcOPT_FUNCTION Function,
+    IN gctINT*        TempIndexMappingArray,
+    IN gctINT*        CurrentTempIndex
+    )
+{
+    gcSL_INSTRUCTION inst   = &Code->instruction;
+    gcSL_OPCODE      opcode = gcmSL_OPCODE_GET(inst->opcode, Opcode);
+    gctINT           i;
+    gctBOOL          renamed = gcvFALSE;
+
+    /* Adjust label temporary register number. */
+    switch (opcode)
+    {
+    case gcSL_NOP:
+        /* fall through */
+    case gcSL_RET:
+        /* fall through */
+    case gcSL_CALL:
+        /* Skip instructions without destination. */
+        break;
+
+    default:
+        /* check target */
+        if (gcmSL_TARGET_GET(inst->temp, Enable) != gcSL_ENABLE_NONE)
+        {
+            if (gcOpt_UpdateIndex(Optimizer,
+                                  Function,
+                                  TempIndexMappingArray,
+                                  CurrentTempIndex,
+                                  &inst->tempIndex))
+            {
+                renamed = gcvTRUE;
+            }
+
+            if (gcmSL_TARGET_GET(inst->temp, Indexed) != gcSL_NOT_INDEXED)
+            {
+                /* fix indexed register */
+                if (gcOpt_UpdateIndex(Optimizer,
+                                      Function,
+                                      TempIndexMappingArray,
+                                      CurrentTempIndex,
+                                      &inst->tempIndexed))
+                {
+                    renamed = gcvTRUE;
+                }
+            }
+        }
+
+        /* fix sources */
+        for (i = 0; i < 2; i++)
+        {
+            gctSOURCE_t source = (i==0) ? inst->source0 : inst->source1;
+            gctUINT16 * index  = (i==0) ? &inst->source0Index
+                                        : &inst->source1Index;
+
+            if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
+            {
+                if (gcOpt_UpdateIndex(Optimizer,
+                                      Function,
+                                      TempIndexMappingArray,
+                                      CurrentTempIndex,
+                                      index))
+                {
+                    renamed = gcvTRUE;
+                }
+            }
+            /* fix indexed value */
+            if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED)
+            {
+                gctUINT16 * indexed = (i==0) ? &inst->source0Indexed
+                                                : &inst->source1Indexed;
+
+                /* fix indexed register */
+                if (gcOpt_UpdateIndex(Optimizer,
+                                      Function,
+                                      TempIndexMappingArray,
+                                      CurrentTempIndex,
+                                      indexed))
+                {
+                    renamed = gcvTRUE;
+                }
+            }
+        }
+    }
+
+    return renamed;
+}
+
+/*******************************************************************************
+**                            gcOpt_RemapTempIndexForFunction
+********************************************************************************
+**
+**    Remap the temp index for a function.
+**
+**    INPUT:
+**
+**        gcOPTIMIZER      Optimizer
+**            Pointer to a gcOPTIMIZER structure.
+**
+**        gcOPT_FUNCTION   Function
+**            Pointer to a gcOPT_FUNCTION structure.
+**
+**        gctINT           NewTempIndexStart
+**            The new temp index start.
+*/
+gceSTATUS
+gcOpt_RemapTempIndexForFunction(
+    IN gcOPTIMIZER      Optimizer,
+    IN gcOPT_FUNCTION   Function,
+    IN gctINT           NewTempIndexStart
+    )
+{
+    gceSTATUS                   status = gcvSTATUS_OK;
+    gcOPT_CODE                  code, codeIter;
+    gcOPT_LIST                  callerList;
+    gcSL_OPCODE                 opcode;
+    gcVARIABLE                  variable;
+    gcsFUNCTION_ARGUMENT_PTR    argument;
+    gctINT                      tempIndex;
+    gctINT                      currentTempIndex = NewTempIndexStart;
+    gctINT                      maxTempIndexCount = Function->tempIndexEnd - Function->tempIndexStart + 1;
+    gctINT                      origTempIndexStart = Function->tempIndexStart;
+    gctINT*                     tempIndexMappingArray;
+    gctUINT32                   i;
+    gctPOINTER                  pointer;
+
+    gcmHEADER_ARG("Optimizer=%p Function=%p NewTempIndexStart=%d",
+                  Optimizer, Function, NewTempIndexStart);
+
+    /* Initialize mapping array. */
+    gcmONERROR(gcoOS_Allocate(gcvNULL,
+                              gcmSIZEOF(gctINT) * maxTempIndexCount,
+                              &pointer));
+    gcoOS_MemFill(pointer, 0xFF, gcmSIZEOF(gctINT) * maxTempIndexCount);
+    tempIndexMappingArray = (gctINT*)pointer;
+
+    /* I: Remap function arguments. */
+    for (i = 0; i < Function->argumentCount; i++)
+    {
+        argument = Function->arguments + i;
+        tempIndex = argument->index - origTempIndexStart;
+
+        if (tempIndexMappingArray[tempIndex] == -1)
+        {
+            tempIndexMappingArray[tempIndex] = currentTempIndex;
+            currentTempIndex++;
+
+#if _SUPPORT_LONG_ULONG_DATA_TYPE
+            if (isFormat64bit(Optimizer->tempArray[argument->index].format))
+            {
+                tempIndexMappingArray[tempIndex + 1] = currentTempIndex;
+                currentTempIndex++;
+            }
+#endif
+        }
+
+        argument->index = (gctUINT16)tempIndexMappingArray[tempIndex];
+
+        if (argument->variableIndex != 0xffff &&
+            argument->variableIndex < Optimizer->shader->variableCount)
+        {
+            gcmONERROR(gcSHADER_GetVariable(Optimizer->shader,
+                                            argument->variableIndex,
+                                            &variable));
+
+            GetVariableTempIndex(variable) = argument->index;
+        }
+    }
+
+    /* II: Update temp index of variables. */
+    for (i = 0; i < Optimizer->shader->variableCount; i++)
+    {
+        variable = Optimizer->shader->variables[i];
+
+        gcOpt_UpdateIndex(Optimizer,
+                          Function,
+                          tempIndexMappingArray,
+                          &currentTempIndex,
+                          &variable->tempIndex);
+    }
+
+    /* III: Remap function body. */
+    for (codeIter = Function->codeHead;
+         codeIter && codeIter != Function->codeTail->next;
+         codeIter = codeIter->next)
+    {
+        gcOpt_RemapTempIndexForCode(Optimizer,
+                                    codeIter,
+                                    Function,
+                                    tempIndexMappingArray,
+                                    &currentTempIndex);
+    }
+
+    /* IV: Remap function callers. */
+    for (callerList = Function->codeHead->callers;
+         callerList != gcvNULL;
+         callerList = callerList->next)
+    {
+        code = callerList->code;
+
+        if (code == gcvNULL)
+        {
+            continue;
+        }
+
+        /* Check inputs. */
+        for (codeIter = code->prev; codeIter; codeIter = codeIter->prev)
+        {
+            opcode = (gcSL_OPCODE)gcmSL_OPCODE_GET(codeIter->instruction.opcode, Opcode);
+
+            if (opcode == gcSL_CALL || opcode == gcSL_RET)
+            {
+                break;
+            }
+
+            gcOpt_RemapTempIndexForCode(Optimizer,
+                                        codeIter,
+                                        Function,
+                                        tempIndexMappingArray,
+                                        &currentTempIndex);
+        }
+
+        /* Check outputs. */
+        for (codeIter = code->next; codeIter; codeIter = codeIter->next)
+        {
+            opcode = (gcSL_OPCODE)gcmSL_OPCODE_GET(codeIter->instruction.opcode, Opcode);
+
+            if (opcode == gcSL_RET ||
+                (opcode == gcSL_CALL && codeIter->callee->function == Function))
+            {
+                break;
+            }
+
+            gcOpt_RemapTempIndexForCode(Optimizer,
+                                        codeIter,
+                                        Function,
+                                        tempIndexMappingArray,
+                                        &currentTempIndex);
+        }
+    }
+
+    /* V: Update temp register start index, end index and count of this function. */
+    Function->tempIndexStart    = NewTempIndexStart;
+    Function->tempIndexEnd      = NewTempIndexStart + Function->tempIndexCount - 1;
+
+OnError:
+    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, pointer));
+
+    gcmFOOTER_NO();
+    return status;
 }
 
 #endif

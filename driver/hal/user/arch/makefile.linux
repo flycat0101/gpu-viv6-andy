@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -90,6 +90,7 @@ ifeq ($(VIVANTE_ENABLE_3D),1)
              $(OBJ_DIR)/gc_hal_user_hardware_engine.o \
              $(OBJ_DIR)/gc_hal_user_hardware_frag_proc.o \
              $(OBJ_DIR)/gc_hal_user_hardware_texture.o \
+             $(OBJ_DIR)/gc_hal_user_hardware_texture_upload.o \
              $(OBJ_DIR)/gc_hal_user_hardware_stream.o \
              $(OBJ_DIR)/gc_hal_user_hardware_shader.o
 

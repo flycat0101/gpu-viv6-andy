@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -88,6 +88,7 @@ static int clfprintf(FILE *file, const char * msg, ...) {
 			T_IMAGE1D_T T_IMAGE1D_ARRAY_T T_IMAGE1D_BUFFER_T
 			T_IMAGE2D_ARRAY_T
 			T_IMAGE2D_T T_IMAGE3D_T
+			T_IMAGE2D_PTR_T
 			T_SIZE_T T_EVENT_T
 			T_PTRDIFF_T T_INTPTR_T T_UINTPTR_T
 			T_GENTYPE T_F_GENTYPE T_IU_GENTYPE T_I_GENTYPE T_U_GENTYPE T_SIU_GENTYPE
@@ -97,6 +98,7 @@ static int clfprintf(FILE *file, const char * msg, ...) {
 			T_SHORT_PACKED T_SHORT2_PACKED T_SHORT3_PACKED T_SHORT4_PACKED T_SHORT8_PACKED T_SHORT16_PACKED T_SHORT32_PACKED
 			T_USHORT_PACKED T_USHORT2_PACKED T_USHORT3_PACKED T_USHORT4_PACKED T_USHORT8_PACKED T_USHORT16_PACKED T_USHORT32_PACKED
 			T_HALF_PACKED T_HALF2_PACKED T_HALF3_PACKED T_HALF4_PACKED T_HALF8_PACKED T_HALF16_PACKED T_HALF32_PACKED
+			T_GENTYPE_PACKED
 
 %token<token>		T_FLOATNXM T_DOUBLENXM
  			T_BUILTIN_DATA_TYPE T_RESERVED_DATA_TYPE T_VIV_PACKED_DATA_TYPE
@@ -119,7 +121,7 @@ static int clfprintf(FILE *file, const char * msg, ...) {
 %token<token>	   	T_CONST
 			T_RESTRICT T_VOLATILE
                         T_STATIC T_EXTERN
-			T_CONSTANT T_GLOBAL T_LOCAL T_PRIVATE T_KERNEL
+			T_CONSTANT T_GLOBAL T_LOCAL T_PRIVATE T_KERNEL T_UNIFORM
 			T_READ_ONLY T_WRITE_ONLY
 			T_PACKED T_ALIGNED T_ENDIAN T_VEC_TYPE_HINT
 			T_ATTRIBUTE__
@@ -661,6 +663,8 @@ type_qualifier_list :
 pointer :
 	'*'
 		{ $$ = clParseEmptyTypeQualifierList(Compiler); }
+	| '*' pointer
+		{ $$ = clParsePointerTypeQualifier(Compiler, gcvNULL, $2); }
 	| '*' type_qualifier_list
 		{$$ = $2;}
 	| '*' type_qualifier_list pointer
@@ -809,6 +813,8 @@ type_qualifier :
 		{ $$ = $1; }
 	| T_EXTERN
 		{ $$ = $1; }
+	| T_UNIFORM
+		{ $$ = $1; }
 	;
 
 type_specifier :
@@ -850,6 +856,8 @@ type_name :
 	| T_IMAGE2D_ARRAY_T
 		{ $$ = $1}
 	| T_IMAGE2D_T
+		{ $$ = $1}
+	| T_IMAGE2D_PTR_T
 		{ $$ = $1}
 	| T_IMAGE3D_T
 		{ $$ = $1}

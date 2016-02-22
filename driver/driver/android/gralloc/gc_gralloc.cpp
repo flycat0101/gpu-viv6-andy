@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -506,7 +506,7 @@ gc_gralloc_alloc_buffer(
 
 #if gcdENABLE_3D
     /* Set tile status disabled by default for compositor. */
-    surface->info.tileStatusDisabled = gcvTRUE;
+    surface->tileStatusDisabled = gcvTRUE;
 #endif
 
 #if gcdANDROID_IMPLICIT_NATIVE_BUFFER_SYNC
@@ -559,19 +559,19 @@ gc_gralloc_alloc_buffer(
     handle->type         = (int) type;
     handle->samples      = (int) samples;
     /* Record surface info. */
-    hnd->size            = (int) surface->info.size;
+    hnd->size            = (int) surface->size;
 
     /* Naming video memory node. */
-    node = surface->info.node.u.normal.node;
+    node = surface->node.u.normal.node;
     gcmVERIFY_OK(gcoHAL_NameVideoMemory(node, &node));
 
     handle->node         = (int) node;
-    handle->nodePool     = (int) surface->info.node.pool;
-    handle->nodeSize     = (int) surface->info.node.size;
+    handle->nodePool     = (int) surface->node.pool;
+    handle->nodeSize     = (int) surface->node.size;
 
 #if gcdENABLE_3D
     /* Naming tile status video memory node. */
-    tsNode = surface->info.tileStatusNode.u.normal.node;
+    tsNode = surface->tileStatusNode.u.normal.node;
 
     if (tsNode != 0)
     {
@@ -579,8 +579,8 @@ gc_gralloc_alloc_buffer(
     }
 
     handle->tsNode       = (int) tsNode;
-    handle->tsNodePool   = (int) surface->info.tileStatusNode.pool;
-    handle->tsNodeSize   = (int) surface->info.tileStatusNode.size;
+    handle->tsNodePool   = (int) surface->tileStatusNode.pool;
+    handle->tsNodeSize   = (int) surface->tileStatusNode.size;
 #endif
 
     handle->hwDoneSignal = (int) intptr_t(signal);
@@ -1129,14 +1129,14 @@ gc_gralloc_register_buffer(
 #endif
 
         /* Restore surface info. */
-        surface->info.size               = (gctSIZE_T) hnd->size;
+        surface->size               = (gctSIZE_T) hnd->size;
 
         /* Import video memory node. */
         gcmVERIFY_OK(gcoHAL_ImportVideoMemory(handle->node, &node));
 
-        surface->info.node.u.normal.node = node;
-        surface->info.node.pool          = (gcePOOL)   handle->nodePool;
-        surface->info.node.size          = (gctSIZE_T) handle->nodeSize;
+        surface->node.u.normal.node = node;
+        surface->node.pool          = (gcePOOL)   handle->nodePool;
+        surface->node.size          = (gctSIZE_T) handle->nodeSize;
 
 #if gcdENABLE_3D
         /* Import tile status video memory node. */
@@ -1145,9 +1145,9 @@ gc_gralloc_register_buffer(
             gcmVERIFY_OK(gcoHAL_ImportVideoMemory(handle->tsNode, &tsNode));
         }
 
-        surface->info.tileStatusNode.u.normal.node = tsNode;
-        surface->info.tileStatusNode.pool          = (gcePOOL  ) handle->tsNodePool;
-        surface->info.tileStatusNode.size          = (gctSIZE_T) handle->tsNodeSize;
+        surface->tileStatusNode.u.normal.node = tsNode;
+        surface->tileStatusNode.pool          = (gcePOOL  ) handle->tsNodePool;
+        surface->tileStatusNode.size          = (gctSIZE_T) handle->tsNodeSize;
 #endif
 
         /* Lock once as it's done in gcoSURF_Construct with vidmem. */

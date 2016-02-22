@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -188,7 +188,6 @@ static gceSTATUS _uploadBlitBlt(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcoSURF srcSurf = gcvNULL;
-    gcsSURF_INFO_PTR srcSurfInfo = gcvNULL;
     gctBOOL srcLocked, dstLocked;
     gceENGINE engine = gcvENGINE_RENDER;
 
@@ -200,7 +199,7 @@ static gceSTATUS _uploadBlitBlt(
     /* TODO: All format should be supported by blt engine.
     ** check failed format.
     */
-    status = gcoHARDWARE_CanDo3DBlitBlt(args->format, args->dstSurf->info.format);
+    status = gcoHARDWARE_CanDo3DBlitBlt(args->format, args->dstSurf->format);
     if(gcmIS_ERROR(status))
     {
         /* Return the status. */
@@ -253,58 +252,56 @@ static gceSTATUS _uploadBlitBlt(
         gcoOS_ZeroMemory(pointer, gcmSIZEOF(struct _gcoSURF));
 
         srcSurf = (gcoSURF)pointer;
-        srcSurfInfo = &srcSurf->info;
         srcView.surf = srcSurf;
 
         /* init srcSurfInfo.*/
-        srcSurfInfo->type = gcvSURF_LINEAR;
-        srcSurfInfo->sampleInfo = args->dstSurf->info.sampleInfo;
-        srcSurfInfo->isMsaa = args->dstSurf->info.isMsaa;
-        srcSurfInfo->edgeAA = args->dstSurf->info.edgeAA;
+        srcSurf->type = gcvSURF_LINEAR;
+        srcSurf->sampleInfo = args->dstSurf->sampleInfo;
+        srcSurf->isMsaa = args->dstSurf->isMsaa;
+        srcSurf->vMsaa = args->dstSurf->vMsaa;
 
         /* update size.*/
-        width *= srcSurfInfo->sampleInfo.x;
-        height *= srcSurfInfo->sampleInfo.y;
+        width  *= srcSurf->sampleInfo.x;
+        height *= srcSurf->sampleInfo.y;
 
         gcmERR_BREAK(gcoSURF_QueryFormat(args->format, &formatInfo));
-        srcSurfInfo->formatInfo = *formatInfo;
+        srcSurf->formatInfo = *formatInfo;
         /* Set dimensions of surface. */
-        srcSurfInfo->format = args->format;
-        srcSurfInfo->tiling = gcvLINEAR;
-        srcSurfInfo->colorSpace = gcd_QUERY_COLOR_SPACE(args->format);
-        srcSurfInfo->pfGetAddr = gcoHARDWARE_GetProcCalcPixelAddr(gcvNULL, srcSurfInfo);
+        srcSurf->format = args->format;
+        srcSurf->tiling = gcvLINEAR;
+        srcSurf->colorSpace = gcd_QUERY_COLOR_SPACE(args->format);
+        srcSurf->pfGetAddr = gcoHARDWARE_GetProcCalcPixelAddr(gcvNULL, srcSurf);
         /* Set aligned surface size, the surf will only be operated by Blit engine.
         ** no align requirement
         */
-        srcSurfInfo->stride = args->stride;
+        srcSurf->stride = args->stride;
 
-        srcSurfInfo->sliceSize
-            = args->rectSize.y * srcSurfInfo->stride;
+        srcSurf->sliceSize = args->rectSize.y * srcSurf->stride;
 
-        srcSurfInfo->size = srcSurfInfo->layerSize = srcSurfInfo->sliceSize;
+        srcSurf->size = srcSurf->layerSize = srcSurf->sliceSize;
 
         gcmERR_BREAK(gcsSURF_NODE_Construct(
-            &srcSurfInfo->node,
-            srcSurfInfo->size,
+            &srcSurf->node,
+            srcSurf->size,
             1,
-            srcSurfInfo->type,
+            srcSurf->type,
             gcvALLOC_FLAG_NONE,
             gcvPOOL_DEFAULT
             ));
 
         gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
                       "Allocated surface 0x%x: pool=%d size=%dx%dx%d bytes=%u",
-                      &srcSurfInfo->node,
-                      srcSurfInfo->node.pool,
+                      &srcSurf->node,
+                      srcSurf->node.pool,
                       width,
                       height,
                       1,
-                      srcSurfInfo->size);
+                      srcSurf->size);
 
         /* Upload data to srcSurf.*/
         /* Lock the video memory. */
         gcmERR_BREAK(
-            gcoHARDWARE_LockEx(&srcSurfInfo->node,
+            gcoHARDWARE_LockEx(&srcSurf->node,
                              engine,
                              gcvNULL,
                              &srcMemory));
@@ -312,22 +309,22 @@ static gceSTATUS _uploadBlitBlt(
         srcLocked = gcvTRUE;
 
         /* Full copy.*/
-        gcoOS_MemCopy(srcMemory, args->buf, srcSurfInfo->size);
+        gcoOS_MemCopy(srcMemory, args->buf, srcSurf->size);
 
         /* Flush the CPU cache. */
-        gcmERR_BREAK(gcoSURF_NODE_Cache(&srcSurfInfo->node,
+        gcmERR_BREAK(gcoSURF_NODE_Cache(&srcSurf->node,
             srcMemory,
-            srcSurfInfo->node.size,
+            srcSurf->node.size,
             gcvCACHE_CLEAN));
 
         gcmDUMP_BUFFER(gcvNULL,
             "texture",
-            gcsSURF_NODE_GetHWAddress(&srcSurfInfo->node),
-            srcSurfInfo->node.logical,
+            gcsSURF_NODE_GetHWAddress(&srcSurf->node),
+            srcSurf->node.logical,
             0,
-            srcSurfInfo->size);
+            srcSurf->size);
 
-        gcmERR_BREAK (gcoHARDWARE_LockEx(&args->dstSurf->info.node,
+        gcmERR_BREAK (gcoHARDWARE_LockEx(&args->dstSurf->node,
                                         engine,
                                         gcvNULL,
                                         gcvNULL));
@@ -337,27 +334,27 @@ static gceSTATUS _uploadBlitBlt(
         /* set the usage.*/
         rlvArgs.uArgs.v2.bUploadTex = gcvTRUE;
 
-        gcmERR_BREAK(gcoHARDWARE_3DBlitBlt_v2(gcvNULL, &srcView, &dstView, &rlvArgs));
+        gcmERR_BREAK(gcoHARDWARE_3DBlitBlt(gcvNULL, &srcView, &dstView, &rlvArgs));
     } while (gcvFALSE);
 
     if (srcSurf)
     {
-        if (srcSurfInfo->node.pool != gcvPOOL_UNKNOWN)
+        if (srcSurf->node.pool != gcvPOOL_UNKNOWN)
         {
             if (srcLocked)
             {
             /* Unlock the surface. */
-                gcoHARDWARE_UnlockEx(&srcSurfInfo->node, engine, srcSurfInfo->type);
+                gcoHARDWARE_UnlockEx(&srcSurf->node, engine, srcSurf->type);
             }
 
-            if (srcSurfInfo->node.u.normal.node != 0)
+            if (srcSurf->node.u.normal.node != 0)
             {
                 /* Free the video memory. */
-                gcmVERIFY_OK(gcsSURF_NODE_Destroy(&srcSurfInfo->node));
+                gcmVERIFY_OK(gcsSURF_NODE_Destroy(&srcSurf->node));
             }
 
             /* Mark the memory as freed. */
-            srcSurfInfo->node.pool = gcvPOOL_UNKNOWN;
+            srcSurf->node.pool = gcvPOOL_UNKNOWN;
         }
 
         gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, srcSurf));
@@ -365,7 +362,7 @@ static gceSTATUS _uploadBlitBlt(
 
     if (dstLocked)
     {
-        gcoHARDWARE_UnlockEx (&args->dstSurf->info.node,engine, args->dstSurf->info.type);
+        gcoHARDWARE_UnlockEx (&args->dstSurf->node, engine, args->dstSurf->type);
     }
 
     /* Return the status. */
@@ -664,7 +661,7 @@ gcoTEXTURE_ConstructSized(
                 break;
             }
 
-            map->sliceSize = map->surface->info.sliceSize;
+            map->sliceSize = map->surface->sliceSize;
 
             /* Append the gcsMIPMAP structure to the end of the chain. */
             if (texture->maps == gcvNULL)
@@ -718,8 +715,8 @@ gcoTEXTURE_ConstructSized(
     texture->baseLevelMap = texture->maps;
 
     /* Set texture filterable property. */
-    texture->filterable = !map->surface->info.formatInfo.fakedFormat ||
-                          map->surface->info.paddingFormat;
+    texture->filterable = !map->surface->formatInfo.fakedFormat ||
+                          map->surface->paddingFormat;
 
     /* Return the gcoTEXTURE object pointer. */
     *Texture = texture;
@@ -777,11 +774,11 @@ gcoTEXTURE_Destroy(
 
 static gctBOOL
 _UseAccurateUpload(
-    gceSURF_FORMAT SrcFmt, gcsSURF_INFO_PTR DstSurfInfo
+    gceSURF_FORMAT SrcFmt, gcoSURF DstSurf
     )
 {
     gcsSURF_FORMAT_INFO_PTR srcFmtInfo = gcvNULL;
-    gcsSURF_FORMAT_INFO_PTR DstFmtInfo = &DstSurfInfo->formatInfo;
+    gcsSURF_FORMAT_INFO_PTR DstFmtInfo = &DstSurf->formatInfo;
 
     gcoSURF_QueryFormat(SrcFmt, &srcFmtInfo);
 
@@ -798,7 +795,7 @@ _UseAccurateUpload(
         * 2: If tiling of DstSurf is gcvMULTI_SUPERTILED, use accurateUpload to upload data.
         *    Because gcvMULTI_SUPERTILED not supported by gcoHARDWARE_UploadTexture.
         */
-        if (DstSurfInfo->tiling == gcvMULTI_SUPERTILED)
+        if (DstSurf->tiling == gcvMULTI_SUPERTILED)
         {
             return gcvTRUE;
         }
@@ -808,24 +805,6 @@ _UseAccurateUpload(
             (DstFmtInfo->fmtDataType != gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED))
         {
             return gcvTRUE;
-        }
-
-        /* 4: If they are both NORMALIZED. */
-        if (!DstSurfInfo->superTiled)
-        {
-            /* Check 2.1: If to upscale, go accurate path. */
-            if (gcvFORMAT_CLASS_RGBA == srcFmtInfo->fmtClass &&
-                gcvFORMAT_CLASS_RGBA == DstFmtInfo->fmtClass)
-            {
-                /* Upscale. */
-                if ((srcFmtInfo->u.rgba.red.width != 0 && srcFmtInfo->u.rgba.red.width < DstFmtInfo->u.rgba.red.width) ||
-                    (srcFmtInfo->u.rgba.green.width != 0 && srcFmtInfo->u.rgba.green.width < DstFmtInfo->u.rgba.green.width) ||
-                    (srcFmtInfo->u.rgba.blue.width != 0 && srcFmtInfo->u.rgba.blue.width < DstFmtInfo->u.rgba.blue.width) ||
-                    (srcFmtInfo->u.rgba.alpha.width != 0 && srcFmtInfo->u.rgba.alpha.width < DstFmtInfo->u.rgba.alpha.width))
-                {
-                    return gcvTRUE;
-                }
-            }
         }
     }
 
@@ -985,14 +964,14 @@ gcoTEXTURE_Upload(
     /* Lock the surface. */
     gcmONERROR(gcoSURF_Lock(map->surface, address, memory));
 
-    if (map->surface->info.hasStencilComponent)
+    if (map->surface->hasStencilComponent)
     {
-        map->surface->info.canDropStencilPlane = gcvFALSE;
+        map->surface->canDropStencilPlane = gcvFALSE;
     }
 
-    if (map->surface->info.hzNode.valid)
+    if (map->surface->hzNode.valid)
     {
-        map->surface->info.hzDisabled = gcvTRUE;
+        map->surface->hzDisabled = gcvTRUE;
     }
 
     gcmSAFECASTSIZET(sliceSize, map->sliceSize);
@@ -1029,16 +1008,16 @@ gcoTEXTURE_Upload(
         gcmONERROR(gcoSURF_WaitFence(map->surface));
 
         if (((Format & gcvSURF_FORMAT_OCL) != 0)              ||
-              !_UseAccurateUpload(Format, &map->surface->info))
+              !_UseAccurateUpload(Format, map->surface))
         {
             /* Copy the data. */
-            gcmONERROR(gcoHARDWARE_UploadTexture(&map->surface->info, offset, 0, 0,
+            gcmONERROR(gcoHARDWARE_UploadTexture(map->surface, offset, 0, 0,
                 width, height, Memory, stride, Format));
 
             /* Flush the CPU cache. */
-            gcmONERROR(gcoSURF_NODE_Cache(&map->surface->info.node,
+            gcmONERROR(gcoSURF_NODE_Cache(&map->surface->node,
                 memory[0],
-                map->surface->info.node.size,
+                map->surface->node.size,
                 gcvCACHE_CLEAN));
         }
         else
@@ -1050,12 +1029,12 @@ gcoTEXTURE_Upload(
                 Format, gcvPOOL_USER, &srcSurf));
 
             /* If user specified stride(alignment in fact), it must be no less than calculated one. */
-            gcmASSERT((gctUINT)Stride >= srcSurf->info.stride);
+            gcmASSERT((gctUINT)Stride >= srcSurf->stride);
             gcmONERROR(gcoSURF_WrapSurface(srcSurf, stride, (gctPOINTER) Memory, gcvINVALID_ADDRESS));
             gcmONERROR(gcoSURF_SetColorSpace(srcSurf, SrcColorSpace));
 
             /* Propagate canDropStencilPlane */
-            srcSurf->info.canDropStencilPlane = map->surface->info.canDropStencilPlane;
+            srcSurf->canDropStencilPlane = map->surface->canDropStencilPlane;
 
             gcoOS_ZeroMemory(&arg, sizeof(arg));
             arg.srcSurface = srcSurf;
@@ -1260,37 +1239,16 @@ gcoTEXTURE_UploadSub(
     /* Lock the surface. */
     gcmONERROR(gcoSURF_Lock(map->surface, address, memory));
 
-    if (map->surface->info.hasStencilComponent)
+    if (map->surface->hasStencilComponent)
     {
-        map->surface->info.canDropStencilPlane = gcvFALSE;
+        map->surface->canDropStencilPlane = gcvFALSE;
     }
 
-    if (map->surface->info.hzNode.valid)
+    if (map->surface->hzNode.valid)
     {
-        map->surface->info.hzDisabled = gcvTRUE;
+        map->surface->hzDisabled = gcvTRUE;
     }
 
-#if gcdDUMP
-    {
-        gctSTRING env;
-        gctINT simFrame = 0;
-        gctUINT frameCount;
-        gcoOS_GetEnv(gcvNULL, "SIM_Frame", &env);
-        gcoHAL_FrameInfoOps(gcvNULL,
-                            gcvFRAMEINFO_FRAME_NUM,
-                            gcvFRAMEINFO_OP_GET,
-                            &frameCount);
-        if (env)
-        {
-            gcoOS_StrToInt(env, &simFrame);
-        }
-
-        if ((gctINT)frameCount < simFrame)
-        {
-            forceSW = gcvTRUE;
-        }
-    }
-#endif
 
     if (gcoHAL_GetOption(gcvNULL, gcvOPTION_GPU_TEX_UPLOAD)            &&
         gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_ENGINE) &&
@@ -1326,21 +1284,21 @@ gcoTEXTURE_UploadSub(
                                          Format, gcvPOOL_USER, &wrapView.surf));
 
             /* If user specified stride(alignment in fact), it must be no less than calculated one. */
-            gcmASSERT((gctUINT)Stride >= wrapView.surf->info.stride);
+            gcmASSERT((gctUINT)Stride >= wrapView.surf->stride);
             gcmERR_BREAK(gcoSURF_WrapSurface(wrapView.surf, (gctUINT)Stride, (gctPOINTER) Memory, PhysicalAddress));
             gcmERR_BREAK(gcoSURF_SetColorSpace(wrapView.surf, SrcColorSpace));
 
             /* Propagate canDropStencilPlane */
-            wrapView.surf->info.canDropStencilPlane = map->surface->info.canDropStencilPlane;
+            wrapView.surf->canDropStencilPlane = map->surface->canDropStencilPlane;
 
-            gcmERR_BREAK(gcoSURF_ResolveRect_v2(&wrapView, &mipView, gcvNULL));
+            gcmERR_BREAK(gcoSURF_ResolveRect(&wrapView, &mipView, gcvNULL));
 
             gcmDUMP_BUFFER(gcvNULL,
                            "memory",
-                           gcsSURF_NODE_GetHWAddress(&wrapView.surf->info.node),
-                           wrapView.surf->info.node.logical,
+                           gcsSURF_NODE_GetHWAddress(&wrapView.surf->node),
+                           wrapView.surf->node.logical,
                            offset,
-                           wrapView.surf->info.size);
+                           wrapView.surf->size);
 
 
         } while (gcvFALSE);
@@ -1360,10 +1318,10 @@ gcoTEXTURE_UploadSub(
     {
         gcmONERROR(gcoSURF_WaitFence(map->surface));
 
-        if (_UseAccurateUpload(Format, &map->surface->info) == gcvFALSE)
+        if (_UseAccurateUpload(Format, map->surface) == gcvFALSE)
         {
             /* Copy the data. */
-            gcmONERROR(gcoHARDWARE_UploadTexture(&map->surface->info,
+            gcmONERROR(gcoHARDWARE_UploadTexture(map->surface,
                                                  offset,
                                                  xOffset,
                                                  yOffset,
@@ -1374,9 +1332,9 @@ gcoTEXTURE_UploadSub(
                                                  Format));
 
             /* Flush the CPU cache. */
-            gcmONERROR(gcoSURF_NODE_Cache(&map->surface->info.node,
+            gcmONERROR(gcoSURF_NODE_Cache(&map->surface->node,
                                           memory[0],
-                                          map->surface->info.node.size,
+                                          map->surface->node.size,
                                           gcvCACHE_CLEAN));
         }
         else
@@ -1391,7 +1349,7 @@ gcoTEXTURE_UploadSub(
                                              Format, gcvPOOL_USER, &srcSurf));
 
                 /* If user specified stride(alignment in fact), it must be no less than calculated one. */
-                gcmASSERT((gctUINT)Stride >= srcSurf->info.stride);
+                gcmASSERT((gctUINT)Stride >= srcSurf->stride);
                 gcmERR_BREAK(gcoSURF_WrapSurface(srcSurf, (gctUINT)Stride, (gctPOINTER)Memory, gcvINVALID_ADDRESS));
                 gcmERR_BREAK(gcoSURF_SetColorSpace(srcSurf, SrcColorSpace));
 
@@ -2033,7 +1991,7 @@ gcoTEXTURE_AddMipMapEx(
             map->height    = height;
             map->depth     = depth;
             map->faces     = faces;
-            map->sliceSize = map->surface->info.sliceSize;
+            map->sliceSize = map->surface->sliceSize;
             map->pool      = Pool;
 
             /* Update the valid surface count. */
@@ -2047,8 +2005,8 @@ gcoTEXTURE_AddMipMapEx(
         }
 
         /* Set texture filterable property. */
-        Texture->filterable = !map->surface->info.formatInfo.fakedFormat ||
-                              map->surface->info.paddingFormat;
+        Texture->filterable = !map->surface->formatInfo.fakedFormat ||
+                              map->surface->paddingFormat;
 
         /* Update internal format no matter surface was reallocated or not */
         map->internalFormat = internalFormat;
@@ -2122,11 +2080,11 @@ gcoTEXTURE_AddMipMapFromClient(
         gcoSURF_ReferenceSurface(Surface));
 
     /* Copy surface format to texture. */
-    Texture->format = Surface->info.format;
+    Texture->format = Surface->format;
 
     /* Set texture filterable property. */
-    Texture->filterable = !Surface->info.formatInfo.fakedFormat ||
-                          Surface->info.paddingFormat;
+    Texture->filterable = !Surface->formatInfo.fakedFormat ||
+                          Surface->paddingFormat;
 
     /* Set descriptor dirty as texture surface is changed */
     Texture->descDirty = gcvTRUE;
@@ -2199,11 +2157,11 @@ gcoTEXTURE_AddMipMapFromSurface(
     ** otherwise the face or slice index cannot be known.
     */
 
-    format = Surface->info.format;
-    tiling = Surface->info.tiling;
-    width  = Surface->info.requestW;
-    height = Surface->info.requestH;
-    face   = Surface->info.requestD;
+    format = Surface->format;
+    tiling = Surface->tiling;
+    width  = Surface->requestW;
+    height = Surface->requestH;
+    face   = Surface->requestD;
 
     /* Query texture support */
     status = gcoHARDWARE_QueryTexture(gcvNULL,
@@ -2246,8 +2204,8 @@ gcoTEXTURE_AddMipMapFromSurface(
     map->height     = height;
     map->depth      = 1;
     map->faces      = 1;
-    map->sliceSize  = Surface->info.sliceSize;
-    map->pool       = Surface->info.node.pool;
+    map->sliceSize  = Surface->sliceSize;
+    map->pool       = Surface->node.pool;
     map->surface    = Surface;
     map->locked     = gcvNULL;
     map->next       = gcvNULL;
@@ -2270,11 +2228,30 @@ gcoTEXTURE_AddMipMapFromSurface(
     Texture->baseLevelMap = Texture->maps;
 
     /* Set texture filterable property. */
-    Texture->filterable = !Surface->info.formatInfo.fakedFormat ||
-                          Surface->info.paddingFormat;
+    Texture->filterable = !Surface->formatInfo.fakedFormat ||
+                          Surface->paddingFormat;
 
     /* Set descriptor dirty as texture surface is changed */
     Texture->descDirty = gcvTRUE;
+
+#if gcdDUMP
+    {
+        gctUINT32 address[3];
+        gctPOINTER memory[3];
+
+        gcmVERIFY_OK(gcoSURF_Lock(Surface, address, memory));
+
+        gcmDUMP_BUFFER(gcvNULL,
+                       "texture",
+                       address[0],
+                       memory[0],
+                       0,
+                       map->sliceSize);
+
+        gcmVERIFY_OK(gcoSURF_Unlock(Surface, memory[0]));
+    }
+#endif
+
     /* Return the status. */
     gcmFOOTER();
     return status;
@@ -2583,7 +2560,6 @@ gcoTEXTURE_QueryCaps(
                                           NonPowerOfTwo,
                                           VertexSamplers,
                                           PixelSamplers,
-                                          gcvNULL,
                                           gcvNULL);
 
     /* Return status. */
@@ -2708,7 +2684,7 @@ gcoTEXTURE_GetFormatInfo(
 
         if (prefMipMap->surface)
         {
-            *TxFormatInfo = &prefMipMap->surface->info.formatInfo;
+            *TxFormatInfo = &prefMipMap->surface->formatInfo;
         }
         else
         {
@@ -2879,9 +2855,9 @@ gceSTATUS gcoTEXTURE_UploadYUV(
     /* Lock the surface. */
     gcmONERROR(gcoSURF_Lock(map->surface, address, memory));
 
-    if (map->surface->info.hasStencilComponent)
+    if (map->surface->hasStencilComponent)
     {
-        map->surface->info.canDropStencilPlane = gcvFALSE;
+        map->surface->canDropStencilPlane = gcvFALSE;
     }
 
     gcmSAFECASTSIZET(sliceSize, map->sliceSize);
@@ -2895,7 +2871,7 @@ gceSTATUS gcoTEXTURE_UploadYUV(
                                             address[0],
                                             memory[0],
                                             offset,
-                                            map->surface->info.stride,
+                                            map->surface->stride,
                                             0,
                                             0,
                                             Width,
@@ -2905,9 +2881,9 @@ gceSTATUS gcoTEXTURE_UploadYUV(
                                             Format));
 
     /* Flush the CPU cache. */
-    gcmONERROR(gcoSURF_NODE_Cache(&map->surface->info.node,
+    gcmONERROR(gcoSURF_NODE_Cache(&map->surface->node,
                                   memory[0],
-                                  map->surface->info.node.size,
+                                  map->surface->node.size,
                                   gcvCACHE_CLEAN));
 
     /* Dump the buffer. */
@@ -3075,7 +3051,7 @@ gcoTEXTURE_UploadCompressed(
     gcmSAFECASTSIZET(offset, index * map->sliceSize);
 
     /* Copy the data. */
-    gcmONERROR(gcoHARDWARE_UploadCompressedTexture(&map->surface->info,
+    gcmONERROR(gcoHARDWARE_UploadCompressedTexture(map->surface,
                                                    Memory,
                                                    offset,
                                                    0,
@@ -3254,7 +3230,7 @@ gcoTEXTURE_UploadCompressedSub(
     gcmSAFECASTSIZET(offset, index*map->sliceSize);
 
     /* Copy the data. */
-    gcmONERROR(gcoHARDWARE_UploadCompressedTexture(&map->surface->info,
+    gcmONERROR(gcoHARDWARE_UploadCompressedTexture(map->surface,
                                                    Memory,
                                                    offset,
                                                    xOffset,
@@ -3339,7 +3315,7 @@ gcoTEXTURE_RenderIntoMipMap(
         return status;
     }
 
-    if (gcoHARDWARE_QuerySurfaceRenderable(gcvNULL, &map->surface->info) == gcvSTATUS_OK)
+    if (gcoHARDWARE_QuerySurfaceRenderable(gcvNULL, map->surface) == gcvSTATUS_OK)
     {
         gcmFOOTER();
         return gcvSTATUS_OK;
@@ -3373,7 +3349,7 @@ gcoTEXTURE_RenderIntoMipMap(
         break;
     }
 
-    if (map->surface->info.type == gcvSURF_TEXTURE)
+    if (map->surface->type == gcvSURF_TEXTURE)
     {
         gcsSURF_VIEW newView = {gcvNULL, 0, 1};
         if (map->locked != gcvNULL)
@@ -3405,7 +3381,7 @@ gcoTEXTURE_RenderIntoMipMap(
             gcsSURF_VIEW oldView = {map->surface, 0, 1};
 
             /* Copy the data. */
-            status = gcoSURF_ResolveRect_v2(&oldView, &newView, gcvNULL);
+            status = gcoSURF_ResolveRect(&oldView, &newView, gcvNULL);
             if (gcmIS_ERROR(status))
             {
                 gcmVERIFY_OK(gcoSURF_Destroy(newView.surf));
@@ -3473,7 +3449,7 @@ gcoTEXTURE_IsRenderable(
     surface = map->surface;
 
     /* Check whether the surface is renderable. */
-    status = gcoHARDWARE_QuerySurfaceRenderable(gcvNULL, &surface->info);
+    status = gcoHARDWARE_QuerySurfaceRenderable(gcvNULL, surface);
 
     /* Return status. */
     gcmFOOTER();
@@ -3527,18 +3503,18 @@ gcoTEXTURE_PrepareForRender(
     /*
     ** The surface can be directly rendered.
     */
-    if (gcoHARDWARE_QuerySurfaceRenderable(gcvNULL, &surface->info) == gcvSTATUS_OK)
+    if (gcoHARDWARE_QuerySurfaceRenderable(gcvNULL, surface) == gcvSTATUS_OK)
     {
         /* Change correct type to make disable tile status buffer work as expected. */
-        switch (surface->info.formatInfo.fmtClass)
+        switch (surface->formatInfo.fmtClass)
         {
         case gcvFORMAT_CLASS_DEPTH:
-            surface->info.type = gcvSURF_DEPTH;
+            surface->type = gcvSURF_DEPTH;
             break;
 
         default:
-            gcmASSERT(surface->info.formatInfo.fmtClass == gcvFORMAT_CLASS_RGBA);
-            surface->info.type = gcvSURF_RENDER_TARGET;
+            gcmASSERT(surface->formatInfo.fmtClass == gcvFORMAT_CLASS_RGBA);
+            surface->type = gcvSURF_RENDER_TARGET;
             break;
         }
 
@@ -3552,7 +3528,7 @@ gcoTEXTURE_PrepareForRender(
         }
         else
         {
-            if (surface->info.hzNode.pool == gcvPOOL_UNKNOWN &&
+            if (surface->hzNode.pool == gcvPOOL_UNKNOWN &&
                 !(Flag & gcvSURF_NO_HZ))
             {
                 /* Try to allocate HZ buffer */
@@ -3562,10 +3538,10 @@ gcoTEXTURE_PrepareForRender(
                 gcmONERROR(gcoSURF_LockHzBuffer(surface));
             }
 
-            if (surface->info.tileStatusNode.pool == gcvPOOL_UNKNOWN &&
+            if (surface->tileStatusNode.pool == gcvPOOL_UNKNOWN &&
                 !(Flag & gcvSURF_NO_TILE_STATUS))
             {
-                surface->info.TSDirty = Dirty;
+                surface->TSDirty = Dirty;
 
                 /* Try to allocate tile status buffer. */
                 gcmONERROR(gcoSURF_AllocateTileStatus(surface));
@@ -3634,17 +3610,17 @@ gcoTEXTURE_ReplaceMipmapIntoRenderable(
 
     surface = map->surface;
 
-    if (gcoHARDWARE_QuerySurfaceRenderable(gcvNULL, &surface->info) != gcvSTATUS_OK)
+    if (gcoHARDWARE_QuerySurfaceRenderable(gcvNULL, surface) != gcvSTATUS_OK)
     {
         /* re-create surface for rendering, which can be sampled later too. */
-        switch (surface->info.formatInfo.fmtClass)
+        switch (surface->formatInfo.fmtClass)
         {
         case gcvFORMAT_CLASS_DEPTH:
             type = gcvSURF_DEPTH;
             break;
 
         default:
-            gcmASSERT(surface->info.formatInfo.fmtClass == gcvFORMAT_CLASS_RGBA);
+            gcmASSERT(surface->formatInfo.fmtClass == gcvFORMAT_CLASS_RGBA);
             type = gcvSURF_RENDER_TARGET;
             break;
         }
@@ -3661,7 +3637,7 @@ gcoTEXTURE_ReplaceMipmapIntoRenderable(
         /* Renderable surface serve as texture later */
         type |= gcvSURF_CREATE_AS_TEXTURE;
 
-        if (map->surface->info.type == gcvSURF_TEXTURE)
+        if (map->surface->type == gcvSURF_TEXTURE)
         {
             if (map->locked != gcvNULL)
             {
@@ -3694,7 +3670,7 @@ gcoTEXTURE_ReplaceMipmapIntoRenderable(
                     gcsSURF_VIEW oldView = {map->surface, 0, 1};
                     gcsSURF_VIEW newView = {surface, 0, 1};
                     /* Copy the data. */
-                    status = gcoSURF_ResolveRect_v2(&oldView, &newView, gcvNULL);
+                    status = gcoSURF_ResolveRect(&oldView, &newView, gcvNULL);
                 }
                 if (gcmIS_ERROR(status))
                 {
@@ -3936,7 +3912,7 @@ _UpdateTextureDesc(
     gcsTXDESC_UPDATE_INFO updateInfo;
     gcsMIPMAP_PTR mipmap = Texture->maps;
     gcsMIPMAP_PTR baseMipMap = gcvNULL;
-    gcsSURF_INFO_PTR baseInfo = gcvNULL;
+    gcoSURF baseSurf = gcvNULL;
     gctINT i;
     gctINT baseLevel = gcmMAX(0, TexParam->baseLevel);
     gctINT maxLevel = gcmMIN(TexParam->maxLevel, Texture->levels - 1);
@@ -3952,41 +3928,37 @@ _UpdateTextureDesc(
 
     for (i = 0; i <= maxLevel; i++, mipmap = mipmap->next)
     {
-        gcsSURF_INFO_PTR info;
-
         if (i < baseLevel)
         {
             continue;
         }
 
-        info = &mipmap->surface->info;
-
-        if (!baseInfo)
+        if (!baseSurf)
         {
-            baseInfo = info;
+            baseSurf = mipmap->surface;
             baseMipMap = mipmap;
         }
 
-        gcmGETHARDWAREADDRESS(info->node, updateInfo.lodAddr[i]);
+        gcmGETHARDWAREADDRESS(mipmap->surface->node, updateInfo.lodAddr[i]);
 
-        if (info->formatInfo.fmtClass == gcvFORMAT_CLASS_ASTC)
+        if (mipmap->surface->formatInfo.fmtClass == gcvFORMAT_CLASS_ASTC)
         {
-            updateInfo.astcSize[i] = info->format -
-                                        (info->formatInfo.sRGB ? gcvSURF_ASTC4x4_SRGB : gcvSURF_ASTC4x4);
-            updateInfo.astcSRGB[i] = info->formatInfo.sRGB;
+            updateInfo.astcSize[i] = mipmap->surface->format -
+                                        (mipmap->surface->formatInfo.sRGB ? gcvSURF_ASTC4x4_SRGB : gcvSURF_ASTC4x4);
+            updateInfo.astcSRGB[i] = mipmap->surface->formatInfo.sRGB;
         }
     }
 
     updateInfo.type = Texture->type;
     updateInfo.unsizedDepthTexture = Texture->unsizedDepthTexture;
-    updateInfo.baseLevelInfo = baseInfo;
-    updateInfo.baseLevelWidth = baseMipMap->width * baseInfo->sampleInfo.x;
-    updateInfo.baseLevelHeight = baseMipMap->height * baseInfo->sampleInfo.y;
+    updateInfo.baseLevelSurf = baseSurf;
+    updateInfo.baseLevelWidth = baseMipMap->width * baseSurf->sampleInfo.x;
+    updateInfo.baseLevelHeight = baseMipMap->height * baseSurf->sampleInfo.y;
     updateInfo.baseLevelDepth = baseMipMap->depth;
     updateInfo.levels = Texture->levels;
     updateInfo.endianHint = Texture->endianHint;
 
-    layers = baseInfo->formatInfo.layers;
+    layers = baseSurf->formatInfo.layers;
 
     if (Texture->descCurIndex >= (gcdMAX_TXDESC_ARRAY_SIZE - 1))
     {
@@ -4036,16 +4008,12 @@ _UpdateTextureDesc(
 
         for (i = 0; i <= maxLevel; i++, mipmap = mipmap->next)
         {
-            gcsSURF_INFO_PTR info;
-
             if (i < baseLevel)
             {
                 continue;
             }
 
-            info = &mipmap->surface->info;
-
-            updateInfo.lodAddr[i] += layerIndex * info->layerSize;
+            updateInfo.lodAddr[i] += layerIndex * mipmap->surface->layerSize;
         }
 
         /* For multi-layer, we have two descriptors, so RG->RG for layer0's descriptor,
@@ -4122,7 +4090,7 @@ gcoTEXTURE_BindTextureDesc(
     gctPOINTER memory[3] = {gcvNULL};
     gcsTEXTURE_PTR pTexParams = gcvNULL;
     gcsTEXTURE tmpInfo;
-    gcsSURF_INFO_PTR info;
+    gcoSURF texSurf;
     gcsSAMPLER samplerInfo;
     gcsTXDescNode *pDescNode;
 
@@ -4170,7 +4138,7 @@ gcoTEXTURE_BindTextureDesc(
         /* Normal textures(include linear RGB) can have up to 14 lods. */
         for (map = baseMipMap, lod = baseLevel; map && (lod <= (gctINT)maxLevel); map = map->next, lod++)
         {
-            info = &map->surface->info;
+            texSurf = map->surface;
             if (map->locked == gcvNULL)
             {
                 /* Lock the texture surface. */
@@ -4185,14 +4153,14 @@ gcoTEXTURE_BindTextureDesc(
             ** Then we can support render into mipmap/multi-slice texture.
             */
             if (((gctINT)maxLevel > baseLevel) &&
-                (info->tileStatusNode.pool != gcvPOOL_UNKNOWN) &&
-                (!info->tileStatusDisabled))
+                (texSurf->tileStatusNode.pool != gcvPOOL_UNKNOWN) &&
+                (!texSurf->tileStatusDisabled))
             {
                 /*
                 ** We have no way to sample MSAA surface for now as we can't resolve MSAA into itself.
                 ** MSAA texture has been put into shadow rendering path.
                 */
-                gcmASSERT(!info->isMsaa);
+                gcmASSERT(!texSurf->isMsaa);
 
                 gcoSURF_DisableTileStatus(map->surface, gcvTRUE);
 
@@ -4216,28 +4184,28 @@ gcoTEXTURE_BindTextureDesc(
         }
 
 
-        info = &baseMipMap->surface->info;
+        texSurf = baseMipMap->surface;
 
-        samplerInfo.formatInfo = &info->formatInfo;
+        samplerInfo.formatInfo = &texSurf->formatInfo;
         samplerInfo.textureInfo = pTexParams;
-        samplerInfo.baseLevelSurface = info;
+        samplerInfo.baseLevelSurf = texSurf;
         samplerInfo.texType = Texture->type;
         samplerInfo.filterable = Texture->filterable;
         samplerInfo.descNode = pDescNode->descNode[TextureLayer];
 
-        if ((info->tileStatusNode.pool != gcvPOOL_UNKNOWN) && (!info->tileStatusDisabled))
+        if ((texSurf->tileStatusNode.pool != gcvPOOL_UNKNOWN) && (!texSurf->tileStatusDisabled))
         {
             /*
             ** 1, ES3.1 MSAA texture.
             ** 2, multisampled_render_to_texture has been put into shadow rendering path.
             */
-            gcmASSERT((!info->isMsaa) ||
+            gcmASSERT((!texSurf->isMsaa) ||
                       (Texture->type == gcvTEXTURE_2D_MS || Texture->type == gcvTEXTURE_2D_MS_ARRAY));
 
             if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_TILE_STATUS_READ) == gcvFALSE) ||
-                (info->compressed && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_DECOMPRESSOR) == gcvFALSE) ||
+                (texSurf->compressed && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_DECOMPRESSOR) == gcvFALSE) ||
                 (gcoHAL_IsSwwaNeeded(gcvNULL, gcvSWWA_1165)) ||
-                ((info->bitsPerPixel < 16) &&
+                ((texSurf->bitsPerPixel < 16) &&
                  (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_8BPP_TS_FIX) == gcvFALSE)))
             {
                 gcoSURF_DisableTileStatus(baseMipMap->surface, gcvTRUE);
@@ -4246,7 +4214,7 @@ gcoTEXTURE_BindTextureDesc(
             else
             {
                 samplerInfo.hasTileStatus = gcvTRUE;
-                samplerInfo.compressedDecFormat = info->compressDecFormat;
+                samplerInfo.compressedDecFormat = texSurf->compressDecFormat;
             }
         }
         else
@@ -4370,10 +4338,9 @@ gcoTEXTURE_BindTextureEx(
 
     if (textureMap && textureMap->surface)
     {
-        gcsSURF_INFO_PTR info = &textureMap->surface->info;
-
         /*Not support multi_tile/multi_supertile mipmap sampler */
-        if (info->tiling == gcvMULTI_TILED || info->tiling == gcvMULTI_SUPERTILED)
+        if (textureMap->surface->tiling == gcvMULTI_TILED ||
+            textureMap->surface->tiling == gcvMULTI_SUPERTILED)
         {
             pTexParams->mipFilter = gcvTEXTURE_NONE;
             pTexParams->lodBias = (gctFLOAT)baseLevel;
@@ -4447,22 +4414,22 @@ gcoTEXTURE_BindTextureEx(
 
         if (baseMipMap != gcvNULL)
         {
-            samplerInfo.format      = baseMipMap->surface->info.format;
+            samplerInfo.format      = baseMipMap->surface->format;
             samplerInfo.unsizedDepthTexture = Texture->unsizedDepthTexture;
-            samplerInfo.formatInfo  = &baseMipMap->surface->info.formatInfo;
-            samplerInfo.tiling      = baseMipMap->surface->info.tiling;
+            samplerInfo.formatInfo  = &baseMipMap->surface->formatInfo;
+            samplerInfo.tiling      = baseMipMap->surface->tiling;
             samplerInfo.width       = baseMipMap->width;
             samplerInfo.height      = baseMipMap->height;
             samplerInfo.depth       = baseMipMap->depth;
             samplerInfo.faces       = baseMipMap->faces;
             samplerInfo.texType     = Texture->type;
-            samplerInfo.hAlignment  = baseMipMap->surface->info.hAlignment;
+            samplerInfo.hAlignment  = baseMipMap->surface->hAlignment;
             samplerInfo.addressing  = gcvSURF_NO_STRIDE_TILED;
             samplerInfo.hasTileStatus = 0;
-            samplerInfo.baseLevelSurface = &baseMipMap->surface->info;
-            samplerInfo.cacheMode = baseMipMap->surface->info.cacheMode;
+            samplerInfo.baseLevelSurf = baseMipMap->surface;
+            samplerInfo.cacheMode = baseMipMap->surface->cacheMode;
 
-            gcoHARDWARE_SetHWSlot(gcvNULL, gcvENGINE_RENDER, gcvHWSLOT_TEXTURE, baseMipMap->surface->info.node.u.normal.node, Sampler);
+            gcoHARDWARE_SetHWSlot(gcvNULL, gcvENGINE_RENDER, gcvHWSLOT_TEXTURE, baseMipMap->surface->node.u.normal.node, Sampler);
         }
         else
         {
@@ -4490,10 +4457,10 @@ gcoTEXTURE_BindTextureEx(
         if ((baseMipMap != gcvNULL)
          && (baseMipMap->surface != gcvNULL))
         {
-            gcsSURF_INFO_PTR info = &baseMipMap->surface->info;
+            gcoSURF baseSurf = baseMipMap->surface;
 
             /* Update horizontal alignment to the surface's alignment. */
-            switch(info->tiling)
+            switch (baseSurf->tiling)
             {
             case gcvLINEAR:
                 samplerInfo.hAlignment = gcvSURF_SIXTEEN;
@@ -4525,7 +4492,7 @@ gcoTEXTURE_BindTextureEx(
                 break;
 
             case gcvTILED:
-                samplerInfo.hAlignment = baseMipMap->surface->info.hAlignment;
+                samplerInfo.hAlignment = baseSurf->hAlignment;
                 samplerInfo.lodNum = 1;
                 break;
 
@@ -4566,32 +4533,32 @@ gcoTEXTURE_BindTextureEx(
             }
 
             /* Set all the LOD levels. */
-            gcmGETHARDWAREADDRESS(info->node, samplerInfo.lodAddr[0]);
-            samplerInfo.lodAddr[0] += (textureLayer * info->layerSize);
+            gcmGETHARDWAREADDRESS(baseSurf->node, samplerInfo.lodAddr[0]);
+            samplerInfo.lodAddr[0] += (textureLayer * baseSurf->layerSize);
 
             if (samplerInfo.lodNum == 3)
             {
                 /* YUV-assembler needs 3 lods. */
-                if (info->flags & gcvSURF_FLAG_MULTI_NODE)
+                if (baseSurf->flags & gcvSURF_FLAG_MULTI_NODE)
                 {
-                    gcmGETHARDWAREADDRESS(info->node2, samplerInfo.lodAddr[1]);
-                    gcmGETHARDWAREADDRESS(info->node3, samplerInfo.lodAddr[2]);
+                    gcmGETHARDWAREADDRESS(baseSurf->node2, samplerInfo.lodAddr[1]);
+                    gcmGETHARDWAREADDRESS(baseSurf->node3, samplerInfo.lodAddr[2]);
                 }
                 else
                 {
-                    samplerInfo.lodAddr[1] = samplerInfo.lodAddr[0] + info->uOffset;
-                    samplerInfo.lodAddr[2] = samplerInfo.lodAddr[0] + info->vOffset;
+                    samplerInfo.lodAddr[1] = samplerInfo.lodAddr[0] + baseSurf->uOffset;
+                    samplerInfo.lodAddr[2] = samplerInfo.lodAddr[0] + baseSurf->vOffset;
                 }
 
                 /* Save strides. */
-                samplerInfo.lodStride[0] = info->stride;
-                samplerInfo.lodStride[1] = info->uStride;
-                samplerInfo.lodStride[2] = info->vStride;
+                samplerInfo.lodStride[0] = baseSurf->stride;
+                samplerInfo.lodStride[1] = baseSurf->uStride;
+                samplerInfo.lodStride[2] = baseSurf->vStride;
             }
             else if (samplerInfo.lodNum == 2)
             {
-                gcmGETHARDWAREADDRESSBOTTOM(info->node, samplerInfo.lodAddr[1]);
-                samplerInfo.lodAddr[1] += (textureLayer * info->layerSize);
+                gcmGETHARDWAREADDRESSBOTTOM(baseSurf->node, samplerInfo.lodAddr[1]);
+                samplerInfo.lodAddr[1] += (textureLayer * baseSurf->layerSize);
             }
             else
             {
@@ -4600,7 +4567,7 @@ gcoTEXTURE_BindTextureEx(
                 /* Normal textures(include linear RGB) can have up to 14 lods. */
                 for (map = baseMipMap, lod = baseLevel; map && (lod <= (gctINT)maxLevel); map = map->next, lod++)
                 {
-                    info = &map->surface->info;
+                    baseSurf = map->surface;
                     if (map->locked == gcvNULL)
                     {
                         /* Lock the texture surface. */
@@ -4631,27 +4598,27 @@ gcoTEXTURE_BindTextureEx(
                     ** Then we can support render into mipmap/multi-slice texture.
                     */
                     if (((gctINT)maxLevel > baseLevel) &&
-                        (info->tileStatusNode.pool != gcvPOOL_UNKNOWN) &&
-                        (!info->tileStatusDisabled))
+                        (baseSurf->tileStatusNode.pool != gcvPOOL_UNKNOWN) &&
+                        (!baseSurf->tileStatusDisabled))
                     {
                         /*
                         ** We have no way to sample MSAA surface for now as we can't resolve MSAA into itself.
                         ** MSAA texture has been put into shadow rendering path.
                         */
-                        gcmASSERT(!info->isMsaa);
+                        gcmASSERT(!baseSurf->isMsaa);
 
                         gcoSURF_DisableTileStatus(map->surface, gcvTRUE);
 
                     }
 
-                    samplerInfo.lodAddr[lod]   = map->address + textureLayer * map->surface->info.layerSize;
-                    samplerInfo.lodStride[lod] = map->surface->info.stride;
+                    samplerInfo.lodAddr[lod]   = map->address + textureLayer * baseSurf->layerSize;
+                    samplerInfo.lodStride[lod] = baseSurf->stride;
 
-                    if (info->formatInfo.fmtClass == gcvFORMAT_CLASS_ASTC)
+                    if (baseSurf->formatInfo.fmtClass == gcvFORMAT_CLASS_ASTC)
                     {
-                        samplerInfo.astcSize[lod] = info->format -
-                                                    (info->formatInfo.sRGB ? gcvSURF_ASTC4x4_SRGB : gcvSURF_ASTC4x4);
-                        samplerInfo.astcSRGB[lod] = info->formatInfo.sRGB;
+                        samplerInfo.astcSize[lod] = baseSurf->format -
+                                                    (baseSurf->formatInfo.sRGB ? gcvSURF_ASTC4x4_SRGB : gcvSURF_ASTC4x4);
+                        samplerInfo.astcSRGB[lod] = baseSurf->formatInfo.sRGB;
                     }
                 }
 
@@ -4659,31 +4626,31 @@ gcoTEXTURE_BindTextureEx(
                 samplerInfo.lodNum = lod;
             }
 
-            info = &baseMipMap->surface->info;
+            baseSurf = baseMipMap->surface;
 
-            if ((info->tileStatusNode.pool != gcvPOOL_UNKNOWN) && (!info->tileStatusDisabled))
+            if ((baseSurf->tileStatusNode.pool != gcvPOOL_UNKNOWN) && (!baseSurf->tileStatusDisabled))
             {
                 /*
                 ** 1, ES3.1 MSAA texture.
                 ** 2, multisampled_render_to_texture has been put into shadow rendering path.
                 */
-                gcmASSERT((!info->isMsaa) ||
+                gcmASSERT((!baseSurf->isMsaa) ||
                           (Texture->type == gcvTEXTURE_2D_MS || Texture->type == gcvTEXTURE_2D_MS_ARRAY));
 
                 if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_TILE_STATUS_READ) == gcvFALSE) ||
-                    (info->compressed && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_DECOMPRESSOR) == gcvFALSE) ||
+                    (baseSurf->compressed && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_DECOMPRESSOR) == gcvFALSE) ||
                     (gcoHAL_IsSwwaNeeded(gcvNULL, gcvSWWA_1165)) ||
-                    ((info->bitsPerPixel < 16) &&
+                    ((baseSurf->bitsPerPixel < 16) &&
                      (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_8BPP_TS_FIX) == gcvFALSE))||
-                    (info->isMsaa && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MSAA_TEXTURE) == gcvFALSE))
+                    (baseSurf->isMsaa && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MSAA_TEXTURE) == gcvFALSE))
                 {
                     gcoSURF_DisableTileStatus(baseMipMap->surface, gcvTRUE);
                     samplerInfo.hasTileStatus = gcvFALSE;
                 }
                 else
                 {
-                    samplerInfo.hasTileStatus = !info->tileStatusDisabled;
-                    samplerInfo.compressedDecFormat = info->compressDecFormat;
+                    samplerInfo.hasTileStatus = !baseSurf->tileStatusDisabled;
+                    samplerInfo.compressedDecFormat = baseSurf->compressDecFormat;
                 }
             }
             else
@@ -4906,27 +4873,6 @@ gcoTEXTURE_GenerateMipMap(
         return gcvSTATUS_OK;
     }
 
-#if gcdDUMP
-    {
-        gctSTRING env;
-        gctINT simFrame = 0;
-        gctUINT frameCount;
-        gcoOS_GetEnv(gcvNULL, "SIM_Frame", &env);
-        gcoHAL_FrameInfoOps(gcvNULL,
-                            gcvFRAMEINFO_FRAME_NUM,
-                            gcvFRAMEINFO_OP_GET,
-                            &frameCount);
-        if (env)
-        {
-            gcoOS_StrToInt(env, &simFrame);
-        }
-
-        if ((gctINT)frameCount < simFrame)
-        {
-            gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-        }
-    }
-#endif
 
     for (i = 0; i < baseLevel; i++)
     {
@@ -4943,8 +4889,7 @@ gcoTEXTURE_GenerateMipMap(
 
     if(Texture->type == gcvTEXTURE_3D)
     {
-        tempSurf[0] = baseMipMap->surface;
-        info.LODs[0] = &tempSurf[0]->info;
+        info.LODs[0] = tempSurf[0] = baseMipMap->surface;
 
         for (l = 1; l <= genLevel; ++l)
         {
@@ -4965,8 +4910,8 @@ gcoTEXTURE_GenerateMipMap(
                gcvPOOL_DEFAULT,
                &tempSurf[l]));
 
-            info.LODs[l] = &tempSurf[l]->info;
-            info.LODsSliceSize[l] = tempSurf[l]->info.sliceSize;
+            info.LODs[l] = tempSurf[l];
+            info.LODsSliceSize[l] = tempSurf[l]->sliceSize;
         }
 
         for (z = 0; z < depth; ++z)
@@ -5008,8 +4953,8 @@ gcoTEXTURE_GenerateMipMap(
 
         for (l = 0, map = baseMipMap; l <= genLevel; l++, map = map->next)
         {
-            info.LODs[l] = &map->surface->info;
-            info.LODsSliceSize[l] = map->surface->info.sliceSize;
+            info.LODs[l] = map->surface;
+            info.LODsSliceSize[l] = map->surface->sliceSize;
         }
 
         for (i = 0; i < slice; i++)
@@ -5063,16 +5008,16 @@ OnError:
                 blitArgs.srcX               = 0;
                 blitArgs.srcY               = 0;
                 blitArgs.srcZ               = 0;
-                blitArgs.srcWidth           = srcSurface->info.requestW;
-                blitArgs.srcHeight          = srcSurface->info.requestH;
-                blitArgs.srcDepth           = srcSurface->info.requestD;
+                blitArgs.srcWidth           = srcSurface->requestW;
+                blitArgs.srcHeight          = srcSurface->requestH;
+                blitArgs.srcDepth           = srcSurface->requestD;
                 blitArgs.srcSurface         = srcSurface;
                 blitArgs.dstX               = 0;
                 blitArgs.dstY               = 0;
                 blitArgs.dstZ               = 0;
-                blitArgs.dstWidth           = destSurface->info.requestW;
-                blitArgs.dstHeight          = destSurface->info.requestH;
-                blitArgs.dstDepth           = destSurface->info.requestD;
+                blitArgs.dstWidth           = destSurface->requestW;
+                blitArgs.dstHeight          = destSurface->requestH;
+                blitArgs.dstDepth           = destSurface->requestD;
                 blitArgs.dstSurface         = destSurface;
                 blitArgs.xReverse           = gcvFALSE;
                 blitArgs.yReverse           = gcvFALSE;

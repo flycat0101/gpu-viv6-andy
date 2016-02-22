@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -56,16 +56,6 @@ static struct _cl_device_id _device =
                                 /* Device Info      */
 };
 
-#if BUILD_OPENCL_FP
-static char *extension_w_atomic_int64 = "cl_khr_byte_addressable_store "
-                                  "cl_khr_global_int32_base_atomics "
-                                  "cl_khr_global_int32_extended_atomics "
-                                  "cl_khr_local_int32_base_atomics "
-                                  "cl_khr_local_int32_extended_atomics "
-                                  "cles_khr_int64 ";
-
-static char *extension_int64 = "cles_khr_int64 ";
-#endif
 static char *extension_w_atomic = "cl_khr_byte_addressable_store "
                                   "cl_khr_global_int32_base_atomics "
                                   "cl_khr_global_int32_extended_atomics "
@@ -188,17 +178,17 @@ clGetDeviceIDs(
             gctUINT32 chipRevision;
             gcePATCH_ID patchId = gcvPATCH_INVALID;
             gctUINT offset;
-#if BUILD_OPENCL_FP
-            gctBOOL fpSupport = gcvFALSE;
-#endif
 
 #if BUILD_OPENCL_FP
             gctSTRING epProfile = "EMBEDDED_PROFILE";
-            if((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) != gcvSTATUS_TRUE) || (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) != gcvSTATUS_TRUE))
+            gctBOOL chipEnableFP = gcvFALSE;
+            gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
+            chipEnableFP = ((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008));
+            if((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) != gcvSTATUS_TRUE) || (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) != gcvSTATUS_TRUE)
+                || (chipEnableFP == gcvFALSE))
             {
                 /*if the features on the device are not availble, still report embedded profile even if BUILD_OPENCL_FP is 1*/
                 clgDefaultDevice->profile = epProfile;
-                fpSupport = gcvTRUE;
             }
 #endif
 
@@ -208,30 +198,12 @@ clGetDeviceIDs(
             device[i].gpuId = i;
             if (clgDefaultDevice->deviceInfo.atomicSupport)
             {
-#if BUILD_OPENCL_FP
-                if(fpSupport == gcvTRUE)
-                {
-                    device[i].extensions = extension_w_atomic_int64;
-                }
-                else
-                {
-                    device[i].extensions = extension_w_atomic;
-                }
-#else
                 device[i].extensions = extension_w_atomic;
-#endif
-            }
-            else
-            {
-#if BUILD_OPENCL_FP
-                if(fpSupport == gcvTRUE)
-                {
-                    device[i].extensions = extension_int64;
-                }
-#endif
             }
 
+#if !BUILD_OPENCL_FP
             gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
+#endif
             gcoHAL_GetPatchID(gcvNULL, &patchId);
 
             offset = 0;
@@ -650,14 +622,7 @@ clGetDeviceInfo(
 
     case CL_DEVICE_EXTENSIONS:
         isRetParamString = gcvTRUE;
-        if (Device->deviceInfo.atomicSupport)
-        {
-            retParamStr = extension_w_atomic;
-        }
-        else
-        {
-            retParamStr = Device->extensions;
-        }
+        retParamStr = Device->extensions;
         break;
 
     case CL_DEVICE_PREFERRED_VECTOR_WIDTH_CHAR:

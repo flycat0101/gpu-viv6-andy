@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -19,7 +19,6 @@
 
 extern GLvoid __glDrawPrimitive(__GLcontext *gc, GLenum mode);
 extern GLvoid __glInitBufferObject(__GLcontext *gc, __GLbufferObject *bufObj, GLuint name);
-extern GLboolean __glDeleteBufferObject(__GLcontext *gc, __GLbufferObject *bufObj);
 
 __GL_INLINE GLvoid __glVertexAttrib4f(__GLcontext *gc, GLuint index, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
 {

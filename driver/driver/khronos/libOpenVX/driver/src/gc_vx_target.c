@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -19,8 +19,12 @@
 extern vx_kernel_description_s *    target_kernels[];
 extern vx_uint32                    num_target_kernels;
 
+
+
 VX_PRIVATE_API vx_status vxInitializeTarget(
-        vx_target target, vx_kernel_description_s *kernelDescTable[], vx_uint32 kernelCount)
+    vx_target target,
+    vx_kernel_description_s *kernelDescTable[],
+    vx_uint32 kernelCount)
 {
     vx_uint32   index;
 
@@ -32,7 +36,8 @@ VX_PRIVATE_API vx_status vxInitializeTarget(
 
     for (index = 0; index < kernelCount; index++)
     {
-        vx_status status = vxoKernel_Initialize(target->base.context, &target->kernelTable[index],
+        vx_status status = vxoKernel_Initialize(target->base.context,
+                                                &target->kernelTable[index],
                                                 kernelDescTable[index]->name,
                                                 kernelDescTable[index]->enumeration,
                                                 VX_NULL,
@@ -42,7 +47,11 @@ VX_PRIVATE_API vx_status vxInitializeTarget(
                                                 kernelDescTable[index]->inputValidate,
                                                 kernelDescTable[index]->outputValidate,
                                                 kernelDescTable[index]->initialize,
-                                                kernelDescTable[index]->deinitialize);
+                                                kernelDescTable[index]->deinitialize
+#if gcdVX_OPTIMIZER
+                                                , kernelDescTable[index]->optAttributes
+#endif
+                                                );
 
         if (status != VX_SUCCESS) return status;
 
@@ -52,13 +61,15 @@ VX_PRIVATE_API vx_status vxInitializeTarget(
     }
 
     /* ToDo : Add more specific return status check */
-    if (gcoVX_Initialize() != gcvSTATUS_OK)
+	if (gcoVX_Initialize(&target->base.context->evisNoInst) != gcvSTATUS_OK)
     {
         return VX_FAILURE;
     }
 
     return VX_SUCCESS;
 }
+
+
 
 VX_PRIVATE_API vx_status vxDeinitializeTarget(vx_target target)
 {
@@ -206,11 +217,19 @@ VX_PRIVATE_API vx_kernel vxoTarget_AddKernel(
 
         if (!kernel->enabled && kernel->enumeration == VX_KERNEL_INVALID)
         {
+#if gcdVX_OPTIMIZER
+            vx_kernel_optimization_attribute_s optAttributes = {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0};
+#endif
+
             vx_status status = vxoKernel_Initialize(target->base.context, kernel,
                                                     name, enumeration,
                                                     program, funcPtr,
                                                     VX_NULL, paramCount,
-                                                    input, output, initialize, deinitialize);
+                                                    input, output, initialize, deinitialize
+#if gcdVX_OPTIMIZER
+                                                    , optAttributes
+#endif
+                                                    );
 
             if (status != VX_SUCCESS)
             {
@@ -244,11 +263,18 @@ VX_PRIVATE_API vx_kernel vxoTarget_AddTilingKernel(
 
         if (!kernel->enabled && kernel->enumeration == VX_KERNEL_INVALID)
         {
+#if gcdVX_OPTIMIZER
+            vx_kernel_optimization_attribute_s optAttributes = {vx_false_e, vx_false_e, 0, 0, 0, 0};
+#endif
             vx_status status = vxoKernel_Initialize(target->base.context, kernel,
                                                     name, enumeration,
                                                     VX_NULL, vxTilingKernelFunction,
                                                     VX_NULL, paramCount,
-                                                    input, output, VX_NULL, VX_NULL);
+                                                    input, output, VX_NULL, VX_NULL
+#if gcdVX_OPTIMIZER
+                                                    , optAttributes
+#endif
+                                                    );
 
             if (status != VX_SUCCESS)
             {
@@ -522,7 +548,7 @@ VX_INTERNAL_API vx_status vxoTarget_Load(vx_context context, vx_string moduleNam
         return VX_ERROR_NO_RESOURCES;
     }
 
-    vxoReference_Initialize(&target->base, context, VX_TYPE_TARGET, &context->base);
+    vxoReference_Initialize(&target->base, context, (vx_type_e)VX_TYPE_TARGET, &context->base);
 
     vxoReference_Increment(&target->base, VX_REF_INTERNAL);
 
@@ -565,7 +591,7 @@ VX_INTERNAL_API vx_status vxoTarget_Unload(vx_context context, vx_uint32 index, 
 
         vxZeroMemory(&target->module.name, sizeof(target->module.name));
 
-        vxoReference_Release((vx_reference_ptr)&target, VX_TYPE_TARGET, VX_REF_INTERNAL);
+        vxoReference_Release((vx_reference_ptr)&target, (vx_type_e)VX_TYPE_TARGET, VX_REF_INTERNAL);
     }
 
     return VX_SUCCESS;
@@ -641,7 +667,7 @@ VX_PUBLIC_API vx_target vxGetTargetByName(vx_context context, const vx_char *nam
 
 VX_PUBLIC_API vx_status vxReleaseTarget(vx_target *target)
 {
-    return vxoReference_Release((vx_reference_ptr)target, VX_TYPE_TARGET, VX_REF_EXTERNAL);
+    return vxoReference_Release((vx_reference_ptr)target, (vx_type_e)VX_TYPE_TARGET, VX_REF_EXTERNAL);
 }
 
 VX_PUBLIC_API vx_status vxQueryTarget(vx_target target, vx_enum attribute, void *ptr, vx_size size)
@@ -650,7 +676,7 @@ VX_PUBLIC_API vx_status vxQueryTarget(vx_target target, vx_enum attribute, void 
     vx_uint32           kernelIndex;
     vx_kernel_info_t *  kernelTable;
 
-    if (!vxoReference_IsValidAndSpecific((vx_reference)target, VX_TYPE_TARGET))
+    if (!vxoReference_IsValidAndSpecific((vx_reference)target, (vx_type_e)VX_TYPE_TARGET))
     {
         return VX_ERROR_INVALID_REFERENCE;
     }
@@ -709,7 +735,7 @@ VX_PUBLIC_API vx_status vxAssignNodeAffinity(vx_node node, vx_target target)
 
     if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) return VX_ERROR_INVALID_REFERENCE;
 
-    if (!vxoReference_IsValidAndSpecific(&target->base, VX_TYPE_TARGET)) return VX_ERROR_INVALID_REFERENCE;
+    if (!vxoReference_IsValidAndSpecific(&target->base, (vx_type_e)VX_TYPE_TARGET)) return VX_ERROR_INVALID_REFERENCE;
 
     for (kernelIndex = 0; kernelIndex < target->kernelCount; kernelIndex++)
     {

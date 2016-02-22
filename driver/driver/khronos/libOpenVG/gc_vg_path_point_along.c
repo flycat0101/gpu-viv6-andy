@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -58,6 +58,8 @@ typedef struct _vgsTESSINFO
     gctFLOAT bottom;
 
     vgsCONTROL_COORD coords;
+
+    gctBOOL  quickBounds;  /* If quickBounds mode is enabled, just use the control points to calculate the rough bounding box. */
 }
 vgsTESSINFO;
 
@@ -1555,10 +1557,21 @@ vgmDEFINETESSELATE(gcvVGCMD_MOVE)
         moveToX = Source->get(Context, Source);
         moveToY = Source->get(Context, Source);
 
-        /* Tesselate the segment. */
-        _AddPoint(
-            Context, Info, moveToX, moveToY, 0.0f, 0.0f, gcvFALSE, gcvFALSE
-            );
+        if (Info->quickBounds)
+        {
+            /* Only update bounds based on control points. */
+            Info->left = gcmMIN(Info->left, moveToX);
+            Info->right = gcmMAX(Info->right, moveToX);
+            Info->bottom = gcmMAX(Info->bottom, moveToY);
+            Info->top = gcmMIN(Info->top, moveToY);
+        }
+        else
+        {
+            /* Tesselate the segment. */
+            _AddPoint(
+                Context, Info, moveToX, moveToY, 0.0f, 0.0f, gcvFALSE, gcvFALSE
+                );
+        }
 
         /* Update the control coordinates. */
         coords->startX   = moveToX;
@@ -1585,10 +1598,21 @@ vgmDEFINETESSELATE(gcvVGCMD_MOVE_REL)
         moveToX = Source->get(Context, Source) + coords->lastX;
         moveToY = Source->get(Context, Source) + coords->lastY;
 
-        /* Tesselate the segment. */
-        _AddPoint(
-            Context, Info, moveToX, moveToY, 0.0f, 0.0f, gcvFALSE, gcvFALSE
-            );
+        if (Info->quickBounds)
+        {
+            /* Only update bounds based on control points. */
+            Info->left = gcmMIN(Info->left, moveToX);
+            Info->right = gcmMAX(Info->right, moveToX);
+            Info->bottom = gcmMAX(Info->bottom, moveToY);
+            Info->top = gcmMIN(Info->top, moveToY);
+        }
+        else
+        {
+            /* Tesselate the segment. */
+            _AddPoint(
+                Context, Info, moveToX, moveToY, 0.0f, 0.0f, gcvFALSE, gcvFALSE
+                );
+        }
 
         /* Update the control coordinates. */
         coords->startX   = moveToX;
@@ -1621,13 +1645,26 @@ vgmDEFINETESSELATE(gcvVGCMD_LINE)
         lineToX = Source->get(Context, Source);
         lineToY = Source->get(Context, Source);
 
-        /* Tesselate the segment. */
-        status = _AddLineTo(
-            Context,
-            Info,
-            coords->lastX, coords->lastY,
-            lineToX, lineToY
-            );
+        if (Info->quickBounds)
+        {
+            /* Only update bounds based on control points. */
+            Info->left = gcmMIN(Info->left, lineToX);
+            Info->right = gcmMAX(Info->right, lineToX);
+            Info->bottom = gcmMAX(Info->bottom, lineToY);
+            Info->top = gcmMIN(Info->top, lineToY);
+
+            status = gcvSTATUS_OK;
+        }
+        else
+        {
+            /* Tesselate the segment. */
+            status = _AddLineTo(
+                Context,
+                Info,
+                coords->lastX, coords->lastY,
+                lineToX, lineToY
+                );
+        }
 
         if (status == gcvSTATUS_TRUE)
         {
@@ -1659,13 +1696,26 @@ vgmDEFINETESSELATE(gcvVGCMD_LINE_REL)
         lineToX = Source->get(Context, Source) + coords->lastX;
         lineToY = Source->get(Context, Source) + coords->lastY;
 
-        /* Tesselate the end of the path. */
-        status = _AddLineTo(
-            Context,
-            Info,
-            coords->lastX, coords->lastY,
-            lineToX, lineToY
-            );
+        if (Info->quickBounds)
+        {
+            /* Only update bounds based on control points. */
+            Info->left = gcmMIN(Info->left, lineToX);
+            Info->right = gcmMAX(Info->right, lineToX);
+            Info->bottom = gcmMAX(Info->bottom, lineToY);
+            Info->top = gcmMIN(Info->top, lineToY);
+
+            status = gcvSTATUS_OK;
+        }
+        else
+        {
+            /* Tesselate the end of the path. */
+            status = _AddLineTo(
+                Context,
+                Info,
+                coords->lastX, coords->lastY,
+                lineToX, lineToY
+                );
+        }
 
         if (status == gcvSTATUS_TRUE)
         {
@@ -1706,14 +1756,32 @@ vgmDEFINETESSELATE(gcvVGCMD_QUAD)
         quadToX  = Source->get(Context, Source);
         quadToY  = Source->get(Context, Source);
 
-        /* Tesselate the end of the path. */
-        status = _AddQuadTo(
-            Context,
-            Info,
-            coords->lastX, coords->lastY,
-            controlX, controlY,
-            quadToX, quadToY
-            );
+        if (Info->quickBounds)
+        {
+            /* Only update bounds based on control points. */
+            Info->left = gcmMIN(Info->left, controlX);
+            Info->right = gcmMAX(Info->right, controlX);
+            Info->bottom = gcmMAX(Info->bottom, controlY);
+            Info->top = gcmMIN(Info->top, controlY);
+
+            Info->left = gcmMIN(Info->left, quadToX);
+            Info->right = gcmMAX(Info->right, quadToX);
+            Info->bottom = gcmMAX(Info->bottom, quadToY);
+            Info->top = gcmMIN(Info->top, quadToY);
+
+            status = gcvSTATUS_OK;
+        }
+        else
+        {
+            /* Tesselate the end of the path. */
+            status = _AddQuadTo(
+                Context,
+                Info,
+                coords->lastX, coords->lastY,
+                controlX, controlY,
+                quadToX, quadToY
+                );
+        }
 
         if (status == gcvSTATUS_TRUE)
         {
@@ -1748,14 +1816,32 @@ vgmDEFINETESSELATE(gcvVGCMD_QUAD_REL)
         quadToX  = Source->get(Context, Source) + coords->lastX;
         quadToY  = Source->get(Context, Source) + coords->lastY;
 
-        /* Tesselate the end of the path. */
-        status = _AddQuadTo(
-            Context,
-            Info,
-            coords->lastX, coords->lastY,
-            controlX, controlY,
-            quadToX, quadToY
-            );
+        if (Info->quickBounds)
+        {
+            /* Only update bounds based on control points. */
+            Info->left = gcmMIN(Info->left, controlX);
+            Info->right = gcmMAX(Info->right, controlX);
+            Info->bottom = gcmMAX(Info->bottom, controlY);
+            Info->top = gcmMIN(Info->top, controlY);
+
+            Info->left = gcmMIN(Info->left, quadToX);
+            Info->right = gcmMAX(Info->right, quadToX);
+            Info->bottom = gcmMAX(Info->bottom, quadToY);
+            Info->top = gcmMIN(Info->top, quadToY);
+
+            status = gcvSTATUS_OK;
+        }
+        else
+        {
+            /* Tesselate the end of the path. */
+            status = _AddQuadTo(
+                Context,
+                Info,
+                coords->lastX, coords->lastY,
+                controlX, controlY,
+                quadToX, quadToY
+                );
+        }
 
         if (status == gcvSTATUS_TRUE)
         {
@@ -1798,15 +1884,38 @@ vgmDEFINETESSELATE(gcvVGCMD_CUBIC)
         cubicToX  = Source->get(Context, Source);
         cubicToY  = Source->get(Context, Source);
 
-        /* Tesselate the end of the path. */
-        status = _AddCubicTo(
-            Context,
-            Info,
-            coords->lastX, coords->lastY,
-            control1X, control1Y,
-            control2X, control2Y,
-            cubicToX, cubicToY
-            );
+        if (Info->quickBounds)
+        {
+            /* Only update bounds based on control points. */
+            Info->left = gcmMIN(Info->left, control1X);
+            Info->right = gcmMAX(Info->right, control1X);
+            Info->bottom = gcmMAX(Info->bottom, control1Y);
+            Info->top = gcmMIN(Info->top, control1Y);
+
+            Info->left = gcmMIN(Info->left, control2X);
+            Info->right = gcmMAX(Info->right, control2X);
+            Info->bottom = gcmMAX(Info->bottom, control2Y);
+            Info->top = gcmMIN(Info->top, control2Y);
+
+            Info->left = gcmMIN(Info->left, cubicToX);
+            Info->right = gcmMAX(Info->right, cubicToX);
+            Info->bottom = gcmMAX(Info->bottom, cubicToY);
+            Info->top = gcmMIN(Info->top, cubicToY);
+
+            status = gcvSTATUS_OK;
+        }
+        else
+        {
+            /* Tesselate the end of the path. */
+            status = _AddCubicTo(
+                Context,
+                Info,
+                coords->lastX, coords->lastY,
+                control1X, control1Y,
+                control2X, control2Y,
+                cubicToX, cubicToY
+                );
+        }
 
         if (status == gcvSTATUS_TRUE)
         {
@@ -1845,15 +1954,38 @@ vgmDEFINETESSELATE(gcvVGCMD_CUBIC_REL)
         cubicToX  = Source->get(Context, Source) + coords->lastX;
         cubicToY  = Source->get(Context, Source) + coords->lastY;
 
-        /* Tesselate the end of the path. */
-        status = _AddCubicTo(
-            Context,
-            Info,
-            coords->lastX, coords->lastY,
-            control1X, control1Y,
-            control2X, control2Y,
-            cubicToX, cubicToY
-            );
+        if (Info->quickBounds)
+        {
+            /* Only update bounds based on control points. */
+            Info->left = gcmMIN(Info->left, control1X);
+            Info->right = gcmMAX(Info->right, control1X);
+            Info->bottom = gcmMAX(Info->bottom, control1Y);
+            Info->top = gcmMIN(Info->top, control1Y);
+
+            Info->left = gcmMIN(Info->left, control2X);
+            Info->right = gcmMAX(Info->right, control2X);
+            Info->bottom = gcmMAX(Info->bottom, control2Y);
+            Info->top = gcmMIN(Info->top, control2Y);
+
+            Info->left = gcmMIN(Info->left, cubicToX);
+            Info->right = gcmMAX(Info->right, cubicToX);
+            Info->bottom = gcmMAX(Info->bottom, cubicToY);
+            Info->top = gcmMIN(Info->top, cubicToY);
+
+            status = gcvSTATUS_OK;
+        }
+        else
+        {
+            /* Tesselate the end of the path. */
+            status = _AddCubicTo(
+                Context,
+                Info,
+                coords->lastX, coords->lastY,
+                control1X, control1Y,
+                control2X, control2Y,
+                cubicToX, cubicToY
+                );
+        }
 
         if (status == gcvSTATUS_TRUE)
         {
@@ -2236,6 +2368,8 @@ gctBOOL vgfComputePointAlongPath(
     info.coords.controlX = 0.0f;
     info.coords.controlY = 0.0f;
 
+    info.quickBounds     = gcvFALSE;
+
     /* Initialize walkers. */
     vgsPATHWALKER_InitializeReader(
         Context, Context->pathStorage, &source, &info.coords, Path
@@ -2316,3 +2450,115 @@ gctBOOL vgfComputePointAlongPath(
     /* Success. */
     return result;
 }
+
+#if gcdMOVG
+gctBOOL vgfComputeCtrlBounds(
+    IN vgsCONTEXT_PTR Context,
+    IN vgsPATH_PTR Path,
+    OUT gctFLOAT_PTR PathLeft,
+    OUT gctFLOAT_PTR PathTop,
+    OUT gctFLOAT_PTR PathRight,
+    OUT gctFLOAT_PTR PathBottom
+    )
+{
+    gceSTATUS status;
+    gctBOOL result;
+    vgsTESSINFO info;
+    vgsPATHWALKER source;
+    gctUINT currentSegment;
+    gctUINT lastSegment;
+    vgmENTERSUBAPI(vgfComputePointAlongPath);
+    /* Empty path? */
+    if (Path->numCoords == 0)
+    {
+        result = gcvFALSE;
+        break;
+    }
+
+    /* Reset the tesselation parameters. */
+    info.enableUpdate = gcvFALSE;
+    info.havePoints   = gcvFALSE;
+
+    info.distance = 0.0f;
+
+    info.positionX = 0.0f;
+    info.positionY = 0.0f;
+
+    info.tangentX = 1.0f;
+    info.tangentY = 0.0f;
+
+    info.length = 0.0f;
+
+    info.left   = gcvMAX_POS_FLOAT;
+    info.top    = gcvMAX_POS_FLOAT;
+    info.right  = gcvMAX_NEG_FLOAT;
+    info.bottom = gcvMAX_NEG_FLOAT;
+
+    /* Reset control coordinates. */
+    info.coords.startX   = 0.0f;
+    info.coords.startY   = 0.0f;
+    info.coords.lastX    = 0.0f;
+    info.coords.lastY    = 0.0f;
+    info.coords.controlX = 0.0f;
+    info.coords.controlY = 0.0f;
+
+    info.quickBounds     = gcvTRUE;
+
+    /* Initialize walkers. */
+    vgsPATHWALKER_InitializeReader(
+        Context, Context->pathStorage, &source, &info.coords, Path
+        );
+
+    /* Reset the initial segment. */
+    currentSegment = 0;
+
+    /* Determine the last segment. */
+    lastSegment = Path->numSegments;
+
+    /* Walk the path. */
+    while (gcvTRUE)
+    {
+        /* Get the current command. */
+        gceVGCMD command = source.command;
+
+        /* Call the handler. */
+        gcmASSERT(gcmIS_VALID_INDEX(command, _tesselateCommand));
+        status = _tesselateCommand[command] (Context, &source, &info);
+
+        /* Finished? */
+        if (status == gcvSTATUS_TRUE)
+        {
+            break;
+        }
+
+        /* Advance to the next segment. */
+        currentSegment += 1;
+
+        /* Finished? */
+        if (currentSegment == lastSegment)
+        {
+            break;
+        }
+
+        /* Get the next segment. */
+        gcmVERIFY_OK(vgsPATHWALKER_NextSegment(Context, &source));
+    }
+
+    /* Set the results. */
+    if (PathLeft   != gcvNULL) * PathLeft   = info.left;
+    if (PathTop    != gcvNULL) * PathTop    = info.top;
+    if (PathRight  != gcvNULL) * PathRight  = info.right;
+    if (PathBottom != gcvNULL) * PathBottom = info.bottom;
+
+    Path->boundsDirty = gcvFALSE;
+    Path->bounds[0] = info.left;
+    Path->bounds[1] = info.right;
+    Path->bounds[2] = info.bottom;
+    Path->bounds[3] = info.top;
+    result = gcvTRUE;
+
+    vgmLEAVESUBAPI(vgfComputePointAlongPath);
+    /* Success. */
+    return result;
+}
+#endif

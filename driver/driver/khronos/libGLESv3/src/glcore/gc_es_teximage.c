@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -21,8 +21,6 @@
 extern GLboolean __glIsTextureComplete(__GLcontext *gc, __GLtextureObject *texObj, GLenum minFilter,
                                        GLenum magFilter, GLenum compareMode, GLint maxLevelUsed);
 extern GLint __glCalcTexMaxLevelUsed(__GLcontext *gc, __GLtextureObject *texObj, GLenum minFilter);
-
-extern GLboolean __glDeleteBufferObject(__GLcontext *gc, __GLbufferObject *bufObj);
 
 #define __GL_TEXIMAGE2D_GET_OBJECT() \
     activeUnit = gc->state.texture.activeTexIndex;\
@@ -393,11 +391,17 @@ GLboolean __glCheckTexDirectFmt(__GLcontext *gc,
     case GL_VIV_NV21:
     case GL_VIV_YUY2:
     case GL_VIV_UYVY:
+    case GL_VIV_YUV420_10_ST:
+    case GL_VIV_YUV420_TILE_ST:
+    case GL_VIV_YUV420_TILE_10_ST:
     case GL_RGB565:
     case GL_RGB:
     case GL_RGBA:
     case GL_BGRA_EXT:
     case GL_RG8_EXT:
+    case GL_ALPHA:
+    case GL_LUMINANCE_ALPHA:
+    case GL_DEPTH_COMPONENT16:
         return GL_TRUE;
 
     default:
@@ -1844,17 +1848,6 @@ GLboolean __glSetMipmapLevelInfo(__GLcontext *gc, __GLtextureObject *tex, GLint 
         mipmap->compressedSize = __glCompressedTexImageSize(lod, internalFormat, width, height, depth);
     }
 
-    /* Initialize other levels if it is 1d or 2d array */
-    if (arrays > 1)
-    {
-        GLint arrayIdx;
-        for (arrayIdx = 1; arrayIdx < arrays; ++arrayIdx)
-        {
-            currentMipmap = &tex->faceMipmap[arrayIdx][lod];
-            __GL_MEMCOPY(currentMipmap, mipmap, sizeof(__GLmipMapLevel));
-        }
-    }
-
     /* Initialize other lods if it is paletted texture */
     if (paletted)
     {
@@ -1925,7 +1918,7 @@ GLboolean __glIsCubeBaselevelConsistent(__GLcontext *gc, __GLtextureObject *tex)
     }
 
     /* If the six baselevel images have identical dimension, internalformat */
-    for (face = 1; face < 6; face++)
+    for (face = 1; face < 6; ++face)
     {
         level = &tex->faceMipmap[face][base];
         if (requestedFormat != level->requestedFormat ||
@@ -4421,7 +4414,7 @@ GLvoid __glUnBindTextureBuffer(__GLcontext *gc, __GLtextureObject *tex, __GLbuff
         __glRemoveImageUser(gc, &bufObj->texList, tex);
 
         if (!bufObj->bindCount && !bufObj->vaoList &&
-!bufObj->texList && (bufObj->flag & __GL_OBJECT_IS_DELETED))
+            !bufObj->texList && (bufObj->flag & __GL_OBJECT_IS_DELETED))
         {
             __glDeleteBufferObject(gc, bufObj);
         }

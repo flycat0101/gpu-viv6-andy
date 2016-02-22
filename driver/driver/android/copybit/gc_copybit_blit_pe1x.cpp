@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -303,7 +303,7 @@ _StretchBlitPE1x(
         private_handle_t * srch = (private_handle_t *) Source->handle;
         private_handle_t * dsth = (private_handle_t *) Dest->handle;
 
-        if  ((((gcoSURF)srchnd->surface)->info.type == gcvSURF_BITMAP) &&
+        if  ((((gcoSURF)srchnd->surface)->type == gcvSURF_BITMAP) &&
             !(srch->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER))
         {
             /* Clean the CPU cache. Source would've been rendered by the CPU. */

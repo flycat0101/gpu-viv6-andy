@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -37,7 +37,6 @@ typedef struct _gcoCL *                 gcoCL;
 typedef struct _gcsFAST_FLUSH *         gcsFAST_FLUSH_PTR;
 
 typedef struct _gcoSURF *               gcoSURF;
-typedef struct _gcsSURF_INFO *          gcsSURF_INFO_PTR;
 typedef struct _gcsSURF_NODE *          gcsSURF_NODE_PTR;
 typedef struct _gcsSURF_FORMAT_INFO *   gcsSURF_FORMAT_INFO_PTR;
 typedef struct _gcsPOINT *              gcsPOINT_PTR;
@@ -97,6 +96,7 @@ typedef struct _gcsSystemInfo
     gctUINT32 memoryLatencySH;
 }
 gcsSystemInfo;
+
 
 #if gcdENABLE_3D
 #define gcPLS_INITIALIZER \
@@ -308,6 +308,7 @@ typedef enum _gceAPI
     gcvAPI_OPENGL_ES20,
     gcvAPI_OPENGL_ES30,
     gcvAPI_OPENGL_ES31,
+    gcvAPI_OPENGL_ES32,
     gcvAPI_OPENGL,
     gcvAPI_OPENVG,
     gcvAPI_OPENCL,
@@ -835,7 +836,8 @@ gceSTATUS
 gcoHAL_QueryCoreCount(
     IN gcoHAL Hal,
     IN gceHARDWARE_TYPE Type,
-    OUT gctUINT *Count
+    OUT gctUINT *Count,
+    OUT gctUINT_PTR ChipIDs
     );
 
 gceSTATUS
@@ -981,7 +983,8 @@ gcoHAL_WrapUserMemory(
 
 gceSTATUS
 gcoHAL_QueryResetTimeStamp(
-    OUT gctUINT64_PTR ResetTimeStamp
+    OUT gctUINT64_PTR ResetTimeStamp,
+    OUT gctUINT64_PTR ContextID
     );
 
 gceSTATUS
@@ -2571,10 +2574,10 @@ gcoSURF_Fill(
 /* Alpha blend two surfaces together. */
 gceSTATUS
 gcoSURF_Blend(
-    IN gcoSURF SrcSurface,
-    IN gcoSURF DestSurface,
-    IN gcsPOINT_PTR SrcOrig,
-    IN gcsPOINT_PTR DestOrigin,
+    IN gcoSURF SrcSurf,
+    IN gcoSURF DstSurf,
+    IN gcsPOINT_PTR SrcOrigin,
+    IN gcsPOINT_PTR DstOrigin,
     IN gcsSIZE_PTR Size,
     IN gceSURF_BLEND_MODE Mode
     );
@@ -2659,12 +2662,6 @@ gceSTATUS
 gcoSURF_QueryOrientation(
     IN gcoSURF Surface,
     OUT gceORIENTATION * Orientation
-    );
-
-gceSTATUS
-gcoSURF_SetOffset(
-    IN gcoSURF Surface,
-    IN gctSIZE_T Offset
     );
 
 gceSTATUS

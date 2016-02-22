@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -59,7 +59,10 @@ extern gctCLCompiler gcCLCompiler;
 #endif
 gcSHADER gcCLPatchLibrary[CL_LIB_COUNT]  = {gcvNULL};
 
-gcSHADER gcCLBuiltinLibrary = gcvNULL;
+/* Builtin library for HW that can't support IMG instructions.*/
+gcSHADER gcCLBuiltinLibrary0 = gcvNULL;
+/* Builtin library for HW that can support IMG instructions.*/
+gcSHADER gcCLBuiltinLibrary1 = gcvNULL;
 
 /* define the max builtin parameter count,
    should be the same as slmMAX_BUILT_IN_PARAMETER_COUNT*/
@@ -422,7 +425,7 @@ _addSamplerArgPassInst(
 
     arg = &Function->arguments[ArgNo];
 
-    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_GET_SAMPLER_IDX, arg->index, arg->enable, gcSL_INTEGER, arg->precision));
+    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_GET_SAMPLER_IDX, arg->index, arg->enable, gcSL_INTEGER, gcSHADER_PRECISION_ANY));
 
     code = Shader->code + Shader->lastInstruction;
 
@@ -579,6 +582,7 @@ _addRetValueInst(
     gcSL_INDEXED             mode;
     gcSL_FORMAT              format;
     gctUINT8                 enable;
+    gcSHADER_PRECISION       precision = gcSHADER_PRECISION_DEFAULT;
     gctBOOL                  isSource0;
     gcsValue *               val;
 
@@ -604,12 +608,14 @@ _addRetValueInst(
                                             (gcSL_SWIZZLE) gcmSL_SOURCE_GET(source, SwizzleY),
                                             (gcSL_SWIZZLE) gcmSL_SOURCE_GET(source, SwizzleZ),
                                             (gcSL_SWIZZLE) gcmSL_SOURCE_GET(source, SwizzleW));
+        precision = gcmSL_SOURCE_GET(source, Precision);
        break;
     case gcvDest: /* dest */
         /*type        = gcSL_TEMP;*/
         mode        = gcmSL_TARGET_GET(Code->temp, Indexed);
         format      = gcmSL_TARGET_GET(Code->temp, Format);
         enable      = gcmSL_TARGET_GET(Code->temp, Enable);
+        precision   = gcmSL_TARGET_GET(Code->temp, Precision);
         swizzle     = gcSL_SWIZZLE_XYZW;
         tempIndex   = Code->tempIndex;
         tempIndexed = Code->tempIndexed;
@@ -634,7 +640,7 @@ _addRetValueInst(
     }
 
     gcmONERROR(gcSHADER_AddOpcodeIndexed(Shader, gcSL_MOV, tempIndex, enable,
-                                         mode, tempIndexed, format, arg->precision));
+                                         mode, tempIndexed, format, precision ? precision : arg->precision));
     gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, arg->index, swizzle, format, arg->precision));
 
 OnError:
@@ -1092,7 +1098,8 @@ gceSTATUS
 gcGetLongULongFunctionName(
     IN  gcSL_INSTRUCTION    Instruction,
     OUT gctSTRING           *FunctionName,
-    OUT gctBOOL             *isI2I
+    OUT gctBOOL             *isI2I,
+    IN gctUINT              isScalar
 )
 {
     /* Compose the name of the function to process 64-bit integer operations.
@@ -1396,6 +1403,10 @@ static const gctSTRING conditionName[] = /*{"_LeftShift", "_RightShift"};*/
                 }
             }
         }
+        else if((opcode == gcSL_LSHIFT) && (isScalar == 1))
+        {
+            gcoOS_StrCatSafe(name, sizeof(name), "_scalar");
+        }
     }
 
     gcoOS_StrDup(gcvNULL, name, FunctionName);
@@ -1472,7 +1483,8 @@ _createLongULongFunction(
     IN gcSHADER             Shader,
     IN gcSHADER             Library,
     IN gcsPatchLongULong *  Patch,
-    OUT gcFUNCTION *        NewFunction
+    OUT gcFUNCTION *        NewFunction,
+    IN gctUINT              isScalar
     )
 {
     /*  What to do:
@@ -1490,7 +1502,7 @@ _createLongULongFunction(
     const gctSTRING *funcNames = gcvNULL;
     gcFUNCTION internalFunc = gcvNULL;
 
-    gcmONERROR(gcGetLongULongFunctionName(&Shader->code[Patch->instructionIndex], &convertFuncName, &isI2I));
+    gcmONERROR(gcGetLongULongFunctionName(&Shader->code[Patch->instructionIndex], &convertFuncName, &isI2I, isScalar));
     gcmONERROR(gcSHADER_GetFunctionByName(Shader, convertFuncName, &convertFunction));
 
     if (convertFunction == gcvNULL)
@@ -1583,7 +1595,7 @@ _createLongULongFunction_jmp(
 
     gcmASSERT(gcmSL_OPCODE_GET(Shader->code[Patch->instructionIndex+Shader->InsertCount].opcode, Opcode) == gcSL_JMP);
 
-    gcmONERROR(gcGetLongULongFunctionName(&Shader->code[Patch->instructionIndex+Shader->InsertCount], &convertFuncName, &isI2I));
+    gcmONERROR(gcGetLongULongFunctionName(&Shader->code[Patch->instructionIndex+Shader->InsertCount], &convertFuncName, &isI2I, 0));
     gcmONERROR(gcSHADER_GetFunctionByName(Shader, convertFuncName, &convertFunction));
 
     if (convertFunction == gcvNULL)
@@ -1717,10 +1729,19 @@ _createReadImageFunction(
     if (convertFunction == gcvNULL)
     {
         /* Link the convert function from library */
-        gcmONERROR(gcSHADER_LinkLibFunction(Shader,
+        status = gcSHADER_FindLibFunction(Shader,
                                             Library,
                                             convertFuncName,
-                                            &convertFunction));
+                                            &convertFunction);
+        if (status == gcvSTATUS_UNSAT_LIB_SYMBOL) {
+            if (convertFuncName)
+            {
+                gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, convertFuncName));
+            }
+            *NewFunction = convertFunction;
+            return status;
+        }
+        gcmONERROR(status);
         gcmASSERT(convertFunction != gcvNULL);
     }
 
@@ -1969,7 +1990,6 @@ _createSwizzleConvertStubFunction(
     */
     if (RetFunction != gcvNULL)
     {
-        /* Insert the value of TEXLD. */
         _addArgPassByAnotherArg(Shader,
                                 SwizzleConvertFunction,
                                 argNo++,
@@ -1979,6 +1999,7 @@ _createSwizzleConvertStubFunction(
     }
     else
     {
+        /* Insert the value of TEXLD. */
         if (TexldStatusInst)
         {
             gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MOV, 1, gcSL_ENABLE_X, valueType, gcSL_PRECISION_DEFAULT));
@@ -2045,15 +2066,12 @@ _createFormatConvertStubFunction(
     gcFUNCTION       stubFunction = StubFunction;
     gctUINT          argNo;
     gctINT           i;
-    gctPOINTER       pointer = gcvNULL;
     gcSL_INSTRUCTION code = Code;
     gcSL_OPCODE      opcode;
     gctINT           type;
     gcSL_OPCODE      texldStatusOpcode = TexldStatusInst ?
                        gcmSL_OPCODE_GET(TexldStatusInst->opcode, Opcode): gcSL_NOP;
     gcsValue         val0;
-
-    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
 
     opcode = (gcSL_OPCODE)gcmSL_OPCODE_GET(code->opcode, Opcode);
 
@@ -2263,25 +2281,25 @@ _createFormatConvertStubFunction(
     val0.i32 = FormatConversion->dimension;
     _addArgPassInst(Shader, ConvertFunction, stubFunction, TexldStatusInst,
         argNo++ /*ARG 5*/, gcvIntConstant, &val0,
-        gcSL_SWIZZLE_INVALID, gcvFALSE);
+        gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
 
     /* pass width */
     val0.f32 = (gctFLOAT)FormatConversion->width;
     _addArgPassInst(Shader, ConvertFunction, stubFunction, TexldStatusInst,
         argNo++ /*ARG 6*/, gcvFloatConstant, &val0,
-        gcSL_SWIZZLE_INVALID, gcvFALSE);
+        gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
 
     /* pass height */
     val0.f32 = (gctFLOAT)FormatConversion->height;
     _addArgPassInst(Shader, ConvertFunction, stubFunction, TexldStatusInst,
         argNo++ /*ARG 7*/, gcvFloatConstant, &val0,
-        gcSL_SWIZZLE_INVALID, gcvFALSE);
+        gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
 
     /* pass depth */
     val0.f32 = (gctFLOAT)FormatConversion->depth;
     _addArgPassInst(Shader, ConvertFunction, stubFunction, TexldStatusInst,
         argNo++ /*ARG 8*/, gcvFloatConstant, &val0,
-        gcSL_SWIZZLE_INVALID, gcvFALSE);
+        gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
 
     if (!(FormatConversion->minFilter == FormatConversion->magFilter &&
         FormatConversion->minFilter == gcTEXTURE_MODE_POINT))
@@ -2289,12 +2307,12 @@ _createFormatConvertStubFunction(
         val0.i32 = FormatConversion->magFilter;
         _addArgPassInst(Shader, ConvertFunction, stubFunction, TexldStatusInst,
             argNo++ /*ARG 9*/, gcvIntConstant, &val0,
-            gcSL_SWIZZLE_INVALID, gcvFALSE);
+            gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
 
         val0.i32 = FormatConversion->minFilter;
         _addArgPassInst(Shader, ConvertFunction, stubFunction, TexldStatusInst,
             argNo++ /*ARG 10*/, gcvIntConstant, &val0,
-            gcSL_SWIZZLE_INVALID, gcvFALSE);
+            gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
     }
 
     if (FormatConversion->mipFilter != gcTEXTURE_MODE_NONE)
@@ -2302,28 +2320,28 @@ _createFormatConvertStubFunction(
         val0.f32 = (gctFLOAT)FormatConversion->mipLevelMin;
         _addArgPassInst(Shader, ConvertFunction, stubFunction, TexldStatusInst,
             argNo++ /*ARG 11*/, gcvFloatConstant, &val0,
-            gcSL_SWIZZLE_INVALID, gcvFALSE);
+            gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
 
         val0.f32 = (gctFLOAT)FormatConversion->mipLevelMax;
         _addArgPassInst(Shader, ConvertFunction, stubFunction, TexldStatusInst,
             argNo++ /*ARG 12*/, gcvFloatConstant, &val0,
-            gcSL_SWIZZLE_INVALID, gcvFALSE);
+            gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
 
         val0.f32 = FormatConversion->LODBias;
         _addArgPassInst(Shader, ConvertFunction, stubFunction, gcvNULL,
             argNo++ /*ARG 13*/, gcvFloatConstant, &val0,
-            gcSL_SWIZZLE_INVALID, gcvFALSE);
+            gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
     }
 
     val0.i32 = FormatConversion->srgb;
     _addArgPassInst(Shader, ConvertFunction, stubFunction, TexldStatusInst,
         argNo++ /*ARG 14*/, gcvIntConstant, &val0,
-        gcSL_SWIZZLE_INVALID, gcvFALSE);
+        gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
 
     val0.i32 = FormatConversion->projected;
     _addArgPassInst(Shader, ConvertFunction, stubFunction, TexldStatusInst,
         argNo++ /*ARG 15*/, gcvIntConstant, &val0,
-        gcSL_SWIZZLE_INVALID, gcvFALSE);
+        gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
 
     for (i = gcvTEXTURE_COMPONENT_R; i < gcvTEXTURE_COMPONENT_NUM; ++i)
     {
@@ -2340,7 +2358,7 @@ _createFormatConvertStubFunction(
             val0.i32 = FormatConversion->swizzle[i];
             _addArgPassInst(Shader, ConvertFunction, stubFunction, TexldStatusInst,
                 argNo++, gcvIntConstant, &val0,
-                gcSL_SWIZZLE_INVALID, gcvFALSE);
+                gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
             gcmASSERT(argNo < ConvertFunction->argumentCount);
         }
     }
@@ -2351,7 +2369,7 @@ _createFormatConvertStubFunction(
             val0.i32 = (gctINT)_SelectSwizzle((gctUINT16)i, code->source0);
             _addArgPassInst(Shader, ConvertFunction, stubFunction, TexldStatusInst,
                 argNo++, gcvIntConstant, &val0,
-                gcSL_SWIZZLE_INVALID, gcvFALSE);
+                gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
             gcmASSERT(argNo < ConvertFunction->argumentCount);
         }
     }
@@ -2573,7 +2591,7 @@ _createOutputConvertStubFunction(
         val0.i32 = OutputConversion->outputs[i]->tempIndex;
         _addRetValueInst(Shader, ConvertFunction, code,
                          argNo++ /*ARG1*/, sourceType, &val0);
-
+        Shader->code[Shader->lastInstruction].temp = gcmSL_TARGET_SET(Shader->code[Shader->lastInstruction].temp, Precision, OutputConversion->outputs[i]->precision);
     }
     /* ret */
     _addRetInst(Shader);
@@ -4283,10 +4301,16 @@ gcSHADER_FreeRecompilerLibrary(
         gcBuiltinLibrary1 = gcvNULL;
     }
 
-    if (gcCLBuiltinLibrary)
+    if (gcCLBuiltinLibrary0)
     {
-        gcSHADER_Destroy(gcCLBuiltinLibrary);
-        gcCLBuiltinLibrary = gcvNULL;
+        gcSHADER_Destroy(gcCLBuiltinLibrary0);
+        gcCLBuiltinLibrary0 = gcvNULL;
+    }
+
+    if (gcCLBuiltinLibrary1)
+    {
+        gcSHADER_Destroy(gcCLBuiltinLibrary1);
+        gcCLBuiltinLibrary1 = gcvNULL;
     }
 
     if (gcBlendEquationLibrary)
@@ -4314,7 +4338,7 @@ _getDXRecompilerShaderBinary(
     gctUINT8_PTR buffer         = gcvNULL;
     gctSIZE_T   bufferSize      = 0;;
 
-    gcmONERROR(gcSHADER_Construct(gcvNULL, gcSHADER_TYPE_FRAGMENT, Shader));
+    gcmONERROR(gcSHADER_Construct(gcvNULL, gcSHADER_TYPE_LIBRARY, Shader));
 
     /* Really should be in gcOS layer!!!  Since this functions works with char strings we need
        to explicitly call the ANSI version since Windows driver can build with Unicode as default */
@@ -4936,6 +4960,114 @@ _patchAlphaBlending(
     return status;
 }
 
+gceSTATUS
+gcSHADER_FindMainFunction(
+    IN   gcSHADER          Shader,
+    OUT  gctINT *          StartCode,
+    OUT  gctINT *          EndCode
+    )
+{
+    gceSTATUS    status    = gcvSTATUS_OK;
+    gctPOINTER * codeOwner = gcvNULL;
+    gctSIZE_T    size      = gcmSIZEOF(gctINT *) * Shader->codeCount;
+    gctUINT      i, f;
+    gctINT       mainStart = -1;
+    gctINT       mainEnd   = -1;
+    gctPOINTER  pointer = gcvNULL;
+
+    if (Shader->lastInstruction == 0)
+    {
+        *StartCode  = 0;
+        *EndCode    = 0;
+        return status;
+    }
+
+    gcmONERROR(gcoOS_Allocate(gcvNULL, size, &pointer));
+    codeOwner = (gctPOINTER *) pointer;
+
+    /* Zero the memory. */
+    gcoOS_ZeroMemory(pointer, size);
+
+    /* Walk through functions to mark the code owner */
+
+    /* Determine ownership of the code for functions. */
+    for (f = 0; f < Shader->functionCount; ++f)
+    {
+        gcFUNCTION function = Shader->functions[f];
+        gctUINT    codeEnd  = function->codeStart + function->codeCount;
+
+        gcmASSERT(function != gcvNULL &&
+                  codeEnd <= Shader->codeCount );
+        for (i = function->codeStart; i < codeEnd; i++)
+        {
+            gcmASSERT(codeOwner[i] == gcvNULL);
+            codeOwner[i] = function;
+        }
+    }
+
+    /* Determine ownership of the code for kernel functions. */
+    for (f = 0; f < Shader->kernelFunctionCount; ++f)
+    {
+        gcKERNEL_FUNCTION kernelFunction = Shader->kernelFunctions[f];
+        gctUINT    codeEnd  = kernelFunction->codeStart + kernelFunction->codeCount;
+
+        if (kernelFunction->isMain)
+        {
+            continue;
+        }
+
+        gcmASSERT(kernelFunction != gcvNULL &&
+                  codeEnd <= Shader->codeCount );
+        for (i = kernelFunction->codeStart; i < codeEnd; i++)
+        {
+            gcmASSERT(codeOwner[i] == gcvNULL);
+            codeOwner[i] = kernelFunction;
+        }
+    }
+
+    /* Walk through all code to find main */
+    for (i = 0; i < Shader->lastInstruction; )
+    {
+        if (codeOwner[i] == gcvNULL)
+        {
+            gcmASSERT(mainStart == -1);
+            mainStart = i;
+            /* find the end of main */
+            for (i = i + 1; i < Shader->lastInstruction; i++)
+            {
+                if (codeOwner[i] != gcvNULL)
+                    break;
+            }
+            mainEnd = i;
+            gcmASSERT(mainStart != -1 && mainEnd != -1);
+            break;
+        }
+        else
+        {
+            i++;
+        }
+    }
+
+    if (StartCode)
+    {
+        *StartCode = mainStart;
+    }
+    if (EndCode)
+    {
+        *EndCode   = mainEnd;
+    }
+
+OnError:
+    if (codeOwner)
+    {
+        /* Free the current code buffer. */
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, codeOwner));
+    }
+
+    /* Return the status. */
+    return status;
+}
+
 gctINT
 _insertNOP2Shader(
     IN OUT gcSHADER          Shader,
@@ -5375,7 +5507,7 @@ _patchYFlippedShader(
                                                            gcSL_NOT_INDEXED,
                                                            0,
                                                            gcSL_FLOAT,
-                                                           gcSHADER_PRECISION_MEDIUM));
+                                                           frontFacing->precision));
             gcSHADER_AddSourceAttributeFormatted(Shader,
                                                  frontFacing,
                                                  gcSL_SWIZZLE_XXXX,
@@ -5539,7 +5671,7 @@ _findSubsampleDepthTemp(
     if (subsampleDepth == gcvNULL)
     {
         gctUINT16 t = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X4);
-        gcmONERROR(gcSHADER_AddOutput(Shader, "#Subsample_Depth", gcSHADER_UINT_X4, 1, t, gcSHADER_PRECISION_MEDIUM));
+        gcmONERROR(gcSHADER_AddOutput(Shader, "#Subsample_Depth", gcSHADER_UINT_X4, 1, t, gcSHADER_PRECISION_HIGH));
         gcmONERROR(gcSHADER_AddOutputLocation(Shader, 0, 1));
 
         subsampleDepth = Shader->outputs[Shader->outputCount - 1];
@@ -7018,7 +7150,8 @@ static gceSTATUS
 _patchLongULong(
     IN OUT gcSHADER         Shader,
     IN OUT gcPatchDirective_PTR CurDir,
-    IN gcsPatchLongULong *  Patch
+    IN gcsPatchLongULong *  Patch,
+    IN gctUINT              isScalar
     )
 {
     /* How to do patch.
@@ -7426,7 +7559,8 @@ _patchLongULong(
             status = _createLongULongFunction(Shader,
                                               gcCLPatchLibrary[2],
                                               Patch,
-                                              &convertFunction);
+                                              &convertFunction,
+                                              isScalar);
             gcmONERROR(status);
 
             /* Construct call stub function. */
@@ -7944,7 +8078,8 @@ _addInstNopToEndOfMainFunc(
 gceSTATUS
 gcSHADER_DynamicPatch(
     IN OUT gcSHADER         Shader,
-    IN  gcPatchDirective *  PatchDirective
+    IN  gcPatchDirective *  PatchDirective,
+    IN gctUINT              isScalar
     )
 {
     gceSTATUS           status       = gcvSTATUS_OK;
@@ -8036,7 +8171,8 @@ gcSHADER_DynamicPatch(
 #if _SUPPORT_LONG_ULONG_DATA_TYPE
         case gceRK_PATCH_CL_LONGULONG:
             status = _patchLongULong(Shader, curDirective,
-                            curDirective->patchValue.longULong);
+                            curDirective->patchValue.longULong,
+                            isScalar);
             break;
 #endif
 
@@ -8200,12 +8336,8 @@ gcSHADER_ConvertIntOrUIntAttribute(
     return status;
 }
 
-gctBOOL isAppConformance()
+gctBOOL isAppConformance(gcePATCH_ID patchId)
 {
-    gcePATCH_ID patchId = gcvPATCH_INVALID;
-
-    gcoHAL_GetPatchID(gcvNULL, &patchId);
-
     if (patchId == gcvPATCH_GTFES30 || patchId == gcvPATCH_DEQP)
         return gcvTRUE;
 
@@ -8306,12 +8438,14 @@ gcSHADER_CompileBuiltinLibrary(
 {
     gceSTATUS   status          = gcvSTATUS_OK;
     gctSTRING   sloBuiltinSource = gcvNULL;
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
 
     gctSIZE_T   length;
     gctPOINTER  pointer = gcvNULL;
     gctINT      i, stringNum = 0;
     gctSTRING   log    = gcvNULL;
 
+    gctBOOL     fmaSupported = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_ADVANCED_SH_INST);
     gctBOOL     isHalti5 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI5);
     gctBOOL     isHalti4 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI4);
     gctBOOL     isHalti2 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI2);
@@ -8518,12 +8652,12 @@ gcSHADER_CompileBuiltinLibrary(
         gcLibREFLECT_Func_3,
         gcLibREFLECT_Func_4,
     };
-    gctSTRING   BuiltinLib_Reflect_halti5[] =
+    gctSTRING   BuiltinLib_Reflect_fmaSupported[] =
     {
-        gcLibREFLECT_Func_1_halti5,
-        gcLibREFLECT_Func_2_halti5,
-        gcLibREFLECT_Func_3_halti5,
-        gcLibREFLECT_Func_4_halti5,
+        gcLibREFLECT_Func_1_fmaSupported,
+        gcLibREFLECT_Func_2_fmaSupported,
+        gcLibREFLECT_Func_3_fmaSupported,
+        gcLibREFLECT_Func_4_fmaSupported,
     };
 
     /* advanced blend equation library */
@@ -9174,6 +9308,8 @@ gcSHADER_CompileBuiltinLibrary(
         }
     }
 
+    gcoHAL_GetPatchID(gcvNULL, &patchId);
+
     gcmONERROR(gcoOS_Allocate(gcvNULL, __BUILTIN_SHADER_LENGTH__, &pointer));
     sloBuiltinSource = pointer;
 
@@ -9228,7 +9364,16 @@ gcSHADER_CompileBuiltinLibrary(
             }
         }
 
-        if (isHalti5 && isAppConformance())
+        if (fmaSupported && isHalti5 && isAppConformance(patchId))
+        {
+            gcoOS_StrCatSafe(sloBuiltinSource,
+                    __BUILTIN_SHADER_LENGTH__, gcLibASIN_ACOS_Funcs_halti5_fmaSupported);
+            gcoOS_StrCatSafe(sloBuiltinSource,
+                    __BUILTIN_SHADER_LENGTH__, gcLibATAN_Funcs_halti5_fmaSupported);
+            gcoOS_StrCatSafe(sloBuiltinSource,
+                    __BUILTIN_SHADER_LENGTH__, gcLibATAN2_Funcs_halti5_fmaSupported);
+        }
+        else if (isHalti5 && isAppConformance(patchId))
         {
             gcoOS_StrCatSafe(sloBuiltinSource,
                     __BUILTIN_SHADER_LENGTH__, gcLibASIN_ACOS_Funcs_halti5);
@@ -9237,7 +9382,7 @@ gcSHADER_CompileBuiltinLibrary(
             gcoOS_StrCatSafe(sloBuiltinSource,
                     __BUILTIN_SHADER_LENGTH__, gcLibATAN2_Funcs_halti5);
         }
-        else if (isHalti2 && isAppConformance())
+        else if (isHalti2 && isAppConformance(patchId))
         {
             gcoOS_StrCatSafe(sloBuiltinSource,
                     __BUILTIN_SHADER_LENGTH__, gcLibASIN_ACOS_Funcs_halti2);
@@ -9270,7 +9415,7 @@ gcSHADER_CompileBuiltinLibrary(
 
         /* add common intrinsic builtin function source */
         gcmASSERT(BuiltinLib_Common[BUILTINLIB_MIX_IDX] == gcLib_2instMixFunc);
-        if (isAppConformance())
+        if (isAppConformance(patchId))
         {
             BuiltinLib_Common[BUILTINLIB_MIX_IDX] = gcLib_3instMixFunc;
         }
@@ -9281,13 +9426,13 @@ gcSHADER_CompileBuiltinLibrary(
                 __BUILTIN_SHADER_LENGTH__, BuiltinLib_Common[i]);
         }
 
-        if (isHalti5)
+        if (fmaSupported)
         {
-            stringNum = sizeof(BuiltinLib_Reflect_halti5) / sizeof(gctSTRING);
+            stringNum = sizeof(BuiltinLib_Reflect_fmaSupported) / sizeof(gctSTRING);
             for (i = 0; i < stringNum; i++)
             {
                 gcoOS_StrCatSafe(sloBuiltinSource,
-                    __BUILTIN_SHADER_LENGTH__, BuiltinLib_Reflect_halti5[i]);
+                    __BUILTIN_SHADER_LENGTH__, BuiltinLib_Reflect_fmaSupported[i]);
             }
         }
         else
@@ -9561,6 +9706,7 @@ gcSHADER_CompileCLBuiltinLibrary(
 {
     gceSTATUS   status        = gcvSTATUS_OK;
     gctSTRING   builtinSource = gcvNULL;
+    gctBOOL     useImgInst;
 
     gctSIZE_T   length;
     gctPOINTER  pointer = gcvNULL;
@@ -9573,8 +9719,15 @@ gcSHADER_CompileCLBuiltinLibrary(
     {
         gcCLLibLongMADSAT_Funcs,
         gcCLLibLongNEXTAFTER_Funcs,
+        gcCLLibImageQuery_Funcs,
     };
 
+    gctSTRING   builtinLib_useImgInst[] =
+    {
+        gcCLLibLongMADSAT_Funcs,
+        gcCLLibLongNEXTAFTER_Funcs,
+        gcCLLibImageQuery_Funcs_UseImgInst,
+    };
 
     gcmASSERT((LibType == gcLIB_CL_BUILTIN && GetShaderHasIntrinsicBuiltin(Shader)));
 
@@ -9586,12 +9739,27 @@ gcSHADER_CompileCLBuiltinLibrary(
         return gcvSTATUS_LINK_LIB_ERROR;
     }
 
+    useImgInst = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMG_INSTRUCTION) &&
+                 !gcdHasOptimization(gcGetOptimizerOptionVariable()->optFlags, gcvOPTIMIZATION_IMAGE_PATCHING) &&
+                 gcSHADER_GoVIRPass(Shader);
+
     if (LibType == gcLIB_CL_BUILTIN)
     {
-        if (gcCLBuiltinLibrary != gcvNULL)
+        if (useImgInst)
         {
-            *Binary = gcCLBuiltinLibrary;
-            return gcvSTATUS_OK;
+            if (gcCLBuiltinLibrary1 != gcvNULL)
+            {
+                *Binary = gcCLBuiltinLibrary1;
+                return gcvSTATUS_OK;
+            }
+        }
+        else
+        {
+            if (gcCLBuiltinLibrary0 != gcvNULL)
+            {
+                *Binary = gcCLBuiltinLibrary0;
+                return gcvSTATUS_OK;
+            }
         }
     }
 
@@ -9604,12 +9772,25 @@ gcSHADER_CompileCLBuiltinLibrary(
 
     if (LibType == gcLIB_CL_BUILTIN)
     {
-        /* add the intrinsic builtin function source */
-        stringNum = sizeof(builtinLib) / sizeof(gctSTRING);
-        for (i = 0; i < stringNum; i++)
+        if (useImgInst)
         {
-            gcoOS_StrCatSafe(builtinSource,
-                             __BUILTIN_SHADER_LENGTH__, builtinLib[i]);
+            /* add the intrinsic builtin function source in gc7000*/
+            stringNum = sizeof(builtinLib_useImgInst) / sizeof(gctSTRING);
+            for (i = 0; i < stringNum; i++)
+            {
+                gcoOS_StrCatSafe(builtinSource,
+                                 __BUILTIN_SHADER_LENGTH__, builtinLib_useImgInst[i]);
+            }
+        }
+        else
+        {
+            /* add the intrinsic builtin function source in gc3000/5000*/
+            stringNum = sizeof(builtinLib) / sizeof(gctSTRING);
+            for (i = 0; i < stringNum; i++)
+            {
+                gcoOS_StrCatSafe(builtinSource,
+                                 __BUILTIN_SHADER_LENGTH__, builtinLib[i]);
+            }
         }
     }
 
@@ -9631,8 +9812,14 @@ gcSHADER_CompileCLBuiltinLibrary(
         gcOpt_Dump(gcvNULL, "Library Shader", gcvNULL, *Binary);
     }
 
-    gcCLBuiltinLibrary = *Binary;
-
+    if (useImgInst)
+    {
+        gcCLBuiltinLibrary1 = *Binary;
+    }
+    else
+    {
+        gcCLBuiltinLibrary0 = *Binary;
+    }
 OnError:
 
     if (builtinSource)
@@ -10433,7 +10620,7 @@ _InsertAssignmentForSamplerSize(
                 if (isUniformLodMinMax(firstChild))
                 {
                     lodMinMaxIndex = firstChild->index;
-                    if (firstChild->nextSibling != -1)
+                    if (firstChild->nextSibling != 1)
                     {
                         levelBaseSizeIndex = firstChild->nextSibling;
                     }
@@ -10442,7 +10629,7 @@ _InsertAssignmentForSamplerSize(
                 {
                     gcmASSERT(isUniformLevelBaseSize(firstChild));
                     levelBaseSizeIndex = firstChild->index;
-                    if (firstChild->nextSibling != -1)
+                    if (firstChild->nextSibling != 1)
                     {
                         lodMinMaxIndex = firstChild->nextSibling;
                     }
@@ -10474,7 +10661,7 @@ _InsertAssignmentForSamplerSize(
                                                   gcSHADER_VAR_CATEGORY_LEVEL_BASE_SIZE,
                                                   0,
                                                   uniform->index,
-                                                  uniform->firstChild != -1 ? uniform->firstChild : -1,
+                                                  uniform->firstChild,
                                                   gcIMAGE_FORMAT_DEFAULT,
                                                   &levelBaseSizeIndex,
                                                   &levelBaseSizeUniform));
@@ -10506,7 +10693,7 @@ _InsertAssignmentForSamplerSize(
                                                   gcSHADER_VAR_CATEGORY_LOD_MIN_MAX,
                                                   0,
                                                   uniform->index,
-                                                  uniform->firstChild != -1 ? uniform->firstChild : -1,
+                                                  -1,
                                                   gcIMAGE_FORMAT_DEFAULT,
                                                   &lodMinMaxIndex,
                                                   &lodMinMaxUniform));
@@ -10787,7 +10974,7 @@ _InsertAssignmentForInterpolation(
         insertCode0->temp = gcmSL_TARGET_SET(0, Format, gcSL_INTEGER)
                             | gcmSL_TARGET_SET(0, Enable, gcSL_ENABLE_X)
                             | gcmSL_TARGET_SET(0, Indexed, gcSL_NOT_INDEXED)
-                            | gcmSL_TARGET_SET(0, Precision, gcSL_PRECISION_HIGH);
+                            | gcmSL_TARGET_SET(0, Precision, gcSL_PRECISION_ANY);
         insertCode0->tempIndex = Function->arguments[currentArg].index;
 
         insertCode0->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_CONSTANT)
@@ -10806,14 +10993,14 @@ _InsertAssignmentForInterpolation(
         insertCode0->temp = gcmSL_TARGET_SET(0, Format, gcSL_FLOAT)
                             | gcmSL_TARGET_SET(0, Enable, gcSL_ENABLE_XYZW)
                             | gcmSL_TARGET_SET(0, Indexed, gcSL_NOT_INDEXED)
-                            | gcmSL_TARGET_SET(0, Precision, gcSL_PRECISION_HIGH);
+                            | gcmSL_TARGET_SET(0, Precision, gcSL_PRECISION_ANY);
         insertCode0->tempIndex = Function->arguments[currentArg].index;
 
         insertCode0->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_ATTRIBUTE)
                                 | gcmSL_SOURCE_SET(0, Format, gcSL_FLOAT)
                                 | gcmSL_SOURCE_SET(0, Swizzle, gcSL_SWIZZLE_XYZW)
                                 | gcmSL_SOURCE_SET(0, Indexed, gcSL_NOT_INDEXED)
-                                | gcmSL_SOURCE_SET(0, Precision, gcSL_PRECISION_HIGH);
+                                | gcmSL_SOURCE_SET(0, Precision, position->precision);
         insertCode0->source0Index = position->index;
         currentPos++;
         currentArg++;
@@ -10824,14 +11011,14 @@ _InsertAssignmentForInterpolation(
         insertCode0->temp = gcmSL_TARGET_SET(0, Format, gcSL_BOOLEAN)
                             | gcmSL_TARGET_SET(0, Enable, gcSL_ENABLE_X)
                             | gcmSL_TARGET_SET(0, Indexed, gcSL_NOT_INDEXED)
-                            | gcmSL_TARGET_SET(0, Precision, gcSL_PRECISION_HIGH);
+                            | gcmSL_TARGET_SET(0, Precision, gcSL_PRECISION_MEDIUM);
         insertCode0->tempIndex = Function->arguments[currentArg].index;
 
         insertCode0->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_UNIFORM)
                                 | gcmSL_SOURCE_SET(0, Format, gcSL_BOOLEAN)
                                 | gcmSL_SOURCE_SET(0, Swizzle, gcSL_SWIZZLE_XXXX)
                                 | gcmSL_SOURCE_SET(0, Indexed, gcSL_NOT_INDEXED)
-                                | gcmSL_SOURCE_SET(0, Precision, gcSL_PRECISION_HIGH);
+                                | gcmSL_SOURCE_SET(0, Precision, multiSampleBufferUniform->precision);
         insertCode0->source0Index = gcmSL_INDEX_SET(0, Index, multiSampleBufferUniform->index);
         currentPos++;
         currentArg++;
@@ -10842,7 +11029,7 @@ _InsertAssignmentForInterpolation(
         insertCode0->temp = gcmSL_TARGET_SET(0, Format, gcSL_BOOLEAN)
                             | gcmSL_TARGET_SET(0, Enable, gcSL_ENABLE_X)
                             | gcmSL_TARGET_SET(0, Indexed, gcSL_NOT_INDEXED)
-                            | gcmSL_TARGET_SET(0, Precision, gcSL_PRECISION_HIGH);
+                            | gcmSL_TARGET_SET(0, Precision, gcSL_PRECISION_MEDIUM);
         insertCode0->tempIndex = Function->arguments[currentArg].index;
 
         insertCode0->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_CONSTANT)
@@ -10861,14 +11048,14 @@ _InsertAssignmentForInterpolation(
         insertCode0->temp = gcmSL_TARGET_SET(0, Format, gcSL_INTEGER)
                             | gcmSL_TARGET_SET(0, Enable, gcSL_ENABLE_X)
                             | gcmSL_TARGET_SET(0, Indexed, gcSL_NOT_INDEXED)
-                            | gcmSL_TARGET_SET(0, Precision, gcSL_PRECISION_HIGH);
+                            | gcmSL_TARGET_SET(0, Precision, gcSL_PRECISION_ANY);
         insertCode0->tempIndex = Function->arguments[currentArg].index;
 
         insertCode0->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_ATTRIBUTE)
                                 | gcmSL_SOURCE_SET(0, Format, gcSL_INTEGER)
                                 | gcmSL_SOURCE_SET(0, Swizzle, gcSL_SWIZZLE_XXXX)
                                 | gcmSL_SOURCE_SET(0, Indexed, gcSL_NOT_INDEXED)
-                                | gcmSL_SOURCE_SET(0, Precision, gcSL_PRECISION_HIGH);
+                                | gcmSL_SOURCE_SET(0, Precision, sampleId->precision);
         insertCode0->source0Index = sampleId->index;
         currentPos++;
         currentArg++;
@@ -10881,14 +11068,14 @@ _InsertAssignmentForInterpolation(
             insertCode0->temp = gcmSL_TARGET_SET(0, Format, gcSL_INTEGER)
                                 | gcmSL_TARGET_SET(0, Enable, gcSL_ENABLE_X)
                                 | gcmSL_TARGET_SET(0, Indexed, gcSL_NOT_INDEXED)
-                                | gcmSL_TARGET_SET(0, Precision, gcSL_PRECISION_HIGH);
+                                | gcmSL_TARGET_SET(0, Precision, gcSL_PRECISION_ANY);
             insertCode0->tempIndex = Function->arguments[currentArg].index;
 
             insertCode0->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_ATTRIBUTE)
                                     | gcmSL_SOURCE_SET(0, Format, gcSL_INTEGER)
                                     | gcmSL_SOURCE_SET(0, Swizzle, gcSL_SWIZZLE_XXXX)
                                     | gcmSL_SOURCE_SET(0, Indexed, gcSL_NOT_INDEXED)
-                                    | gcmSL_SOURCE_SET(0, Precision, gcSL_PRECISION_HIGH);
+                                    | gcmSL_SOURCE_SET(0, Precision, sampleMaskIn->precision);
             insertCode0->source0Index = sampleMaskIn->index;
             currentPos++;
             currentArg++;
@@ -10903,14 +11090,14 @@ _InsertAssignmentForInterpolation(
             insertCode0->temp = gcmSL_TARGET_SET(0, Format, gcSL_FLOAT)
                                 | gcmSL_TARGET_SET(0, Enable, gcSL_ENABLE_XYZW)
                                 | gcmSL_TARGET_SET(0, Indexed, gcSL_NOT_INDEXED)
-                                | gcmSL_TARGET_SET(0, Precision, gcSL_PRECISION_HIGH);
+                                | gcmSL_TARGET_SET(0, Precision, gcSL_PRECISION_ANY);
             insertCode0->tempIndex = Function->arguments[currentArg + j].index;
 
             insertCode0->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_UNIFORM)
                                     | gcmSL_SOURCE_SET(0, Format, gcSL_FLOAT)
                                     | gcmSL_SOURCE_SET(0, Swizzle, gcSL_SWIZZLE_XYZW)
                                     | gcmSL_SOURCE_SET(0, Indexed, gcSL_NOT_INDEXED)
-                                    | gcmSL_SOURCE_SET(0, Precision, gcSL_PRECISION_HIGH);
+                                    | gcmSL_SOURCE_SET(0, Precision, sampleLocationUniform->precision);
             insertCode0->source0Index = gcmSL_INDEX_SET(0, Index, sampleLocationUniform->index)
                                         | gcmSL_INDEX_SET(0, ConstValue, j);
         }
@@ -11511,6 +11698,45 @@ gcSHADER_LinkLibFunction(
     gceSTATUS   status = gcvSTATUS_OK;
     gcFUNCTION  libFunction = gcvNULL;
     gcFUNCTION  function = gcvNULL;
+    gctSTRING   functionName = (gctSTRING)FunctionName;
+
+    gcmONERROR(gcSHADER_GetFunctionByName(Library, functionName, &libFunction));
+    if (libFunction == gcvNULL)
+    {
+        gcoOS_Print("Error: Failed to link unsatified function %s to shader (id:%d)",
+                         functionName, GetShaderID(Shader));
+        *Function = gcvNULL;
+        return gcvSTATUS_UNSAT_LIB_SYMBOL;
+    }
+    gcmONERROR(gcSHADER_GetFunctionByName(Shader, functionName, &function));
+    if(function == gcvNULL)
+    {
+        if(libFunction->intrinsicsKind == gceINTRIN_source)
+        {
+            gcmASSERT(libFunction->codeCount == 0);
+            gcoOS_Print("Error: Failed to link unsatified function %s to shader (id:%d)",
+                        functionName, GetShaderID(Shader));
+            *Function = gcvNULL;
+            return gcvSTATUS_UNSAT_LIB_SYMBOL;
+        }
+    }
+    return gcSHADER_FindLibFunction(Shader, Library, FunctionName, Function);
+OnError:
+    /* Return the status. */
+    return status;
+
+}
+gceSTATUS
+gcSHADER_FindLibFunction(
+    IN OUT gcSHADER         Shader,
+    IN     gcSHADER         Library,
+    IN     gctCONST_STRING  FunctionName,
+    OUT    gcFUNCTION *     Function
+    )
+{
+    gceSTATUS   status = gcvSTATUS_OK;
+    gcFUNCTION  libFunction = gcvNULL;
+    gcFUNCTION  function = gcvNULL;
     gctPOINTER  pointer = gcvNULL;
     gcSL_INSTRUCTION newCode = gcvNULL;
     gcSL_INSTRUCTION code;
@@ -11542,8 +11768,6 @@ gcSHADER_LinkLibFunction(
     gcmONERROR(gcSHADER_GetFunctionByName(Library, functionName, &libFunction));
     if (libFunction == gcvNULL)
     {
-        gcoOS_Print("Error: Failed to link unsatified function %s to shader (id:%d)",
-                         functionName, GetShaderID(Shader));
         *Function = gcvNULL;
         return gcvSTATUS_UNSAT_LIB_SYMBOL;
     }
@@ -11553,8 +11777,6 @@ gcSHADER_LinkLibFunction(
         if(libFunction->intrinsicsKind == gceINTRIN_source)
         {
             gcmASSERT(libFunction->codeCount == 0);
-            gcoOS_Print("Error: Failed to link unsatified function %s to shader (id:%d)",
-                        functionName, GetShaderID(Shader));
             *Function = gcvNULL;
             return gcvSTATUS_UNSAT_LIB_SYMBOL;
         }
@@ -12667,7 +12889,7 @@ gcSHADER_PatchCentroidVaryingAsCenter(
                                                   gcvNULL,
                                                   argumentTempIndex1,
                                                   gcSHADER_VAR_CATEGORY_FUNCTION_INPUT_ARGUMENT,
-                                                  gcSHADER_PRECISION_HIGH,
+                                                  gcSHADER_PRECISION_ANY,
                                                   0,
                                                   -1,
                                                   -1,
@@ -12679,7 +12901,7 @@ gcSHADER_PatchCentroidVaryingAsCenter(
                                                   gcvNULL,
                                                   argumentTempIndex2,
                                                   gcSHADER_VAR_CATEGORY_FUNCTION_OUTPUT_ARGUMENT,
-                                                  gcSHADER_PRECISION_HIGH,
+                                                  gcSHADER_PRECISION_ANY,
                                                   0,
                                                   -1,
                                                   -1,
@@ -12689,14 +12911,14 @@ gcSHADER_PatchCentroidVaryingAsCenter(
                                                   argumentTempIndex1,
                                                   enableList[funcIndex],
                                                   gcvFUNCTION_INPUT,
-                                                  gcSHADER_PRECISION_HIGH,
+                                                  gcSHADER_PRECISION_ANY,
                                                   gcvFALSE));
                 gcmONERROR(gcFUNCTION_AddArgument(convertFunc,
                                                   (gctUINT16)variableIndex2,
                                                   argumentTempIndex2,
                                                   enableList[funcIndex],
                                                   gcvFUNCTION_OUTPUT,
-                                                  gcSHADER_PRECISION_HIGH,
+                                                  gcSHADER_PRECISION_ANY,
                                                   gcvFALSE));
             }
             convertFuncList[funcIndex] = convertFunc;
@@ -12726,8 +12948,7 @@ gcSHADER_PatchCentroidVaryingAsCenter(
             code->opcode = gcSL_MOV;
             code->temp = gcmSL_TARGET_SET(0, Format, gcSL_FLOAT)
                        | gcmSL_TARGET_SET(0, Enable, enableList[funcIndex])
-                       | gcmSL_TARGET_SET(0, Indexed, gcSL_NOT_INDEXED)
-                       | gcmSL_TARGET_SET(0, Precision, GetATTRPrecision(attribute));
+                       | gcmSL_TARGET_SET(0, Indexed, gcSL_NOT_INDEXED);
             code->tempIndex = convertFunc->arguments[0].index;
             code->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_ATTRIBUTE)
                           | gcmSL_SOURCE_SET(0, Format, gcSL_FLOAT)
@@ -12746,8 +12967,7 @@ gcSHADER_PatchCentroidVaryingAsCenter(
             code->opcode = gcSL_MOV;
             code->temp = gcmSL_TARGET_SET(0, Format, gcSL_FLOAT)
                        | gcmSL_TARGET_SET(0, Enable, enableList[funcIndex])
-                       | gcmSL_TARGET_SET(0, Indexed, gcSL_NOT_INDEXED)
-                       | gcmSL_TARGET_SET(0, Precision, GetATTRPrecision(attribute));
+                       | gcmSL_TARGET_SET(0, Indexed, gcSL_NOT_INDEXED);
             code->tempIndex = (gctUINT16)(mapTempIndex + j);
             code->source0 = gcmSL_SOURCE_SET(0, Type, gcSL_TEMP)
                           | gcmSL_SOURCE_SET(0, Format, gcSL_FLOAT)

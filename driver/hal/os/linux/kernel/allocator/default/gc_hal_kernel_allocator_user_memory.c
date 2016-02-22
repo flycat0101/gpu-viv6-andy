@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -509,13 +509,13 @@ static gctINT
 _UserMemoryMapUser(
     IN gckALLOCATOR Allocator,
     IN PLINUX_MDL Mdl,
-    IN PLINUX_MDL_MAP MdlMap,
-    IN gctBOOL Cacheable
+    IN gctBOOL Cacheable,
+    OUT gctPOINTER * UserLogical
     )
 {
     gcsUserMemory *userMemory = Mdl->priv;
 
-    MdlMap->vmaAddr = userMemory->logical;
+    *UserLogical = userMemory->logical;
 
     return 0;
 }
@@ -554,19 +554,6 @@ _UserMemoryUnmapKernel(
 }
 
 static gceSTATUS
-_UserMemoryLogicalToPhysical(
-    IN gckALLOCATOR Allocator,
-    IN PLINUX_MDL Mdl,
-    IN gctPOINTER Logical,
-    IN gctUINT32 ProcessID,
-    OUT gctPHYS_ADDR_T *Physical
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-
-static gceSTATUS
 _UserMemoryCache(
     IN gckALLOCATOR Allocator,
     IN PLINUX_MDL Mdl,
@@ -589,22 +576,26 @@ _UserMemoryPhysical(
 {
     gckOS os = Allocator->os;
     gcsUserMemory *userMemory = Mdl->priv;
+    gctUINT32 offsetInPage = Offset & ~PAGE_MASK;
+    gctUINT32 index = Offset / PAGE_SIZE;
 
     if (userMemory->pages)
     {
-        if (Offset == userMemory->pageCount - 1 && userMemory->extraPage)
+        if (index == userMemory->pageCount - 1 && userMemory->extraPage)
         {
             *Physical = page_to_phys(os->paddingPage);
         }
         else
         {
-            *Physical = page_to_phys(userMemory->pages[Offset]);
+            *Physical = page_to_phys(userMemory->pages[index]);
         }
     }
     else
     {
-        *Physical = userMemory->physical + Offset * PAGE_SIZE;
+        *Physical = userMemory->physical + index * PAGE_SIZE;
     }
+
+    *Physical += offsetInPage;
 
     return gcvSTATUS_OK;
 }
@@ -618,7 +609,6 @@ static gcsALLOCATOR_OPERATIONS UserMemoryAllocatorOperations =
     .UnmapUser          = _UserMemoryUnmapUser,
     .MapKernel          = _UserMemoryMapKernel,
     .UnmapKernel        = _UserMemoryUnmapKernel,
-    .LogicalToPhysical  = _UserMemoryLogicalToPhysical,
     .Cache              = _UserMemoryCache,
     .Physical           = _UserMemoryPhysical,
 };

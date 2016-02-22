@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -87,7 +87,7 @@ LIBS += -L $(AQROOT)/build/sdk/drivers
 LIBS += -L $(AQROOT)/hal/user/$(OBJ_DIR)
 LIBS += -L $(AQROOT)/driver/khronos/libGLESv3/$(OBJ_DIR)
 LIBS += -L $(AQROOT)/compiler/libVSC/$(OBJ_DIR)
-LIBS += -l GAL -lVSC -l GLESv2
+LIBS += -l GAL -lVSC -l GLESv2 -lm
 
 ################################################################################
 # Add extra include path.

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1043,7 +1043,7 @@ SSP_GPR_SPILL_PRIV;
 /* For these hints, they must be natively provided by original shader or shader owner, such as HS/DS/GS,
    there are special hints for them, such as vertex/pixel/CP (sub executable object) count and tessellation
    mode for patch primitive, etc */
-typedef union SHADER_EXECUTABLE_NATIVE_HINTS
+typedef struct SHADER_EXECUTABLE_NATIVE_HINTS
 {
     struct
     {
@@ -1095,6 +1095,16 @@ typedef union SHADER_EXECUTABLE_NATIVE_HINTS
 
             gctUINT                                      reserved            : 31;
         } ps;
+
+        /* States acted on gps */
+        struct
+        {
+            gctUINT                                      shareMemSizePerThreadGrpInByte;
+
+            gctUINT                                      threadGrpDimX;
+            gctUINT                                      threadGrpDimY;
+            gctUINT                                      threadGrpDimZ;
+        } gps;
     } prvStates;
 }
 SHADER_EXECUTABLE_NATIVE_HINTS;
@@ -1125,6 +1135,26 @@ typedef enum UNIFIED_RF_ALLOC_STRATEGY
 }
 UNIFIED_RF_ALLOC_STRATEGY;
 
+/* Shder mem access hints for executable-derived-hints */
+typedef enum SHADER_EDH_MEM_ACCESS_HINT
+{
+    SHADER_EDH_MEM_ACCESS_HINT_NONE               = 0x0000,
+    SHADER_EDH_MEM_ACCESS_HINT_LOAD               = 0x0001,
+    SHADER_EDH_MEM_ACCESS_HINT_STORE              = 0x0002,
+    SHADER_EDH_MEM_ACCESS_HINT_IMG_READ           = 0x0004,
+    SHADER_EDH_MEM_ACCESS_HINT_IMG_WRITE          = 0x0008,
+    SHADER_EDH_MEM_ACCESS_HINT_ATOMIC             = 0x0010,
+
+    SHADER_EDH_MEM_ACCESS_HINT_READ               = SHADER_EDH_MEM_ACCESS_HINT_LOAD       |
+                                                    SHADER_EDH_MEM_ACCESS_HINT_IMG_READ   |
+                                                    SHADER_EDH_MEM_ACCESS_HINT_ATOMIC,
+    SHADER_EDH_MEM_ACCESS_HINT_WRITE              = SHADER_EDH_MEM_ACCESS_HINT_STORE      |
+                                                    SHADER_EDH_MEM_ACCESS_HINT_IMG_WRITE  |
+                                                    SHADER_EDH_MEM_ACCESS_HINT_ATOMIC,
+
+    SHADER_EDH_MEM_ACCESS_HINT_BARRIER            = 0x0020,
+}SHADER_EDH_MEM_ACCESS_HINT;
+
 /* For these hints, we can retrieve them by analyzing machine code on the fly, but it will
    hurt perf, so collect them by analyzing (derived) directly from compiler. */
 typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
@@ -1151,20 +1181,8 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
         /* Followings are OPTIONAL global hints */
         /****************************************/
 
-        /* Shader has load/store operations */
-        gctUINT                   bLoadStore                      : 1;
-
-        /* Shader has image load/store operations */
-        gctUINT                   bImgReadWrite                   : 1;
-
-        /* Shader has atomic operations */
-        gctUINT                   bAtomicOp                       : 1;
-
-        /* Shader has memory access operations */
-        gctUINT                   bMemAccess                      : 1;
-
-        /* Shader has barrier operation */
-        gctUINT                   bBarrierOp                      : 1;
+        /* What kind of memory access operations shader holds */
+        gctUINT                   memoryAccessHint                : 6;
 
         /* First HW reg and its channel that will be used to store addresses
            of USC for each vertex when executing hs/ds/gs. */
@@ -1176,7 +1194,7 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
            output are all LE 4 */
         gctUINT                   bIoUSCAddrsPackedToOneReg       : 1;
 
-        gctUINT                   reserved                        : 14;
+        gctUINT                   reserved                        : 13;
     } globalStates;
 
     struct
@@ -1214,6 +1232,9 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
             /* To determine which io-index of output mapping have alpha write */
             gctUINT               alphaWriteOutputIndexMask       : 8;
 
+            /* Shader has operation to calc gradient on x of RT */
+            gctUINT               bDerivRTx                       : 1;
+
             /* Shader has operation to calc gradient on y of RT */
             gctUINT               bDerivRTy                       : 1;
 
@@ -1239,9 +1260,9 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
 
 #if gcdALPHA_KILL_IN_SHADER
             gctUINT               alphaClrKillInstsGened          : 1;
-            gctUINT               reserved                        : 3;
+            gctUINT               reserved                        : 2;
 #else
-            gctUINT               reserved                        : 4;
+            gctUINT               reserved                        : 3;
 #endif
         } ps;
     } prvStates;

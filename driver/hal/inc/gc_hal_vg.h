@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -422,6 +422,8 @@ gckVGHARDWARE_QueryChipIdentity(
     IN gckVGHARDWARE Hardware,
     OUT gceCHIPMODEL* ChipModel,
     OUT gctUINT32* ChipRevision,
+    OUT gctUINT32* ProductID,
+    OUT gctUINT32* EcoID,
     OUT gctUINT32* ChipFeatures,
     OUT gctUINT32* ChipMinorFeatures,
     OUT gctUINT32* ChipMinorFeatures1

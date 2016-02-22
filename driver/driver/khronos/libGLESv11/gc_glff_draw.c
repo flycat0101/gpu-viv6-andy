@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -220,7 +220,7 @@ static gceSTATUS _LogicOpPreProcess(
 
         /* Resolve the frame buffer to the linear destination buffer. */
         fbView.surf = Context->fbLinear;
-        gcmERR_BREAK(gcoSURF_ResolveRect_v2(&drawView, &fbView, gcvNULL));
+        gcmERR_BREAK(gcoSURF_ResolveRect(&drawView, &fbView, gcvNULL));
 
         /* Create a temporary frame buffer. */
         gcmERR_BREAK(gcoSURF_Construct(
@@ -264,7 +264,7 @@ static gceSTATUS _LogicOpPreProcess(
         clearArgs.flags = gcvCLEAR_COLOR;
 
         tmpView.surf = Context->tempDraw;
-        gcmERR_BREAK(gcoSURF_Clear_v2(&tmpView, &clearArgs));
+        gcmERR_BREAK(gcoSURF_Clear(&tmpView, &clearArgs));
     }
     while (gcvFALSE);
 
@@ -311,7 +311,7 @@ static gceSTATUS _LogicOpPostProcess(
             ));
 
         /* Resolve the temporary frame buffer to the linear source buffer. */
-        gcmONERROR(gcoSURF_ResolveRect_v2(&tempDrawView, &tempView, gcvNULL));
+        gcmONERROR(gcoSURF_ResolveRect(&tempDrawView, &tempView, gcvNULL));
 
         /* Delete the temporary frame buffer. */
         gcmONERROR(gcoSURF_Destroy(Context->tempDraw));
@@ -340,7 +340,7 @@ static gceSTATUS _LogicOpPostProcess(
 
         /* Tile the linear destination buffer back to the frame buffer. */
         fbView.surf = Context->fbLinear;
-        gcmONERROR(gcoSURF_ResolveRect_v2(&fbView, &drawView, gcvNULL));
+        gcmONERROR(gcoSURF_ResolveRect(&fbView, &drawView, gcvNULL));
 
         /* Delete the linear frame buffers. */
         gcmONERROR(gcoSURF_Destroy(tempView.surf));
@@ -2236,7 +2236,7 @@ GL_API void GL_APIENTRY glDrawElements(
                     case GL_UNSIGNED_BYTE:
                         gcoINDEX_GetIndexRange(object->index,
                                                gcvINDEX_8,
-                                               (gctUINT32) Indices,
+                                               (gctUINT32) (gctUINTPTR_T) Indices,
                                                Count,
                                                (gctUINT32_PTR) &min,
                                                (gctUINT32_PTR) &max);
@@ -2245,7 +2245,7 @@ GL_API void GL_APIENTRY glDrawElements(
                     case GL_UNSIGNED_SHORT:
                         gcoINDEX_GetIndexRange(object->index,
                                                gcvINDEX_16,
-                                               (gctUINT32) Indices,
+                                               (gctUINT32) (gctUINTPTR_T) Indices,
                                                Count,
                                                (gctUINT32_PTR) &min,
                                                (gctUINT32_PTR) &max);
@@ -2254,7 +2254,7 @@ GL_API void GL_APIENTRY glDrawElements(
                     case GL_UNSIGNED_INT:
                         gcoINDEX_GetIndexRange(object->index,
                                                gcvINDEX_32,
-                                               (gctUINT32) Indices,
+                                               (gctUINT32) (gctUINTPTR_T) Indices,
                                                Count,
                                                (gctUINT32_PTR) &min,
                                                (gctUINT32_PTR) &max);

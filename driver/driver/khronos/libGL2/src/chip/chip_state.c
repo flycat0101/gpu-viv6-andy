@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1472,12 +1472,15 @@ static gceSTATUS validateShader(__GLcontext *gc)
         gcsHINT_PTR psHints = program->hints;
         gctBOOL psReadZ   = psHints->useFragCoord[2];
         gctBOOL psReadW   = psHints->useFragCoord[3];
+        gctBOOL hasMemoryAccess = (psHints->memoryAccessFlags[gcvPROGRAM_STAGE_FRAGMENT] & gceMA_FLAG_READ)
+                                  ||
+                                  (psHints->memoryAccessFlags[gcvPROGRAM_STAGE_FRAGMENT] & gceMA_FLAG_WRITE);
         gctUINT samples;
 
         gcmONERROR(gcoSURF_GetSamples(chipCtx->drawRT[0], &samples));
         gcmONERROR(gcSHADER_GetEarlyFragTest(fsProgram, &enableEarlyTest));
         gcmONERROR(gco3D_SetAllEarlyDepthModes(chipCtx->hw, enableEarlyTest ?
-                                                                        gcvFALSE : psHints->psHasFragDepthOut || psHints->useMemoryAccess[gcvPROGRAM_STAGE_FRAGMENT]));
+                                                                        gcvFALSE : psHints->psHasFragDepthOut || hasMemoryAccess));
 
         gcmONERROR(gco3D_SetSampleShading(chipCtx->hw, psHints->usedSampleIdOrSamplePosition,
                                                     psHints->psUsedSampleInput,
@@ -1493,7 +1496,7 @@ static gceSTATUS validateShader(__GLcontext *gc)
         if(gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_RA_DEPTH_WRITE))
         {
             gcmONERROR(gco3D_SetRADepthWrite(chipCtx->hw, enableEarlyTest ?
-                                                        gcvFALSE : psHints->psHasFragDepthOut || psHints->hasKill || psHints->useMemoryAccess[gcvPROGRAM_STAGE_FRAGMENT],
+                                                        gcvFALSE : psHints->psHasFragDepthOut || psHints->hasKill || hasMemoryAccess,
                                                         psReadZ, (psReadW || (psHints->rtArrayComponent != -1))));
         }
         gcmONERROR(gco3D_SetShaderLayered(chipCtx->hw, (psHints->rtArrayComponent != -1)));

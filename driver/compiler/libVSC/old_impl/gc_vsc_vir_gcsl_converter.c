@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -16,7 +16,6 @@
 
 /* Zone used for header/footer. */
 #define _GC_OBJ_ZONE    gcvZONE_COMPILER
-#if VSC_BUILD
 
 #define SHADER_LASTINST(CONV) ((CONV)->Shader->lastInstruction)
 #define TEMP_REGISTER_COUNT (1)
@@ -180,7 +179,7 @@ _CalculateInstCount(
     case VIR_OP_AND_BITWISE:case VIR_OP_OR_BITWISE:
     case VIR_OP_NOT_BITWISE:case VIR_OP_LSHIFT:
     case VIR_OP_RSHIFT:     case VIR_OP_ROTATE:
-    case VIR_OP_LOAD:
+    case VIR_OP_LOAD:       case VIR_OP_LOAD_L:
     case VIR_OP_KILL:       case VIR_OP_XOR_BITWISE:
     case VIR_OP_BARRIER:
     case VIR_OP_MEM_BARRIER:
@@ -204,6 +203,7 @@ _CalculateInstCount(
     case VIR_OP_GET_SAMPLER_LMM:
     case VIR_OP_GET_SAMPLER_LBS:
     case VIR_OP_AQ_F2I:
+    case VIR_OP_AQ_I2F:
         return 1;
     case VIR_OP_BITEXTRACT:
     case VIR_OP_BITINSERT1:
@@ -221,6 +221,7 @@ _CalculateInstCount(
         return 2;
 
     case VIR_OP_STORE:
+    case VIR_OP_STORE_L:
         {
             VIR_OperandInfo src1Info;
             VIR_Operand_GetOperandInfo(VirInst, VirInst->src[1], &src1Info);
@@ -1032,6 +1033,8 @@ _ConvVirOpndPrec2Prec(
         return gcSHADER_PRECISION_MEDIUM;
     case VIR_PRECISION_LOW:
         return gcSHADER_PRECISION_LOW;
+    case VIR_PRECISION_ANY:
+        return gcSHADER_PRECISION_ANY;
     default:
         gcmASSERT(0);
         return gcSHADER_PRECISION_MEDIUM;
@@ -1248,11 +1251,18 @@ _GetIndexedRegisterIndex(
     }
     else
     {
-        indexRegister =
-                VIR_Operand_GetRelAddrMode(Operand) != VIR_INDEXED_NONE ?
-                (gctUINT16)_GetRegisterIndex(Converter,
-                VIR_Function_GetSymFromId(VIR_Inst_GetFunction(VirInst), relIndexing), Operand) :
-            (gctUINT16) relIndexing;
+        if (VIR_Operand_GetRelAddrMode(Operand) != VIR_INDEXED_NONE)
+        {
+            gcmASSERT(!VirInst->_parentUseBB &&
+                      VIR_Inst_GetFunction(VirInst) != gcvNULL);
+
+            indexRegister = (gctUINT16)_GetRegisterIndex(Converter,
+                VIR_Function_GetSymFromId(VIR_Inst_GetFunction(VirInst), relIndexing), Operand);
+        }
+        else
+        {
+            indexRegister = (gctUINT16) relIndexing;
+        }
 
         if (VIR_Operand_GetRelAddrMode(Operand) != VIR_INDEXED_NONE)
         {
@@ -1283,7 +1293,7 @@ _ConvVirOpcode2Opcode(
     case VIR_OP_IMG_LOAD_3D:    return gcSL_IMAGE_RD_3D;
     case VIR_OP_IMG_STORE_3D:   return gcSL_IMAGE_WR_3D;
     case VIR_OP_IMG_ADDR:       return gcSL_IMAGE_ADDR;
-    case VIR_OP_IMG_ADDR_3D:    return gcSL_IMAGE_ADDR_3D;
+    case VIR_OP_IMG_ADDR_3D:       return gcSL_IMAGE_ADDR_3D;
     case VIR_OP_CLAMP0MAX:      return gcSL_CLAMP0MAX;
     case VIR_OP_NOP:            return gcSL_NOP;
     case VIR_OP_MOV:            return gcSL_MOV;
@@ -1344,7 +1354,9 @@ _ConvVirOpcode2Opcode(
     case VIR_OP_RSHIFT:         return gcSL_RSHIFT;
     case VIR_OP_ROTATE:         return gcSL_ROTATE;
     case VIR_OP_STORE:          return gcSL_STORE1;
+    case VIR_OP_STORE_L:        return gcSL_STORE_L;
     case VIR_OP_LOAD:           return gcSL_LOAD;
+    case VIR_OP_LOAD_L:         return gcSL_LOAD_L;
     case VIR_OP_KILL:           return gcSL_KILL;
     case VIR_OP_XOR_BITWISE:    return gcSL_XOR_BITWISE;
     case VIR_OP_BARRIER:        return gcSL_BARRIER;
@@ -1389,6 +1401,7 @@ _ConvVirOpcode2Opcode(
     case VIR_OP_BITRANGE:       return gcSL_BITRANGE;
     case VIR_OP_BITRANGE1:      return gcSL_BITRANGE1;
     case VIR_OP_AQ_F2I:         return gcSL_F2I;
+    case VIR_OP_AQ_I2F:         return gcSL_I2F;
     case VIR_OP_MEM_BARRIER:
         {
             /* Currently HW can't support memory barrier. */
@@ -1461,8 +1474,9 @@ _ConvVirOperand2Target(
 
             gctUINT32     defIndex = 0;
 
-            gcmASSERT(VIR_Inst_GetFunction(VirInst) != gcvNULL &&
-                VIR_Operand_GetLabel(Operand) != gcvNULL);
+            gcmASSERT(!VirInst->_parentUseBB &&
+                      VIR_Inst_GetFunction(VirInst) != gcvNULL &&
+                      VIR_Operand_GetLabel(Operand) != gcvNULL);
 
             label = VIR_Operand_GetLabel(Operand);
             type = VIR_Shader_GetTypeFromId(Converter->VirShader, VIR_Operand_GetType(Operand));
@@ -1485,7 +1499,8 @@ _ConvVirOperand2Target(
             VIR_Type        *type;
             gctUINT32        defIndex = 0;
 
-            gcmASSERT(VIR_Inst_GetFunction(VirInst) != gcvNULL);
+            gcmASSERT(!VirInst->_parentUseBB &&
+                      VIR_Inst_GetFunction(VirInst) != gcvNULL);
 
             type = VIR_Shader_GetTypeFromId(Converter->VirShader, VIR_Operand_GetType(Operand));
             if(type == gcvNULL)
@@ -1906,7 +1921,7 @@ _ConvVirInst2Inst(
     case VIR_OP_AND_BITWISE:case VIR_OP_OR_BITWISE:
     case VIR_OP_NOT_BITWISE:case VIR_OP_LSHIFT:
     case VIR_OP_RSHIFT:     case VIR_OP_ROTATE:
-    case VIR_OP_LOAD:
+    case VIR_OP_LOAD:       case VIR_OP_LOAD_L:
     case VIR_OP_KILL:       case VIR_OP_XOR_BITWISE:
     case VIR_OP_BARRIER:
     case VIR_OP_MEM_BARRIER:
@@ -1925,6 +1940,7 @@ _ConvVirInst2Inst(
     case VIR_OP_GET_SAMPLER_LMM:
     case VIR_OP_GET_SAMPLER_LBS:
     case VIR_OP_AQ_F2I:
+    case VIR_OP_AQ_I2F:
         {
             gctSIZE_T i = 0;
 
@@ -1942,9 +1958,14 @@ _ConvVirInst2Inst(
     case VIR_OP_IMG_STORE:
     case VIR_OP_IMG_STORE_3D:
         {
-            _ConvVirOperand2Target(Converter, opcode, VirInst->src[0], VirInst, condition);
-            _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 0);
-            _ConvVirOperand2Source(Converter, VirInst->src[2], VirInst, 1);
+            /* For gcSL_IMAGE_STORE:
+                    target is the data, src0 is the base address, src1 is the offset.
+               For VIR_OP_IMG_STORE:
+                    src0 is the base address, src1 is the offset, src2 is the data.
+            */
+            _ConvVirOperand2Target(Converter, opcode, VirInst->src[2], VirInst, condition);
+            _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
+            _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 1);
             break;
         }
     case VIR_OP_ATOMADD:    case VIR_OP_ATOMSUB:
@@ -1981,6 +2002,7 @@ _ConvVirInst2Inst(
         }
 
     case VIR_OP_STORE:
+    case VIR_OP_STORE_L:
         {
             VIR_OperandInfo src1Info;
 
@@ -2007,6 +2029,7 @@ _ConvVirInst2Inst(
                 gcSL_SWIZZLE    swizzle;
                 gcSHADER_PRECISION precision;
 
+                gcmASSERT(VIR_OpndInfo_Is_Virtual_Reg(&src1Info) || src1Info.u1.immValue.iValue != 0);
                 _CloneVirOpnd2TmpOpnd(Converter, VirInst, VirInst->src[1], 0, &tmpReg, &enable, &format, &precision);
 
                 /* add t0, src0, src2 */
@@ -2601,8 +2624,6 @@ _ConvVirFunction2Function(
     {
         gcmASSERT(Func != gcvNULL);
 
-        gcmASSERT(0 == (VirFunc->flags & VIR_FUNCFLAG_KERNEL));
-
         gcSHADER_BeginFunction(Converter->Shader,
             Func);
 
@@ -2921,7 +2942,7 @@ gcSHADER_ConvFromVIR(
 
     if (VirShader->shaderKind == VIR_SHADER_FRAGMENT)
     {
-        Shader->dual16Mode = VirShader->__IsDual16Shader;
+        Shader->isDual16Shader = VirShader->__IsDual16Shader;
     }
 
     /* Add uniforms. Assume only inserting const values. */
@@ -3186,6 +3207,19 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                                                       &levelBaseSizeUniform));
                     virUniform->gcslIndex = levelBaseSizeIndex;
                 }
+                else if(VIR_Symbol_GetUniformKind(virUniformSym) == VIR_UNIFORM_CONST_BORDER_VALUE)
+                {
+                    gcUNIFORM uniform;
+
+                    gcmONERROR(gcSHADER_AddUniformEx(Shader,
+                                                     VIR_Shader_GetSymNameString(VirShader, virUniformSym),
+                                                     gcSHADER_UINT_X4,
+                                                     gcSHADER_PRECISION_HIGH,
+                                                     1,
+                                                     &uniform));
+
+                    virUniform->gcslIndex = GetUniformIndex(uniform);
+                }
                 else
                 {
                     gcmASSERT(VIR_Uniform_GetInitializer(virUniform) != VIR_INVALID_ID);
@@ -3439,6 +3473,7 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
 
             gcslUniform = Shader->uniforms[symUniform->gcslIndex];
             gcslUniform->physical = symUniform->physical;
+            gcslUniform->samplerPhysical = symUniform->samplerPhysical;
             gcslUniform->swizzle = symUniform->swizzle;
             gcslUniform->address = symUniform->address;
             gcslUniform->baseBindingIdx = -1;
@@ -3588,17 +3623,40 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
             gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Shader->functions));
             Shader->functionArraySize = 0;
             Shader->functionCount = 0;
+            Shader->currentFunction = gcvNULL;
         }
 
         /* Free any kernel functions. */
         if (Shader->kernelFunctions != gcvNULL)
         {
-            gctUINT i         = 0;
+            gctUINT             i = 0;
+            gcKERNEL_FUNCTION  *kernelFunctions = gcvNULL;
+            gctPOINTER          pointer = gcvNULL;
+            gctUINT32           length = Shader->currentKernelFunction->nameLength;
+
+            /* Allocate a new kernel function list. */
+            gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                      gcmSIZEOF(gcKERNEL_FUNCTION),
+                                      &pointer));
+            gcoOS_ZeroMemory(pointer, gcmSIZEOF(gcKERNEL_FUNCTION));
+            kernelFunctions = (gcKERNEL_FUNCTION*)pointer;
+
+            /* Copy the current kernel function. */
+            gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                      gcmOFFSETOF(_gcsKERNEL_FUNCTION, name) + length + 1,
+                                      &pointer));
+            gcoOS_ZeroMemory(pointer, gcmOFFSETOF(_gcsKERNEL_FUNCTION, name) + length + 1);
+            kernelFunctions[0] = (gcKERNEL_FUNCTION)pointer;
+
+            gcoOS_MemCopy(kernelFunctions[0], Shader->currentKernelFunction, gcmSIZEOF(struct _gcsKERNEL_FUNCTION));
+            gcoOS_MemCopy(kernelFunctions[0]->name, Shader->currentKernelFunction->name, length + 1);
+
             for (i = 0; i < Shader->kernelFunctionCount; i++)
             {
                 if (Shader->kernelFunctions[i] != gcvNULL)
                 {
-                    if (Shader->kernelFunctions[i]->arguments != gcvNULL)
+                    if (Shader->kernelFunctions[i]->arguments != gcvNULL &&
+                        Shader->kernelFunctions[i] != Shader->currentKernelFunction)
                     {
                         /* Free the gcSHADER_FUNCTION_ARGUMENT structure. */
                         gcmVERIFY_OK(
@@ -3612,11 +3670,16 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
 
             /* Free the array of gcSHADER_FUNCTION pointers. */
             gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Shader->kernelFunctions));
-            Shader->kernelFunctionArraySize = 0;
-            Shader->kernelFunctionCount = 0;
+
+            /* Reset kernel functionns */
+            Shader->kernelFunctionArraySize = 1;
+            Shader->kernelFunctionCount = 1;
+            Shader->kernelFunctions = kernelFunctions;
+            Shader->currentKernelFunction = kernelFunctions[0];
         }
 
         /* Build function */
+        /* TODO: we need to handle kernel functions too. */
         if(converter.VirShader->functions.info.count > 0)
         {
             VIR_FunctionNode *funcNode;
@@ -3644,7 +3707,19 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                 }
                 else
                 {
+                    if (Shader->currentKernelFunction)
+                    {
+                        Shader->currentKernelFunction->codeStart = Shader->lastInstruction;
+                    }
+
                     _ConvVirFunction2Function(&converter, gcvNULL, VirShader->mainFunction);
+
+                    if (Shader->currentKernelFunction)
+                    {
+                        Shader->currentKernelFunction->codeEnd = Shader->lastInstruction + 1;
+                        Shader->currentKernelFunction->codeCount =
+                            Shader->currentKernelFunction->codeEnd - Shader->currentKernelFunction->codeStart;
+                    }
                 }
             }
         }
@@ -3661,7 +3736,6 @@ OnError:
     gcmFOOTER_ARG("Shader=0x%x", Shader);
     return status;
 }
-#endif
 
 #endif
 

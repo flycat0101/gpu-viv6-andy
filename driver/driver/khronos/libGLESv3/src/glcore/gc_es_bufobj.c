@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -61,8 +61,6 @@
     }
 
 #define _GC_OBJ_ZONE __GLES3_ZONE_CORE
-
-GLboolean __glDeleteBufferObject(__GLcontext *gc, __GLbufferObject *bufObj);
 
 GLvoid __glInitBufferObject(__GLcontext *gc, __GLbufferObject *bufObj, GLuint name)
 {
@@ -227,7 +225,7 @@ GLvoid __glBindBufferToArrayPoint(__GLcontext *gc, GLuint targetIndex, GLuint bi
     pBindingPoint->bufOffset    = offset;
     pBindingPoint->bufSize      = size;
 
-    __glBitmaskOR(&gc->bufferObject.bindingDirties[targetIndex], bindingPointIdx);
+    __glBitmaskSet(&gc->bufferObject.bindingDirties[targetIndex], bindingPointIdx);
 
     if (bufObj)
     {
@@ -924,7 +922,7 @@ GLvoid GL_APIENTRY __gles_BufferData(__GLcontext *gc, GLenum target, GLsizeiptr 
         if (arrayIdx < gc->bufferObject.maxBufBindings[targetIdx] &&
             gc->bufferObject.bindingPoints[targetIdx][arrayIdx].boundBufObj == bufObj)
         {
-            __glBitmaskOR(&gc->bufferObject.bindingDirties[targetIdx], arrayIdx);
+            __glBitmaskSet(&gc->bufferObject.bindingDirties[targetIdx], arrayIdx);
         }
 
         bindUser = bindUser->next;

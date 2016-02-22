@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -440,6 +440,7 @@ typedef enum _gceSTATUS
     gcvSTATUS_INTERRUPTED           =   -26,
     gcvSTATUS_DEVICE                =   -27,
     gcvSTATUS_NOT_MULTI_PIPE_ALIGNED =   -28,
+    gcvSTATUS_OUT_OF_SAMPLER         =   -29,
 
     /* Linker errors. */
     gcvSTATUS_GLOBAL_TYPE_MISMATCH              =   -1000,
@@ -472,6 +473,7 @@ typedef enum _gceSTATUS
     gcvSTATUS_NON_INVOCATION_ID_AS_INDEX        =   -1025,
     gcvSTATUS_INPUT_ARRAY_SIZE_MISMATCH         =   -1026,
     gcvSTATUS_OUTPUT_ARRAY_SIZE_MISMATCH        =   -1027,
+    gcvSTATUS_LOCATION_ALIASED                  =   -1028,
 
     /* Compiler errors. */
     gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR    =   -2000,
@@ -935,23 +937,6 @@ struct _gckQUEUE
     gctUINT32                   front;
     gctUINT32                   count;
     gctUINT32                   size;
-};
-
-#define gcdENTRY_QUEUE_SIZE 256
-typedef struct _gckENTRYDATA * gckENTRYDATA;
-struct _gckENTRYDATA
-{
-    gctUINT32                   physical;
-    gctUINT32                   bytes;
-};
-
-typedef struct _gckENTRYQUEUE * gckENTRYQUEUE;
-struct _gckENTRYQUEUE
-{
-    struct _gckENTRYDATA        data[gcdENTRY_QUEUE_SIZE];
-    gctUINT32                   rear;
-    gctUINT32                   front;
-    gctUINT32                   count;
 };
 
 typedef enum _gceTRACEMODE

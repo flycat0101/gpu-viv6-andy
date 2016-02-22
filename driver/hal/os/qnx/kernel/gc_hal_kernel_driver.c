@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1227,7 +1227,6 @@ drv_shmpool_alloc_contiguous(
 
         if (pageCount <= shmPool->freePageCount)
         {
-
             /* Try finding enough contiguous free pages. */
             for (i = shmPool->freePage; i+pageCount <= shmPool->pageCount;)
             {
@@ -1973,6 +1972,7 @@ static int drv_init(void)
     args.stuckDump       = stuckDump;
     args.powerManagement = powerManagement;
     args.mmu             = mmu;
+    args.gpuProfiler     = gpuProfiler;
 
     /* TODO: Enable clock by driver support? */
     gcmkTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_DRIVER,

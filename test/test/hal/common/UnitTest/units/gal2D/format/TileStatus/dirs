@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -35,5 +35,8 @@ DIRS=\
 	006\
 	007\
 	008\
-	009
+	009\
+	010\
+	011\
+	012
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1868,7 +1868,7 @@ gceSTATUS SetUniform_ImageSampler(_vgHARDWARE *hardware, gctINT sampler)
 
         gcmVERIFY_OK(gcoHAL_Commit(hardware->context->hal, gcvTRUE));
 
-        gcoSURF_ResolveRect_v2(&surfView, &texView, gcvNULL);
+        gcoSURF_ResolveRect(&surfView, &texView, gcvNULL);
 
         /* Semaphore/stall. */
         gcmVERIFY_OK(
@@ -1904,7 +1904,7 @@ gceSTATUS SetUniform_GradientSampler(_vgHARDWARE *hardware, gctINT sampler)
         gcmVERIFY_OK(gcoHAL_Commit(hardware->context->hal, gcvTRUE));
 
         /* Resolve the render target into the texture. */
-        gcmVERIFY_OK(gcoSURF_ResolveRect_v2(&surfView, &texView, gcvNULL));
+        gcmVERIFY_OK(gcoSURF_ResolveRect(&surfView, &texView, gcvNULL));
 
         /* Semaphore/stall. */
         gcmVERIFY_OK(
@@ -1936,7 +1936,7 @@ gceSTATUS SetUniform_PatternSampler(_vgHARDWARE *hardware, gctINT sampler)
         gcmVERIFY_OK(gcoHAL_Commit(hardware->context->hal, gcvTRUE));
 
         /* Resolve the render target into the texture. */
-        gcmVERIFY_OK(gcoSURF_ResolveRect_v2(&surfView, &texView, gcvNULL));
+        gcmVERIFY_OK(gcoSURF_ResolveRect(&surfView, &texView, gcvNULL));
 
         /* Semaphore/stall. */
         gcmVERIFY_OK(
@@ -1980,7 +1980,7 @@ gceSTATUS SetUniform_RenderTargetSampler(_vgHARDWARE *hardware, gctINT sampler)
 
             gcmVERIFY_OK(gcoHAL_Commit(hardware->context->hal, gcvTRUE));
 
-            gcmERR_BREAK(gcoSURF_ResolveRect_v2(&surfView, &texView, gcvNULL));
+            gcmERR_BREAK(gcoSURF_ResolveRect(&surfView, &texView, gcvNULL));
 
             /* Sempahore/stall. */
             gcmERR_BREAK(
@@ -2022,7 +2022,7 @@ gceSTATUS SetUniform_MaskSampler(_vgHARDWARE *hardware, gctINT sampler)
 
         gcmVERIFY_OK(gcoHAL_Commit(hardware->context->hal, gcvTRUE));
 
-        gcmVERIFY_OK(gcoSURF_ResolveRect_v2(&surfView, &texView, gcvNULL));
+        gcmVERIFY_OK(gcoSURF_ResolveRect(&surfView, &texView, gcvNULL));
 
         /* Sempahore/stall. */
         gcmVERIFY_OK(
@@ -2054,7 +2054,7 @@ gceSTATUS SetUniform_SourceMaskSampler(_vgHARDWARE *hardware, gctINT sampler)
 
         gcmVERIFY_OK(gcoHAL_Commit(hardware->context->hal, gcvTRUE));
 
-        gcmVERIFY_OK(gcoSURF_ResolveRect_v2(&surfView, &texView, gcvNULL));
+        gcmVERIFY_OK(gcoSURF_ResolveRect(&surfView, &texView, gcvNULL));
 
         /* Sempahore/stall. */
         gcmVERIFY_OK(
@@ -2553,6 +2553,7 @@ static gceSTATUS _LinkShader(_VGProgram *program)
                         ( gcvSHADER_DEAD_CODE
                         | gcvSHADER_RESOURCE_USAGE
                         | gcvSHADER_OPTIMIZER
+                        | gcvSHADER_FLUSH_DENORM_TO_ZERO
                         ),
                         &program->statesSize,
                         &program->states,
@@ -7148,7 +7149,7 @@ gceSTATUS vgshClear(
                     gcsSURF_VIEW surfView = {context->hardware.currentImage->surface, 0, 1};
                     gcsSURF_VIEW texView  = {context->hardware.currentImage->texSurface, 0, 1};
 
-                    gcmVERIFY_OK(gcoSURF_ResolveRect_v2(&surfView, &texView, gcvNULL));
+                    gcmVERIFY_OK(gcoSURF_ResolveRect(&surfView, &texView, gcvNULL));
 
                     gcmVERIFY_OK(gco3D_Semaphore(
                         context->hardware.core.engine,
@@ -7172,7 +7173,7 @@ gceSTATUS vgshClear(
 
             /* use the surface clear */
             imgView.surf = image->surface;
-            gcmERR_BREAK(gcoSURF_Clear_v2(&imgView, &clearArgs));
+            gcmERR_BREAK(gcoSURF_Clear(&imgView, &clearArgs));
 
             *image->dirtyPtr = gcvTRUE;
         }
@@ -7371,7 +7372,7 @@ gceSTATUS vgshCreateMaskBuffer(_VGContext  *context)
                 context->engine, 0xF));
 
             imgView.surf = context->maskImage.surface;
-            gcmERR_BREAK(gcoSURF_Clear_v2(&imgView, &clearArgs));
+            gcmERR_BREAK(gcoSURF_Clear(&imgView, &clearArgs));
 #endif
 
             *context->maskImage.dirtyPtr = gcvTRUE;
@@ -7409,7 +7410,7 @@ gceSTATUS _SetStates(_vgHARDWARE *hardware)
             gcsSURF_VIEW surfView = {hardware->currentImage->surface, 0, 1};
             gcsSURF_VIEW texView  = {hardware->currentImage->texSurface, 0, 1};
 
-            gcmVERIFY_OK(gcoSURF_ResolveRect_v2(&surfView, &texView, gcvNULL));
+            gcmVERIFY_OK(gcoSURF_ResolveRect(&surfView, &texView, gcvNULL));
 
             gcmVERIFY_OK(gco3D_Semaphore(
                 hardware->core.engine,

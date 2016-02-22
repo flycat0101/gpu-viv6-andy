@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -117,6 +117,8 @@ OnError:
 void
 gcoWL_ReleaseDisplay(gcsWL_EGL_DISPLAY* display)
 {
+    wl_display_roundtrip_queue(display->wl_display, display->wl_swap_queue);
+    wl_display_roundtrip_queue(display->wl_display, display->wl_queue);
     wl_registry_destroy(display->registry);
     wl_event_queue_destroy(display->wl_queue);
     wl_event_queue_destroy(display->wl_swap_queue);

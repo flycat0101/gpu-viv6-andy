@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -16,6 +16,9 @@
 #include "../user/gc_hal_user_shader.h"
 
 #define __NEXT_MSG_ID__     007032
+
+extern gctBOOL gcSHADER_GoVIRPass(gcSHADER Shader);
+
 
 /*****************************************************************************\
 |*                         Supporting functions                              *|
@@ -59,8 +62,8 @@ clfSetupImageSampler(
     /* Get sampler value. */
     samplerValue = Arg->samplerValue;
 
-    gcmASSERT((samplerValue & CLK_NORMALIZED_COORDS_TRUE)
-        == CLK_NORMALIZED_COORDS_TRUE);
+    /*gcmASSERT((samplerValue & CLK_NORMALIZED_COORDS_TRUE)
+        == CLK_NORMALIZED_COORDS_TRUE);*/
     filterMode = (samplerValue & 0xF00) >> 8;
     addressMode = samplerValue & 0xF;
 
@@ -146,7 +149,10 @@ clfLoadKernelArgValues(
     gctUINT             WorkDim,
     size_t              GlobalWorkOffset[3],
     size_t              GlobalWorkSize[3],
-    size_t              LocalWorkSize[3]
+    size_t              LocalWorkSize[3],
+    clsArgument_PTR     baseArg,
+    gctUINT             numArg,
+    clsPrivateBuffer_PTR *privateBufList
     )
 {
     gcSHADER_TYPE       type;
@@ -155,6 +161,8 @@ clfLoadKernelArgValues(
     gctBOOL             isPointer;
     gceUNIFORM_FLAGS    flags;
     gctINT              status;
+    clsMemAllocInfo_PTR privateBuf = gcvNULL;
+    static clsKernel_PTR previousKernel = gcvNULL;
 
     gcmHEADER_ARG("Kernel=0x%x Arg=0x%x WorkDim=%d",
                   Kernel, Arg, WorkDim);
@@ -182,6 +190,7 @@ clfLoadKernelArgValues(
         {
             clsMem_PTR memObj = *(clsMem_PTR *) Arg->data;
             gctINT * data;
+            gctUINT32 tmpData[8] = {0};
 
             /* Handle NULL buffer object */
             if (!memObj && length == 1)
@@ -210,41 +219,319 @@ clfLoadKernelArgValues(
                 data = (gctINT *) &memObj->u.image.physical;
 
 #if cldTUNING
-                do
+                if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMG_INSTRUCTION) && (Kernel->patchNeeded == gcvFALSE) && gcSHADER_GoVIRPass(Shader))
                 {
-                    gctUINT count, i;
-                    gctCONST_STRING name;
-                    char nameImage[128];
-                    gcUNIFORM uniform;
-                    gceSTATUS status;
+                    gctUINT addressMode = 0, format, tiling, type=0, componentCount=0,
+                            swizzleR=0, swizzleG=0, swizzleB=0, swizzleA=0, i=0;
+                    gctUINT sliceSize = 0, depth = 0;
+                    clsArgument_PTR tmpArg = gcvNULL;
+                    gcKERNEL_FUNCTION kernelFunction = gcvNULL;
+                    gcsIMAGE_SAMPLER_PTR imageSampler = gcvNULL;
+                    gctUINT shift = (unsigned int)(gcoMATH_Log((gctFLOAT)memObj->u.image.elementSize)/gcoMATH_Log(2.0));
 
-                    gcmERR_BREAK(gcSHADER_GetUniformCount(Shader, &count));
-                    gcmERR_BREAK(gcUNIFORM_GetName(Arg->uniform, gcvNULL, &name));
-                    gcmERR_BREAK(gcoOS_StrCopySafe(nameImage, gcmSIZEOF(nameImage), name));
-                    gcmERR_BREAK(gcoOS_StrCatSafe(nameImage, gcmSIZEOF(nameImage), "#size"));
+                    tmpData[0] = (gctUINT32 ) memObj->u.image.texturePhysical;
+                    tmpData[1] = memObj->u.image.textureStride;
 
-                    for (i = 0; i < count; i++)
+                    switch(memObj->type)
                     {
-                        gcmERR_BREAK(gcSHADER_GetUniform(Shader, i, &uniform));
-                        if (uniform != gcvNULL)
+                    case CL_MEM_OBJECT_IMAGE1D:
+                        tmpData[2] = (memObj->u.image.width) | (memObj->u.image.width<<16);
+                        sliceSize = memObj->u.image.width;
+                        depth = 1;
+                        type = 0;
+                        break;
+                    case CL_MEM_OBJECT_IMAGE2D:
+                        tmpData[2] = (memObj->u.image.width) | (memObj->u.image.height<<16);
+                        sliceSize = memObj->u.image.width * memObj->u.image.height;
+                        depth = 1;
+                        type = 1;
+                        break;
+                    case CL_MEM_OBJECT_IMAGE3D:
+                        tmpData[2] = (memObj->u.image.width) | (memObj->u.image.height<<16);
+                        sliceSize = memObj->u.image.width * memObj->u.image.height;
+                        depth = memObj->u.image.depth;
+                        type = 1;
+                        break;
+                    case CL_MEM_OBJECT_IMAGE1D_ARRAY:
+                        tmpData[2] = (memObj->u.image.width) | (memObj->u.image.width<<16);
+                        sliceSize = memObj->u.image.width;
+                        depth = memObj->u.image.arraySize;
+                        type = 1;
+                        break;
+                    case CL_MEM_OBJECT_IMAGE2D_ARRAY:
+                        tmpData[2] = (memObj->u.image.width) | (memObj->u.image.height<<16);
+                        sliceSize = memObj->u.image.width * memObj->u.image.height;
+                        depth = memObj->u.image.arraySize;
+                        type = 1;
+                        break;
+                    default:
+                        break;
+                    }
+                    switch(memObj->u.image.format.image_channel_data_type)
+                    {
+                    case CL_UNORM_INT8:
+                        format = 0xF;
+                        break;
+                    case CL_UNORM_INT16:
+                        format = 0xE;
+                        break;
+                    case CL_SNORM_INT8:
+                        format = 0xC;
+                        break;
+                    case CL_SNORM_INT16:
+                        format = 0xB;
+                        break;
+                    case CL_UNORM_SHORT_565:
+                        format = 9;
+                        break;
+                    case CL_UNORM_SHORT_555:
+                        format = 8;
+                        break;
+                    case CL_UNORM_INT_101010:
+                        format = 0xA;
+                        break;
+                    case CL_SIGNED_INT8:
+                        format = 4;
+                        break;
+                    case CL_SIGNED_INT16:
+                        format = 3;
+                        break;
+                    case CL_SIGNED_INT32:
+                        format = 2;
+                        break;
+                    case CL_UNSIGNED_INT8:
+                        format = 7;
+                        break;
+                    case CL_UNSIGNED_INT16:
+                        format = 6;
+                        break;
+                    case CL_UNSIGNED_INT32:
+                        format = 5;
+                        break;
+                    case CL_HALF_FLOAT:
+                        format = 1;
+                        break;
+                    case CL_FLOAT:
+                    default:
+                        format = 0;
+                        break;
+                    }
+                    tiling = (memObj->u.image.tiling == gcvLINEAR ? 0 : memObj->u.image.tiling == gcvTILED ? 1 : memObj->u.image.tiling == gcvSUPERTILED ? 2 : 3);
+                    switch(memObj->u.image.format.image_channel_order)
+                    {
+                    case CL_R:
+                    case CL_Rx:
+                        componentCount = 1;
+                        swizzleR = 0;
+                        swizzleG = 4;
+                        swizzleB = 4;
+                        swizzleA = 5;
+                        break;
+                    case CL_A:
+                        componentCount = 1;
+                        swizzleR = 4;
+                        swizzleG = 4;
+                        swizzleB = 4;
+                        swizzleA = 3;
+                        break;
+                    case CL_RG:
+                    case CL_RGx:
+                        componentCount = 2;
+                        swizzleR = 0;
+                        swizzleG = 1;
+                        swizzleB = 4;
+                        swizzleA = 5;
+                        break;
+                    case CL_RA:
+                        componentCount = 2;
+                        swizzleR = 0;
+                        swizzleG = 4;
+                        swizzleB = 4;
+                        swizzleA = 3;
+                        break;
+                    case CL_RGB:
+                        componentCount = 3;
+                        swizzleR = 0;
+                        swizzleG = 1;
+                        swizzleB = 2;
+                        swizzleA = 5;
+                        break;
+                    case CL_RGBA:
+                        componentCount = 0;
+                        swizzleR = 0;
+                        swizzleG = 1;
+                        swizzleB = 2;
+                        swizzleA = 3;
+                        break;
+                    case CL_BGRA:
+                        componentCount = 0;
+                        swizzleR = 2;
+                        swizzleG = 1;
+                        swizzleB = 0;
+                        swizzleA = 3;
+                        break;
+                    case CL_ARGB:
+                        componentCount = 0;
+                        swizzleR = 1;
+                        swizzleG = 2;
+                        swizzleB = 3;
+                        swizzleA = 0;
+                        break;
+                    case CL_INTENSITY:
+                        componentCount = 0;
+                        swizzleR = 0;
+                        swizzleG = 0;
+                        swizzleB = 0;
+                        swizzleA = 0;
+                        break;
+                    case CL_LUMINANCE:
+                        componentCount = 0;
+                        swizzleR = 0;
+                        swizzleG = 0;
+                        swizzleB = 0;
+                        swizzleA = 5;
+                        break;
+                    default:
+                        componentCount = 0;
+                        break;
+                    }
+                    /* Get main kernel function. */
+                    gcmASSERT(Shader->kernelFunctions);
+                    for (i = 0; i < Shader->kernelFunctionCount; i++)
+                    {
+                        if (Shader->kernelFunctions[i] == gcvNULL) continue;
+
+                        if (Shader->kernelFunctions[i]->isMain)
                         {
-                            gcmERR_BREAK(gcUNIFORM_GetName(uniform, gcvNULL, &name));
-                            if (gcoOS_StrCmp(name, nameImage) == gcvSTATUS_OK)
+                            kernelFunction = Shader->kernelFunctions[i];
+                            break;
+                        }
+                    }
+                    imageSampler = &kernelFunction->imageSamplers[Arg->uniform->imageSamplerIndex];
+
+                    if(imageSampler != gcvNULL)
+                    {
+                        if(imageSampler->isConstantSamplerType == gcvFALSE)
+                        {
+                            for(tmpArg = baseArg, i = 0; i < numArg; tmpArg++, i++)
                             {
-                                gctINT image[4];
-                                clsImageHeader_PTR imageHeader = (clsImageHeader_PTR) memObj->u.image.logical;
-                                image[0] = imageHeader->width;
-                                image[1] = imageHeader->rowPitch;
-                                image[2] = imageHeader->width - 1;
-                                image[3] = imageHeader->height - 1;
-                                gcmERR_BREAK(gcUNIFORM_SetValue(uniform, 1, image));
-                                data = (gctINT *) &imageHeader->physical;
-                                break;
+                                if(tmpArg->uniform != gcvNULL && isUniformKernelArgSampler(tmpArg->uniform))
+                                {
+                                    cleSAMPLER sampler = *(cleSAMPLER *) tmpArg->data;
+                                    if((sampler & CLK_ADDRESS_CLAMP) == CLK_ADDRESS_CLAMP)
+                                    {
+                                        switch(memObj->u.image.format.image_channel_order)
+                                        {
+                                        case CL_A:
+                                        case CL_INTENSITY:
+                                        case CL_Rx:
+                                        case CL_RA:
+                                        case CL_RGx:
+                                        default:
+                                            addressMode = 1;
+                                            break;
+                                        case CL_R:
+                                        case CL_RG:
+                                        case CL_RGB:
+                                        case CL_LUMINANCE:
+                                            addressMode = 2;
+                                            break;
+                                        }
+                                    }
+                                    else if((sampler & CLK_ADDRESS_CLAMP_TO_EDGE) == CLK_ADDRESS_CLAMP_TO_EDGE)
+                                    {
+                                        addressMode = 3;
+                                    }
+                                    else
+                                    {
+                                        addressMode = 0;
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if((imageSampler->samplerType & 0xF) == CLK_ADDRESS_CLAMP)
+                            {
+                                switch(memObj->u.image.format.image_channel_order)
+                                {
+                                    case CL_A:
+                                    case CL_INTENSITY:
+                                    case CL_Rx:
+                                    case CL_RA:
+                                    case CL_RGx:
+                                    default:
+                                        addressMode = 1;
+                                        break;
+                                    case CL_R:
+                                    case CL_RG:
+                                    case CL_RGB:
+                                    case CL_LUMINANCE:
+                                        addressMode = 2;
+                                        break;
+                                }
+                            }
+                            else if((imageSampler->samplerType & 0xF) == CLK_ADDRESS_CLAMP_TO_EDGE)
+                            {
+                                addressMode = 3;
                             }
                         }
                     }
+
+                    tmpData[3] = shift | (addressMode<<4) | (format<<6) | (tiling<<10) | (type<<12)
+                        | (componentCount<<14) | (swizzleR<<16) | (swizzleG<<20) | (swizzleB<<24) | (swizzleA<<28);
+                    tmpData[4] = sliceSize;
+                    tmpData[5] = depth;
+                    tmpData[6] = ((gctUINT)(memObj->u.image.format.image_channel_data_type << 16) | (gctUINT)(memObj->u.image.format.image_channel_order));
+                    data = (gctINT *)tmpData;
+                    if(Arg->uniform->arraySize == 2)
+                    {
+                        length = 8;
+                    }
+                    else
+                    {
+                        length = 4;
+                    }
                 }
-                while (gcvFALSE);
+                else
+                {
+                    do
+                    {
+                        gctUINT count, i;
+                        gctCONST_STRING name;
+                        char nameImage[128];
+                        gcUNIFORM uniform;
+                        gceSTATUS status;
+
+                        gcmERR_BREAK(gcSHADER_GetUniformCount(Shader, &count));
+                        gcmERR_BREAK(gcUNIFORM_GetName(Arg->uniform, gcvNULL, &name));
+                        gcmERR_BREAK(gcoOS_StrCopySafe(nameImage, gcmSIZEOF(nameImage), name));
+                        gcmERR_BREAK(gcoOS_StrCatSafe(nameImage, gcmSIZEOF(nameImage), "#size"));
+
+                        for (i = 0; i < count; i++)
+                        {
+                            gcmERR_BREAK(gcSHADER_GetUniform(Shader, i, &uniform));
+                            if (uniform != gcvNULL)
+                            {
+                                gcmERR_BREAK(gcUNIFORM_GetName(uniform, gcvNULL, &name));
+                                if (gcoOS_StrCmp(name, nameImage) == gcvSTATUS_OK)
+                                {
+                                    gctINT image[4];
+                                    clsImageHeader_PTR imageHeader = (clsImageHeader_PTR) memObj->u.image.logical;
+                                    image[0] = imageHeader->width;
+                                    image[1] = imageHeader->rowPitch;
+                                    image[2] = imageHeader->width - 1;
+                                    image[3] = imageHeader->height - 1;
+                                    gcmERR_BREAK(gcUNIFORM_SetValue(uniform, 1, image));
+                                    data = (gctINT *) &imageHeader->physical;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    while (gcvFALSE);
+                }
 #endif
             }
 
@@ -497,16 +784,123 @@ clfLoadKernelArgValues(
 
             memAllocInfo->allocatedSize *= isUniformPrivateAddressSpace(Arg->uniform) ? totalNumItems : totalNumGroups;
 
-            /* Allocate the physical buffer */
-            clmONERROR(gcoCL_AllocateMemory(&memAllocInfo->allocatedSize,
-                                            &memAllocInfo->physical,
-                                            &memAllocInfo->logical,
-                                            &memAllocInfo->node),
-                       CL_INVALID_VALUE);
+            if ((*privateBufList) == gcvNULL)
+            {
+                clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsPrivateBuffer), (gctPOINTER *)privateBufList), CL_OUT_OF_HOST_MEMORY);
+                clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsMemAllocInfo), (gctPOINTER *)&privateBuf), CL_OUT_OF_HOST_MEMORY);
 
-            data = (gctINT *) &memAllocInfo->physical;
-            clmONERROR(gcUNIFORM_SetValue(Arg->uniform, length, data),
-                       CL_INVALID_VALUE);
+                /* Allocate the physical buffer */
+                clmONERROR(gcoCL_AllocateMemory(&memAllocInfo->allocatedSize,
+                                                &memAllocInfo->physical,
+                                                &memAllocInfo->logical,
+                                                &memAllocInfo->node),
+                           CL_INVALID_VALUE);
+
+                gcoOS_MemCopy(privateBuf, memAllocInfo,  sizeof(clsMemAllocInfo));
+                (*privateBufList)->buffer = privateBuf;
+                (*privateBufList)->next = gcvNULL;
+                (*privateBufList)->kernel = Kernel;
+                (*privateBufList)->uniform = Arg->uniform;
+            }
+            else
+            {
+                clsPrivateBuffer_PTR node = gcvNULL;
+                gctBOOL found = gcvFALSE;
+
+                /* search in the list */
+                for (node = (*privateBufList); node != gcvNULL; node = node->next)
+                {
+                    if (Kernel != previousKernel)
+                    {
+                        /* find previous kernel's private buffer and re-use it */
+                        if (previousKernel == node->kernel)
+                        {
+                            found = gcvTRUE;
+                            privateBuf = node->buffer;
+                            /* update node */
+                            node->kernel = Kernel;
+                            node->uniform = Arg->uniform;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        /* find the same uniform in the same kernel */
+                        if (Kernel == node->kernel && Arg->uniform == node->uniform)
+                        {
+                            found = gcvTRUE;
+                            privateBuf =  node->buffer;
+                            break;
+                        }
+                    }
+                }
+
+                if (found)
+                {
+                    if (memAllocInfo->allocatedSize > privateBuf->allocatedSize)
+                    {
+				        /* flush first */
+                        gcoCL_Flush(gcvTRUE);
+
+                        gcoCL_FreeMemory(privateBuf->physical,
+                                         privateBuf->logical,
+                                         privateBuf->allocatedSize,
+                                         privateBuf->node);
+
+                        /* Allocate the physical buffer */
+                        clmONERROR(gcoCL_AllocateMemory(&memAllocInfo->allocatedSize,
+                                                        &memAllocInfo->physical,
+                                                        &memAllocInfo->logical,
+                                                        &memAllocInfo->node),
+                                   CL_INVALID_VALUE);
+                        gcoOS_MemCopy(privateBuf, memAllocInfo,  sizeof(clsMemAllocInfo));
+
+                        node->buffer = privateBuf;
+                    }
+                    else
+                    {
+                        memAllocInfo = privateBuf;
+                    }
+                }
+                else
+                {
+                    /* insert a new buffer to the list */
+                    node = (*privateBufList);
+                    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsPrivateBuffer), (gctPOINTER *)privateBufList), CL_OUT_OF_HOST_MEMORY);
+                    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsMemAllocInfo), (gctPOINTER *)&privateBuf), CL_OUT_OF_HOST_MEMORY);
+
+                    clmONERROR(gcoCL_AllocateMemory(&memAllocInfo->allocatedSize,
+                                                    &memAllocInfo->physical,
+                                                    &memAllocInfo->logical,
+                                                    &memAllocInfo->node),
+                               CL_INVALID_VALUE);
+
+                    gcoOS_MemCopy(privateBuf, memAllocInfo,  sizeof(clsMemAllocInfo));
+
+                    (*privateBufList)->buffer = privateBuf;
+                    (*privateBufList)->next = node;
+                    (*privateBufList)->kernel = Kernel;
+                    (*privateBufList)->uniform = Arg->uniform;
+                }
+            }
+
+            /* update previous Kernel */
+            previousKernel = Kernel;
+
+            if (gcmOPT_hasFeature(FB_FORCE_LS_ACCESS) /* triage option */)
+            {
+                /* Local memory address starts at 0. */
+                gctPHYS_ADDR physical = 0;
+                data = (gctINT *) &physical;
+                clmONERROR(gcUNIFORM_SetValue(Arg->uniform, length, data),
+                           CL_INVALID_VALUE);
+            }
+            else
+            {
+                data = (gctINT *) &memAllocInfo->physical;
+                clmONERROR(gcUNIFORM_SetValue(Arg->uniform, length, data),
+                           CL_INVALID_VALUE);
+            }
         }
     }
     else if (isUniformConstantAddressSpace(Arg->uniform) && (GetUniformPhysical(Arg->uniform) != -1))
@@ -966,6 +1360,171 @@ clfAdjustLocalWorkSize(
 }
 
 gctINT
+clfCalcLocalWorkSize(
+    clsKernel_PTR       Kernel,
+    gctUINT             WorkDim,
+    size_t              InputGlobalWorkOffset[3],
+    size_t              InputGlobalWorkSize[3],
+    size_t              InputLocalWorkSize[3],
+    size_t              OutputGlobalWorkOffset[9],
+    size_t              OutputGlobalWorkSize[9],
+    size_t              OutputLocalWorkSize[9]
+    )
+{
+    gctINT              status = CL_SUCCESS;
+    size_t              i,j;
+    size_t              preferredWorkGroupSize;
+
+    gcmHEADER_ARG("Kernel=0x%x", Kernel);
+    switch (WorkDim)
+    {
+    case 1:
+        if ((InputGlobalWorkSize[0] > Kernel->preferredWorkGroupSizeMultiple) && (InputGlobalWorkSize[0] % Kernel->preferredWorkGroupSizeMultiple != 0))
+        {
+            OutputGlobalWorkOffset[0] = InputGlobalWorkOffset[0];
+            OutputGlobalWorkSize[0] = InputGlobalWorkSize[0] - InputGlobalWorkSize[0] % Kernel->preferredWorkGroupSizeMultiple;
+            OutputLocalWorkSize[0] = Kernel->preferredWorkGroupSizeMultiple;
+
+            if (OutputGlobalWorkSize[0] < InputGlobalWorkSize[0])
+            {
+                OutputGlobalWorkOffset[3] = OutputGlobalWorkSize[0];
+                OutputGlobalWorkSize[3] = InputGlobalWorkSize[0]-OutputGlobalWorkSize[0];
+                OutputLocalWorkSize[3] = InputLocalWorkSize[0]; /* NULL */
+            }
+        }
+        else
+        {
+            OutputGlobalWorkOffset[0] = InputGlobalWorkOffset[0];
+            OutputGlobalWorkSize[0] = InputGlobalWorkSize[0];
+            OutputLocalWorkSize[0] = InputLocalWorkSize[0]; /* NULL */
+        }
+        break;
+    case 2:
+        {
+            size_t *WidthLeave;
+            size_t *HeightLeave;
+            gctINT WidthGroupSize=Kernel->preferredWorkGroupSizeMultiple;
+            gctINT HeightGroupSize=Kernel->preferredWorkGroupSizeMultiple;
+            size_t TotalLeave = 0xCfffffff;
+            size_t count=0;
+            gctBOOL HeightAlign=gcvFALSE,WidthAlign=gcvFALSE;
+            preferredWorkGroupSize = Kernel->preferredWorkGroupSizeMultiple;
+            while(preferredWorkGroupSize>=2)
+            {
+                count++;
+                preferredWorkGroupSize=preferredWorkGroupSize>>1;
+            }
+
+            preferredWorkGroupSize = Kernel->preferredWorkGroupSizeMultiple;
+            /* Assume GPU Core Count is 2^N */
+            gcmASSERT( preferredWorkGroupSize == (size_t)(1 << count));
+
+            gcoOS_Allocate(gcvNULL, count*sizeof(size_t), (gctPOINTER*)&WidthLeave);
+            gcoOS_Allocate(gcvNULL, count*sizeof(size_t), (gctPOINTER*)&HeightLeave);
+
+            WidthAlign = InputGlobalWorkSize[0]%preferredWorkGroupSize == 0;
+            HeightAlign = InputGlobalWorkSize[1]%preferredWorkGroupSize == 0;
+
+            for (i = 0; i < count; i++)
+            {
+                WidthLeave[i] = InputGlobalWorkSize[0]%(preferredWorkGroupSize>>i);
+                HeightLeave[i] = InputGlobalWorkSize[1]%(preferredWorkGroupSize>>i);
+            }
+            for (i = 0; i < count; i++)
+            {
+                for (j = 0; j < count; j++)
+                {
+                    if ((size_t)((preferredWorkGroupSize>>i)*(preferredWorkGroupSize>>j)) % preferredWorkGroupSize == 0)
+                    {
+                        if (TotalLeave > (WidthLeave[i]*InputGlobalWorkSize[1] + HeightLeave[j]*InputGlobalWorkSize[0]  - WidthLeave[i]*HeightLeave[j]))
+                        {
+                            /* TODO: can refine to choose logic like P1, Both Align, P2, WidthAlign, P3, HeightAlign, P4, No Align */
+                            TotalLeave = WidthLeave[i]*InputGlobalWorkSize[1] + HeightLeave[j]*InputGlobalWorkSize[0]  - WidthLeave[i]*HeightLeave[j];
+                            WidthGroupSize = preferredWorkGroupSize>>i;
+                            HeightGroupSize = preferredWorkGroupSize>>j;
+                            WidthAlign = InputGlobalWorkSize[0]%WidthGroupSize== 0;
+                            HeightAlign = InputGlobalWorkSize[1]%HeightGroupSize== 0;
+                        }
+                    }
+                }
+            }
+            if (InputGlobalWorkSize[0] < (size_t)WidthGroupSize || InputGlobalWorkSize[1] < (size_t)HeightGroupSize)
+            {
+                OutputGlobalWorkOffset[0] = InputGlobalWorkOffset[0];
+                OutputGlobalWorkOffset[1] = InputGlobalWorkOffset[1];
+                OutputGlobalWorkSize[0] = InputGlobalWorkSize[0];
+                OutputGlobalWorkSize[1] = InputGlobalWorkSize[1];
+                OutputLocalWorkSize[0] = InputLocalWorkSize[0]; /* NULL */
+                OutputLocalWorkSize[1] = InputLocalWorkSize[1]; /* NULL */
+            }
+            else
+            {
+                OutputGlobalWorkOffset[0] = InputGlobalWorkOffset[0];
+                OutputGlobalWorkOffset[1] = InputGlobalWorkOffset[1];
+                OutputGlobalWorkSize[0] = InputGlobalWorkSize[0] - InputGlobalWorkSize[0] % WidthGroupSize;
+                OutputGlobalWorkSize[1] = InputGlobalWorkSize[1] - InputGlobalWorkSize[1] % HeightGroupSize;
+                OutputLocalWorkSize[0] = WidthGroupSize;
+                OutputLocalWorkSize[1] = HeightGroupSize;
+                if(WidthAlign && HeightAlign)
+                {
+                    OutputLocalWorkSize[0] = InputLocalWorkSize[0]; /* NULL */
+                    OutputLocalWorkSize[1] = InputLocalWorkSize[1]; /* NULL */
+                }
+                else if (WidthAlign)
+                {
+                    /* Process remainder Height */
+                    OutputGlobalWorkOffset[3] = InputGlobalWorkOffset[0];
+                    OutputGlobalWorkOffset[4] = OutputGlobalWorkSize[1];
+                    OutputGlobalWorkSize[3] = InputGlobalWorkSize[0];
+                    OutputGlobalWorkSize[4] = InputGlobalWorkSize[1] - OutputGlobalWorkSize[1];
+                    OutputLocalWorkSize[3] = InputLocalWorkSize[0]; /* NULL */
+                    OutputLocalWorkSize[4] = InputLocalWorkSize[1]; /* NULL */
+                }
+                else if (HeightAlign)
+                {
+                    /* Process remainder Width */
+                    OutputGlobalWorkOffset[3] = OutputGlobalWorkSize[0];
+                    OutputGlobalWorkOffset[4] = InputGlobalWorkOffset[1];
+                    OutputGlobalWorkSize[3] = InputGlobalWorkSize[0]- OutputGlobalWorkSize[0];
+                    OutputGlobalWorkSize[4] = InputGlobalWorkSize[1];
+                    OutputLocalWorkSize[3] = InputLocalWorkSize[0]; /* NULL */
+                    OutputLocalWorkSize[4] = InputLocalWorkSize[1]; /* NULL */
+                }
+                else  /* Not Align in Height and Width */
+                {
+                    /* Process remainder Height */
+                    OutputGlobalWorkOffset[3] = InputGlobalWorkOffset[0];
+                    OutputGlobalWorkOffset[4] = OutputGlobalWorkSize[1];
+                    OutputGlobalWorkSize[3] = InputGlobalWorkSize[0];
+                    OutputGlobalWorkSize[4] = InputGlobalWorkSize[1] - OutputGlobalWorkSize[1];
+                    OutputLocalWorkSize[3] = InputLocalWorkSize[0]; /* NULL */
+                    OutputLocalWorkSize[4] = InputLocalWorkSize[1]; /* NULL */
+
+                    /* Process remainder Width not include common part of Height*/
+                    OutputGlobalWorkOffset[6] = OutputGlobalWorkSize[0];
+                    OutputGlobalWorkOffset[7] = InputGlobalWorkOffset[1];
+                    OutputGlobalWorkSize[6] = InputGlobalWorkSize[0] - OutputGlobalWorkSize[0];
+                    OutputGlobalWorkSize[7] = OutputGlobalWorkSize[1];
+                    OutputLocalWorkSize[6] = InputLocalWorkSize[0]; /* NULL */
+                    OutputLocalWorkSize[7] = InputLocalWorkSize[1]; /* NULL */
+                }
+            }
+            gcoOS_Free(gcvNULL, (gctPOINTER)WidthLeave);
+            gcoOS_Free(gcvNULL, (gctPOINTER)HeightLeave);
+        }
+        break;
+    case 3:
+        gcmASSERT(-1);/* TODO, need support 3D WAR */
+        break;
+    default:
+        break;
+    }
+
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+gctINT
 clfGetKernelValueOrder(
     clsKernel_PTR       Kernel,
     gctUINT_PTR         ValueOrder
@@ -1053,7 +1612,8 @@ clfExecuteKernel(
     gctUINT             WorkDim,
     size_t              GlobalWorkOffset[3],
     size_t              GlobalWorkSize[3],
-    size_t              LocalWorkSize[3]
+    size_t              LocalWorkSize[3],
+    clsPrivateBuffer_PTR *privateBufList
     )
 {
     gcsTHREAD_WALKER_INFO   info;
@@ -1091,7 +1651,10 @@ clfExecuteKernel(
                                                   WorkDim,
                                                   GlobalWorkOffset,
                                                   GlobalWorkSize,
-                                                  LocalWorkSize),
+                                                  LocalWorkSize,
+                                                  &Args[0],
+                                                  NumArgs,
+                                                  privateBufList),
                            CL_INVALID_VALUE);
             }
         }
@@ -1165,7 +1728,10 @@ clfExecuteKernel(
                                                   patchedWorkDim,
                                                   patchedGlobalWorkOffset,
                                                   patchedGlobalWorkSize,
-                                                  patchedLocalWorkSize),
+                                                  patchedLocalWorkSize,
+                                                  &Args[0],
+                                                  NumArgs,
+                                                  privateBufList),
                            CL_INVALID_VALUE);
             }
         }
@@ -1209,7 +1775,13 @@ clfExecuteCommandNDRangeKernel(
     )
 {
     clsCommandNDRangeKernel_PTR     NDRangeKernel;
-    gctINT              status;
+    gctINT              status = gcvSTATUS_OK;
+    gctBOOL             userNotSetLocalGroup = gcvTRUE;
+    size_t              i;
+    size_t              globalWorkOffset[9] = {0};
+    size_t              globalWorkSize[9] = {0};
+    size_t              localWorkSize[9] = {0};
+    gctBOOL             noGroupRelateOP = gcvTRUE;
 
     gcmHEADER_ARG("Command=0x%x", Command);
 
@@ -1221,15 +1793,111 @@ clfExecuteCommandNDRangeKernel(
 
     NDRangeKernel = &Command->u.NDRangeKernel;
 
-    clmONERROR(clfExecuteKernel(NDRangeKernel->kernel,
-                                NDRangeKernel->states,
-                                NDRangeKernel->numArgs,
-                                NDRangeKernel->args,
-                                NDRangeKernel->workDim,
-                                NDRangeKernel->globalWorkOffset,
-                                NDRangeKernel->globalWorkSize,
-                                NDRangeKernel->localWorkSize),
-               status);
+    for(i=0;i<NDRangeKernel->workDim;i++)
+    {
+        userNotSetLocalGroup=userNotSetLocalGroup&&(NDRangeKernel->localWorkSize[i]!=0 ? gcvFALSE:gcvTRUE);
+    }
+
+    i = 0;
+    while(userNotSetLocalGroup && i < GetShaderUniformCount((gcSHADER)NDRangeKernel->kernel->states.binary))
+    {
+        gcUNIFORM uniform = GetShaderUniform((gcSHADER)NDRangeKernel->kernel->states.binary, i);
+        gctCONST_STRING tmpName=gcvNULL;
+		gctUINT8 uniformName[128]={0};
+        if (uniform == gcvNULL) break;
+
+        gcUNIFORM_GetName(uniform, gcvNULL, &tmpName);
+		gcoOS_StrCopySafe((gctSTRING)uniformName, gcmSIZEOF(uniformName), tmpName);
+
+        if (gcoOS_MemCmp(uniformName, "#global_size", 12) == gcvSTATUS_OK)
+        {
+            noGroupRelateOP = gcvFALSE;
+            break;
+        }
+
+        if (gcoOS_MemCmp(uniformName, "#local_size", 11) == gcvSTATUS_OK)
+        {
+            noGroupRelateOP = gcvFALSE;
+            break;
+        }
+
+        if (gcoOS_MemCmp(uniformName, "#num_groups",11) == gcvSTATUS_OK)
+        {
+            noGroupRelateOP = gcvFALSE;
+            break;
+        }
+
+        if (gcoOS_MemCmp(uniformName, "#global_offset",14) == gcvSTATUS_OK)
+        {
+            noGroupRelateOP = gcvFALSE;
+            break;
+        }
+        i++;
+    }
+
+    i = 0;
+    while (userNotSetLocalGroup && noGroupRelateOP && i < GetShaderAttributeCount((gcSHADER)NDRangeKernel->kernel->states.binary)) {
+        gctCONST_STRING attributeName=gcvNULL;
+        gcATTRIBUTE attribute = GetShaderAttribute((gcSHADER)NDRangeKernel->kernel->states.binary, i);
+		if (attribute == gcvNULL) break;
+        gcATTRIBUTE_GetName((gcSHADER)NDRangeKernel->kernel->states.binary,attribute, gcvFALSE, gcvNULL, &attributeName);
+		if (attributeName == gcvNULL) break;
+        if (gcoOS_StrCmp(attributeName, "#local_id") == 0)
+        {
+            noGroupRelateOP = gcvFALSE;
+            break;
+        }
+        i++;
+    }
+    if(userNotSetLocalGroup && noGroupRelateOP && NDRangeKernel->kernel->states.hints)
+    {
+        /* relax the maxworkgroupsize while shader used barrier as HW limit*/
+        for (i = 0; i < GetShaderCodeCount((gcSHADER)NDRangeKernel->kernel->states.binary); i++)
+        {
+            gcSL_INSTRUCTION inst   = GetShaderInstruction((gcSHADER)NDRangeKernel->kernel->states.binary, i);
+            /* barrier is design base on work group so we can't refine it*/
+            if(gcmSL_OPCODE_GET(inst->opcode, Opcode) == gcSL_BARRIER)
+            {
+                noGroupRelateOP = gcvFALSE;
+                break;
+            }
+        }
+    }
+
+    /*TODO: we need add different branch for v6.3 HW*/
+    if (userNotSetLocalGroup && NDRangeKernel->workDim < 3 && noGroupRelateOP)
+    {
+        clfCalcLocalWorkSize(NDRangeKernel->kernel, NDRangeKernel->workDim,
+                             NDRangeKernel->globalWorkOffset,NDRangeKernel->globalWorkSize, NDRangeKernel->localWorkSize,
+                             globalWorkOffset, globalWorkSize, localWorkSize);
+        for(i = 0; i < 9; i+=3)
+        {
+            if(globalWorkSize[i]==0) break;
+            clmONERROR(clfExecuteKernel(NDRangeKernel->kernel,
+                                        NDRangeKernel->states,
+                                        NDRangeKernel->numArgs,
+                                        NDRangeKernel->args,
+                                        NDRangeKernel->workDim,
+                                        globalWorkOffset+i,
+                                        globalWorkSize+i,
+                                        localWorkSize+i,
+                                        &(Command->commandQueue->privateBufList)),
+                       status);
+        }
+    }
+    else
+    {
+        clmONERROR(clfExecuteKernel(NDRangeKernel->kernel,
+                                    NDRangeKernel->states,
+                                    NDRangeKernel->numArgs,
+                                    NDRangeKernel->args,
+                                    NDRangeKernel->workDim,
+                                    NDRangeKernel->globalWorkOffset,
+                                    NDRangeKernel->globalWorkSize,
+                                    NDRangeKernel->localWorkSize,
+                                    &(Command->commandQueue->privateBufList)),
+                   status);
+    }
 
 OnError:
     gcmFOOTER_ARG("%d", status);
@@ -1264,7 +1932,8 @@ clfExecuteCommandTask(
                                 1,
                                 globalWorkOffset,
                                 globalWorkSize,
-                                localWorkSize),
+                                localWorkSize,
+                                &(Command->commandQueue->privateBufList)),
                status);
 OnError:
     gcmFOOTER_ARG("%d", status);
@@ -1605,6 +2274,232 @@ OnError:
 }
 
 gctINT
+clfReallocateKernelUinformArgs(
+    gctUINT             OrgNumArgs,
+    clsKernel_PTR       Kernel
+    )
+{
+    gceSTATUS           status;
+    gctPOINTER          pointer;
+    clsArgument_PTR     argument;
+    gctUINT32           i;
+    gctUINT             NewNumArgs = Kernel->numArgs;
+    clsArgument_PTR *   Args = &(Kernel->args);
+
+    if (NewNumArgs < OrgNumArgs || Args == gcvNULL)
+    {
+        return CL_INVALID_VALUE;
+    }
+
+    if (*Args == gcvNULL && OrgNumArgs != 0)
+    {
+        return CL_INVALID_VALUE;
+    }
+
+    /* Allocate the array of clsArgument structures. */
+    clmONERROR(gcoOS_Allocate(gcvNULL, NewNumArgs * gcmSIZEOF(clsArgument), &pointer),
+               CL_OUT_OF_HOST_MEMORY);
+    gcoOS_ZeroMemory(pointer, NewNumArgs * gcmSIZEOF(clsArgument));
+
+    argument = pointer;
+    /* Copy the data. */
+    if (*Args)
+    {
+        gcoOS_MemCopy(pointer, *Args, OrgNumArgs * gcmSIZEOF(clsArgument));
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, *Args));
+    }
+    for (i = 0; i < NewNumArgs; i++, argument++)
+    {
+        gcUNIFORM uniform;
+        gcSHADER_TYPE type;
+        gcSL_FORMAT format;
+        gctBOOL isPointer;
+        gctUINT length;
+        gctSIZE_T bytes;
+
+        if(i < OrgNumArgs)
+        {
+            clmONERROR(gcSHADER_GetUniform((gcSHADER) Kernel->states.binary, i, &uniform), CL_INVALID_VALUE);
+            if (!uniform) continue;
+            argument->uniform    = uniform;
+            continue;
+        }
+
+        clmONERROR(gcSHADER_GetUniform((gcSHADER) Kernel->states.binary, i, &uniform), CL_INVALID_VALUE);
+
+        if (!uniform) continue;
+        clmONERROR(gcUNIFORM_GetType(uniform, &type, &length), CL_INVALID_VALUE);
+        clmONERROR(gcUNIFORM_GetFormat(uniform, &format, &isPointer), CL_INVALID_VALUE);
+
+        if (isUniformLocalAddressSpace(uniform) ||
+            isUniformPrivateAddressSpace(uniform) ||
+            isUniformConstantAddressSpace(uniform) ||
+            isUniformKernelArgPrivate(uniform) ||
+            isUniformKernelArgLocal(uniform) ||
+            isUniformKernelArgLocalMemSize(uniform) ||
+            isUniformPrintfAddress(uniform))
+        {
+            clsMemAllocInfo_PTR memAllocInfo;
+            gctPOINTER pointer;
+
+            bytes = sizeof(clsMemAllocInfo);
+
+            /* Allocate the memory allocation info. */
+            clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &pointer), CL_OUT_OF_HOST_MEMORY);
+            gcoOS_ZeroMemory(pointer, bytes);
+            memAllocInfo = pointer;
+
+            /* Get the required memory size.
+             * For local/private kernel arguments it will be set by the application.
+             */
+            if (isUniformLocalAddressSpace(uniform))
+            {
+                clmONERROR(gcSHADER_GetLocalMemorySize((gcSHADER) Kernel->states.binary, &memAllocInfo->allocatedSize), CL_INVALID_VALUE);
+                Kernel->localMemSize += memAllocInfo->allocatedSize;
+            }
+            else if (isUniformPrivateAddressSpace(uniform))
+            {
+                clmONERROR(gcSHADER_GetPrivateMemorySize((gcSHADER) Kernel->states.binary, &memAllocInfo->allocatedSize), CL_INVALID_VALUE);
+                Kernel->privateMemSize += memAllocInfo->allocatedSize;
+            }
+            else if (isUniformConstantAddressSpace(uniform))
+            {
+                clmONERROR(gcSHADER_GetConstantMemorySize((gcSHADER) Kernel->states.binary, &memAllocInfo->allocatedSize, &Kernel->constantMemBuffer ), CL_INVALID_VALUE);
+                Kernel->constantMemSize += memAllocInfo->allocatedSize;
+            }
+
+            argument->data       = memAllocInfo;
+            argument->uniform    = uniform;
+            argument->size       = bytes;
+            argument->set        = gcvFALSE;
+            argument->isMemAlloc = gcvTRUE;
+            argument->isPointer  = gcvFALSE;
+        }
+        else
+        {
+            if (isPointer)
+            {
+                bytes = gcmSIZEOF(gctPOINTER);
+            }
+            else
+            {
+                switch (type)
+                {
+                case gcSHADER_FLOAT_X1:
+                case gcSHADER_BOOLEAN_X1:
+                case gcSHADER_INTEGER_X1:
+                case gcSHADER_UINT_X1:
+                    bytes = 1 * gcmSIZEOF(cl_float) * length;
+                    break;
+
+                case gcSHADER_FLOAT_X2:
+                case gcSHADER_BOOLEAN_X2:
+                case gcSHADER_INTEGER_X2:
+                case gcSHADER_UINT_X2:
+                    bytes = 2 * gcmSIZEOF(cl_float) * length;
+                    break;
+
+                case gcSHADER_FLOAT_X3:
+                case gcSHADER_BOOLEAN_X3:
+                case gcSHADER_INTEGER_X3:
+                case gcSHADER_UINT_X3:
+                    bytes = 3 * gcmSIZEOF(cl_float) * length;
+                    break;
+
+                case gcSHADER_FLOAT_X4:
+                case gcSHADER_BOOLEAN_X4:
+                case gcSHADER_INTEGER_X4:
+                case gcSHADER_UINT_X4:
+                    bytes = 4 * gcmSIZEOF(cl_float) * length;
+                    break;
+
+                case gcSHADER_INT64_X1:
+                case gcSHADER_UINT64_X1:
+                    bytes = 1 * gcmSIZEOF(cl_long) * length;
+                    break;
+                case gcSHADER_INT64_X2:
+                case gcSHADER_UINT64_X2:
+                    bytes = 2 * gcmSIZEOF(cl_long) * length;
+                    break;
+                case gcSHADER_INT64_X3:
+                case gcSHADER_UINT64_X3:
+                    bytes = 3 * gcmSIZEOF(cl_long) * length;
+                    break;
+                case gcSHADER_INT64_X4:
+                case gcSHADER_UINT64_X4:
+                    bytes = 4 * gcmSIZEOF(cl_long) * length;
+                    break;
+
+                case gcSHADER_FLOAT_2X2:
+                    bytes = 2 * 2 * gcmSIZEOF(cl_float) * length;
+                    break;
+
+                case gcSHADER_FLOAT_3X3:
+                    bytes = 3 * 3 * gcmSIZEOF(cl_float) * length;
+                    break;
+
+                case gcSHADER_FLOAT_4X4:
+                    bytes = 4 * 4 * gcmSIZEOF(cl_float) * length;
+                    break;
+
+                case gcSHADER_IMAGE_2D:
+                case gcSHADER_IMAGE_3D:
+                case gcSHADER_SAMPLER:
+                case gcSHADER_IMAGE_1D:
+                case gcSHADER_IMAGE_1D_ARRAY:
+                case gcSHADER_IMAGE_1D_BUFFER:
+                case gcSHADER_IMAGE_2D_ARRAY:
+                    bytes = 1 * gcmSIZEOF(cl_uint) * length;
+                    break;
+
+                case gcSHADER_SAMPLER_2D:
+                case gcSHADER_SAMPLER_3D:
+                    bytes = 1 * gcmSIZEOF(cl_float) * length;
+                    break;
+
+                default:
+                    clmASSERT("Unknown shader type", CL_INVALID_VALUE);
+                    bytes = 0;
+                }
+
+                switch (format)
+                {
+                case gcSL_INT8:
+                case gcSL_UINT8:
+                    bytes /= 4;
+                    break;
+
+                case gcSL_INT16:
+                case gcSL_UINT16:
+                    bytes /= 2;
+                    break;
+
+                default:
+                    break;
+                }
+            }
+
+            /* Allocate the data array. */
+            clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
+
+            gcoOS_ZeroMemory(argument->data, bytes);
+
+            argument->uniform    = uniform;
+            argument->size       = bytes;
+            argument->set        = gcvFALSE;
+            argument->isMemAlloc = gcvFALSE;
+            argument->isPointer  = isPointer;
+        }
+    }
+
+    *Args = pointer;
+    return gcvSTATUS_OK;
+
+OnError:
+    return status;
+}
+
+gctINT
 clfFreeKernelArgs(
     gctUINT         NumArgs,
     clsArgument_PTR Args,
@@ -1623,10 +2518,6 @@ clfFreeKernelArgs(
         if (Args[i].isMemAlloc)
         {
             clsMemAllocInfo_PTR memAllocInfo = (clsMemAllocInfo_PTR) Args[i].data;
-            gcoCL_FreeMemory(memAllocInfo->physical,
-                             memAllocInfo->logical,
-                             memAllocInfo->allocatedSize,
-                             memAllocInfo->node);
             if (FreeAllocData && memAllocInfo->data) gcmOS_SAFE_FREE(gcvNULL, memAllocInfo->data);
         }
         if (Args[i].data)
@@ -1696,6 +2587,7 @@ clfGetKernelNumArg(
     return numArg;
 }
 
+
 /*****************************************************************************\
 |*                       OpenCL Kernel Object API                            *|
 \*****************************************************************************/
@@ -1714,6 +2606,13 @@ clCreateKernel(
     gctUINT         bufferSize  = 0;
     gcsHINT_PTR     hints       = gcvNULL;
     gcSHADER        pgmBinary, kernelBinary;
+#if BUILD_OPENCL_FP
+    gcSHADER        tmpBinary = gcvNULL;
+    gctUINT         tmpBinarySize = 0;
+    gctPOINTER      savedTmpBinary = gcvNULL;
+    gceCHIPMODEL    chipModel;
+    gctUINT32       chipRevision;
+#endif
     gctUINT         binarySize;
     gctUINT         i, j;
     gctUINT         count, propertySize = 0;
@@ -1727,6 +2626,7 @@ clCreateKernel(
                   Program, KernelName);
 
     gcoCL_InitializeHardware();
+
 
     if (Program == gcvNULL || Program->objectType != clvOBJECT_PROGRAM)
     {
@@ -1854,18 +2754,26 @@ clCreateKernel(
         /* Check imageSampler. */
         if (GetKFunctionISamplerCount(kernelFunction))
         {
-            /* Delete the old imageSamplers. */
-            SetKFunctionISamplerCount(kernelFunction, 0);
+            if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMG_INSTRUCTION))
+            {
+                kernel->patchNeeded = gcvFALSE;
+            }
+            else
+            {
+                /* Delete the old imageSamplers. */
+                SetKFunctionISamplerCount(kernelFunction, 0);
 
-            /* Patching is needed. */
-            kernel->patchNeeded = gcvTRUE;
+                /* Patching is needed. */
+                kernel->patchNeeded = gcvTRUE;
+            }
+            flags |= gcSHADER_HAS_IMAGE_IN_KERNEL;
         }
         else
         {
+            gcSHADER_TYPE type = 0;
+
             for (i = 0; i < GetShaderUniformCount(kernelBinary); i++)
             {
-                gcSHADER_TYPE type;
-
                 if (GetShaderUniform(kernelBinary, i) == gcvNULL)
                 {
                     continue;
@@ -1882,9 +2790,16 @@ clCreateKernel(
 
             if (i < GetShaderUniformCount(kernelBinary))
             {
-                /* Patching is needed. */
-                kernel->patchNeeded = gcvTRUE;
-
+                if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMG_INSTRUCTION) && (type == gcSHADER_IMAGE_2D || type == gcSHADER_IMAGE_1D))
+                {
+                    kernel->patchNeeded = gcvFALSE;
+                }
+                else
+                {
+                    /* Patching is needed. */
+                    kernel->patchNeeded = gcvTRUE;
+                }
+                flags |= gcSHADER_HAS_IMAGE_IN_KERNEL;
                 /* TODO - Check for IMAGE_WR. */
             }
         }
@@ -1907,11 +2822,77 @@ clCreateKernel(
 
     gcmASSERT(kernel->context->platform->compiler11);
     gcSetCLCompiler(kernel->context->platform->compiler11);
+
+#if BUILD_OPENCL_FP
+    gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
+    if((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008))
+    {
+        clmONERROR(gcSHADER_SaveEx(pgmBinary, gcvNULL, &tmpBinarySize), CL_INVALID_VALUE);
+        clmONERROR(gcoOS_Allocate(gcvNULL, tmpBinarySize, &savedTmpBinary), CL_OUT_OF_HOST_MEMORY);
+        clmONERROR(gcSHADER_SaveEx(pgmBinary, savedTmpBinary, &tmpBinarySize), CL_INVALID_VALUE);
+    }
+#endif
+
     status = gcLinkKernel(kernelBinary,
                           flags | gcvSHADER_REMOVE_UNUSED_UNIFORMS,
                           &bufferSize,
                           &buffer,
                           &hints);
+
+#if BUILD_OPENCL_FP
+    if((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008))
+    {
+        if((status == gcvSTATUS_NOT_FOUND || status == gcvSTATUS_OUT_OF_RESOURCES) &&  gcmOPT_INLINELEVEL() != 4)
+        {
+            gcmASSERT(savedTmpBinary);
+
+            /* Construct kernel binary. */
+            if(tmpBinary == gcvNULL)
+                clmONERROR(gcSHADER_Construct(gcvNULL, gcSHADER_TYPE_CL, &tmpBinary), CL_OUT_OF_HOST_MEMORY);
+
+            /* Load kernel binary from program binary */
+            status = gcSHADER_LoadEx(tmpBinary, savedTmpBinary, tmpBinarySize);
+            if (gcmIS_ERROR(status))
+            {
+                clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+            }
+            /* Load temp binary uniforms with the given kernel name */
+            clmONERROR(gcSHADER_LoadKernel(tmpBinary, kernel->name), CL_OUT_OF_HOST_MEMORY);
+
+            gcoOS_Free(gcvNULL, savedTmpBinary);
+            savedTmpBinary = gcvNULL;
+            tmpBinarySize = 0;
+            bufferSize = 0;
+
+            status = gcLinkKernel(tmpBinary,
+                    flags | gcvSHADER_REMOVE_UNUSED_UNIFORMS | gcvSHADER_SET_INLINE_LEVEL_4,
+                    &bufferSize,
+                    &buffer,
+                    &hints);
+
+            if (gcmIS_ERROR(status))
+            {
+                gcSHADER_Destroy(tmpBinary);
+                clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+            }
+
+            gcSHADER_Destroy(kernelBinary);
+            kernelBinary = tmpBinary;
+        }
+        else
+        {
+            gcoOS_Free(gcvNULL, savedTmpBinary);
+            savedTmpBinary = gcvNULL;
+        }
+
+        if(status == gcvSTATUS_OUT_OF_SAMPLER)
+        {
+            kernel->maxWorkGroupSize = kernel->preferredWorkGroupSizeMultiple;
+            goto OnSkipOutOfSampler;
+        }
+    }
+#endif
+
     if (gcmIS_ERROR(status))
     {
         gcmUSER_DEBUG_ERROR_MSG(
@@ -1920,51 +2901,57 @@ clCreateKernel(
         clmRETURN_ERROR(CL_OUT_OF_RESOURCES);
     }
 
+OnSkipOutOfSampler:
     kernel->states.binary          = (gctUINT8_PTR) kernelBinary;
     kernel->states.stateBuffer     = buffer;
     kernel->states.stateBufferSize = bufferSize;
     kernel->states.hints           = hints;
 
-    /* relax the maxworkgroupsize while shader used barrier as HW limit*/
+    if(gcShaderHasInt64(kernelBinary))
+        kernel->patchNeeded = gcvTRUE;
 
-    for (j = 0; j < GetShaderCodeCount(kernelBinary); j++)
+    if(hints)
     {
-        gcSL_INSTRUCTION inst   = GetShaderInstruction(kernelBinary, j);
-        if(gcmSL_OPCODE_GET(inst->opcode, Opcode) == gcSL_BARRIER)
+        /* relax the maxworkgroupsize while shader used barrier as HW limit*/
+        for (j = 0; j < GetShaderCodeCount(kernelBinary); j++)
         {
-            hasBarrier = gcvTRUE;
+            gcSL_INSTRUCTION inst   = GetShaderInstruction(kernelBinary, j);
+            if(gcmSL_OPCODE_GET(inst->opcode, Opcode) == gcSL_BARRIER)
+            {
+                hasBarrier = gcvTRUE;
+            }
+
+            if(gcmSL_OPCODE_GET(inst->opcode, Opcode) == gcSL_IMAGE_WR)
+            {
+                hasImageWrite = gcvTRUE;
+            }
         }
 
-        if(gcmSL_OPCODE_GET(inst->opcode, Opcode) == gcSL_IMAGE_WR)
+        if (hints->threadWalkerInPS)
         {
-            hasImageWrite = gcvTRUE;
-        }
-    }
-
-    if (hints->threadWalkerInPS)
-    {
-        if(hasBarrier && hasImageWrite)
-        {
-             kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, kernel->states.hints->fsMaxTemp+3)) *
-                4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+            if(hasBarrier && hasImageWrite)
+            {
+                 kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, kernel->states.hints->fsMaxTemp+3)) *
+                    4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+            }
+            else
+            {
+                kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, kernel->states.hints->fsMaxTemp)) *
+                    4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+            }
         }
         else
         {
-            kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, kernel->states.hints->fsMaxTemp)) *
-                4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
-        }
-    }
-    else
-    {
-        if(hasBarrier && hasImageWrite)
-        {
-            kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, kernel->states.hints->vsMaxTemp+3)) *
-                                   4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
-        }
-        else
-        {
-            kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, kernel->states.hints->vsMaxTemp)) *
-                                   4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+            if(hasBarrier && hasImageWrite)
+            {
+                kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, kernel->states.hints->vsMaxTemp+3)) *
+                                       4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+            }
+            else
+            {
+                kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, kernel->states.hints->vsMaxTemp)) *
+                                       4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
+            }
         }
     }
 
@@ -2028,6 +3015,15 @@ OnError:
     {
         *ErrcodeRet = status;
     }
+
+#if BUILD_OPENCL_FP
+    if(savedTmpBinary)
+    {
+        gcoOS_Free(gcvNULL, savedTmpBinary);
+        savedTmpBinary = gcvNULL;
+    }
+#endif
+
     if (kernel)
     {
         if (kernel->args)
@@ -2191,31 +3187,42 @@ clReleaseKernel(
         Kernel->objectType = clvOBJECT_UNKNOWN;
         clReleaseProgram(Kernel->program);
 
-        if (Kernel->states.stateBuffer) gcoOS_Free(gcvNULL, Kernel->states.stateBuffer);
-        if (Kernel->states.hints) gcHINTS_Destroy(Kernel->states.hints);
-        if (Kernel->states.hints) gcoOS_Free(gcvNULL, Kernel->states.hints);
-        if (Kernel->states.binary) gcSHADER_Destroy((gcSHADER)Kernel->states.binary);
-        if (Kernel->name) gcoOS_Free(gcvNULL, Kernel->name);
-
         while (Kernel->patchedStates)
         {
             clsKernelStates_PTR states = Kernel->patchedStates;
 
             /* Release states */
             Kernel->patchedStates = states->next;
-            if (states->stateBuffer) gcoOS_Free(gcvNULL, states->stateBuffer);
+            if (states->stateBuffer) gcmOS_SAFE_FREE(gcvNULL, states->stateBuffer);
             if (states->hints) gcHINTS_Destroy(states->hints);
-            if (states->hints) gcoOS_Free(gcvNULL, states->hints);
+            if (states->hints)
+            {
+                if(states->hints == Kernel->states.hints)
+                {
+                    gcmOS_SAFE_FREE(gcvNULL, states->hints);
+                    Kernel->states.hints = gcvNULL;
+                }
+                else
+                {
+                    gcmOS_SAFE_FREE(gcvNULL, states->hints);
+                }
+            }
             if (states->binary) gcSHADER_Destroy((gcSHADER)states->binary);
             if (states->patchDirective) clfDestroyPatchDirective(&states->patchDirective);
-            gcoOS_Free(gcvNULL, states);
+            gcmOS_SAFE_FREE(gcvNULL, states);
         }
+
+        if (Kernel->states.stateBuffer) gcmOS_SAFE_FREE(gcvNULL, Kernel->states.stateBuffer);
+        if (Kernel->states.hints) gcHINTS_Destroy(Kernel->states.hints);
+        if (Kernel->states.hints) gcmOS_SAFE_FREE(gcvNULL, Kernel->states.hints);
+        if (Kernel->states.binary) gcSHADER_Destroy((gcSHADER)Kernel->states.binary);
+        if (Kernel->name) gcmOS_SAFE_FREE(gcvNULL, Kernel->name);
 
         /* Destroy the reference count object */
         gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, Kernel->referenceCount));
         Kernel->referenceCount = gcvNULL;
 
-        gcoOS_Free(gcvNULL, Kernel);
+        gcmOS_SAFE_FREE(gcvNULL, Kernel);
     }
 
     gcmFOOTER_ARG("%d", CL_SUCCESS);
@@ -2319,6 +3326,96 @@ clSetKernelArg(
     {
         clsSampler_PTR sampler = *(clsSampler_PTR *) ArgValue;
         gctINT * data = (gctINT *) &sampler->samplerValue;
+
+        if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMG_INSTRUCTION) && (Kernel->patchNeeded == gcvFALSE))
+        {
+            gcKERNEL_FUNCTION   kernelFunction = gcvNULL;
+            {
+                gctUINT32           orgArgNum = 0, binarySize = 0;
+                gctPOINTER          pointer;
+                gctPOINTER          buffer      = gcvNULL;
+                gctUINT32           bufferSize  = 0, i;
+                gcsHINT_PTR         hints       = gcvNULL;
+                gcSHADER            pgmBinary, kernelBinary;
+
+                Kernel->patchNeeded = gcvTRUE;
+                /* Save program binary into buffer */
+                pgmBinary = (gcSHADER) Kernel->program->binary;
+                clmONERROR(gcSHADER_SaveEx(pgmBinary, gcvNULL, &binarySize), CL_INVALID_VALUE);
+                clmONERROR(gcoOS_Allocate(gcvNULL, binarySize, &pointer), CL_OUT_OF_HOST_MEMORY);
+                clmONERROR(gcSHADER_SaveEx(pgmBinary, pointer, &binarySize), CL_INVALID_VALUE);
+
+                /* Construct kernel binary. */
+                clmONERROR(gcSHADER_Construct(gcvNULL, gcSHADER_TYPE_CL, &kernelBinary), CL_OUT_OF_HOST_MEMORY);
+
+                /* Load kernel binary from program binary */
+                status = gcSHADER_LoadEx(kernelBinary, pointer, binarySize);
+                if (gcmIS_ERROR(status))
+                {
+                    gcmUSER_DEBUG_ERROR_MSG(
+                        "OCL-007003: (clCreateKernel) Cannot extract kernel from program.\n");
+                    clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+                }
+                gcoOS_Free(gcvNULL, pointer);
+
+                /* Load kernel binary uniforms with the given kernel name */
+                status = gcSHADER_LoadKernel(kernelBinary, Kernel->name);
+                if (gcmIS_ERROR(status))
+                {
+                    clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+                }
+
+                /* Set kernelFunction. */
+                for (i = 0; i < GetShaderKernelFunctionCount(kernelBinary); i++)
+                {
+                    kernelFunction = GetShaderKernelFunction(kernelBinary, i);
+                    if (kernelFunction && GetKFunctionIsMain(kernelFunction))
+                    {
+                        gcmASSERT(gcmIS_SUCCESS(gcoOS_StrCmp(GetKFunctionName(kernelFunction), Kernel->name)));
+                        break;
+                    }
+                }
+                gcmASSERT(kernelFunction);
+
+                /* Check imageSampler. */
+                if (GetKFunctionISamplerCount(kernelFunction))
+                {
+                    /* Delete the old imageSamplers. */
+                    SetKFunctionISamplerCount(kernelFunction, 0);
+                }
+
+                gcmVERIFY_OK(gcSHADER_GetKernelUniformCount((gcSHADER)(Kernel->states.binary), &orgArgNum));
+
+                gcmASSERT(Kernel->context->platform->compiler11);
+                gcSetCLCompiler(Kernel->context->platform->compiler11);
+                status = gcLinkKernel(kernelBinary,
+                                      gcvSHADER_RESOURCE_USAGE | gcvSHADER_OPTIMIZER | gcvSHADER_IMAGE_PATCHING | gcvSHADER_REMOVE_UNUSED_UNIFORMS | gcSHADER_HAS_IMAGE_IN_KERNEL,
+                                      &bufferSize,
+                                      &buffer,
+                                      &hints);
+                if (gcmIS_ERROR(status))
+                {
+                    clmRETURN_ERROR(CL_OUT_OF_RESOURCES);
+                }
+
+                if(Kernel->states.binary)
+                    gcoOS_Free(gcvNULL, Kernel->states.binary);
+                if(Kernel->states.stateBuffer)
+                    gcoOS_Free(gcvNULL, Kernel->states.stateBuffer);
+                Kernel->states.binary          = (gctUINT8_PTR) kernelBinary;
+                Kernel->states.stateBuffer     = buffer;
+                Kernel->states.stateBufferSize = bufferSize;
+                Kernel->states.hints           = hints;
+
+                gcmVERIFY_OK(gcSHADER_GetAttributeCount(kernelBinary, &Kernel->attributeCount));
+                gcmVERIFY_OK(gcSHADER_GetKernelUniformCount((gcSHADER)(Kernel->states.binary), &Kernel->numArgs));
+
+                /* Allocate kernel arguments. */
+                clmONERROR(clfReallocateKernelUinformArgs(orgArgNum, Kernel), CL_OUT_OF_HOST_MEMORY);
+
+                argument = clfGetKernelArg(Kernel, ArgIndex, gcvNULL, gcvNULL, gcvNULL);
+            }
+        }
 
         if (ArgSize != sizeof(cl_sampler))
         {

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -398,7 +398,7 @@ GLvoid __glChipLockBuffer(__GLcontext *gc,
         rlvArgs.uArgs.v2.rectSize.x = drawBuffer->width;
         rlvArgs.uArgs.v2.rectSize.y = drawBuffer->height;
         rlvArgs.uArgs.v2.numSlices  = 1;
-        gcoSURF_ResolveRect_v2(&tgtView, &lockView, &rlvArgs);
+        gcoSURF_ResolveRect(&tgtView, &lockView, &rlvArgs);
     }
 
     gcoSURF_Flush(*chipBuffer);
@@ -457,7 +457,7 @@ GLvoid __glChipUnlockBuffer(__GLcontext *gc, void *buffer, GLuint format)
         rlvArgs.uArgs.v2.rectSize.x = drawBuffer->width;
         rlvArgs.uArgs.v2.rectSize.y = drawBuffer->height;
         rlvArgs.uArgs.v2.numSlices  = 1;
-        gcoSURF_ResolveRect_v2(&lockView, &tgtView, &rlvArgs);
+        gcoSURF_ResolveRect(&lockView, &tgtView, &rlvArgs);
     }
 
     gcoSURF_Unlock(*chipBuffer, NULL);

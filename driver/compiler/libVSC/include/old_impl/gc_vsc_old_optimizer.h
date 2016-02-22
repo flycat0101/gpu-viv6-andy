@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -26,6 +26,8 @@ BEGIN_EXTERN_C()
 
 /* Right now, all the chips have the same call stack limitation, 4. */
 #define _MAX_CALL_STACK_DEPTH_          3
+
+#define _REMAP_TEMP_INDEX_FOR_FUNCTION_ 0
 
 /*******************************************************************************
 **                            gcOptimizer Constants
@@ -144,18 +146,22 @@ struct _gcOPT_TEMP
     /* Data format for the temporary register. */
     gctINT                      format;     /* -1: unknown, -2: union. */
 
-    /* Array variable if the register is part of the array. */
+    /**/
     gcVARIABLE                  arrayVariable;
 
-    /* Pointer to the function if used as that function's argument. */
+    gctBOOL                     setFunction;
+    /*
+    ** 1) Pointer to the function if it is used as a function argument.
+    ** 2) Pointer to the function if it is used as a local temp register.
+    ** 3) Otherwise it is NULL.
+    */
     gcOPT_FUNCTION              function;
+
+    /* Pointer to the argument if it is used as a function argument. */
     gcsFUNCTION_ARGUMENT_PTR    argument;
 
     /* Temp interger. */
     gctINT                      tempInt;
-
-    /* Temp pointer. */
-    gctPOINTER                  temp;
 };
 
 /* Structure that save the usage of global variables in function. */
@@ -195,6 +201,13 @@ struct _gcOPT_FUNCTION
 
     /* Pointer to shader's function's arguments. */
     gcsFUNCTION_ARGUMENT_PTR    arguments;
+
+    /* temp register start index, end index and count */
+    gctUINT32                   tempIndexStart;
+
+    gctUINT32                   tempIndexEnd;
+
+    gctUINT32                   tempIndexCount;
 
     /* Updated for global usage. */
     gctBOOL                     updated;
@@ -278,6 +291,9 @@ struct _gcOPTIMIZER
     /* Pointer to the gcSHADER object. */
     gcSHADER                    shader;
 
+    /* Patch ID */
+    gcePATCH_ID                 patchID;
+
     /* Number of instructons in shader. */
     gctUINT                     codeCount;
     gctUINT                     jmpCount;
@@ -333,7 +349,6 @@ struct _gcOPTIMIZER
 
     gcsMEM_AFS_MEM_POOL         functionArrayMemPool;
     gcsMEM_AFS_MEM_POOL         codeArrayMemPool;
-    gcsMEM_AFS_MEM_POOL         tempArrayMemPool;
     gcsMEM_AFS_MEM_POOL         tempDefineArrayMemPool;
 
     /* hardware capabilities */
@@ -473,7 +488,8 @@ gcOpt_MoveCodeListAfter(
     IN gcOPTIMIZER      Optimizer,
     IN gcOPT_CODE       SrcCodeFirst,
     IN gcOPT_CODE       SrcCodeLast,
-    IN gcOPT_CODE       DestCode
+    IN gcOPT_CODE       DestCode,
+    IN gctBOOL          MergeToUpper
     );
 
 gceSTATUS
@@ -511,6 +527,31 @@ gcOpt_ChangeCodeToNOP(
     IN gcOPT_CODE       Code
     );
 
+gctBOOL
+gcOpt_UpdateIndex(
+    IN gcOPTIMIZER      Optimizer,
+    IN gcOPT_FUNCTION   Function,
+    IN gctINT*          TempIndexMappingArray,
+    IN gctINT*          CurrentTempIndex,
+    OUT gctUINT16 *     IndexPtr
+    );
+
+gctBOOL
+gcOpt_RemapTempIndexForCode(
+    IN gcOPTIMIZER      Optimizer,
+    IN gcOPT_CODE       Code,
+    IN gcOPT_FUNCTION   Function,
+    IN gctINT*          TempIndexMappingArray,
+    IN gctINT*          CurrentTempIndex
+    );
+
+gceSTATUS
+gcOpt_RemapTempIndexForFunction(
+    IN gcOPTIMIZER      Optimizer,
+    IN gcOPT_FUNCTION   Function,
+    IN gctINT           NewTempIndexStart
+    );
+
 gceSTATUS
 gcOpt_DestroyCodeDependency(
     IN gcOPTIMIZER      Optimizer,
@@ -522,7 +563,7 @@ gceSTATUS
 gcOpt_DeleteFunction(
     IN gcOPTIMIZER      Optimizer,
     IN gcOPT_FUNCTION   Function,
-    IN gctBOOL          RebiuldDF,
+    IN gctBOOL          RebuildDF,
     IN gctBOOL          DeleteVariable
     );
 
@@ -658,14 +699,24 @@ gcOpt_hasMultipleDependencyForSameTemp(
       IN gcSL_ENABLE    EanbledComponents
       );
 
-gctBOOL
-gcOpt_IsTempFunctionArgument(
-    IN  gcOPTIMIZER      Optimizer,
-    IN  gcOPT_FUNCTION   Function,
-    IN  gctUINT          Index,
-    IN  gctUINT          InputOrOutputOrAll,
-    OUT gctUINT *        ArgIndex,
-    OUT gcOPT_FUNCTION * ArgFunction
+gceSTATUS
+gcOpt_BuildTempArray(
+    IN gcOPTIMIZER      Optimizer
+    );
+
+gceSTATUS
+gcOpt_DestroyTempArray(
+    IN gcOPTIMIZER      Optimizer
+    );
+
+gceSTATUS
+gcOpt_RebuildTempArray(
+    IN gcOPTIMIZER      Optimizer
+    );
+
+gceSTATUS
+gcOpt_RemapTempIndex(
+    INOUT gcOPTIMIZER * OptimizerPtr
     );
 
 /*******************************************************************************
@@ -705,10 +756,8 @@ gcOpt_DumpMessage(
 void dbg_dumpOptimizer(gcOPTIMIZER Optimizer);
 /* dump shader to stdout */
 void dbg_dumpShader(gcSHADER Shader);
-void dbg_dumpMC16(gctUINT32_PTR States);
 
 void dbg_dumpCode(gcOPT_CODE Code);
-void dbg_dumpMC(gctUINT32_PTR States);
 
 void
 gcOpt_GenShader(

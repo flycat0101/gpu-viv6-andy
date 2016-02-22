@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -395,6 +395,9 @@ eglPatchID(
     )
 {
 #if gcdENABLE_3D
+
+    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
+
     if (Set)
     {
         gcoHAL_SetGlobalPatchID(gcvNULL, *PatchID);
@@ -899,7 +902,7 @@ void GL_APIENTRY glProgramBinaryOES_Entry(EGLint program, EGLenum binaryFormat, 
 
 typedef void (GL_APIENTRY *TexDirectFunc)(EGLenum target, EGLint width, EGLint height, EGLenum format, void ** pixels);
 typedef void (GL_APIENTRY *TexDirectInvalidateFunc)(EGLenum target);
-typedef void (GL_APIENTRY *TexDirectVIVMapFunc)(EGLenum target, EGLint width, EGLint height, EGLenum format, void ** logical, const EGLint * physical, EGLBoolean tiled);
+typedef void (GL_APIENTRY *TexDirectVIVMapFunc)(EGLenum target, EGLint width, EGLint height, EGLenum format, void ** logical, const EGLint * physical);
 typedef void (GL_APIENTRY *TexDirectTiledMapFunc)(EGLenum target, EGLint width, EGLint height, EGLenum format, void ** logical, const EGLint * physical);
 
 void GL_APIENTRY glTexDirectVIV_Entry(EGLenum target, EGLint width, EGLint height, EGLenum format, void ** pixels)
@@ -976,7 +979,7 @@ void GL_APIENTRY glTexDirectInvalidateVIV_Entry(EGLenum target)
     }
 }
 
-void GL_APIENTRY glTexDirectVIVMap_Entry(EGLenum target, EGLint width, EGLint height, EGLenum format, void ** logical, const EGLint * physical, EGLBoolean tiled)
+void GL_APIENTRY glTexDirectVIVMap_Entry(EGLenum target, EGLint width, EGLint height, EGLenum format, void ** logical, const EGLint * physical)
 {
     TexDirectVIVMapFunc extfunc;
     VEGLThreadData thread;
@@ -1008,7 +1011,7 @@ void GL_APIENTRY glTexDirectVIVMap_Entry(EGLenum target, EGLint width, EGLint he
         extfunc = (TexDirectVIVMapFunc)thread->texDirectMapFunc[index];
         if (extfunc)
         {
-            (*extfunc)(target, width, height, format, logical, physical, tiled);
+            (*extfunc)(target, width, height, format, logical, physical);
         }
     }
 }
@@ -1053,8 +1056,23 @@ void GL_APIENTRY glTexDirectTiledMapVIV_Entry(EGLenum target, EGLint width, EGLi
 #if defined(WL_EGL_PLATFORM)
 EGLAPI EGLBoolean EGLAPIENTRY eglBindWaylandDisplayWL(EGLDisplay dpy, struct wl_display *display)
 {
-    VEGL_DISPLAY(dpy)->localInfo = (gctPOINTER)display;
-    return veglInitLocalDisplayInfo(VEGL_DISPLAY(dpy));
+    gcsWL_LOCAL_DISPLAY* wl_localDisplay;
+    gctPOINTER tmp = VEGL_DISPLAY(dpy)->localInfo;
+
+    gcoOS_AllocateMemory(gcvNULL, sizeof *wl_localDisplay, (gctPOINTER) &wl_localDisplay );
+    gcoOS_ZeroMemory( wl_localDisplay, sizeof *wl_localDisplay);
+
+    wl_localDisplay->wl_signature = WL_LOCAL_DISPLAY_SIGNATURE;
+    wl_localDisplay->localInfo = (gctPOINTER)display;
+
+    VEGL_DISPLAY(dpy)->localInfo = wl_localDisplay;
+    veglInitLocalDisplayInfo(VEGL_DISPLAY(dpy));
+
+    VEGL_DISPLAY(dpy)->localInfo = tmp;
+
+    gcoOS_FreeMemory(gcvNULL, wl_localDisplay);
+
+    return EGL_TRUE;
 }
 EGLAPI EGLBoolean EGLAPIENTRY eglUnbindWaylandDisplayWL(EGLDisplay dpy, struct wl_display *display)
 {

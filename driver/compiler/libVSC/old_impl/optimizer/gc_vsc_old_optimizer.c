@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -513,32 +513,6 @@ _isSimpleMOV(
     return gcvTRUE;
 }
 
-/* change code to copy same components as DepCode's enable */
-static void
-_changeCopyEnable(
-    IN OUT gcOPT_CODE Code,
-    IN     gcOPT_CODE DepCode
-    )
-{
-    gctUINT16 depCodeEnable;
-    gctUINT16 newSwizzle;
-
-    gcmASSERT(gcmSL_OPCODE_GET(Code->instruction.opcode, Opcode) == gcSL_MOV);
-
-    depCodeEnable = gcmSL_TARGET_GET(DepCode->instruction.temp, Enable);
-
-    /* change enable */
-    Code->instruction.temp =
-        gcmSL_TARGET_SET(Code->instruction.temp, Enable, depCodeEnable);
-
-    /* change source swizzle to use all components */
-    newSwizzle =
-        _ConvertEnable2Swizzle(
-                    gcmSL_TARGET_GET(DepCode->instruction.temp, Enable));
-    Code->instruction.source0 =
-        gcmSL_SOURCE_SET(Code->instruction.source0, Swizzle, newSwizzle);
-}
-
 /*******************************************************************************
 **                          gcOpt_OptimizeMOVInstructions
 ********************************************************************************
@@ -575,8 +549,6 @@ gcOpt_OptimizeMOVInstructions(
     gctBOOL needToChangeSwizzle;
     gctSOURCE_t orgDepSource0, orgDepSource1;
     gcSL_SWIZZLE lastSwizzle0, lastSwizzle1;
-    const gctUINT enableCount[16] = {0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4};
-    gcePATCH_ID patchID = gcvPATCH_INVALID;
 
     gcmHEADER_ARG("Optimizer=0x%x", Optimizer);
 
@@ -593,7 +565,6 @@ gcOpt_OptimizeMOVInstructions(
         return status;
     }
 
-    gcoHAL_GetPatchID(gcvNULL, &patchID);
     imagePatch = gcdHasOptimization(Optimizer->option, gcvOPTIMIZATION_IMAGE_PATCHING);
     /* Pass 1: Check if a MOV instruction can be removed by replacing the dependant instructions' target
                with the target of the MOV instruction. */
@@ -619,7 +590,7 @@ gcOpt_OptimizeMOVInstructions(
         }
 
         /* Skip function arguments in callers. */
-        if (tempArray[code->instruction.tempIndex].function != gcvNULL)
+        if (tempArray[code->instruction.tempIndex].argument != gcvNULL)
         {
             if (tempArray[code->instruction.tempIndex].function != code->function)
             {
@@ -902,56 +873,6 @@ gcOpt_OptimizeMOVInstructions(
         codeEnable    = gcmSL_TARGET_GET(code->instruction.temp, Enable);
         depCodeEnable = gcmSL_TARGET_GET(depCode->instruction.temp, Enable);
 
-        if (patchID == gcvPATCH_MM06)
-        {
-            if (enableCount[codeEnable] != enableCount[depCodeEnable])
-            {
-                /* change the partial move to full move if doesn't change the
-                   semantic of the move:
-
-                       MOV TEMP(3).xyz   TEMP(2).xyz
-                   ==>
-                       MOV TEMP(3), TEMP(2)
-
-                   Conditions to do the transformation:
-                       o the full copy will not overwrite the existing valid data
-                       o no swizzle is used for source
-                       o code does not use any component not in depCode's enable
-
-                */
-
-                if ((codeEnable & (~depCodeEnable)) == 0 &&
-                    _noPrevDefineForTemp(code, depCode)  &&
-                    _isSimpleMOV(code) /* && _notInLoop(code) */)
-                {
-                    /* depCode only has MOV as user and
-                       code's enable and swizzle are same channels*/
-                    if (depCode->users->next == gcvNULL &&
-                        _ConvertEnable2Swizzle(codeEnable) == gcmSL_SOURCE_GET(code->instruction.source0, Swizzle) &&
-                        gcmSL_OPCODE_GET(depCode->instruction.opcode, Opcode) == gcSL_LOAD)
-                    {
-                        /* copy code's enable to depCode */
-                        depCode->instruction.temp =
-                            gcmSL_TARGET_SET(depCode->instruction.temp, Enable, codeEnable);
-
-                        depCodeEnable = gcmSL_TARGET_GET(depCode->instruction.temp, Enable);
-                    }
-                    else
-                    {
-                        /* change code to copy same components as depCode's enable */
-                        _changeCopyEnable(code, depCode);
-                        codeEnable        = gcmSL_TARGET_GET(code->instruction.temp, Enable);
-                    }
-
-                    gcmASSERT(codeEnable == depCodeEnable);
-                }
-            }
-
-            /* Skip if dependant instruction has different enable count. */
-            if (enableCount[codeEnable] != enableCount[depCodeEnable])
-                continue;
-        }
-
         /* Special handling for LOAD and IMAGE_RD. */
         /* The swizzle of input data for LOAD is always xyzw, */
         /* so not all enables in MOV instruction can be optimized. */
@@ -970,6 +891,31 @@ gcOpt_OptimizeMOVInstructions(
                 depCode->users->next == gcvNULL &&
                 _ConvertEnable2Swizzle(codeEnable) == gcmSL_SOURCE_GET(code->instruction.source0, Swizzle))
             {
+                gctUINT firstChannel0 = 0, firstChannel1 = 0, index;
+
+                for (index = 0; index < 4; index++)
+                {
+                    if (depCodeEnable & (1 << index))
+                    {
+                        firstChannel0 = index;
+                        break;
+                    }
+                }
+
+                for (index = 0; index < 4; index++)
+                {
+                    if (codeEnable & (1 << index))
+                    {
+                        firstChannel1 = index;
+                        break;
+                    }
+                }
+
+                if (firstChannel1 != firstChannel0)
+                {
+                    continue;
+                }
+
                 /* copy code's enable to depCode */
                 depCode->instruction.temp = gcmSL_TARGET_SET(depCode->instruction.temp, Enable, codeEnable);
 
@@ -1220,6 +1166,8 @@ gcOpt_OptimizeMOVInstructions(
                 &&  gcmSL_TARGET_GET(depCode->prev->instruction.temp, Condition) == gcSL_ZERO)
                 {
                     depCode->prev->instruction.temp = gcmSL_TARGET_SET(depCode->prev->instruction.temp, Enable, codeEnable);
+                    depCode->prev->instruction.temp = gcmSL_TARGET_SET(depCode->prev->instruction.temp, Precision,
+                                                                       gcmSL_TARGET_GET(code->instruction.temp, Precision));
                     depCode->prev->instruction.tempIndex   = code->instruction.tempIndex;
                     depCode->prev->instruction.tempIndexed = code->instruction.tempIndexed;
                 }
@@ -1465,7 +1413,7 @@ gcOpt_OptimizeMOVInstructions(
 
         /* Skip function arguments in callers. */
         if (gcmSL_SOURCE_GET(code->instruction.source0, Type) == gcSL_TEMP &&
-            tempArray[gcmSL_INDEX_GET(code->instruction.source0Index, Index)].function != gcvNULL)
+            tempArray[gcmSL_INDEX_GET(code->instruction.source0Index, Index)].argument != gcvNULL)
         {
             if (tempArray[gcmSL_INDEX_GET(code->instruction.source0Index, Index)].function != code->function)
             {
@@ -1671,6 +1619,7 @@ gcOpt_OptimizeMOVInstructions(
                 source0 = gcmSL_SOURCE_SET(source0, Indexed, gcmSL_SOURCE_GET(source, Indexed));
                 source0 = gcmSL_SOURCE_SET(source0, Neg, gcmSL_SOURCE_GET(source, Neg) ^ gcmSL_SOURCE_GET(source0, Neg));
                 source0 = gcmSL_SOURCE_SET(source0, Abs, gcmSL_SOURCE_GET(source, Abs) | gcmSL_SOURCE_GET(source0, Abs));
+                source0 = gcmSL_SOURCE_SET(source0, Precision, gcmSL_SOURCE_GET(source, Precision));
                 source0 = gcmSL_SOURCE_SET(source0, SwizzleX, _GetSwizzle(gcmSL_SOURCE_GET(source0, SwizzleX), source));
                 source0 = gcmSL_SOURCE_SET(source0, SwizzleY, _GetSwizzle(gcmSL_SOURCE_GET(source0, SwizzleY), source));
                 source0 = gcmSL_SOURCE_SET(source0, SwizzleZ, _GetSwizzle(gcmSL_SOURCE_GET(source0, SwizzleZ), source));
@@ -1714,6 +1663,7 @@ gcOpt_OptimizeMOVInstructions(
                 source1 = gcmSL_SOURCE_SET(source1, Indexed, gcmSL_SOURCE_GET(source, Indexed));
                 source1 = gcmSL_SOURCE_SET(source1, Neg, gcmSL_SOURCE_GET(source, Neg) ^ gcmSL_SOURCE_GET(source1, Neg));
                 source1 = gcmSL_SOURCE_SET(source1, Abs, gcmSL_SOURCE_GET(source, Abs) | gcmSL_SOURCE_GET(source1, Abs));
+                source1 = gcmSL_SOURCE_SET(source1, Precision, gcmSL_SOURCE_GET(source, Precision));
                 source1 = gcmSL_SOURCE_SET(source1, SwizzleX, _GetSwizzle(gcmSL_SOURCE_GET(source1, SwizzleX), source));
                 source1 = gcmSL_SOURCE_SET(source1, SwizzleY, _GetSwizzle(gcmSL_SOURCE_GET(source1, SwizzleY), source));
                 source1 = gcmSL_SOURCE_SET(source1, SwizzleZ, _GetSwizzle(gcmSL_SOURCE_GET(source1, SwizzleZ), source));
@@ -2295,10 +2245,16 @@ gcOpt_OptimizeConstantAssignment(
                         gcOpt_AddCodeToList(Optimizer, &code2->dependencies1, code1);
                         gcOpt_AddCodeToList(Optimizer, &code1->users, code2);
                     }
+
+                    if (!source0 && !source1)   /* code2 may have no source operand */
+                    {
+                        gcOpt_AddCodeToList(Optimizer, &code1->users, code2);
+                    }
                 }
 
                 /* Update code. */
                 code1->instruction.tempIndex = userCode->instruction.tempIndex;
+                code1->instruction.temp = gcmSL_TARGET_SET(code1->instruction.temp, Precision, gcmSL_TARGET_GET(userCode->instruction.temp, Precision));
             }
 
             gcmVERIFY_OK(gcOpt_ChangeCodeToNOP(Optimizer, userCode));
@@ -3695,24 +3651,7 @@ _renameTempIndex(
         if (RenameTarget &&
             gcmSL_TARGET_GET(inst->temp, Enable) != gcSL_ENABLE_NONE)
         {
-            gctBOOL update = gcvTRUE;
-            gcOPT_FUNCTION function = gcvNULL;
-
-            if (gcOpt_IsTempFunctionArgument(Optimizer,
-                                             gcvNULL,
-                                             (gctUINT)inst->tempIndex,
-                                             2,
-                                             gcvNULL,
-                                             &function))
-            {
-                if (function != Function && function != gcvNULL)
-                {
-                    update = gcvFALSE;
-                }
-            }
-
-            if (update &&
-                _updateIndex(Optimizer, Function, OldTempIndexStart,
+            if (_updateIndex(Optimizer, Function, OldTempIndexStart,
                     TempIndexCount, NewTempIndexStart,&inst->tempIndex))
             {
                 renamed = gcvTRUE;
@@ -3721,22 +3660,8 @@ _renameTempIndex(
 
             if (gcmSL_TARGET_GET(inst->temp, Indexed) != gcSL_NOT_INDEXED)
             {
-                update = gcvTRUE;
-                if (gcOpt_IsTempFunctionArgument(Optimizer,
-                                                 gcvNULL,
-                                                 (gctUINT)inst->tempIndexed,
-                                                 2,
-                                                 gcvNULL,
-                                                 &function))
-                {
-                    if (function != Function && function != gcvNULL)
-                    {
-                        update = gcvFALSE;
-                    }
-                }
                 /* fix indexed register */
-                if (update &&
-                    _updateIndex(Optimizer, Function, OldTempIndexStart,
+                if (_updateIndex(Optimizer, Function, OldTempIndexStart,
                         TempIndexCount, NewTempIndexStart,&inst->tempIndexed))
                 {
                     renamed = gcvTRUE;
@@ -3776,25 +3701,8 @@ _renameTempIndex(
 
                 if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
                 {
-                    gctBOOL update = gcvTRUE;
-                    gcOPT_FUNCTION function = gcvNULL;
-
-                    if (gcOpt_IsTempFunctionArgument(Optimizer,
-                                                     gcvNULL,
-                                                     (gctUINT)(*index),
-                                                     2,
-                                                     gcvNULL,
-                                                     &function))
-                    {
-                        if (function != Function && function != gcvNULL)
-                        {
-                            update = gcvFALSE;
-                        }
-                    }
-
-                   /* Adjust temporary register count. */
-                    if (update &&
-                        _updateIndex(Optimizer, Function, OldTempIndexStart,
+                    /* Adjust temporary register count. */
+                    if (_updateIndex(Optimizer, Function, OldTempIndexStart,
                             TempIndexCount, NewTempIndexStart,index))
                     {
                         renamed = gcvTRUE;
@@ -3805,25 +3713,9 @@ _renameTempIndex(
                 {
                     gctUINT16 * indexed = (i==0) ? &inst->source0Indexed
                                                  : &inst->source1Indexed;
-                    gctBOOL update = gcvTRUE;
-                    gcOPT_FUNCTION function = gcvNULL;
-
-                    if (gcOpt_IsTempFunctionArgument(Optimizer,
-                                                     gcvNULL,
-                                                     (gctUINT)(*indexed),
-                                                     2,
-                                                     gcvNULL,
-                                                     &function))
-                    {
-                        if (function != Function && function != gcvNULL)
-                        {
-                            update = gcvFALSE;
-                        }
-                    }
 
                     /* fix indexed register */
-                    if (update &&
-                        _updateIndex(Optimizer, Function, OldTempIndexStart,
+                    if (_updateIndex(Optimizer, Function, OldTempIndexStart,
                             TempIndexCount, NewTempIndexStart,indexed))
                     {
                         renamed = gcvTRUE;
@@ -3833,6 +3725,211 @@ _renameTempIndex(
         }
     }
     return renamed;
+}
+
+static gceSTATUS
+_RemapTempIndexForExpandFunction(
+    IN gcOPTIMIZER Optimizer,
+    IN gcOPT_FUNCTION Function,
+    IN gcOPT_CODE Caller,
+    IN gcOPT_CODE CodeNext,
+    IN gctINT OldTempIndexStart,
+    IN gctINT TempIndexCount,
+    IN gctINT NewTempIndexStart,
+    IN gctUINT RealCallerCount
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcOPT_TEMP tempArray = Optimizer->tempArray + OldTempIndexStart;
+    gcOPT_CODE codeNext = CodeNext;
+    gcOPT_CODE code;
+    gctINT i;
+
+    /* duplicate arrayVariable if existing */
+    for (i = 0; i < TempIndexCount && (i + OldTempIndexStart) < (gctINT)Optimizer->tempCount; i++)
+    {
+        if (tempArray[i].function != Function)
+            continue;
+        /*
+        ** We need to make sure that we only remap the registers belong to this function.
+        */
+        if (tempArray[i].arrayVariable)
+        {
+            gctCHAR variableName[256];
+            gctUINT offset = 0;
+            gcVARIABLE variable = tempArray[i].arrayVariable;
+            gctINT16   varIndex = -1;
+            gctCONST_STRING name = (variable->nameLength < 0)
+                                    ? gcSHADER_GetBuiltinNameString(variable->nameLength)
+                                    : variable->name;
+
+            gcmVERIFY_OK(
+                gcoOS_PrintStrSafe(variableName, sizeof(variableName), &offset,
+                                    "%s_%d", name, RealCallerCount));
+
+            /* TODO - append suffix to variable name. */
+            gcmONERROR(gcSHADER_AddVariableEx(Optimizer->shader,
+                                              variableName,
+                                              variable->u.type,
+                                              variable->arrayLengthCount,
+                                              variable->arrayLengthList,
+                                              (gctUINT16)(i + NewTempIndexStart),
+                                              gcSHADER_VAR_CATEGORY_NORMAL,
+                                              variable->precision,
+                                              0,
+                                              -1,
+                                              -1,
+                                              &varIndex));
+            i += GetVariableKnownArraySize(variable) - 1;
+        }
+    }
+
+    /* first handle inlined function body */
+    for (code = Caller; code != gcvNULL && code != codeNext; code = code->next)
+    {
+        _renameTempIndex(Optimizer,
+                         code,
+                         Function,
+                         OldTempIndexStart,
+                         TempIndexCount,
+                         NewTempIndexStart,
+                         gcvFALSE,
+                         gcvTRUE,
+                         gcvTRUE);
+    }
+
+    /* then handle argument passing in caller */
+    if (Function->argumentCount > 0)
+    {
+        gctINT inputArgs  = 0;
+        gctINT outputArgs = 0;
+        gctINT j;
+        gcsFUNCTION_ARGUMENT_PTR argument;
+
+        /* count intput output arg numbers */
+        for (j=0; j < (gctINT)Function->argumentCount; j++)
+        {
+            argument = Function->arguments + j;
+            if (argument->qualifier == gcvFUNCTION_INPUT)
+            {
+                inputArgs++;
+            }
+            else if (argument->qualifier == gcvFUNCTION_INOUT)
+            {
+                inputArgs++;
+                outputArgs++;
+            }
+            else
+            {
+                gcmASSERT((argument->qualifier == gcvFUNCTION_OUTPUT));
+                outputArgs++;
+            }
+        }
+
+        /* check input arguments */
+        if (inputArgs > 0)
+        {
+            for (code = Caller->prev; code != gcvNULL; code = code->prev)
+            {
+                gcSL_OPCODE opcode =
+                    gcmSL_OPCODE_GET(code->instruction.opcode, Opcode);
+
+                if (opcode == gcSL_CALL ||
+                    opcode == gcSL_RET )
+                {
+                    /* bail out if encountered control follow code */
+                    break;
+                }
+                if (gcmSL_TARGET_GET(code->instruction.temp, Enable) != gcSL_ENABLE_NONE)
+                {
+                    gctUINT16   tempIndex = code->instruction.tempIndex;
+
+                    /* check against each argument */
+                    for (j = 0; j < (gctINT)Function->argumentCount; j++)
+                    {
+                        argument = Function->arguments + j;
+                        if (argument->qualifier != gcvFUNCTION_OUTPUT &&
+                            tempIndex == argument->index)
+                        {
+                            /* found */
+                            _renameTempIndex(Optimizer,
+                                             code,
+                                             Function,
+                                             OldTempIndexStart,
+                                             TempIndexCount,
+                                             NewTempIndexStart,
+                                             gcvTRUE,
+                                             gcvTRUE,
+                                             gcvFALSE);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        /* check output arguments */
+        if (outputArgs > 0)
+        {
+            for (code = codeNext; code != gcvNULL; code = code->next)
+            {
+                gctINT i;
+                gcSL_INSTRUCTION inst   = &code->instruction;
+                gcSL_OPCODE opcode      = gcmSL_OPCODE_GET(inst->opcode, Opcode);
+
+                if (opcode == gcSL_RET)
+                {
+                    /* bail out if encountered control follow code */
+                    break;
+                }
+
+                /* bail out if encountered control follow code */
+                if (opcode == gcSL_CALL &&
+                    code->callee->function == Function)
+                {
+                    break;
+                }
+
+                if (gcmSL_TARGET_GET(inst->temp, Enable) != gcSL_ENABLE_NONE ||
+                    (opcode == gcSL_JMP && gcmSL_TARGET_GET(inst->temp, Condition) != gcSL_ALWAYS))
+                {
+                    for (i = 0; i < 2; i++)
+                    {
+                        gctSOURCE_t source = (i==0) ? inst->source0 : inst->source1;
+
+                        if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
+                        {
+                            gctUINT16 * index  = (i==0) ? &inst->source0Index
+                                                        : &inst->source1Index;
+                            /* check against each argument */
+                            for (j = 0; j < (gctINT)Function->argumentCount; j++)
+                            {
+                                argument = Function->arguments + j;
+                                if (argument->qualifier != gcvFUNCTION_INPUT &&
+                                    *index == argument->index)
+                                {
+                                    /* Adjust temporary register count. */
+                                    gctBOOL renamed =
+                                        _updateIndex(Optimizer, Function, OldTempIndexStart,
+                                            TempIndexCount, NewTempIndexStart,index);
+                                    if (renamed != gcvTRUE)
+                                    {
+                                        gcmASSERT(gcvFALSE);
+                                    }
+
+                                    break;
+                                }
+                                /* no need to check indexed value */
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+OnError:
+    return status;
 }
 
 /*******************************************************************************
@@ -3861,16 +3958,19 @@ _ExpandOneFunctionCall(
     IN gcOPT_FUNCTION Function,
     IN gcOPT_CODE Caller,
     IN gctUINT RealCallerCount,
-    IN gctBOOL *RenameArgument
+    IN gctBOOL *RenameArgument,
+    IN gctBOOL *UpdateTempArray
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcOPT_CODE codeNext = Caller->next;
     gcOPT_CODE code;
-    gcePATCH_ID patchID = gcvPATCH_INVALID;
+    gcePATCH_ID patchID = Optimizer->patchID;
     gctBOOL inlineAllFunctionForCTS = gcvFALSE;
     gctBOOL WillRemoveFunction = (RealCallerCount == 0);
     gctBOOL FunctionwithCall = gcvFALSE;
+    gcOPT_FUNCTION callerFunction = Caller->function;
+    gctUINT32 newTempStart = 0, newTempEnd = 0;
 
     gcmHEADER_ARG("Optimizer=0x%x Function=0x%x Caller=0x%x WillRemoveFunction=%d",
                    Optimizer, Function, Caller, WillRemoveFunction);
@@ -3880,9 +3980,10 @@ _ExpandOneFunctionCall(
     {
         /* Expand the function by moving the code to after caller. */
         gcOpt_MoveCodeListAfter(Optimizer,
-                                    Function->codeHead,
-                                    Function->codeTail,
-                                    Caller);
+                                Function->codeHead,
+                                Function->codeTail,
+                                Caller,
+                                gcvTRUE);
         Function->codeHead = gcvNULL;
         Function->codeTail = gcvNULL;
     }
@@ -3918,7 +4019,7 @@ _ExpandOneFunctionCall(
             gcmONERROR(gcOpt_AddCodeToList(Optimizer, &codeNext->callers, code));
         }
     }
-    gcoHAL_GetPatchID(gcvNULL, &patchID);
+
     if (patchID == gcvPATCH_DEQP)
     {
         for (code = Function->codeHead; code != Function->codeTail; code = code->next)
@@ -3943,218 +4044,71 @@ _ExpandOneFunctionCall(
         inlineAllFunctionForCTS = gcvTRUE;
     }
 
+    if (callerFunction)
+    {
+        newTempStart = Function->tempIndexStart;
+        newTempEnd = Function->tempIndexEnd;
+    }
+
     if (!FunctionwithCall &&
         !WillRemoveFunction &&
-        gctOPT_hasFeature(FB_INLINE_RENAMETEMP)
+        gcmOPT_hasFeature(FB_INLINE_RENAMETEMP)
         && !inlineAllFunctionForCTS
         )
     {
-        gctINT oldTempIndexStart = (Function->shaderFunction != gcvNULL)
-                                      ? Function->shaderFunction->tempIndexStart
-                                      : Function->kernelFunction->tempIndexStart;
-        /*
-        ** TODO:
-        ** The temp index count here is not correctly, we need to refine it later.
-        */
-        gctINT tempIndexCount    = (Function->shaderFunction != gcvNULL)
-                                      ? Function->shaderFunction->tempIndexCount
-                                      : Function->kernelFunction->tempIndexCount;
-        gctINT newTempIndexStart;
-        gcOPT_TEMP tempArray = Optimizer->tempArray + oldTempIndexStart;
-        gctINT i;
+        gctINT oldTempIndexStart = Function->tempIndexStart;
+        gctINT tempIndexCount    = Function->tempIndexCount;
+        gctINT newTempIndexStart = gcSHADER_NewTempRegs(Optimizer->shader,
+                                                        tempIndexCount,
+                                                        gcSHADER_FLOAT_X1);
 
-        newTempIndexStart =
-            gcSHADER_NewTempRegs(Optimizer->shader,
-                                 tempIndexCount,
-                                 gcSHADER_FLOAT_X1);
+        newTempStart = newTempIndexStart;
+        newTempEnd = gcSHADER_GetTempCount(Optimizer->shader);
 
-        /* duplicate arrayVariable if existing */
-        for (i = 0; i < tempIndexCount; i++)
-        {
-            if (tempArray[i].function != Function)
-                continue;
-            /*
-            ** We need to make sure that we only remap the registers belong to this function.
-            */
-            if (tempArray[i].arrayVariable)
-            {
-                gctCHAR variableName[256];
-                gctUINT offset = 0;
-                gcVARIABLE variable = tempArray[i].arrayVariable;
-                gctINT16   varIndex = -1;
-                gctCONST_STRING name = (variable->nameLength < 0)
-                                     ? gcSHADER_GetBuiltinNameString(variable->nameLength)
-                                     : variable->name;
-
-                gcmVERIFY_OK(
-                    gcoOS_PrintStrSafe(variableName, sizeof(variableName), &offset,
-                                       "%s_%d", name, RealCallerCount));
-
-                /* TODO - append suffix to variable name. */
-                gcmONERROR(gcSHADER_AddVariableEx(Optimizer->shader,
-                                                  variableName,
-                                                  variable->u.type,
-                                                  variable->arrayLengthCount,
-                                                  variable->arrayLengthList,
-                                                  (gctUINT16)(i + newTempIndexStart),
-                                                  gcSHADER_VAR_CATEGORY_NORMAL,
-                                                  variable->precision,
-                                                  0,
-                                                  -1,
-                                                  -1,
-                                                  &varIndex));
-                i += GetVariableKnownArraySize(variable) - 1;
-            }
-        }
-
-        /* first handle inlined function body */
-        for (code = Caller; code != gcvNULL && code != codeNext; code = code->next)
-        {
-            _renameTempIndex(Optimizer,
-                             code,
-                             Function,
-                             oldTempIndexStart,
-                             tempIndexCount,
-                             newTempIndexStart,
-                             gcvFALSE,
-                             gcvTRUE,
-                             gcvTRUE);
-        }
-
-        /* then handle argument passing in caller */
-        if (Function->argumentCount > 0)
-        {
-            gctINT inputArgs  = 0;
-            gctINT outputArgs = 0;
-            gctINT j;
-            gcsFUNCTION_ARGUMENT_PTR argument;
-
-            /* count intput output arg numbers */
-            for (j=0; j < (gctINT)Function->argumentCount; j++)
-            {
-                argument = Function->arguments + j;
-                if (argument->qualifier == gcvFUNCTION_INPUT)
-                {
-                    inputArgs++;
-                }
-                else if (argument->qualifier == gcvFUNCTION_INOUT)
-                {
-                    inputArgs++;
-                    outputArgs++;
-                }
-                else
-                {
-                    gcmASSERT((argument->qualifier == gcvFUNCTION_OUTPUT));
-                    outputArgs++;
-                }
-            }
-
-            /* check input arguments */
-            if (inputArgs > 0)
-            {
-                for (code = Caller->prev; code != gcvNULL; code = code->prev)
-                {
-                    gcSL_OPCODE opcode =
-                        gcmSL_OPCODE_GET(code->instruction.opcode, Opcode);
-
-                    if (opcode == gcSL_CALL ||
-                        opcode == gcSL_RET )
-                    {
-                        /* bail out if encountered control follow code */
-                        break;
-                    }
-                    if (gcmSL_TARGET_GET(code->instruction.temp, Enable) != gcSL_ENABLE_NONE)
-                    {
-                        gctUINT16   tempIndex = code->instruction.tempIndex;
-
-                        /* check against each argument */
-                        for (j=0; j < (gctINT)Function->argumentCount; j++)
-                        {
-                            argument = Function->arguments + j;
-                            if (argument->qualifier != gcvFUNCTION_OUTPUT &&
-                                tempIndex == argument->index)
-                            {
-                                /* found */
-                                _renameTempIndex(Optimizer,
-                                                 code,
-                                                 Function,
-                                                 oldTempIndexStart,
-                                                 tempIndexCount,
-                                                 newTempIndexStart,
-                                                 gcvTRUE,
-                                                 gcvTRUE,
-                                                 gcvFALSE
-                                                 );
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            /* check output arguments */
-            if (outputArgs > 0)
-            {
-                for (code = codeNext; code != gcvNULL; code = code->next)
-                {
-                    gctINT i;
-                    gcSL_INSTRUCTION inst   = &code->instruction;
-                    gcSL_OPCODE opcode      = gcmSL_OPCODE_GET(inst->opcode, Opcode);
-
-                    if (opcode == gcSL_RET)
-                    {
-                        /* bail out if encountered control follow code */
-                        break;
-                    }
-
-                    /* bail out if encountered control follow code */
-                    if (opcode == gcSL_CALL &&
-                        code->callee->function == Function)
-                    {
-                        break;
-                    }
-
-                    if (gcmSL_TARGET_GET(inst->temp, Enable) != gcSL_ENABLE_NONE ||
-                        (opcode == gcSL_JMP && gcmSL_TARGET_GET(inst->temp, Condition) != gcSL_ALWAYS))
-                    {
-                        for (i = 0; i < 2; i++)
-                        {
-                            gctSOURCE_t source = (i==0) ? inst->source0 : inst->source1;
-
-                            if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
-                            {
-                                gctUINT16 * index  = (i==0) ? &inst->source0Index
-                                                            : &inst->source1Index;
-                                /* check against each argument */
-                                for (j=0; j < (gctINT)Function->argumentCount; j++)
-                                {
-                                    argument = Function->arguments + j;
-                                    if (argument->qualifier != gcvFUNCTION_INPUT &&
-                                        *index == argument->index)
-                                    {
-                                       /* Adjust temporary register count. */
-                                        gctBOOL renamed =
-                                            _updateIndex(Optimizer, Function, oldTempIndexStart,
-                                                tempIndexCount, newTempIndexStart,index);
-                                        if (renamed != gcvTRUE)
-                                        {
-                                            gcmASSERT(gcvFALSE);
-                                        }
-
-                                        break;
-                                    }
-                                    /* no need to check indexed value */
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
+        gcmONERROR(_RemapTempIndexForExpandFunction(Optimizer,
+                                                    Function,
+                                                    Caller,
+                                                    codeNext,
+                                                    oldTempIndexStart,
+                                                    tempIndexCount,
+                                                    newTempIndexStart,
+                                                    RealCallerCount));
         if (RenameArgument)
         {
             *RenameArgument = gcvTRUE;
+        }
+    }
+
+    if (callerFunction != gcvNULL)
+    {
+        gctUINT32 tempStart = 0, tempEnd = 0, tempCount = 0;
+
+        tempStart = gcmMIN(newTempStart, callerFunction->tempIndexStart);
+        tempEnd = gcmMAX(newTempEnd, callerFunction->tempIndexEnd);
+        tempCount = callerFunction->tempIndexEnd - callerFunction->tempIndexStart + 1;
+
+        callerFunction->tempIndexStart = tempStart;
+        callerFunction->tempIndexEnd = tempEnd;
+        callerFunction->tempIndexCount = tempCount;
+
+        if (callerFunction->shaderFunction)
+        {
+            callerFunction->shaderFunction->tempIndexStart = tempStart;
+            callerFunction->shaderFunction->tempIndexEnd = tempEnd;
+            callerFunction->shaderFunction->tempIndexCount = tempCount;
+        }
+        else
+        {
+            gcmASSERT(callerFunction->kernelFunction);
+
+            callerFunction->kernelFunction->tempIndexStart = tempStart;
+            callerFunction->kernelFunction->tempIndexEnd = tempEnd;
+            callerFunction->kernelFunction->tempIndexCount = tempCount;
+        }
+
+        if (UpdateTempArray)
+        {
+            *UpdateTempArray = gcvTRUE;
         }
     }
 
@@ -4167,48 +4121,53 @@ OnError:
     return status;
 }
 
-static gctUINT
+static gctINT
 _GetInlineBudget(
     IN gcOPTIMIZER Optimizer
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gctUINT vsInstMax = 0, psInstMax = 0, instMax = 0, budget=0;
+    gctUINT vsInstMax = 0, psInstMax = 0, instMax = 0;
+    gctINT  budget=0;
     gcSHADER shader = Optimizer->shader;
     gctSIZE_T codeCount = Optimizer->codeTail->id + 1;
-    gcePATCH_ID patchID = gcvPATCH_INVALID;
-
-    gcoHAL_GetPatchID(gcvNULL, &patchID);
+    gcePATCH_ID patchID = Optimizer->patchID;
 
     if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SHADER_HAS_INSTRUCTION_CACHE) &&
         (patchID == gcvPATCH_GTFES30 || patchID == gcvPATCH_DEQP))
     {
         return 0x7FFFFFFF;
     }
-
-    /* Determine the maximum number of instructions. */
-    gcmONERROR(
-        gcoHAL_QueryShaderCaps(gcvNULL,
-                               gcvNULL,
-                               gcvNULL,
-                               gcvNULL,
-                               gcvNULL,
-                               gcvNULL,
-                               gcvNULL,
-                               &vsInstMax,
-                               &psInstMax));
-    if (shader->type == gcSHADER_TYPE_VERTEX)
+    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SHADER_HAS_INSTRUCTION_CACHE))
     {
-        instMax = vsInstMax;
+        instMax = 512*gcmOPT_INLINELEVEL();
     }
     else
     {
-        instMax = psInstMax;
+        /* Determine the maximum number of instructions. */
+        gcmONERROR(
+            gcoHAL_QueryShaderCaps(gcvNULL,
+                                   gcvNULL,
+                                   gcvNULL,
+                                   gcvNULL,
+                                   gcvNULL,
+                                   gcvNULL,
+                                   gcvNULL,
+                                   &vsInstMax,
+                                   &psInstMax));
+        if (shader->type == gcSHADER_TYPE_VERTEX)
+        {
+            instMax = vsInstMax;
+        }
+        else
+        {
+            instMax = psInstMax;
+        }
     }
     /* get budget based on current shader code count */
     if (codeCount * 1.2 < (gctFLOAT)instMax)
     {
-        budget = instMax - (gctUINT)(codeCount * 1.2);
+        budget = (gctINT)(instMax - (gctUINT)(codeCount * 1.2));
     }
 OnError:
     return budget;
@@ -4216,7 +4175,7 @@ OnError:
 
 static gctBOOL
 _isFunctionInlinable(
-    IN OUT gctUINT *    CurrentBudegt,
+    IN OUT gctINT *     CurrentBudegt,
     IN gcOPT_FUNCTION   Function,
     IN gctUINT          CallerCount,
     IN gctUINT          InlineLevel)
@@ -4245,7 +4204,7 @@ _isFunctionInlinable(
     }
 
     if (CallerCount <= inlineFuncCountThreshold &&
-        (funcCodeCount * CallerCount) < *CurrentBudegt)
+        (gctINT)(funcCodeCount * CallerCount) < *CurrentBudegt)
     {
         /* update inline budget */
         *CurrentBudegt -= (funcCodeCount * CallerCount);
@@ -4254,13 +4213,20 @@ _isFunctionInlinable(
 
     /* check for small function */
     if ((funcCodeCount < Function->argumentCount + 3*InlineLevel) &&
-         *CurrentBudegt > 3*InlineLevel*CallerCount )
+         *CurrentBudegt > (gctINT)(3*InlineLevel*CallerCount) )
     {
         /* update inline budget */
         *CurrentBudegt -=  3*InlineLevel*CallerCount;
         return gcvTRUE;
     }
 
+    /* inline if there are engouh budget left: inline use less than 2/3 of budget */
+   if ((gctINT)(funcCodeCount * CallerCount) < (*CurrentBudegt * 2)/3 )
+    {
+        /* update inline budget */
+        *CurrentBudegt -= (funcCodeCount * CallerCount);
+        return gcvTRUE;
+    }
     return gcvFALSE;
 }
 
@@ -4361,7 +4327,7 @@ _InlineSinglelFunction(
     IN gctBOOL imagePatch,
     IN gctBOOL alwaysInline,
     IN OUT gctBOOL * imageFunctionInlined,
-    IN OUT gctUINT * currentBudget,
+    IN OUT gctINT *  currentBudget,
     IN OUT gctUINT * functionRemoved
     )
 {
@@ -4372,10 +4338,9 @@ _InlineSinglelFunction(
     gctBOOL isMainKernelFunction = gcvFALSE;
     gctBOOL renameArgument = gcvFALSE;
     enum ForceInlineKind forceInline;
-    gcePATCH_ID patchID = gcvPATCH_INVALID;
+    gcePATCH_ID patchID = Optimizer->patchID;
     gctBOOL inlineAllFunctionForCTS = gcvFALSE;
-
-    gcoHAL_GetPatchID(gcvNULL, &patchID);
+    gctBOOL updateTempArray = gcvFALSE;
 
     if (function->shaderFunction && function->shaderFunction->name &&
         gcoOS_StrNCmp(function->shaderFunction->name, "compare_", 8) == 0 &&
@@ -4493,7 +4458,7 @@ _InlineSinglelFunction(
             isMainKernelFunction = gcvTRUE;
         }
 
-        /* Remove caller from the caller list. */
+        /* If the caller is inside the other function, we need to remap temp index. */
         gcmVERIFY_OK(gcOpt_DeleteCodeFromList(Optimizer,
                         &function->codeHead->callers,
                         codeCaller));
@@ -4502,14 +4467,13 @@ _InlineSinglelFunction(
                         function,
                         codeCaller,
                         realCallerCount,
-                        (realCallerCount == 0) ? &renameArgument : gcvNULL));
+                        (realCallerCount == 0) ? &renameArgument : gcvNULL,
+                        &updateTempArray));
     }
     while (realCallerCount > 0);
 
     if (isMainKernelFunction)
     {
-        gcmASSERT(Optimizer->main->shaderFunction == gcvNULL);
-        gcmASSERT(Optimizer->main->kernelFunction == gcvNULL);
         Optimizer->main->kernelFunction = function->kernelFunction;
         Optimizer->isMainMergeWithKerenel = gcvTRUE;
     }
@@ -4519,6 +4483,11 @@ _InlineSinglelFunction(
     (*functionRemoved)++;
 
     status = gcvSTATUS_TRUE;
+
+    if (updateTempArray)
+    {
+        gcOpt_RebuildTempArray(Optimizer);
+    }
 
 OnError:
     /* Return the status. */
@@ -4549,7 +4518,7 @@ gcOpt_InlineFunctions(
     gcOPTIMIZER Optimizer = *OptimizerPtr;
     gctUINT inlineDepthComparison  = gcmOPT_INLINEDEPTHCOMP();
     gctUINT inlineFormatConversion = gcmOPT_INLINEFORMATCONV();
-    gctUINT currentBudget;
+    gctINT  currentBudget;
     gctUINT savedShaderTempCount = Optimizer->shader->_tempRegCount;
     gctBOOL imagePatch;
     gctBOOL imageFunctionInlined;
@@ -4593,23 +4562,65 @@ gcOpt_InlineFunctions(
         return status;
     }
 
-    /* Id's will be used to calculate functions' codeCount. */
+    /* Update code id. */
     gcOpt_UpdateCodeId(Optimizer);
 
-    do
+    /* Inline all recompiler stub first. */
+    if (Optimizer->shader->type != gcSHADER_TYPE_CL)
     {
-        imageFunctionInlined = gcvFALSE;
         for (i = Optimizer->functionCount - 1; i >= 0; i--)
         {
             gcOPT_FUNCTION function = Optimizer->functionArray + i;
-            _InlineSinglelFunction(Optimizer, function, inlineDepthComparison, inlineFormatConversion,
-                                inlineLevel, imagePatch, AlwaysInline, &imageFunctionInlined, &currentBudget, &functionRemoved);
+
+            if (function == gcvNULL ||
+                !(function->shaderFunction != gcvNULL &&
+                  IsFunctionRecompilerStub(function->shaderFunction)))
+            {
+                continue;
+            }
+
+            _InlineSinglelFunction(Optimizer,
+                                   function,
+                                   inlineDepthComparison,
+                                   inlineFormatConversion,
+                                   inlineLevel,
+                                   imagePatch,
+                                   gcvTRUE,
+                                   &imageFunctionInlined,
+                                   &currentBudget,
+                                   &functionRemoved);
+        }
+    }
+
+    /* Update code id. */
+    gcOpt_UpdateCodeId(Optimizer);
+
+    /* Inline all the other functions. */
+    do
+    {
+        imageFunctionInlined = gcvFALSE;
+
+        for (i = Optimizer->functionCount - 1; i >= 0; i--)
+        {
+            gcOPT_FUNCTION function = Optimizer->functionArray + i;
+
+            _InlineSinglelFunction(Optimizer,
+                                   function,
+                                   inlineDepthComparison,
+                                   inlineFormatConversion,
+                                   inlineLevel,
+                                   imagePatch,
+                                   AlwaysInline,
+                                   &imageFunctionInlined,
+                                   &currentBudget,
+                                   &functionRemoved);
         }
     }
     while (imageFunctionInlined);
 
     isCTSInline = Optimizer->isCTSInline;
 
+    /* Rebuild flow graph or reconstruct optimizer. */
     if (functionRemoved)
     {
         if (savedShaderTempCount != Optimizer->shader->_tempRegCount)
@@ -4654,29 +4665,9 @@ gcOpt_UpdatePrecision(
     gcOPT_TEMP tempArray = Optimizer->tempArray;
     gcOPT_CODE code;
 
-    gcePATCH_ID     patchID = gcvPATCH_INVALID;
-    gctBOOL         qualityMode = gcvTRUE;
+    gctUINT         dual16PrecisionRule = gcmOPT_DualFP16PrecisionRule();
 
-    gcoHAL_GetPatchID(gcvNULL, &patchID);
-
-    /* dual16 quality mode: more restrict mode for higher quality
-       e.g., immediate set to highp (according to spec) */
-    switch (patchID)
-    {
-    case gcvPATCH_GLBM21:
-    case gcvPATCH_GLBM25:
-    case gcvPATCH_GLBM27:
-    case gcvPATCH_GFXBENCH:
-    case gcvPATCH_NENAMARK2:
-    case gcvPATCH_LEANBACK:
-    case gcvPATCH_ANGRYBIRDS:
-        qualityMode = gcvFALSE;
-        break;
-    default:
-        break;
-    }
-
-    if(Optimizer->shader->type == gcSHADER_TYPE_CL)
+    if(Optimizer->shader->type != gcSHADER_TYPE_FRAGMENT)
     {
         return;
     }
@@ -4697,10 +4688,15 @@ gcOpt_UpdatePrecision(
                 function->arguments[j].precision = gcSHADER_PRECISION_HIGH;
                 tempArray[function->arguments[j].index].precision = gcSHADER_PRECISION_HIGH;
             }
+            else
+            {
+                tempArray[function->arguments[j].index].precision = function->arguments[j].precision;
+            }
         }
     }
 
-    for(code = Optimizer->codeHead; code != gcvNULL; code = code->next)
+    code = Optimizer->codeHead;
+    while(code != gcvNULL)
     {
         gcSL_INSTRUCTION inst = &code->instruction;
         gcSL_TYPE type0 = gcmSL_SOURCE_GET(inst->source0, Type);
@@ -4714,13 +4710,60 @@ gcOpt_UpdatePrecision(
         {
             if(type0 == gcSL_CONSTANT)
             {
-                if (qualityMode)
+                if (dual16PrecisionRule & Dual16_PrecisionRule_IMMED_HP)
                 {
                     inst->source0 = gcmSL_SOURCE_SET(inst->source0, Precision, gcSHADER_PRECISION_HIGH);
                 }
-                else
+                else if (dual16PrecisionRule & Dual16_PrecisionRule_IMMED_MP)
                 {
                     inst->source0 = gcmSL_SOURCE_SET(inst->source0, Precision, gcSHADER_PRECISION_MEDIUM);
+                }
+                else
+                {
+                    /* Assemble the 32-bit value. */
+                    gctUINT32 value = inst->source0Index | (inst->source0Indexed << 16);
+
+                    switch (gcmSL_SOURCE_GET(inst->source0, Format))
+                    {
+                        case gcSL_FLOAT:
+                            if(CAN_EXACTLY_CVT_S23E8_2_S10E5(value))
+                            {
+                                inst->source0 = gcmSL_SOURCE_SET(inst->source0, Precision, gcSHADER_PRECISION_MEDIUM);
+                            }
+                            else
+                            {
+                                inst->source0 = gcmSL_SOURCE_SET(inst->source0, Precision, gcSHADER_PRECISION_HIGH);
+                            }
+                            break;
+
+                        case gcSL_INTEGER:
+                            if(CAN_EXACTLY_CVT_S32_2_S16(value))
+                            {
+                                inst->source0 = gcmSL_SOURCE_SET(inst->source0, Precision, gcSHADER_PRECISION_MEDIUM);
+                            }
+                            else
+                            {
+                                inst->source0 = gcmSL_SOURCE_SET(inst->source0, Precision, gcSHADER_PRECISION_HIGH);
+                            }
+                            break;
+
+                        case gcSL_UINT32:
+                            if(CAN_EXACTLY_CVT_U32_2_U16(value))
+                            {
+                                inst->source0 = gcmSL_SOURCE_SET(inst->source0, Precision, gcSHADER_PRECISION_MEDIUM);
+                            }
+                            else
+                            {
+                                inst->source0 = gcmSL_SOURCE_SET(inst->source0, Precision, gcSHADER_PRECISION_HIGH);
+                            }
+                            break;
+
+                        case gcSL_BOOLEAN:
+                            inst->source0 = gcmSL_SOURCE_SET(inst->source0, Precision, gcSHADER_PRECISION_MEDIUM);
+                            break;
+                        default:
+                            gcmASSERT(0);
+                    }
                 }
             }
             else if(type0 == gcSL_SAMPLER && gcmSL_SOURCE_GET(inst->source0, Indexed))
@@ -4730,11 +4773,13 @@ gcOpt_UpdatePrecision(
 
                 inst->source0 = gcmSL_SOURCE_SET(inst->source0, Precision, tempArray[inst->source0Indexed].precision);
             }
-            else if(gcmSL_SOURCE_GET(inst->source0, Precision) == gcSHADER_PRECISION_ANY
+            else if(type0 == gcSL_TEMP &&
+                    (gcmSL_SOURCE_GET(inst->source0, Precision) == gcSHADER_PRECISION_ANY
 #if TREAT_DP_AS_ANYP
-               || gcmSL_SOURCE_GET(inst->source0, Precision) == gcSHADER_PRECISION_DEFAULT
+                     || gcmSL_SOURCE_GET(inst->source0, Precision) == gcSHADER_PRECISION_DEFAULT
 #endif
-               )
+                     || (gctUINT)tempArray[gcmSL_INDEX_GET(inst->source0Index, Index)].precision > (gctUINT)gcmSL_SOURCE_GET(inst->source0, Precision)
+                    ))
             {
                 gcmASSERT(tempArray[gcmSL_INDEX_GET(inst->source0Index, Index)].precision != gcSHADER_PRECISION_ANY &&
                           tempArray[gcmSL_INDEX_GET(inst->source0Index, Index)].precision != gcSHADER_PRECISION_DEFAULT);
@@ -4751,20 +4796,69 @@ gcOpt_UpdatePrecision(
 #endif
             if(type1 == gcSL_CONSTANT)
             {
-                if (qualityMode)
+                if (dual16PrecisionRule & Dual16_PrecisionRule_IMMED_HP)
                 {
                     inst->source1 = gcmSL_SOURCE_SET(inst->source1, Precision, gcSHADER_PRECISION_HIGH);
                 }
-                else
+                else if (dual16PrecisionRule & Dual16_PrecisionRule_IMMED_MP)
                 {
                     inst->source1 = gcmSL_SOURCE_SET(inst->source1, Precision, gcSHADER_PRECISION_MEDIUM);
                 }
+                else
+                {
+                    /* Assemble the 32-bit value. */
+                    gctUINT32 value = inst->source1Index | (inst->source1Indexed << 16);
+
+                    switch (gcmSL_SOURCE_GET(inst->source1, Format))
+                    {
+                        case gcSL_FLOAT:
+                            if(CAN_EXACTLY_CVT_S23E8_2_S10E5(value))
+                            {
+                                inst->source1 = gcmSL_SOURCE_SET(inst->source1, Precision, gcSHADER_PRECISION_MEDIUM);
+                            }
+                            else
+                            {
+                                inst->source1 = gcmSL_SOURCE_SET(inst->source1, Precision, gcSHADER_PRECISION_HIGH);
+                            }
+                            break;
+
+                        case gcSL_INTEGER:
+                            if(CAN_EXACTLY_CVT_S32_2_S16(value))
+                            {
+                                inst->source1 = gcmSL_SOURCE_SET(inst->source1, Precision, gcSHADER_PRECISION_MEDIUM);
+                            }
+                            else
+                            {
+                                inst->source1 = gcmSL_SOURCE_SET(inst->source1, Precision, gcSHADER_PRECISION_HIGH);
+                            }
+                            break;
+
+                        case gcSL_UINT32:
+                            if(CAN_EXACTLY_CVT_U32_2_U16(value))
+                            {
+                                inst->source1 = gcmSL_SOURCE_SET(inst->source1, Precision, gcSHADER_PRECISION_MEDIUM);
+                            }
+                            else
+                            {
+                                inst->source1 = gcmSL_SOURCE_SET(inst->source1, Precision, gcSHADER_PRECISION_HIGH);
+                            }
+                            break;
+
+                        case gcSL_BOOLEAN:
+                            inst->source1 = gcmSL_SOURCE_SET(inst->source1, Precision, gcSHADER_PRECISION_MEDIUM);
+                            break;
+                        default:
+                            gcmASSERT(0);
+                    }
+                }
             }
-            else if(gcmSL_SOURCE_GET(inst->source1, Precision) == gcSHADER_PRECISION_ANY
+            else if(type1 == gcSL_TEMP &&
+                    (gcmSL_SOURCE_GET(inst->source1, Precision) == gcSHADER_PRECISION_ANY
 #if TREAT_DP_AS_ANYP
-               || gcmSL_SOURCE_GET(inst->source1, Precision) == gcSHADER_PRECISION_DEFAULT
+                     || gcmSL_SOURCE_GET(inst->source1, Precision) == gcSHADER_PRECISION_DEFAULT
 #endif
-               )
+                     || (gctUINT)tempArray[gcmSL_INDEX_GET(inst->source1Index, Index)].precision > (gctUINT)gcmSL_SOURCE_GET(inst->source1, Precision)
+                    ))
             {
                 gcmASSERT(tempArray[gcmSL_INDEX_GET(inst->source1Index, Index)].precision != gcSHADER_PRECISION_ANY &&
                           tempArray[gcmSL_INDEX_GET(inst->source1Index, Index)].precision != gcSHADER_PRECISION_DEFAULT);
@@ -4773,19 +4867,33 @@ gcOpt_UpdatePrecision(
             }
         }
 
-        if(gcvOpcodeAttr[gcmSL_OPCODE_GET(inst->opcode, Opcode)].resultPrecision != _gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID)
+        if(gcSL_isOpcodeUseTargetAsSource(gcmSL_OPCODE_GET(inst->opcode, Opcode)))
         {
             if(gcmSL_TARGET_GET(inst->temp, Precision) == gcSHADER_PRECISION_ANY
 #if TREAT_DP_AS_ANYP
                || gcmSL_TARGET_GET(inst->temp, Precision) == gcSHADER_PRECISION_DEFAULT
 #endif
-               )
+              )
             {
-                gcSHADER_PRECISION truePrecision = gcSHADER_PRECISION_DEFAULT;
+                gcmASSERT(tempArray[inst->tempIndex].precision != gcSHADER_PRECISION_ANY &&
+                          tempArray[inst->tempIndex].precision != gcSHADER_PRECISION_DEFAULT);
 
-    #if !TREAT_DP_AS_ANYP
+                inst->temp = gcmSL_TARGET_SET(inst->temp, Precision, tempArray[inst->tempIndex].precision);
+            }
+        }
+        else if(gcvOpcodeAttr[gcmSL_OPCODE_GET(inst->opcode, Opcode)].resultPrecision != _gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID) /* dest should be taken care of */
+        {
+            if(gcmSL_TARGET_GET(inst->temp, Precision) == gcSHADER_PRECISION_ANY
+#if TREAT_DP_AS_ANYP
+               || gcmSL_TARGET_GET(inst->temp, Precision) == gcSHADER_PRECISION_DEFAULT
+#endif
+              )
+            {
+                gcSHADER_PRECISION expPrecision = gcSHADER_PRECISION_DEFAULT;
+
+#if !TREAT_DP_AS_ANYP
                 gcmSL_TARGET_GET(inst->temp, Precision) != gcSHADER_PRECISION_DEFAULT);
-    #endif
+#endif
                 switch(gcvOpcodeAttr[gcmSL_OPCODE_GET(inst->opcode, Opcode)].resultPrecision)
                 {
                     case _gcSL_OPCODE_ATTR_RESULT_PRECISION_INVALID:
@@ -4796,64 +4904,111 @@ gcOpt_UpdatePrecision(
                         gcSHADER_PRECISION precision0 = gcmSL_SOURCE_GET(inst->source0, Precision);
                         gcSHADER_PRECISION precision1 = gcmSL_SOURCE_GET(inst->source1, Precision);
 
+                        /* Set precision to highp for a default precision attribute. */
+                        if (type0 == gcSL_ATTRIBUTE && precision0 == gcSHADER_PRECISION_DEFAULT)
+                        {
+                            precision0 = gcSHADER_PRECISION_HIGH;
+                        }
+
+                        if (type1 == gcSL_ATTRIBUTE && precision1 == gcSHADER_PRECISION_DEFAULT)
+                        {
+                            precision1 = gcSHADER_PRECISION_HIGH;
+                        }
+
                         gcmASSERT(type0 != gcSL_NONE && type1 != gcSL_NONE);
                         gcmASSERT(precision0 != gcSHADER_PRECISION_ANY && precision1 != gcSHADER_PRECISION_ANY);
-    #if !TREAT_DP_AS_ANYP
+#if !TREAT_DP_AS_ANYP
                         gcmASSERT(precision0 != gcSHADER_PRECISION_DEFAULT && precision1 != gcSHADER_PRECISION_DEFAULT);
-    #endif
-                        truePrecision = precision0 < precision1 ? precision0 : precision1;
+#endif
+                        expPrecision = precision0 > precision1 ? precision0 : precision1;
                         break;
                     }
                     case _gcSL_OPCODE_ATTR_RESULT_PRECISION_AF:
                     {
                         gcSHADER_PRECISION precision0 = gcmSL_SOURCE_GET(inst->source0, Precision);
 
+                        /* Set precision to highp for a default precision attribute. */
+                        if (type0 == gcSL_ATTRIBUTE && precision0 == gcSHADER_PRECISION_DEFAULT)
+                        {
+                            precision0 = gcSHADER_PRECISION_HIGH;
+                        }
+
                         gcmASSERT(type0 != gcSL_NONE);
                         gcmASSERT(precision0 != gcSHADER_PRECISION_ANY);
-    #if !TREAT_DP_AS_ANYP
+#if !TREAT_DP_AS_ANYP
                         gcmASSERT(precision0 != gcSHADER_PRECISION_DEFAULT);
-    #endif
-                        truePrecision = precision0;
+#endif
+                        expPrecision = precision0;
                         break;
                     }
                     case _gcSL_OPCODE_ATTR_RESULT_PRECISION_AS:
                     {
                         gcSHADER_PRECISION precision1 = gcmSL_SOURCE_GET(inst->source1, Precision);
 
+                        /* Set precision to highp for a default precision attribute. */
+                        if (type1 == gcSL_ATTRIBUTE && precision1 == gcSHADER_PRECISION_DEFAULT)
+                        {
+                            precision1 = gcSHADER_PRECISION_HIGH;
+                        }
+
                         gcmASSERT(type1 != gcSL_NONE);
                         gcmASSERT(precision1 != gcSHADER_PRECISION_ANY);
-    #if !TREAT_DP_AS_ANYP
+#if !TREAT_DP_AS_ANYP
                         gcmASSERT(precision1 != gcSHADER_PRECISION_DEFAULT);
-    #endif
-                        truePrecision = precision1;
+#endif
+                        expPrecision = precision1;
                         break;
                     }
                     case _gcSL_OPCODE_ATTR_RESULT_PRECISION_HP:
                     {
-                        truePrecision = gcSHADER_PRECISION_HIGH;
+                        expPrecision = gcSHADER_PRECISION_HIGH;
                         break;
                     }
                     case _gcSL_OPCODE_ATTR_RESULT_PRECISION_MP:
                     {
-                        truePrecision = gcSHADER_PRECISION_MEDIUM;
+                        expPrecision = gcSHADER_PRECISION_MEDIUM;
                         break;
                     }
                     case _gcSL_OPCODE_ATTR_RESULT_PRECISION_LP:
                     {
-                        truePrecision = gcSHADER_PRECISION_LOW;
+                        expPrecision = gcSHADER_PRECISION_LOW;
                         break;
                     }
                     case _gcSL_OPCODE_ATTR_RESULT_PRECISION_IGNORE:
-                        continue;
+                        expPrecision = gcSHADER_PRECISION_LOW;
+                        break;
                     default:
                         gcmASSERT(0);
                 }
-                gcmASSERT(truePrecision != gcSHADER_PRECISION_DEFAULT && truePrecision != gcSHADER_PRECISION_ANY);
-                inst->temp = gcmSL_TARGET_SET(inst->temp, Precision, truePrecision);
-                tempArray[inst->tempIndex].precision = truePrecision;
+                gcmASSERT(expPrecision != gcSHADER_PRECISION_DEFAULT && expPrecision != gcSHADER_PRECISION_ANY);
+                if(tempArray[inst->tempIndex].precision && tempArray[inst->tempIndex].precision != gcSHADER_PRECISION_ANY)
+                {
+                    if((gctUINT)tempArray[inst->tempIndex].precision >= (gctUINT)expPrecision)
+                    {
+                        /* precision need to be promoted */
+                        inst->temp = gcmSL_TARGET_SET(inst->temp, Precision, tempArray[inst->tempIndex].precision);
+                    }
+                    else
+                    {
+                        /* precision conflict, need to redo the precision update */
+                        tempArray[inst->tempIndex].precision = expPrecision;
+                        code = Optimizer->codeHead;
+                        continue;
+                    }
+                }
+                else
+                {
+                    inst->temp = gcmSL_TARGET_SET(inst->temp, Precision, expPrecision);
+                    tempArray[inst->tempIndex].precision = expPrecision;
+                }
             }
-            tempArray[inst->tempIndex].precision = gcmSL_TARGET_GET(inst->temp, Precision);
+            else if((gctUINT)tempArray[inst->tempIndex].precision > (gctUINT)gcmSL_TARGET_GET(inst->temp, Precision))
+            {
+                inst->temp = gcmSL_TARGET_SET(inst->temp, Precision, tempArray[inst->tempIndex].precision);
+            }
+            tempArray[inst->tempIndex].precision = gcmSL_TARGET_GET(inst->temp, Precision);     /* indexed sampler may need this */
         }
+        code = code->next;
     }
 
     DUMP_OPTIMIZER("Update precision in the shader", Optimizer);
@@ -4912,7 +5067,7 @@ gcOpt_OptimizeCallStackDepth(
     gctUINT inlineLevel = gcmOPT_INLINELEVEL();
     gctUINT inlineDepthComparison  = gcmOPT_INLINEDEPTHCOMP();
     gctUINT inlineFormatConversion = gcmOPT_INLINEFORMATCONV();
-    gctUINT currentBudget = (inlineLevel == 4) ? 0x7fffffff
+    gctINT  currentBudget = (inlineLevel == 4) ? 0x7fffffff
                                                : _GetInlineBudget(Optimizer);
     gctUINT savedShaderTempCount = Optimizer->shader->_tempRegCount;
 
@@ -6320,6 +6475,7 @@ gcOpt_PropagateConstants(
     gctUINT16 sourceIndex = 0;
     gctUINT16 sourceIndexed = 0;
     gctBOOL needToPropagate;
+    gctBOOL needRebuildFlow = gcvFALSE;
     gcOPT_LIST list, nextList;
 #if !(defined(ANDROID) && defined(__arm__) || defined(UNDER_CE))
     gctUINT32 oldRound = 0;
@@ -6410,16 +6566,13 @@ gcOpt_PropagateConstants(
                 break;
 
             case gcSL_CALL:
-                /* No inter-procedural propagation. */
-            case gcSL_STORE:
-            case gcSL_STORE1:
-                /* Skip store1 because it may cause two constants in an instruction. */
-            case gcSL_IMAGE_WR:
-            case gcSL_IMAGE_WR_3D:
-                /* Skip gcSL_IMAGE_WR because it's DataFlow is messed up: data is in dest and its usage is in src1 */
                 cannotReplace = gcvTRUE;
                 break;
             default:
+                if (gcSL_isOpcodeTargetInvalid(gcmSL_OPCODE_GET(codeUser->instruction.opcode,Opcode)))
+                {
+                    cannotReplace = gcvTRUE;
+                }
                 break;
             }
 
@@ -6667,12 +6820,9 @@ gcOpt_PropagateConstants(
                 gctINT       indexedValue = 0;
                 gctUINT      val;
                 gcSL_FORMAT  format;
-                gctSOURCE_t source = codeUser->instruction.source0;
-
-                /* set source0 as not indexed */
-                codeUser->instruction.source0 =
-                    gcmSL_SOURCE_SET(source, Indexed, gcSL_NOT_INDEXED);
-                codeUser->instruction.source0Indexed = 0;
+                gctSOURCE_t  source = codeUser->instruction.source0;
+                gcVARIABLE   variable = Optimizer->tempArray[codeUser->instruction.source0Index].arrayVariable;
+                gctBOOL      validIndex = gcvTRUE;
 
                 /* get the indexed value */
                 val = (code->instruction.source0Index & 0xFFFF) |
@@ -6699,26 +6849,51 @@ gcOpt_PropagateConstants(
                     return gcvSTATUS_INVALID_DATA;
                 }
 
-                gcmASSERT(indexedValue >= 0); /* we should not have
-                                                negative indexing for sampler */
-                /* set the sampler index */
-                codeUser->instruction.source0Index +=
-                                        (gctUINT16)indexedValue;
-
-                /* Remove dependency and user. */
-                if (!useOnBothSource0AndSource1)
+                if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
                 {
-                    gcmVERIFY_OK(gcOpt_DeleteCodeFromList(Optimizer,
-                                                &code->users, codeUser));
-                }
-                /* make sure all dependents are removed from list once constant propogated:
-                    *  it happens when multiple dependents having same value or only one
-                    *  is the true dependent
-                    */
-                gcmVERIFY_OK(gcOpt_DestroyList(Optimizer, &codeUser->dependencies0));
+                    /* This is a invalid index, it may be skip by any previous JMPs. */
+                    if (variable && variable->arraySize > 1)
+                    {
+                        if ((codeUser->instruction.source0Index + (gctUINT16)indexedValue) >=
+                            (variable->tempIndex + (gctUINT16)variable->arraySize))
+                        {
+                            validIndex = gcvFALSE;
+                        }
+                    }
 
-                propagateSource0 = gcvTRUE;
-                constPropagated++;
+                    if ((codeUser->instruction.source0Index + (gctUINT16)indexedValue) >= (gctUINT16)Optimizer->tempCount)
+                    {
+                        validIndex = gcvFALSE;
+                    }
+                }
+
+                if (validIndex)
+                {
+                    /* set source0 as not indexed */
+                    codeUser->instruction.source0 =
+                        gcmSL_SOURCE_SET(source, Indexed, gcSL_NOT_INDEXED);
+                    codeUser->instruction.source0Indexed = 0;
+
+                    codeUser->instruction.source0Index +=
+                                            (gctUINT16)indexedValue;
+
+                    /* Remove dependency and user. */
+                    if (!useOnBothSource0AndSource1)
+                    {
+                        gcmVERIFY_OK(gcOpt_DeleteCodeFromList(Optimizer,
+                                                    &code->users, codeUser));
+                    }
+                    /* make sure all dependents are removed from list once constant propogated:
+                        *  it happens when multiple dependents having same value or only one
+                        *  is the true dependent
+                        */
+                    gcmVERIFY_OK(gcOpt_DestroyList(Optimizer, &codeUser->dependencies0));
+
+                    propagateSource0 = gcvTRUE;
+                    constPropagated++;
+
+                    needRebuildFlow = gcvTRUE;
+                }
             }
 
             removeAllDep = gcvFALSE;
@@ -6844,12 +7019,9 @@ gcOpt_PropagateConstants(
                 gctINT       indexedValue = 0;
                 gctUINT      val;
                 gcSL_FORMAT  format;
-                gctSOURCE_t source = codeUser->instruction.source1;
-
-                /* set source1 as not indexed */
-                codeUser->instruction.source1 =
-                    gcmSL_SOURCE_SET(source, Indexed, gcSL_NOT_INDEXED);
-                codeUser->instruction.source1Indexed = 0;
+                gctSOURCE_t  source = codeUser->instruction.source1;
+                gcVARIABLE   variable = Optimizer->tempArray[codeUser->instruction.source1Index].arrayVariable;
+                gctBOOL      validIndex = gcvTRUE;
 
                 /* get the indexed value */
                 val = (code->instruction.source0Index & 0xFFFF) |
@@ -6876,22 +7048,48 @@ gcOpt_PropagateConstants(
                     return gcvSTATUS_INVALID_DATA;
                 }
 
-                gcmASSERT(indexedValue >= 0); /* we should not have
-                                                negative indexing for sampler */
-                /* set the sampler index */
-                codeUser->instruction.source1Index +=
-                                        (gctUINT16)indexedValue;
-
-                /* Remove dependency and user. */
-                if (!useOnBothSource0AndSource1)
+                if (gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP)
                 {
-                    gcmVERIFY_OK(gcOpt_DeleteCodeFromList(Optimizer,
-                                                &code->users, codeUser));
-                }
-                gcmVERIFY_OK(gcOpt_DestroyList(Optimizer, &codeUser->dependencies1));
+                    /* This is a invalid index, it may be skip by any previous JMPs. */
+                    if (variable && variable->arraySize > 1)
+                    {
+                        if ((codeUser->instruction.source1Index + (gctUINT16)indexedValue) >=
+                            (variable->tempIndex + (gctUINT16)variable->arraySize))
+                        {
+                            validIndex = gcvFALSE;
+                        }
+                    }
 
-                propagateSource1 = gcvTRUE;
-                constPropagated++;
+                    if ((codeUser->instruction.source1Index + (gctUINT16)indexedValue) >= (gctUINT16)Optimizer->tempCount)
+                    {
+                        validIndex = gcvFALSE;
+                    }
+                }
+
+                if (validIndex)
+                {
+                    /* set source1 as not indexed */
+                    codeUser->instruction.source1 =
+                        gcmSL_SOURCE_SET(source, Indexed, gcSL_NOT_INDEXED);
+                    codeUser->instruction.source1Indexed = 0;
+
+                    /* set the sampler index */
+                    codeUser->instruction.source1Index +=
+                                            (gctUINT16)indexedValue;
+
+                    /* Remove dependency and user. */
+                    if (!useOnBothSource0AndSource1)
+                    {
+                        gcmVERIFY_OK(gcOpt_DeleteCodeFromList(Optimizer,
+                                                    &code->users, codeUser));
+                    }
+                    gcmVERIFY_OK(gcOpt_DestroyList(Optimizer, &codeUser->dependencies1));
+
+                    propagateSource1 = gcvTRUE;
+                    constPropagated++;
+
+                    needRebuildFlow = gcvTRUE;
+                }
             }
 
             if (useOnBothSource0AndSource1 && propagateSource0 && propagateSource1)
@@ -6910,6 +7108,12 @@ gcOpt_PropagateConstants(
     if (constPropagated > 0)
     {
         status = gcvSTATUS_CHANGED;
+    }
+
+    if (needRebuildFlow)
+    {
+        /* Rebuild flow graph. */
+        gcmVERIFY_OK(gcOpt_RebuildFlowGraph(Optimizer));
     }
 
     if (status == gcvSTATUS_CHANGED)
@@ -7626,16 +7830,13 @@ _gcConvertTEXLD2MOV(
     gctUINT16  srcConfig0, srcConfig1;
     char       constTexelName[64];
     gctUINT    offset = 0;
-    gcePATCH_ID patchId = gcvPATCH_INVALID;
-
-    gcoHAL_GetPatchID(gcvNULL, &patchId);
+    gcePATCH_ID patchId = Optimizer->patchID;
 
     if (Optimizer->shader->type != gcSHADER_TYPE_FRAGMENT)
         return status;
 
-    if(patchId == gcvPATCH_GLBM21 || patchId == gcvPATCH_GLBM25)
+    if (patchId == gcvPATCH_GLBM21 || patchId == gcvPATCH_GLBM25)
     {
-
         for (code = Optimizer->codeHead; code; code = code->next)
         {
             if (code->instruction.opcode == gcSL_TEXLD &&
@@ -9512,12 +9713,9 @@ gcOpt_MovTexLodCode(
     {
         opcode = gcmSL_OPCODE_GET(code->instruction.opcode, Opcode);
 
-        /* Test for TEXBIAS, TEXGRAD, TEXGATHER, TEXFETCH_MS, TEXLOD instruction. */
-        if (opcode != gcSL_TEXBIAS &&
-            opcode != gcSL_TEXGRAD &&
-            opcode != gcSL_TEXGATHER &&
-            opcode != gcSL_TEXFETCH_MS &&
-            opcode != gcSL_TEXLOD) continue;
+        /* Test for texld modifier instruction. */
+        if (!gcSL_isOpcodeTexldModifier(opcode))
+            continue;
 
         for (userCode = code->next; userCode; userCode = userCode->next)
         {
@@ -9972,6 +10170,12 @@ gcOptimizeShader(
         /* Construct the optimizer. */
         gcmERR_BREAK(gcOpt_ConstructOptimizer(Shader, &optimizer));
 
+        gcmERR_BREAK(gcOpt_RemoveDeadCode(optimizer));
+
+#if _REMAP_TEMP_INDEX_FOR_FUNCTION_
+        gcmERR_BREAK(gcOpt_RemapTempIndex(&optimizer));
+#endif
+
         optimizer->logFile = LogFile;
 
         DUMP_OPTIMIZER("After preprocessing", optimizer);
@@ -10338,6 +10542,8 @@ gcOptimizeShader(
         }
         else if (gcdHasOptimization(option, gcvOPTIMIZATION_UNIT_TEST))
         {
+            status = gcvSTATUS_OK;
+
             if (gcdHasOptimization(option, gcvOPTIMIZATION_DEAD_CODE))
             {
                 status = gcOpt_RemoveDeadCode(optimizer);

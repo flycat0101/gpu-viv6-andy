@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -153,7 +153,7 @@ struct eglWorkerInfo
 #elif defined(__QNXNTO__)
 #   define EGL_WORKER_COUNT     1
 #else
-#   define EGL_WORKER_COUNT     4
+#   define EGL_WORKER_COUNT     16
 #endif
 
 typedef void (* VEGL_ESPrivDestructor) (gctPOINTER priv);
@@ -703,11 +703,6 @@ veglResizeSurface(
     IN VEGLSurface Surface,
     IN gctUINT Width,
     IN gctUINT Height
-    );
-
-void
-veglUpdateSurfaceAge(
-    IN VEGLDisplay Display
     );
 
 /*******************************************************************************

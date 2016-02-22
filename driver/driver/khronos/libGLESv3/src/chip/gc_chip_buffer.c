@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2015 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -15,9 +15,13 @@
 #include "gc_chip_context.h"
 
 #define _GC_OBJ_ZONE    __GLES3_ZONE_BUFFER
+
+static GLint MSAASample0 = 0;
+static GLint MSAASamples[4] = {0};
                                                     /*requestFormat,      readFormat,        writeFormat,     flags,  patchCase,  numSampler,    samples[4] */
-#define __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(b)      {b,             gcvSURF_UNKNOWN,   gcvSURF_UNKNOWN,    0,         0,          0,        {0,0,0,0} }
-#define __GL_INITIALIZE_FORMAT_MAP_INFO_WITH_FLAGS(b,f) {b,             gcvSURF_UNKNOWN,   gcvSURF_UNKNOWN,    f,         0,          0,        {0,0,0,0} }
+#define __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(b)      {b,             gcvSURF_UNKNOWN,   gcvSURF_UNKNOWN,    0,         0,          0,        &MSAASample0 }
+#define __GL_INITIALIZE_FORMAT_MAP_INFO_WITH_FLAGS(b,f) {b,             gcvSURF_UNKNOWN,   gcvSURF_UNKNOWN,    f,         0,          0,        &MSAASample0 }
+
 
 /* OGL format naming rules:
 ** 1, Non packed-format, from LSB to MSB. e.g RGBA8, R is LSB, A is MSB.
@@ -178,6 +182,8 @@ static __GLchipFmtMapInfo __glChipFmtMapInfo[__GL_FMT_MAX + 1] =
 static __GLchipFmtMapInfo __glChipFmtMapInfo_patch[__GL_CHIP_PATCH_FMT_MAX];
 extern __GLformatInfo __glFormatInfoTable[];
 
+
+
 /************************************************************************/
 /* Implementation for EXPORTED FUNCIONS                                 */
 /************************************************************************/
@@ -226,7 +232,7 @@ gcChipSetFmtMapAttribs(
                 (glFormat == __GL_FMT_RGB16F))
             {
                 fmtMapInfo->numSamples = 0;
-                fmtMapInfo->samples[0] = 0;
+                fmtMapInfo->samples = &MSAASample0;
             }
             else if (((__glFormatInfoTable[glFormat].dataFormat == GL_RED_INTEGER)    ||
                       (__glFormatInfoTable[glFormat].dataFormat == GL_RG_INTEGER)     ||
@@ -235,27 +241,28 @@ gcChipSetFmtMapAttribs(
                      (gc->apiVersion <= __GL_API_VERSION_ES30))
             {
                 fmtMapInfo->numSamples = 0;
-                fmtMapInfo->samples[0] = 0;
+                fmtMapInfo->samples = &MSAASample0;
             }
             else
             {
                 /* we only support 1 sample mode for renderable internal non-integer formats */
-                fmtMapInfo->numSamples = 1;
-                fmtMapInfo->samples[0] = maxSamples;
+                fmtMapInfo->numSamples = chipCtx->numSamples;
+                fmtMapInfo->samples = MSAASamples;
+                gcoOS_MemCopy(fmtMapInfo->samples, chipCtx->samples, sizeof(chipCtx->samples));
             }
         }
         else
         {
             /* we only support 1 sample mode for renderable internal formats */
             fmtMapInfo->numSamples = 0;
-            fmtMapInfo->samples[0] = 0;
+            fmtMapInfo->samples = &MSAASample0;
         }
     }
     else
     {
         /* we don't any multisample configurations for non-renderable format */
         fmtMapInfo->numSamples = 0;
-        fmtMapInfo->samples[0] = 0;
+        fmtMapInfo->samples = &MSAASample0;
     }
 }
 
@@ -309,6 +316,18 @@ gcChipInitFormatMapInfo(
     GLuint halfFloatTableSize = 0;
 
     gcmHEADER_ARG("gc=0x%x", gc);
+
+    if (chipCtx->chipFeature.supportMSAA2X)
+    {
+        chipCtx->numSamples = 2;
+        chipCtx->samples[0] = 2;
+        chipCtx->samples[1] = maxSamples;
+    }
+    else
+    {
+        chipCtx->numSamples = 1;
+        chipCtx->samples[0] = maxSamples;
+    }
 
     if (initializedVer == gc->apiVersion)
     {
@@ -789,7 +808,7 @@ __glChipMapBufferRange(
 #if gcdDUMP
             if (access & GL_MAP_READ_BIT)
             {
-                gcmDUMP(gcvNULL, "#verify mapped bufobj");
+                gcmDUMP(gcvNULL, "#[info: verify mapped bufobj");
                 gcmDUMP_BUFFER(gcvNULL,
                                "verify",
                                physical,
@@ -1111,7 +1130,7 @@ __glChipBufferSubData(
             if (arrayIdx < gc->bufferObject.maxBufBindings[targetIdx] &&
                 gc->bufferObject.bindingPoints[targetIdx][arrayIdx].boundBufObj == bufObj)
             {
-                __glBitmaskOR(&gc->bufferObject.bindingDirties[targetIdx], arrayIdx);
+                __glBitmaskSet(&gc->bufferObject.bindingDirties[targetIdx], arrayIdx);
             }
 
             bindUser = bindUser->next;

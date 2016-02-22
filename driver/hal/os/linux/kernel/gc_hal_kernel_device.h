@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2015 Vivante Corporation
+*    Copyright (c) 2014 - 2016 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2015 Vivante Corporation
+*    Copyright (C) 2014 - 2016 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -57,6 +57,7 @@
 #define __gc_hal_kernel_device_h_
 
 #include "gc_hal_kernel_debugfs.h"
+#include "gc_hal_ta.h"
 
 typedef struct _gcsDEVICE_CONSTRUCT_ARGS
 {
@@ -77,6 +78,8 @@ typedef struct _gcsDEVICE_CONSTRUCT_ARGS
     gctUINT             registerBases[gcvCORE_COUNT];
     gctUINT             registerSizes[gcvCORE_COUNT];
     gctBOOL             powerManagement;
+    gctBOOL             gpuProfiler;
+    gctUINT             chipIDs[gcvCORE_COUNT];
 }
 gcsDEVICE_CONSTRUCT_ARGS;
 
@@ -136,9 +139,6 @@ typedef struct _gckGALDEVICE
     /* Signal management. */
     gctINT              signal;
 
-    /* Core mapping (obsolete). */
-    gceCORE             coreMapping[8];
-
     /* States before suspend. */
     gceCHIPPOWERSTATE   statesStored[gcdMAX_GPU_COUNT];
 
@@ -150,6 +150,9 @@ typedef struct _gckGALDEVICE
     gckDEVICE           device;
 
     gcsDEVICE_CONSTRUCT_ARGS args;
+
+    /* gctsOs object for trust application. */
+    gctaOS              taos;
 }
 * gckGALDEVICE;
 
