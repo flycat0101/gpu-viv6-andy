@@ -890,6 +890,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Uniform_GetOffset(Uniform)                  ((Uniform)->offset)
 #define VIR_Uniform_SetOffset(Uniform, offset)          ((Uniform)->offset = offset)
 #define VIR_Uniform_GetInitializer(Uniform)             ((Uniform)->u.initializer)
+#define VIR_Uniform_SetInitializer(Uniform, i)          ((Uniform)->u.initializer = (i))
 
 #define VIR_UniformBlock_GetBlockSize(UB)               ((UB)->blockSize)
 

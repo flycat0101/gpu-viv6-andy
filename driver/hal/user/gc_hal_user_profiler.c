@@ -23,8 +23,14 @@
 
 #ifdef ANDROID
 #define DEFAULT_PROFILE_FILE_NAME   "/sdcard/vprofiler.vpd"
+#if VIVANTE_PROFILER_PROBE
+#define DEFAULT_PROBE_FILE_NAME   "/sdcard/vprobe.xml"
+#endif
 #else
 #define DEFAULT_PROFILE_FILE_NAME   "vprofiler.vpd"
+#if VIVANTE_PROFILER_PROBE
+#define DEFAULT_PROBE_FILE_NAME   "vprobe.xml"
+#endif
 #endif
 
 #if gcdNEW_PROFILER_FILE
@@ -32,59 +38,6 @@
 #define _HAL Hal
 #else
 #define _HAL gcPLS.hal
-#endif
-
-#if VIVANTE_PROFILER_PROBE
-#define   MODULE_FRONT_END                                0x0
-#define   MODULE_VERTEX_SHADER                            0x1
-#define   MODULE_PRIMITIVE_ASSEMBLY                       0x2
-#define   MODULE_SETUP                                    0x3
-#define   MODULE_RASTERIZER                               0x4
-#define   MODULE_PIXEL_SHADER                             0x5
-#define   MODULE_TEXTURE                                  0x6
-#define   MODULE_PIXEL_ENGINE                             0x7
-#define   MODULE_MEMORY_CONTROLLER_COLOR                  0x8
-#define   MODULE_MEMORY_CONTROLLER_DEPTH                  0x9
-#define   MODULE_HOST_INTERFACE0                          0xA
-#define   MODULE_HOST_INTERFACE1                          0xB
-#define   MODULE_GPUL2_CACHE                              0xC
-
-/*
-#define   MODULE_FRONT_END_COUNTER_NUM                    0x5
-#define   MODULE_VERTEX_SHADER_COUNTER_NUM                0x9
-#define   MODULE_PRIMITIVE_ASSEMBLY_COUNTER_NUM           0xC
-#define   MODULE_SETUP_COUNTER_NUM                        0xD
-#define   MODULE_RASTERIZER_COUNTER_NUM                   0xE
-#define   MODULE_PIXEL_SHADER_COUNTER_NUM                 0x9
-#define   MODULE_TEXTURE_COUNTER_NUM                      0x8
-#define   MODULE_PIXEL_ENGINE_COUNTER_NUM                 0x8
-#define   MODULE_MEMORY_CONTROLLER_COLOR_COUNTER_NUM      0xC
-#define   MODULE_MEMORY_CONTROLLER_DEPTH_COUNTER_NUM      0xC
-#define   MODULE_HOST_INTERFACE0_COUNTER_NUM              0x9
-#define   MODULE_HOST_INTERFACE1_COUNTER_NUM              0x7
-#define   MODULE_GPUL2_CACHE_COUNTER_NUM                  0xE */
-
-#define   MODULE_FRONT_END_COUNTER_NUM                    0x0
-#define   MODULE_VERTEX_SHADER_COUNTER_NUM                0x0
-#define   MODULE_PRIMITIVE_ASSEMBLY_COUNTER_NUM           0x3
-#define   MODULE_SETUP_COUNTER_NUM                        0x0
-#define   MODULE_RASTERIZER_COUNTER_NUM                   0x0
-#define   MODULE_PIXEL_SHADER_COUNTER_NUM                 0x0
-#define   MODULE_TEXTURE_COUNTER_NUM                      0x0
-#define   MODULE_PIXEL_ENGINE_COUNTER_NUM                 0x0
-#define   MODULE_MEMORY_CONTROLLER_COLOR_COUNTER_NUM      0x0
-#define   MODULE_MEMORY_CONTROLLER_DEPTH_COUNTER_NUM      0x0
-#define   MODULE_HOST_INTERFACE0_COUNTER_NUM              0x9
-#define   MODULE_HOST_INTERFACE1_COUNTER_NUM              0x0
-#define   MODULE_GPUL2_CACHE_COUNTER_NUM                  0x0
-
-#define PROBE_MODULE_COUNTERS(module_id, counter_num) \
-        for (i = 0; i < counter_num; i++) \
-        { \
-            gcoHARDWARE_ProbeCounter(hardware, address + (i + offset) * sizeof(gctUINT32), module_id, i); \
-        } \
-        offset += counter_num; \
-
 #endif
 
 #if VIVANTE_PROFILER_CONTEXT
@@ -294,6 +247,64 @@ static void glhal_map_delete(gcoHAL Hal){}
     while (gcvFALSE)
 #endif
 
+#if VIVANTE_PROFILER_PROBE
+#define gcmWRITE_XML_STRING(String) \
+    do \
+    { \
+    gceSTATUS status; \
+    gctINT32 length; \
+    length = (gctINT32) gcoOS_StrLen((gctSTRING) String, gcvNULL); \
+    gcmERR_BREAK(gcoPROFILER_Write(_HAL, length, String)); \
+    } \
+    while (gcvFALSE)
+
+
+#define gcmWRITE_XML_COUNTER(Counter,Value) \
+    do \
+    { \
+    char buffer[256]; \
+    gctUINT tempOffset = 0; \
+    gceSTATUS status; \
+    if (Value == 0xDEADDEAD) \
+    { \
+        gcmERR_BREAK(gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), \
+        &tempOffset, \
+        "<%s> %s </%s>\n", \
+        Counter, \
+        "invalid", \
+        Counter)); \
+        gcmWRITE_XML_STRING(buffer); \
+    } \
+    else \
+    { \
+        gcmERR_BREAK(gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), \
+        &tempOffset, \
+        "<%s> %d </%s>\n", \
+        Counter, \
+        Value, \
+        Counter)); \
+        gcmWRITE_XML_STRING(buffer); \
+    } \
+    } \
+    while (gcvFALSE)
+
+#define gcmWRITE_XML_Value(Counter,Value,Dec) \
+    do \
+    { \
+    char buffer[256]; \
+    gctUINT offset = 0; \
+    gceSTATUS status; \
+    gcmERR_BREAK(gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), \
+    &offset, \
+    Dec?"<%s>%d</%s>\n":"<%s>%x</%s>\n", \
+    Counter, \
+    Value, \
+    Counter)); \
+    gcmWRITE_XML_STRING(buffer); \
+    } \
+    while (gcvFALSE)
+#endif
+
 gceSTATUS
 gcoPROFILER_Initialize(
     IN gcoHAL Hal,
@@ -339,11 +350,17 @@ gcoPROFILER_Initialize(
             &iface, gcmSIZEOF(iface),
             &iface, gcmSIZEOF(iface));
 
+
 #if VIVANTE_PROFILER_PROBE
         if (_HAL && hardware)
         {
             int bufId = 0;
             gcoBUFOBJ counterBuf;
+            gctHANDLE pid = gcoOS_GetCurrentProcessID();
+            static gctUINT8 num = 1;
+            gctUINT offset = 0;
+            char* pos = gcvNULL;
+
             gcoHARDWARE_EnableCounters(hardware);
             for (; bufId < NumOfDrawBuf;bufId++)
             {
@@ -352,6 +369,17 @@ gcoPROFILER_Initialize(
                 _HAL->profiler.newCounterBuf[bufId] = (gctHANDLE)counterBuf;
             }
             _HAL->profiler.curBufId = 0;
+
+            /*generate file name for each context*/
+            fileName = DEFAULT_PROBE_FILE_NAME;
+            if(fileName) gcoOS_StrCatSafe(inputFileName,256,fileName);
+
+            gcoOS_StrStr (inputFileName, ".xml",&pos);
+            if(pos) pos[0] = '\0';
+            gcoOS_PrintStrSafe(profilerName, gcmSIZEOF(profilerName), &offset, "%s_%d_%d.xml",inputFileName,(gctUINTPTR_T)pid, num);
+
+            num++;
+            gcoOS_Open(gcvNULL, profilerName, gcvFILE_CREATETEXT, &_HAL->profiler.probeFile);
         }
 #endif
 
@@ -560,22 +588,29 @@ gcoPROFILER_Destroy(
         return gcvSTATUS_NOT_SUPPORTED;
     }
 
-    gcmWRITE_CONST(VPG_END);
-
-    gcoPROFILER_Flush(gcvNULL);
-    if (_HAL->profiler.enable )
+    if (_HAL->profiler.enable)
     {
         /* Close the profiler file. */
+        gcmWRITE_CONST(VPG_END);
+
+        gcoPROFILER_Flush(gcvNULL);
         gcmVERIFY_OK(gcoOS_Close(gcvNULL, _HAL->profiler.file));
     }
-    glhal_map_delete(_HAL);
-#if VIVANTE_PROFILER_PROBE
+    else
     {
+#if VIVANTE_PROFILER_PROBE
         gctUINT32 i = 0;
         for (i = 0;  i < NumOfDrawBuf; i++)
             gcoBUFOBJ_Destroy(_HAL->profiler.newCounterBuf[i]);
-    }
+
+        gcmWRITE_XML_STRING("</DrawCounter>\n");
+        gcoPROFILER_Flush(gcvNULL);
+        gcoOS_Close(gcvNULL, _HAL->profiler.probeFile);
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
 #endif
+    }
+    glhal_map_delete(_HAL);
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -598,13 +633,22 @@ gcoPROFILER_Write(
         return gcvSTATUS_NOT_SUPPORTED;
     }
     /* Check if already destroyed. */
-       if (_HAL->profiler.enable)
+    if (_HAL->profiler.enable)
     {
         status = gcoOS_Write(gcvNULL,
             _HAL->profiler.file,
             ByteCount, Data);
     }
-
+    else
+    {
+#if VIVANTE_PROFILER_PROBE
+        {
+            status = gcoOS_Write(gcvNULL,
+                _HAL->profiler.probeFile,
+                ByteCount, Data);
+        }
+#endif
+    }
     gcmFOOTER();
     return status;
 }
@@ -831,7 +875,7 @@ gcoPROFILER_EndFrame(
 #endif
 
     gcmHEADER();
-    if(!_HAL)
+    if (!_HAL)
     {
         gcmFOOTER_NO();
         return gcvSTATUS_NOT_SUPPORTED;
@@ -840,32 +884,251 @@ gcoPROFILER_EndFrame(
     if (!_HAL->profiler.enable)
     {
 #if VIVANTE_PROFILER_PROBE
-        gctUINT32 totalCycle = 0;
-        gctUINT32 paOffset = MODULE_FRONT_END_COUNTER_NUM + MODULE_VERTEX_SHADER_COUNTER_NUM;
-        gctUINT32 hi0Offest = MODULE_PRIMITIVE_ASSEMBLY_COUNTER_NUM + MODULE_SETUP_COUNTER_NUM
-            + MODULE_RASTERIZER_COUNTER_NUM + MODULE_PIXEL_SHADER_COUNTER_NUM
-            + MODULE_TEXTURE_COUNTER_NUM + MODULE_PIXEL_ENGINE_COUNTER_NUM
-            + MODULE_MEMORY_CONTROLLER_COLOR_COUNTER_NUM + MODULE_MEMORY_CONTROLLER_DEPTH_COUNTER_NUM;
 
-        gcmPRINT("Frame %d:\n", frameNo);
-        gcmPRINT("************\n");
-
-        for (j = 0; j < _HAL->profiler.curBufId; j++)
+        if (_HAL->profiler.curBufId > 0)
         {
-            gcmPRINT("draw #%d\n************\n", j);
-            gcoBUFOBJ_Lock(_HAL->profiler.newCounterBuf[j], &address, &memory);
-            offset = paOffset;
-            /* module PA */
-            gcmPRINT("PA counter: Input prim: %d\n", *((gctUINT32_PTR)memory + offset));
-            gcmPRINT("PA counter: Output prim: %d\n", *((gctUINT32_PTR)memory + 1 + offset));
-            offset += hi0Offest;
-            /* module HI0 */
-            gcmPRINT("HI0 counter: GPU cycle: %d\n************\n", *((gctUINT32_PTR)memory + 7 + offset));
-            totalCycle += *((gctUINT32_PTR)memory + 7 + offset);
+            gcoHAL_Commit(_HAL, gcvTRUE);
+            gcmWRITE_XML_STRING("\t<FrameID>\n");
+            gcmWRITE_XML_STRING("\t\t");gcmWRITE_XML_Value("FrameNUM", frameNo, 1);
+
+            for (j = 0; j < _HAL->profiler.curBufId; j++)
+            {
+                gctUINT32 min_latency = 0;
+                gctUINT32 max_latency = 0;
+
+                gcmWRITE_XML_STRING("\t\t<Operation>\n");
+                gcmWRITE_XML_STRING("\t\t\t");gcmWRITE_XML_Value("OperationType",0,1);
+                gcmWRITE_XML_STRING("\t\t\t");gcmWRITE_XML_Value("OperationNumber",j,1);
+
+                gcoBUFOBJ_Lock(_HAL->profiler.newCounterBuf[j], &address, &memory);
+                offset = 0;
+                /* module FE */
+
+                gcmWRITE_XML_STRING("\t\t\t<FECounters>\n");
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("VtxOuputCount",*((gctUINT32_PTR)memory + 0 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("VtxCacheMissCount",*((gctUINT32_PTR)memory + 1 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("VtxCacheLookupCount",*((gctUINT32_PTR)memory + 2 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("StallCount",*((gctUINT32_PTR)memory + 3 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("ProcessCount",*((gctUINT32_PTR)memory + 4 + offset));
+                gcmWRITE_XML_STRING("\t\t\t</FECounters>\n");
+                offset += MODULE_FRONT_END_COUNTER_NUM;
+
+                /* module VS */
+                gcmWRITE_XML_STRING("\t\t\t<VSCounters>\n");
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("CycleCounter",*((gctUINT32_PTR)memory + 0 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("PixelInstrPerCore",*((gctUINT32_PTR)memory + 1 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalPixelShaded",*((gctUINT32_PTR)memory + 2 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("VertexInstrPerCore",*((gctUINT32_PTR)memory + 3 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("VertexExecute",*((gctUINT32_PTR)memory + 4 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("VertexBranchInstrExecute",*((gctUINT32_PTR)memory + 5 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("VertexTextureInstrExecute",*((gctUINT32_PTR)memory + 6 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("PixelBranchInstrExecute",*((gctUINT32_PTR)memory + 7 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("PixelTextureInstrExecute",*((gctUINT32_PTR)memory + 8 + offset));
+                gcmWRITE_XML_STRING("\t\t\t</VSCounters>\n");
+                offset += MODULE_VERTEX_SHADER_COUNTER_NUM;
+
+                /* module PA */
+                gcmWRITE_XML_STRING("\t\t\t<PACounters>\n");
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("VTXCount",*((gctUINT32_PTR)memory + 0 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("InPrimCount",*((gctUINT32_PTR)memory + 1 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("OutPrimCount",*((gctUINT32_PTR)memory + 2 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("tRejCount",*((gctUINT32_PTR)memory + 3 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("CullPrimCount",*((gctUINT32_PTR)memory + 4 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("DropPrimCount",*((gctUINT32_PTR)memory + 5 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("FrstClipPrimCount",*((gctUINT32_PTR)memory + 6 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("FrstClipDropPrimCount",*((gctUINT32_PTR)memory + 7 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("NonIdleStarveCount",*((gctUINT32_PTR)memory + 8 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("StarveCount",*((gctUINT32_PTR)memory + 9 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("StallCount",*((gctUINT32_PTR)memory + 10 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("ProcessCount",*((gctUINT32_PTR)memory + 11 + offset));
+                gcmWRITE_XML_STRING("\t\t\t</PACounters>\n");
+                offset += MODULE_PRIMITIVE_ASSEMBLY_COUNTER_NUM;
+
+                /* module SE */
+                gcmWRITE_XML_STRING("\t\t\t<SECounters>\n");
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("StarveCount",*((gctUINT32_PTR)memory + 0 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("StallCount",*((gctUINT32_PTR)memory + 1 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("InputTriCount",*((gctUINT32_PTR)memory + 2 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("OutputTriCount",*((gctUINT32_PTR)memory + 3 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("InputLineCount",*((gctUINT32_PTR)memory + 4 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("OutputLineCount",*((gctUINT32_PTR)memory + 5 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("ProcessCount",*((gctUINT32_PTR)memory + 6 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("ClippedTriCount",*((gctUINT32_PTR)memory + 7 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("ClippedLineCount",*((gctUINT32_PTR)memory + 8 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("CulledTriCount",*((gctUINT32_PTR)memory + 9 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("CulledLineCount",*((gctUINT32_PTR)memory + 10 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TrivialRejLineCount",*((gctUINT32_PTR)memory + 11 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("NonIdleStartveCount",*((gctUINT32_PTR)memory + 12 + offset));
+                gcmWRITE_XML_STRING("\t\t\t</SECounters>\n");
+                offset += MODULE_SETUP_COUNTER_NUM;
+
+                /* module RA */
+                gcmWRITE_XML_STRING("\t\t\t<RACounters>\n");
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("PrimInputCount",*((gctUINT32_PTR)memory + 0 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("QuadCountFromScan",*((gctUINT32_PTR)memory + 1 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("ZCacheMiss",*((gctUINT32_PTR)memory + 2 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("HZCacheMiss",*((gctUINT32_PTR)memory + 3 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("QuadCountAfterHZorEEZ",*((gctUINT32_PTR)memory + 4 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("ValidPixelCountToRender",*((gctUINT32_PTR)memory + 5 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("OutputValidQuadCount",*((gctUINT32_PTR)memory + 6 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("OutputValidPixelCount",*((gctUINT32_PTR)memory + 7 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("HZPipeCacheMiss",*((gctUINT32_PTR)memory + 8 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("RARenderPipe1CacheMiss",*((gctUINT32_PTR)memory + 9 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("NonIdleStarveCount",*((gctUINT32_PTR)memory + 10 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("StarveCount",*((gctUINT32_PTR)memory + 11 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("StallCount",*((gctUINT32_PTR)memory + 12 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("ProcessCount",*((gctUINT32_PTR)memory + 13 + offset));
+                gcmWRITE_XML_STRING("\t\t\t</RACounters>\n");
+                offset += MODULE_RASTERIZER_COUNTER_NUM;
+
+                /* module PS */
+                gcmWRITE_XML_STRING("\t\t\t<PSCounters>\n");
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("CycleCounter",*((gctUINT32_PTR)memory + 0 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("PixelInstrPerCore",*((gctUINT32_PTR)memory + 1 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalPixelShaded",*((gctUINT32_PTR)memory + 2 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("VertexInstrPerCore",*((gctUINT32_PTR)memory + 3 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("VertexExecute",*((gctUINT32_PTR)memory + 4 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("VertexBranchInstrExecute",*((gctUINT32_PTR)memory + 5 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("VertexTextureInstrExecute",*((gctUINT32_PTR)memory + 6 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("PixelBranchInstrExecute",*((gctUINT32_PTR)memory + 7 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("PixelTextureInstrExecute",*((gctUINT32_PTR)memory + 8 + offset));
+                gcmWRITE_XML_STRING("\t\t\t</PSCounters>\n");
+                offset += MODULE_PIXEL_SHADER_COUNTER_NUM;
+
+                /* module TX */
+                gcmWRITE_XML_STRING("\t\t\t<TXCounters>\n");
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("BiLinearIncomingPixel",*((gctUINT32_PTR)memory + 0 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TriLinearIncomingPixel",*((gctUINT32_PTR)memory + 1 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("DiscardIncomingPixel",*((gctUINT32_PTR)memory + 2 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalIncomingPixel",*((gctUINT32_PTR)memory + 3 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("MC0MissCount",*((gctUINT32_PTR)memory + 4 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("MC0MemoryRequestByte",*((gctUINT32_PTR)memory + 5 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("MC1MissCount",*((gctUINT32_PTR)memory + 6 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("MC1MemoryRequestByte",*((gctUINT32_PTR)memory + 7 + offset));
+                gcmWRITE_XML_STRING("\t\t\t</TXCounters>\n");
+                offset += MODULE_TEXTURE_COUNTER_NUM;
+
+                /* module PE */
+                gcmWRITE_XML_STRING("\t\t\t<PECounters>\n");
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("PE0ColorKilledCount",*((gctUINT32_PTR)memory + 0 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("PE0DepthKilledCount",*((gctUINT32_PTR)memory + 1 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("PE0ColorDrawnCount",*((gctUINT32_PTR)memory + 2 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("PE0DepthDrawnCount",*((gctUINT32_PTR)memory + 3 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("PE1ColorKilledCount",*((gctUINT32_PTR)memory + 4 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("PE1DepthKilledCount",*((gctUINT32_PTR)memory + 5 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("PE1ColorDrawnCount",*((gctUINT32_PTR)memory + 6 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("PE1DepthDrawnCount",*((gctUINT32_PTR)memory + 7 + offset));
+                gcmWRITE_XML_STRING("\t\t\t</PECounters>\n");
+                offset += MODULE_PIXEL_ENGINE_COUNTER_NUM;
+
+                /* module MCC */
+                gcmWRITE_XML_STRING("\t\t\t<MCCCounters>\n");
+                if (*((gctUINT32_PTR)memory + offset) != 0xDEADDEAD)
+                {
+                    max_latency = ((*((gctUINT32_PTR)memory + offset) & 0xfff000) >> 12);
+                    min_latency = (*((gctUINT32_PTR)memory + offset) & 0x000fff);
+                    if (min_latency == 4095)
+                        min_latency = 0;
+                    gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("MaxLatency",max_latency);
+                    gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("MinLatency",min_latency);
+                }
+                else
+                {
+                    gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("MinMaxLatency",*((gctUINT32_PTR)memory + 0 + offset));
+                }
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("Total_Latency",*((gctUINT32_PTR)memory + 1 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalSampleCount",*((gctUINT32_PTR)memory + 2 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalReadin8BFromPE",*((gctUINT32_PTR)memory + 3 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalReadin8BFromComp",*((gctUINT32_PTR)memory + 4 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalWritein8BFromPE",*((gctUINT32_PTR)memory + 5 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalReadReqFromPE",*((gctUINT32_PTR)memory + 6 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalWriteReqFromPE",*((gctUINT32_PTR)memory + 7 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalReadRin8BFromOthers",*((gctUINT32_PTR)memory + 8 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalWritein8BFromOthers",*((gctUINT32_PTR)memory + 9 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalReadReqFromOthers",*((gctUINT32_PTR)memory + 10 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalWriteReqFromOthers",*((gctUINT32_PTR)memory + 11 + offset));
+                gcmWRITE_XML_STRING("\t\t\t</MCCCounters>\n");
+                offset += MODULE_MEMORY_CONTROLLER_COLOR_COUNTER_NUM;
+
+                /* module MCZ */
+                gcmWRITE_XML_STRING("\t\t\t<MCZCounters>\n");
+                if (*((gctUINT32_PTR)memory + offset) != 0xDEADDEAD)
+                {
+                    max_latency = ((*((gctUINT32_PTR)memory + offset) & 0xfff000) >> 12);
+                    min_latency = (*((gctUINT32_PTR)memory + offset) & 0x000fff);
+                    if (min_latency == 4095)
+                        min_latency = 0;
+                    gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("MaxLatency",max_latency);
+                    gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("MinLatency",min_latency);
+                }
+                else
+                {
+                    gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("MinMaxLatency",*((gctUINT32_PTR)memory + 0 + offset));
+                }
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("Total_Latency",*((gctUINT32_PTR)memory + 1 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalSampleCount",*((gctUINT32_PTR)memory + 2 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalReadin8BFromPE",*((gctUINT32_PTR)memory + 3 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalReadin8BFromComp",*((gctUINT32_PTR)memory + 4 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalWritein8BFromPE",*((gctUINT32_PTR)memory + 5 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalReadReqFromPE",*((gctUINT32_PTR)memory + 6 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalWriteReqFromPE",*((gctUINT32_PTR)memory + 7 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalReadRin8BFromOthers",*((gctUINT32_PTR)memory + 8 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalWritein8BFromOthers",*((gctUINT32_PTR)memory + 9 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalReadReqFromOthers",*((gctUINT32_PTR)memory + 10 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalWriteReqFromOthers",*((gctUINT32_PTR)memory + 11 + offset));
+                gcmWRITE_XML_STRING("\t\t\t</MCZCounters>\n");
+                offset += MODULE_MEMORY_CONTROLLER_DEPTH_COUNTER_NUM;
+
+                /* module HI0 */
+                gcmWRITE_XML_STRING("\t\t\t<HI0Counters>\n");
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalReadsin64bits",*((gctUINT32_PTR)memory + 0 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalWritesin64bits",*((gctUINT32_PTR)memory + 1 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalWriteReqCount",*((gctUINT32_PTR)memory + 2 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalReadReqCount",*((gctUINT32_PTR)memory + 3 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("NumberOfCyclesAXIReadReqisStalled",*((gctUINT32_PTR)memory + 4 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("NumberOfCyclesAXIWriteReqisStalled",*((gctUINT32_PTR)memory + 5 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("NumberOfCyclesAXIWriteDataisStalled",*((gctUINT32_PTR)memory + 6 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalCycle",*((gctUINT32_PTR)memory + 7 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalIdleCycle",*((gctUINT32_PTR)memory + 8 + offset));
+                gcmWRITE_XML_STRING("\t\t\t</HI0Counters>\n");
+                offset += MODULE_HOST_INTERFACE0_COUNTER_NUM;
+
+                /* module HI1 */
+                gcmWRITE_XML_STRING("\t\t\t<HI1Counters>\n");
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalReadsin64bits",*((gctUINT32_PTR)memory + 0 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalWritesin64bits",*((gctUINT32_PTR)memory + 1 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalWriteReqCount",*((gctUINT32_PTR)memory + 2 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalReadReqCount",*((gctUINT32_PTR)memory + 3 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("NumberOfCyclesAXIReadReqisStalled",*((gctUINT32_PTR)memory + 4 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("NumberOfCyclesAXIWriteReqisStalled",*((gctUINT32_PTR)memory + 5 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("NumberOfCyclesAXIWriteDataisStalled",*((gctUINT32_PTR)memory + 6 + offset));
+                gcmWRITE_XML_STRING("\t\t\t</HI1Counters>\n");
+                offset += MODULE_HOST_INTERFACE1_COUNTER_NUM;
+
+                /* module L2 */
+                gcmWRITE_XML_STRING("\t\t\t<GPUL2Counters>\n");
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalAXI0ReadReq",*((gctUINT32_PTR)memory + 0 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalAXI1ReadReq",*((gctUINT32_PTR)memory + 1 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalAXI0WriteReq",*((gctUINT32_PTR)memory + 2 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalAXI1WriteReq",*((gctUINT32_PTR)memory + 3 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalAXI0ReadTransReq",*((gctUINT32_PTR)memory + 4 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalAXI1ReadTransReq",*((gctUINT32_PTR)memory + 5 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalAXI0WriteTransReq",*((gctUINT32_PTR)memory + 6 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("TotalAXI1WriteTransReq",*((gctUINT32_PTR)memory + 7 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("AXI0MinMaxLatency",*((gctUINT32_PTR)memory + 8 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("AXI0TotalLatency",*((gctUINT32_PTR)memory + 9 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("AXI0TotalReq",*((gctUINT32_PTR)memory + 10 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("AXI1MinMaxLatency",*((gctUINT32_PTR)memory + 11 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("AXI1TotalLatency",*((gctUINT32_PTR)memory + 12 + offset));
+                gcmWRITE_XML_STRING("\t\t\t\t");gcmWRITE_XML_COUNTER("AXI1TotalReq",*((gctUINT32_PTR)memory + 13 + offset));
+                gcmWRITE_XML_STRING("\t\t\t</GPUL2Counters>\n");
+
+                gcmWRITE_XML_STRING("\t\t</Operation>\n");
+            }
+            gcmWRITE_XML_STRING("\t</FrameID>\n");
+            frameNo++;
+            _HAL->profiler.curBufId = 0;
         }
-        gcmPRINT("Total GPU cycle: %d\n************\n", totalCycle);
-        frameNo++;
-        _HAL->profiler.curBufId = 0;
 #endif
         gcmFOOTER_NO();
         return gcvSTATUS_OK;
@@ -1489,6 +1752,52 @@ CalcDelta(
 #endif
 
 gceSTATUS
+gcoPROFILER_BeginDraw(
+                    IN gcoHAL Hal
+                    )
+{
+#if VIVANTE_PROFILER_PROBE
+    gceSTATUS status;
+    gcoHARDWARE hardware = gcvNULL;
+    gcmHEADER();
+    if(!_HAL)
+    {
+        gcmFOOTER_NO();
+        return gcvSTATUS_NOT_SUPPORTED;
+    }
+
+    /* TODO */
+    if (_HAL->profiler.curBufId >= NumOfDrawBuf)
+    {
+        int bufId = 0;
+        _HAL->profiler.curBufId = 0;
+        for (; bufId < NumOfDrawBuf;bufId++)
+        {
+            gcoBUFOBJ_Upload(_HAL->profiler.newCounterBuf[bufId], gcvNULL, 0, 1024*sizeof(gctUINT32), gcvBUFOBJ_USAGE_STATIC_DRAW);
+        }
+    }
+
+    gcmGETHARDWARE(hardware);
+    if (hardware)
+    {
+        gctUINT32   address;
+        gctINT32   module;
+
+        gcoBUFOBJ_Lock(_HAL->profiler.newCounterBuf[_HAL->profiler.curBufId], &address, gcvNULL);
+
+        for (module = 0; module < gcvCOUNTER_COUNT; module++)
+        {
+            gcoHARDWARE_ProbeCounter(hardware, address, (gceCOUNTER)module, gcvTRUE);
+        }
+    }
+
+OnError:
+    gcmFOOTER_NO();
+#endif
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
 gcoPROFILER_EndDraw(
                     IN gcoHAL Hal,
                     IN gctBOOL FirstDraw
@@ -1512,24 +1821,15 @@ gcoPROFILER_EndDraw(
     if (hardware)
     {
         gctUINT32   address;
-        gctUINT32   offset = 0;
-        gctPOINTER  memory;
-        gctUINT32 i;
+        gctINT32    module;
 
-        gcoBUFOBJ_Lock(_HAL->profiler.newCounterBuf[_HAL->profiler.curBufId], &address, &memory);
-        PROBE_MODULE_COUNTERS(MODULE_FRONT_END, MODULE_FRONT_END_COUNTER_NUM);
-        PROBE_MODULE_COUNTERS(MODULE_VERTEX_SHADER, MODULE_VERTEX_SHADER_COUNTER_NUM);
-        PROBE_MODULE_COUNTERS(MODULE_PRIMITIVE_ASSEMBLY, MODULE_PRIMITIVE_ASSEMBLY_COUNTER_NUM);
-        PROBE_MODULE_COUNTERS(MODULE_SETUP, MODULE_SETUP_COUNTER_NUM);
-        PROBE_MODULE_COUNTERS(MODULE_RASTERIZER, MODULE_RASTERIZER_COUNTER_NUM);
-        PROBE_MODULE_COUNTERS(MODULE_PIXEL_SHADER, MODULE_PIXEL_SHADER_COUNTER_NUM);
-        PROBE_MODULE_COUNTERS(MODULE_TEXTURE, MODULE_TEXTURE_COUNTER_NUM);
-        PROBE_MODULE_COUNTERS(MODULE_PIXEL_ENGINE, MODULE_PIXEL_ENGINE_COUNTER_NUM);
-        PROBE_MODULE_COUNTERS(MODULE_MEMORY_CONTROLLER_COLOR, MODULE_MEMORY_CONTROLLER_COLOR_COUNTER_NUM);
-        PROBE_MODULE_COUNTERS(MODULE_MEMORY_CONTROLLER_DEPTH, MODULE_MEMORY_CONTROLLER_DEPTH_COUNTER_NUM);
-        PROBE_MODULE_COUNTERS(MODULE_HOST_INTERFACE0, MODULE_HOST_INTERFACE0_COUNTER_NUM);
-        PROBE_MODULE_COUNTERS(MODULE_HOST_INTERFACE1, MODULE_HOST_INTERFACE1_COUNTER_NUM);
-        PROBE_MODULE_COUNTERS(MODULE_GPUL2_CACHE, MODULE_GPUL2_CACHE_COUNTER_NUM);
+        gcoBUFOBJ_Lock(_HAL->profiler.newCounterBuf[_HAL->profiler.curBufId], &address, gcvNULL);
+
+        for (module = 0; module < gcvCOUNTER_COUNT; module++)
+        {
+            gcoHARDWARE_ProbeCounter(hardware, address, (gceCOUNTER)module, gcvFALSE);
+        }
+
         _HAL->profiler.curBufId++;
     }
 
@@ -1796,6 +2096,15 @@ gcoPROFILER_EndFrame(
     return gcvSTATUS_INVALID_REQUEST;
 }
 
+gceSTATUS
+gcoPROFILER_BeginDraw(
+                    IN gcoHAL Hal
+                    )
+{
+    gcmHEADER();
+    gcmFOOTER_NO();
+    return gcvSTATUS_INVALID_REQUEST;
+}
 /* Call to signal end of draw. */
 gceSTATUS
 gcoPROFILER_EndDraw(

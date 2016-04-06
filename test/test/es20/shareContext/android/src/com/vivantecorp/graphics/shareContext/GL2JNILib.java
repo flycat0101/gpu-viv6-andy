@@ -1,5 +1,4 @@
 
-
 package com.vivantecorp.graphics.shareContext;
 
 import javax.microedition.khronos.egl.EGLContext;
@@ -19,7 +18,8 @@ public class GL2JNILib
      * @param width the current view width
      * @param height the current view height
      */
-     public static native boolean init(Object surface);
+     public static native boolean init(Object surface, Object surface2);
      public static native boolean repaint();
      public static native boolean key(int key, boolean down);
+     public static native boolean finish();
 }

@@ -66,14 +66,14 @@ static const char *sSrcFile[] = {
     "resource/zero2_R8G8B8X8.bmp",
     "resource/zero2_X1B5G5R5.bmp",
     "resource/zero2_X4B4G4R4.bmp",
-    "resource/zero2_UYVY_1920x1080_Linear.vimg",
+	"resource/zero2_X8B8G8R8.bmp",
     "resource/zero2_UYVY_640X480_Linear.vimg",
-    "resource/zero2_X8B8G8R8.bmp",
     "resource/zero2_YUY2_640X480_Linear.vimg",
+	"resource/Crew_NV12_1280x720_Linear.vimg",
+	"resource/Crew_NV16_1280x720_Linear.vimg",
+	"resource/zero2_YUV420_640X480_Linear.vimg",
     "resource/rects_A8R8G8B8_640x640_Tile.vimg",
-    "resource/rects_A8R8G8B8_640x640_Multi_Tile.vimg",
     "resource/rects_A8R8G8B8_640x640_SuperTileV3.vimg",
-    "resource/rects_A8R8G8B8_640x640_Multi_SuperTileV3.vimg",
 };
 
 

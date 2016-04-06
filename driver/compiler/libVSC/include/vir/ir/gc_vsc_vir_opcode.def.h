@@ -140,7 +140,7 @@
     /* sign of operator: Integer: 0 -> 0, positive -> 1, negative -> -1
                          Float:  +/-0.0 ->+/-0.0, nan -> nan,
                                  positive -> 1.0, negative -> -1.0 */
-    VIR_OPINFO(SIGN, 1, HasDest|Componentwise|Expr, 1, AL),
+    VIR_OPINFO(SIGN, 1, HasDest|Componentwise|Expr|EPMP, 1, AL),
     /* get fraction value of float source: FRAC dest, src */
     VIR_OPINFO(FRAC, 1, HasDest|Componentwise|Expr|EPFromS0, 1, AL),
     /* compute reciprocal value: RCP dest, src */

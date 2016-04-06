@@ -241,12 +241,16 @@ typedef enum _gceFEATURE
     gcvFEATURE_2D_FILTERBLIT_A8_ALPHA,
     gcvFEATURE_2D_MULTI_SRC_BLT_TO_UNIFIED_DST_RECT,
     gcvFEATURE_2D_MULTI_SRC_BLT_BILINEAR_FILTER,
+    gcvFEATURE_2D_MULTI_SRC_BLT_1_5_ENHANCEMENT,
     gcvFEATURE_V2_COMPRESSION_Z16_FIX,
     gcvFEATURE_VERTEX_INST_ID_AS_INTEGER,
     gcvFEATURE_2D_YUV_MODE,
     gcvFEATURE_2D_CACHE_128B256BPERLINE,
     gcvFEATURE_2D_MAJOR_SUPER_TILE,
     gcvFEATURE_2D_V4COMPRESSION,
+    gcvFEATURE_2D_VMSAA,
+    gcvFEATURE_2D_10BIT_OUTPUT_LINEAR,
+    gcvFEATURE_2D_YUV420_OUTPUT_LINEAR,
     gcvFEATURE_ACE,
     gcvFEATURE_COLOR_COMPRESSION,
     gcvFEATURE_32BPP_COMPONENT_TEXTURE_CHANNEL_SWIZZLE,
@@ -468,6 +472,7 @@ typedef enum _gceFEATURE
 
     gcvFEATURE_PE_ENHANCEMENTS2,
     gcvFEATURE_PSIO_MSAA_CL_FIX,
+    gcvFEATURE_FE_NEED_DUMMYDRAW,
 
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */
@@ -761,6 +766,7 @@ typedef enum _gceSURF_FORMAT
     gcvSURF_A16R16G16B16_2_A8R8G8B8,
     gcvSURF_A32R32G32B32_2_G32R32F,
     gcvSURF_A32R32G32B32_4_A8R8G8B8,
+    gcvSURF_R10G10B10A2,
     /* BGR formats. */
     gcvSURF_A4B4G4R4            = 300,
     gcvSURF_A1B5G5R5,
@@ -788,6 +794,7 @@ typedef enum _gceSURF_FORMAT
     gcvSURF_X8B8G8R8_SNORM,
     gcvSURF_A8B8G8R8_SNORM,
     gcvSURF_A8B12G12R12_2_A8R8G8B8,
+    gcvSURF_B10G10R10A2,
 
     /* Compressed formats. */
     gcvSURF_DXT1                = 400,
@@ -828,6 +835,10 @@ typedef enum _gceSURF_FORMAT
     gcvSURF_ANV12,
     gcvSURF_ANV16,
 #endif
+    gcvSURF_NV12_10BIT,
+    gcvSURF_NV21_10BIT,
+    gcvSURF_NV16_10BIT,
+    gcvSURF_NV61_10BIT,
 
     /* Depth formats. */
     gcvSURF_D16                 = 600,

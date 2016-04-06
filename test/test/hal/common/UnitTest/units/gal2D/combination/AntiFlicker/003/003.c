@@ -375,6 +375,7 @@ static void CDECL Destroy(Test2D *t2d)
 
 const gceFEATURE FeatureList[]=
 {
+    gcvFEATURE_SCALER,
     gcvFEATURE_YUV420_SCALER,
     gcvFEATURE_ANDROID_ONLY,
 };

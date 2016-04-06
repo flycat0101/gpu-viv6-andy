@@ -941,6 +941,9 @@ static void _VIR_RA_LS_Init(
     pRA->threadIdxSymId  = VIR_INVALID_ID;
 
     pRA->samplePosRegister = VIR_INVALID_ID;
+
+    pRA->maxReg[VIR_RA_HWREG_GR] = 0;
+    pRA->maxReg[VIR_RA_HWREG_A0] = 0;
 }
 
 /* ===========================================================================
@@ -2587,73 +2590,86 @@ _VIR_RA_LS_GetMaxReg(
     gctUINT     hwType,
     gctUINT     reservedDataReg)
 {
-    VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
-    VIR_RA_ColorPool    *pCP = VIR_RA_LS_GetColorPool(pRA);
-    gctUINT             maxFreeReg = 0;
-    gctFLOAT            workGroupSize = 0, threadCount;
-    VSC_HW_CONFIG       *hwConfig = VIR_RA_LS_GetHwCfg(pRA);
-    gctUINT             maxReg = pCP->colorMap[hwType].maxReg;
+    /* avoid compute it multiple times */
+    gctUINT             maxReg;
 
-    /* if the shader needs sampleDepth, we need to make sure the last
-       register is for sampleDepth */
-    if (_VIR_RA_isShaderNeedSampleDepth(pRA))
+    if (pRA->maxReg[hwType] == 0)
     {
-        maxReg -= 1;
-    }
+        VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
+        VIR_RA_ColorPool    *pCP = VIR_RA_LS_GetColorPool(pRA);
+        gctUINT             maxFreeReg = 0;
+        gctFLOAT            workGroupSize = 0, threadCount;
+        VSC_HW_CONFIG       *hwConfig = VIR_RA_LS_GetHwCfg(pRA);
 
-    if (VIR_Shader_HasBarrier(pShader))
+        maxReg = pCP->colorMap[hwType].maxReg;
+
+        /* if the shader needs sampleDepth, we need to make sure the last
+           register is for sampleDepth */
+        if (_VIR_RA_isShaderNeedSampleDepth(pRA))
+        {
+            maxReg -= 1;
+        }
+
+        if (VIR_Shader_HasBarrier(pShader))
+        {
+            /* if compute shader has barrier, the temp count must follow
+               ceiling(work_group_size/(shader_core_count*4*threads_per_register)) <= floor(113/temp_register_count)
+            */
+
+            /* VIR_SHADER_TESSELLATION_CONTROL should not have barrier if core == 8 */
+            gcmASSERT(pShader->shaderKind == VIR_SHADER_CL ||
+                      pShader->shaderKind == VIR_SHADER_COMPUTE ||
+                      pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL);
+            threadCount = (gctFLOAT) (hwConfig->maxCoreCount * 4 * (VIR_Shader_isDual16Mode(pShader) ? 2 : 1));
+
+            /* Halti5 HW with TS/GS supports */
+            if (hwConfig->hwFeatureFlags.hasHalti5
+                && hwConfig->hwFeatureFlags.supportGS
+                && hwConfig->hwFeatureFlags.supportTS
+                )
+            {
+                /*  128: total temp registers per workgroup (128 = 512/4: total temp register per core/4)
+                    16: reserved 1 page (16 registers) each for other shaders.
+                    3: partial page (up to 3 registers) used by current shader previously.
+                    free registers: 128 - 16 - 3 = 109 */
+                maxFreeReg = 109;
+            }
+            else
+            {
+                /* 128: total temp registers per workgroup.
+                   8: reserved 1 page (8 registers) for VS or PS.
+                   7: partial page (up to 7 registers) used by PS or VS.
+                   free registers: 128 - 8 - 7 = 113 */
+                maxFreeReg = 113;
+            }
+
+            if (pShader->shaderKind == VIR_SHADER_COMPUTE)
+            {
+                workGroupSize = (gctFLOAT) (pShader->shaderLayout.compute.workGroupSize[0] *
+                                            pShader->shaderLayout.compute.workGroupSize[1] *
+                                            pShader->shaderLayout.compute.workGroupSize[2]);
+                maxReg = maxFreeReg / (gctUINT) (ceil(workGroupSize / threadCount));
+            }
+            else if (pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL)
+            {
+                workGroupSize = (gctFLOAT) (pShader->shaderLayout.tcs.tcsPatchOutputVertices);
+                maxReg = maxFreeReg / (gctUINT) (ceil(workGroupSize / threadCount));
+            }
+            else if (pShader->shaderKind == VIR_SHADER_CL)
+            {
+                workGroupSize = 128.0;  /* assume minumum work group size is 128 */
+                maxReg = maxFreeReg / (gctUINT) (ceil(workGroupSize / threadCount));
+            }
+        }
+
+        maxReg = vscMIN(maxReg, hwConfig->maxGPRCountPerThread);
+
+        pRA->maxReg[hwType] = maxReg;
+    }
+    else
     {
-        /* if compute shader has barrier, the temp count must follow
-           ceiling(work_group_size/(shader_core_count*4*threads_per_register)) <= floor(113/temp_register_count)
-        */
-
-        /* VIR_SHADER_TESSELLATION_CONTROL should not have barrier if core == 8 */
-        gcmASSERT(pShader->shaderKind == VIR_SHADER_CL ||
-                  pShader->shaderKind == VIR_SHADER_COMPUTE ||
-                  pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL);
-        threadCount = (gctFLOAT) (hwConfig->maxCoreCount * 4 * (VIR_Shader_isDual16Mode(pShader) ? 2 : 1));
-
-        /* Halti5 HW with TS/GS supports */
-        if (hwConfig->hwFeatureFlags.hasHalti5
-            && hwConfig->hwFeatureFlags.supportGS
-            && hwConfig->hwFeatureFlags.supportTS
-            )
-        {
-            /*  128: total temp registers per workgroup (128 = 512/4: total temp register per core/4)
-                16: reserved 1 page (16 registers) each for other shaders.
-                3: partial page (up to 3 registers) used by current shader previously.
-                free registers: 128 - 16 - 3 = 109 */
-            maxFreeReg = 109;
-        }
-        else
-        {
-            /* 128: total temp registers per workgroup.
-               8: reserved 1 page (8 registers) for VS or PS.
-               7: partial page (up to 7 registers) used by PS or VS.
-               free registers: 128 - 8 - 7 = 113 */
-            maxFreeReg = 113;
-        }
-
-        if (pShader->shaderKind == VIR_SHADER_COMPUTE)
-        {
-            workGroupSize = (gctFLOAT) (pShader->shaderLayout.compute.workGroupSize[0] *
-                                        pShader->shaderLayout.compute.workGroupSize[1] *
-                                        pShader->shaderLayout.compute.workGroupSize[2]);
-            maxReg = maxFreeReg / (gctUINT) (ceil(workGroupSize / threadCount));
-        }
-        else if (pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL)
-        {
-            workGroupSize = (gctFLOAT) (pShader->shaderLayout.tcs.tcsPatchOutputVertices);
-            maxReg = maxFreeReg / (gctUINT) (ceil(workGroupSize / threadCount));
-        }
-        else if (pShader->shaderKind == VIR_SHADER_CL)
-        {
-            workGroupSize = 128.0;  /* assume minumum work group size is 128 */
-            maxReg = maxFreeReg / (gctUINT) (ceil(workGroupSize / threadCount));
-        }
+        maxReg = pRA->maxReg[hwType];
     }
-
-    maxReg = vscMIN(maxReg, hwConfig->maxGPRCountPerThread);
 
     /* we need to reserve 2 more registers for spilling */
     if (reservedDataReg > 0 &&
@@ -2969,44 +2985,44 @@ _VIR_RA_LS_AddActiveLRs(
     VIR_RA_LS_Liverange *pPrev, *pNext;
     VIR_RA_LS_Liverange *pLR = _VIR_RA_LS_Web2LR(pRA, webIdx);
 
-    gcmASSERT(!isLRSpilled(pLR));
-
-    pPrev = VIR_RA_LS_GetActiveLRHead(pRA);
-    pNext = pPrev->nextActiveLR;
-    while ((pNext != &LREndMark) &&
-           (pNext != pLR) &&
-           (pNext->endPoint <= pLR->endPoint))
+    if(!isLRSpilled(pLR))
     {
-        pPrev = pNext;
-        pNext = pNext->nextActiveLR;
-    }
-
-    /* insert pLR between pHead and pHeadNext
-       don't insert the live range twice */
-    if (pNext != pLR)
-    {
-        pPrev->nextActiveLR = pLR;
-        pLR->nextActiveLR = pNext;
-
-        if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
-        VSC_OPTN_RAOptions_TRACE_ASSIGN_COLOR))
+        pPrev = VIR_RA_LS_GetActiveLRHead(pRA);
+        pNext = pPrev->nextActiveLR;
+        while ((pNext != &LREndMark) &&
+               (pNext != pLR) &&
+               (pNext->endPoint <= pLR->endPoint))
         {
-            VIR_LOG(pDumper, "add LR%d to the active list", pLR->webIdx);
-            VIR_LOG_FLUSH(pDumper);
+            pPrev = pNext;
+            pNext = pNext->nextActiveLR;
         }
 
-        _VIR_RA_LS_SetUsedColorForLR(pRA, pLR, newColor, reservedDataReg);
-
-        /* set the register allocation water mark */
-        _VIR_RA_LS_SetMaxAllocReg(pRA, _VIR_RA_GetLRColor(pLR),
-            pLR->hwType, pLR->regNoRange);
-
-        if (pLR->colorFunc != VIR_RA_LS_ATTRIBUTE_FUNC)
+        /* insert pLR between pHead and pHeadNext
+           don't insert the live range twice */
+        if (pNext != pLR)
         {
-            pLR->colorFunc = pFunc;
+            pPrev->nextActiveLR = pLR;
+            pLR->nextActiveLR = pNext;
+
+            if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
+            VSC_OPTN_RAOptions_TRACE_ASSIGN_COLOR))
+            {
+                VIR_LOG(pDumper, "add LR%d to the active list", pLR->webIdx);
+                VIR_LOG_FLUSH(pDumper);
+            }
+
+            _VIR_RA_LS_SetUsedColorForLR(pRA, pLR, newColor, reservedDataReg);
+
+            /* set the register allocation water mark */
+            _VIR_RA_LS_SetMaxAllocReg(pRA, _VIR_RA_GetLRColor(pLR),
+                pLR->hwType, pLR->regNoRange);
+
+            if (pLR->colorFunc != VIR_RA_LS_ATTRIBUTE_FUNC)
+            {
+                pLR->colorFunc = pFunc;
+            }
         }
     }
-
     return retValue;
 }
 
@@ -6523,7 +6539,8 @@ _VIR_RA_LS_computeWeight(
 gctBOOL _VIR_RA_LS_FindBrandnewColor(
     VIR_RA_LS           *pRA,
     VIR_RA_LS_Liverange *pLR,
-    VIR_RA_HWReg_Color  *color)
+    VIR_RA_HWReg_Color  *color,
+    gctUINT             reservedDataReg)
 {
     gctBOOL             retValue = gcvTRUE;
     VIR_RA_ColorPool    *pCP = VIR_RA_LS_GetColorPool(pRA);
@@ -6538,7 +6555,7 @@ gctBOOL _VIR_RA_LS_FindBrandnewColor(
         regNoRange = pLR->regNoRange;
     }
 
-    if (pCP->colorMap[VIR_RA_HWREG_GR].maxAllocReg + regNoRange < pCP->colorMap[VIR_RA_HWREG_GR].maxReg)
+    if (pCP->colorMap[VIR_RA_HWREG_GR].maxAllocReg + regNoRange < (pCP->colorMap[VIR_RA_HWREG_GR].maxReg - reservedDataReg - 1))
     {
         gctUINT regNo = pCP->colorMap[VIR_RA_HWREG_GR].maxAllocReg + 1;
         _VIR_RA_MakeColor(regNo, 0, color);
@@ -6547,7 +6564,7 @@ gctBOOL _VIR_RA_LS_FindBrandnewColor(
         if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
             VSC_OPTN_RAOptions_TRACE_ASSIGN_COLOR))
         {
-            VIR_LOG(pDumper, "find brand new ");
+            VIR_LOG(pDumper, "find brand new [r%d]", regNo);
             VIR_LOG_FLUSH(pDumper);
         }
     }
@@ -6711,11 +6728,12 @@ VSC_ErrCode  _VIR_RA_LS_AssignColorLR(
                 gctUINT  regIdx = 0, highDiff = 0;
                 gctBOOL conflict = gcvFALSE;
                 gctBOOL conflictHI = gcvFALSE;
+                VIR_RA_HWReg_Color LRColor = _VIR_RA_GetLRColor(pLR);
 
-                if (!_VIR_RA_LS_IsInvalidHIColor(_VIR_RA_GetLRColor(pLR)) &&
+                if (!_VIR_RA_LS_IsInvalidHIColor(LRColor) &&
                     pLR->regNoRange > 1)
                 {
-                    highDiff = _VIR_RA_Color_HIRegNo(_VIR_RA_GetLRColor(pLR)) - _VIR_RA_Color_RegNo(_VIR_RA_GetLRColor(pLR));
+                    highDiff = _VIR_RA_Color_HIRegNo(LRColor) - _VIR_RA_Color_RegNo(LRColor);
                 }
 
                 /* the color is assigned in other place, try to see whether
@@ -6723,21 +6741,21 @@ VSC_ErrCode  _VIR_RA_LS_AssignColorLR(
                 for (regIdx = 0; regIdx < pLR->regNoRange; regIdx++)
                 {
                     if (_VIR_RA_LS_TestUsedColor(pRA, pLR->hwType,
-                            _VIR_RA_Color_RegNo(_VIR_RA_GetLRColor(pLR)) + regIdx * (highDiff + 1),
+                            _VIR_RA_Color_RegNo(LRColor) + regIdx * (highDiff + 1),
                             _VIR_RA_Color_Channels(
                                 VIR_RA_LS_LR2WebChannelMask(pRA, pLR),
-                                _VIR_RA_Color_Shift(_VIR_RA_GetLRColor(pLR)))))
+                                _VIR_RA_Color_Shift(LRColor))))
                     {
                         conflict = gcvTRUE;
                     }
 
-                    if (!_VIR_RA_LS_IsInvalidHIColor(_VIR_RA_GetLRColor(pLR)))
+                    if (!_VIR_RA_LS_IsInvalidHIColor(LRColor))
                     {
                         if (_VIR_RA_LS_TestUsedColor(pRA, pLR->hwType,
-                            _VIR_RA_Color_HIRegNo(_VIR_RA_GetLRColor(pLR)) + regIdx * (highDiff + 1),
+                            _VIR_RA_Color_HIRegNo(LRColor) + regIdx * (highDiff + 1),
                             _VIR_RA_Color_Channels(
                                 VIR_RA_LS_LR2WebChannelMask(pRA, pLR),
-                                _VIR_RA_Color_HIShift(_VIR_RA_GetLRColor(pLR)))))
+                                _VIR_RA_Color_HIShift(LRColor))))
                         {
                             conflictHI = gcvTRUE;
                         }
@@ -6746,47 +6764,67 @@ VSC_ErrCode  _VIR_RA_LS_AssignColorLR(
                 /* if conflict, we need to find a brand new color for it */
                 if (conflict)
                 {
-                    if (_VIR_RA_LS_FindBrandnewColor(pRA, pLR, &curColor))
+                    if (_VIR_RA_LS_FindBrandnewColor(pRA, pLR, &curColor, reservedDataReg))
                     {
                         _VIR_RA_SetLRColor(pLR,
                             _VIR_RA_Color_RegNo(curColor),
                             _VIR_RA_Color_Shift(curColor));
                     }
                     /* we could not find a color */
-                    else if (reservedDataReg == 0)
-                    {
-                        gcmASSERT(pLR->hwType != VIR_RA_HWREG_A0);
-                        /* have not tried spill yet */
-                        retValue = VSC_RA_ERR_OUT_OF_REG_SPILL;
-                        return retValue;
-                    }
                     else
                     {
-                        /* already tried spill, could not assign color */
-                        retValue = VSC_RA_ERR_OUT_OF_REG_FAIL;
-                        return retValue;
+                        /* need hi color */
+                        if (!_VIR_RA_LS_IsInvalidHIColor(LRColor))
+                        {
+                            /* release the hi color */
+                            _VIR_RA_LS_ClearUsedColor(pRA, pLR->hwType,
+                                _VIR_RA_Color_HIRegNo(LRColor) + regIdx * (highDiff + 1),
+                                _VIR_RA_Color_Channels(
+                                    VIR_RA_LS_LR2WebChannelMask(pRA, pLR),
+                                    _VIR_RA_Color_HIShift(LRColor)));
+
+                            VIR_RA_LR_SetFlag(pLR, VIR_RA_LRFLAG_SPILLED);
+                            _VIR_RA_SetLRSpillOffset(pLR, pRA->spillOffset);
+                            pRA->spillOffset += 2 * pLR->regNoRange * 16;
+                            conflictHI = gcvFALSE;
+                        }
+                        else
+                        {
+                            VIR_RA_LR_SetFlag(pLR, VIR_RA_LRFLAG_SPILLED);
+                            _VIR_RA_SetLRSpillOffset(pLR, pRA->spillOffset);
+                            pRA->spillOffset += pLR->regNoRange * 16;
+                        }
                     }
                 }
                 if (conflictHI)
                 {
-                    if (_VIR_RA_LS_FindBrandnewColor(pRA, pLR, &curColor))
+                    if (_VIR_RA_LS_FindBrandnewColor(pRA, pLR, &curColor, reservedDataReg))
                     {
                         _VIR_RA_SetLRColorHI(pLR,
                             _VIR_RA_Color_RegNo(curColor),
                             _VIR_RA_Color_Shift(curColor));
                     }
-                    else if (reservedDataReg == 0)
-                    {
-                        gcmASSERT(pLR->hwType != VIR_RA_HWREG_A0);
-                        /* have not tried spill yet */
-                        retValue = VSC_RA_ERR_OUT_OF_REG_SPILL;
-                        return retValue;
-                    }
                     else
                     {
-                        /* already tried spill, could not assign color */
-                        retValue = VSC_RA_ERR_OUT_OF_REG_FAIL;
-                        return retValue;
+                        /* need low color */
+                        if (!isLRSpilled(pLR))
+                        {
+                            /* release the low color */
+                            _VIR_RA_LS_ClearUsedColor(pRA, pLR->hwType,
+                                _VIR_RA_Color_RegNo(LRColor) + regIdx * (highDiff + 1),
+                                _VIR_RA_Color_Channels(
+                                    VIR_RA_LS_LR2WebChannelMask(pRA, pLR),
+                                    _VIR_RA_Color_Shift(LRColor)));
+
+                            VIR_RA_LR_SetFlag(pLR, VIR_RA_LRFLAG_SPILLED);
+                            _VIR_RA_SetLRSpillOffset(pLR, pRA->spillOffset);
+                            pRA->spillOffset += 2 * pLR->regNoRange * 16;
+                        }
+                        else
+                        {
+                            /* should be done earlier */
+                            gcmASSERT(gcvFALSE);
+                        }
                     }
                 }
             }
@@ -8342,7 +8380,7 @@ _VIR_RA_LS_RewriteColor_Src(
             else
             {
                 /* find a brand new color for the temp */
-                if (_VIR_RA_LS_FindBrandnewColor(pRA, gcvNULL, &curColor))
+                if (_VIR_RA_LS_FindBrandnewColor(pRA, gcvNULL, &curColor, 0))
                 {
                     /* update the maxAllocReg*/
                     pCP->colorMap[VIR_RA_HWREG_GR].maxAllocReg ++;
@@ -11140,7 +11178,7 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
                             VSC_OPTN_RAOptions_TRACE_ASSIGN_COLOR))
                         {
                             VIR_LOG(pDumper, "\n!!!%d registers is not enough!!! restart the coloring with spills.\n",
-                                _VIR_RA_LS_GetMaxReg(&ra, VIR_RA_HWREG_GR, gcvFALSE));
+                                _VIR_RA_LS_GetMaxReg(&ra, VIR_RA_HWREG_GR, 0));
                             VIR_LOG_FLUSH(pDumper);
                         }
                         reservedDataReg ++;

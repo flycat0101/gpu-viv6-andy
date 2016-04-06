@@ -26,6 +26,7 @@
 *****************************************************************************/
 
 
+
 /*
  *  Feature:    Filter Blit - check non-aligned YUV420 source
  *  API:        gco2D_FilterBlit
@@ -294,7 +295,6 @@ static void CDECL Destroy(Test2D *t2d)
 
 const gceFEATURE FeatureList[]=
 {
-    gcvFEATURE_SCALER,
     gcvFEATURE_YUV420_SCALER,
     gcvFEATURE_2D_MULTI_SRC_BLT_BILINEAR_FILTER,
 };

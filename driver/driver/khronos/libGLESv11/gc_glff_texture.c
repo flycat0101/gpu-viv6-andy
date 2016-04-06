@@ -6701,6 +6701,7 @@ GL_API void GL_APIENTRY glTexEnvf(
 {
     glmENTER3(glmARGENUM, Target, glmARGENUM, Name, glmARGFLOAT, Param)
     {
+        GLfloat params[4];
         gcmDUMP_API("${ES11 glTexEnvf 0x%08X 0x%08X 0x%08X}", Target, Name, *(GLuint*)&Param);
 
         glmPROFILE(context, GLES1_TEXENVF, 0);
@@ -6710,7 +6711,8 @@ GL_API void GL_APIENTRY glTexEnvf(
             break;
         }
 
-        if (!_SetTextureState(context, Target, Name, &Param))
+        params[0] = Param;
+        if (!_SetTextureState(context, Target, Name, params))
         {
             glmERROR(GL_INVALID_ENUM);
             break;
@@ -6749,7 +6751,7 @@ GL_API void GL_APIENTRY glTexEnvx(
 {
     glmENTER3(glmARGENUM, Target, glmARGENUM, Name, glmARGFIXED, Param)
     {
-        GLfloat param;
+        GLfloat params[4];
 
         gcmDUMP_API("${ES11 glTexEnvx 0x%08X 0x%08X 0x%08X}", Target, Name, Param);
         glmPROFILE(context, GLES1_TEXENVX, 0);
@@ -6762,14 +6764,14 @@ GL_API void GL_APIENTRY glTexEnvx(
         /* Convert to float */
         if (Name == GL_RGB_SCALE || Name == GL_ALPHA_SCALE)
         {
-            param = glmFIXED2FLOAT(Param);
+            params[0] = glmFIXED2FLOAT(Param);
         }
         else
         {
-            param = (GLfloat) Param;
+            params[0] = (GLfloat) Param;
         }
 
-        if (!_SetTextureState(context, Target, Name, &param))
+        if (!_SetTextureState(context, Target, Name, params))
         {
             glmERROR(GL_INVALID_ENUM);
             break;
@@ -6786,7 +6788,7 @@ GL_API void GL_APIENTRY glTexEnvxOES(
 {
     glmENTER3(glmARGENUM, Target, glmARGENUM, Name, glmARGFIXED, Param)
     {
-        GLfloat param;
+        GLfloat params[4];
 
         gcmDUMP_API("${ES11 glTexEnvxOES 0x%08X 0x%08X 0x%08X}", Target, Name, Param);
 
@@ -6799,14 +6801,14 @@ GL_API void GL_APIENTRY glTexEnvxOES(
         /* Convert to float */
         if (Name == GL_RGB_SCALE || Name == GL_ALPHA_SCALE)
         {
-            param = glmFIXED2FLOAT(Param);
+            params[0] = glmFIXED2FLOAT(Param);
         }
         else
         {
-            param = (GLfloat) Param;
+            params[0] = (GLfloat) Param;
         }
 
-        if (!_SetTextureState(context, Target, Name, &param))
+        if (!_SetTextureState(context, Target, Name, params))
         {
             glmERROR(GL_INVALID_ENUM);
             break;
@@ -6905,7 +6907,7 @@ GL_API void GL_APIENTRY glTexEnvi(
 {
     glmENTER3(glmARGENUM, Target, glmARGENUM, Name, glmARGUINT, Param)
     {
-        GLfloat param;
+        GLfloat params[4];
 
         gcmDUMP_API("${ES11 glTexEnvi 0x%08X 0x%08X 0x%08X}", Target, Name, Param);
         glmPROFILE(context, GLES1_TEXENVI, 0);
@@ -6916,9 +6918,9 @@ GL_API void GL_APIENTRY glTexEnvi(
         }
 
         /* Convert to float */
-        param = glmINT2FLOAT(Param);
+        params[0] = glmINT2FLOAT(Param);
 
-        if (!_SetTextureState(context, Target, Name, &param))
+        if (!_SetTextureState(context, Target, Name, params))
         {
             glmERROR(GL_INVALID_ENUM);
             break;

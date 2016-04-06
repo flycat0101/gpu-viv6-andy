@@ -212,7 +212,9 @@ typedef enum _cleOPCODE
     clvOPCODE_TEXTURE_LOAD,
     clvOPCODE_IMAGE_SAMPLER,
     clvOPCODE_IMAGE_READ,
+    clvOPCODE_IMAGE_READ_3D,
     clvOPCODE_IMAGE_WRITE,
+    clvOPCODE_IMAGE_WRITE_3D,
 
 
     /* Conversion Operations */

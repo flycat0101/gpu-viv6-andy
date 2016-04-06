@@ -98,6 +98,8 @@ IN gctCONST_STRING Options)
                               cloCOMPILER_GetExtension(Compiler));
     if(gcmIS_ERROR(status)) return status;
 
+/* Force basic vector types to be packed when VX extension is enabled */
+
 #ifdef SL_SCAN_ONLY
     while (cloCOMPILER_Scan(Compiler, &token) != T_EOF);
 #else
@@ -1274,7 +1276,8 @@ IN cloIR_EXPR RightOperand
                 }
             }
             else { /* variable indexing to array or vector elements */
-                if(clmDECL_IsArray(&LeftOperand->decl)) {
+                if(clmDECL_IsArray(&LeftOperand->decl) &&
+                   LeftOperand->decl.dataType->type != T_IMAGE2D_DYNAMIC_ARRAY_T) {
                     gctUINT elementCount;
 
                     clmGetArrayElementCount(LeftOperand->decl.array, 0, elementCount);
@@ -1287,27 +1290,36 @@ IN cloIR_EXPR RightOperand
                 leafName->u.variableInfo.indirectlyAddressed = gcvTRUE;
             }
         }
-    }
+        /* Create the binary expression */
+        if(clmIR_EXPR_IsBinaryType(LeftOperand, clvBINARY_SUBSCRIPT)) {
+            cloIR_BINARY_EXPR  subscriptExpr;
 
-    /* Create the binary expression */
-    if(clmIR_EXPR_IsBinaryType(LeftOperand, clvBINARY_SUBSCRIPT)) {
-        cloIR_BINARY_EXPR  subscriptExpr;
+            binaryExpr = (cloIR_BINARY_EXPR) &LeftOperand->base;
+            status = cloIR_BINARY_EXPR_Construct(Compiler,
+                                                 LeftOperand->base.lineNo,
+                                                 LeftOperand->base.stringNo,
+                                                 clvBINARY_MULTI_DIM_SUBSCRIPT,
+                                                 binaryExpr->rightOperand,
+                                                 RightOperand,
+                                                 &subscriptExpr);
+            if (gcmIS_ERROR(status)) return gcvNULL;
 
-        binaryExpr = (cloIR_BINARY_EXPR) &LeftOperand->base;
-        status = cloIR_BINARY_EXPR_Construct(Compiler,
-                                             LeftOperand->base.lineNo,
-                                             LeftOperand->base.stringNo,
-                                             clvBINARY_MULTI_DIM_SUBSCRIPT,
-                                             binaryExpr->rightOperand,
-                                             RightOperand,
-                                             &subscriptExpr);
-        if (gcmIS_ERROR(status)) return gcvNULL;
-
-        binaryExpr->rightOperand = &subscriptExpr->exprBase;
-        status = cloCOMPILER_CreateElementDecl(Compiler,
-                                               &binaryExpr->exprBase.decl,
-                                               &binaryExpr->exprBase.decl);
-        if (gcmIS_ERROR(status)) return gcvNULL;
+            binaryExpr->rightOperand = &subscriptExpr->exprBase;
+            status = cloCOMPILER_CreateElementDecl(Compiler,
+                                                   &binaryExpr->exprBase.decl,
+                                                   &binaryExpr->exprBase.decl);
+            if (gcmIS_ERROR(status)) return gcvNULL;
+        }
+        else {
+            status = cloIR_BINARY_EXPR_Construct(Compiler,
+                                                 LeftOperand->base.lineNo,
+                                                 LeftOperand->base.stringNo,
+                                                 clvBINARY_SUBSCRIPT,
+                                                 LeftOperand,
+                                                 RightOperand,
+                                                 &binaryExpr);
+            if (gcmIS_ERROR(status)) return gcvNULL;
+        }
     }
     else {
         status = cloIR_BINARY_EXPR_Construct(Compiler,
@@ -1819,7 +1831,7 @@ OUT clsDECL *NewDecl
    clsARRAY *newArray;
    clsARRAY arrayBuf[1];
 
-   if(clmDECL_IsUnderlyingArray(OrigDecl)) {
+   if(clmDECL_IsArray(OrigDecl)) {
       gctINT i, j;
       gcmASSERT(!OrigDecl->ptrDominant &&
                 ((OrigDecl->array.numDim + Array->numDim) <= cldMAX_ARRAY_DIMENSION));
@@ -3211,7 +3223,7 @@ IN slsSLINK_LIST *PtrDscr
                                       "image cannot have pointer type"));
    }
    else {
-        slmSLINK_LIST_Prepend(PtrDscr, decl.ptrDscr);
+      clMergePtrDscrToDecl(Compiler, PtrDscr, &decl, PtrDscr != gcvNULL);
    }
    return decl;
 }
@@ -3330,6 +3342,12 @@ IN cloIR_TYPECAST_ARGS TypeCastArgs
       polynaryExpr = clParseFuncCallHeaderExpr(Compiler,
                                                &type,
                                                clmDECL_IsArray(Decl) ? &Decl->array : (clsARRAY *) 0);
+      polynaryExpr->exprBase.decl.ptrDscr = Decl->ptrDscr;
+      if(Decl->ptrDominant) {
+          polynaryExpr->exprBase.decl.ptrDominant = gcvTRUE;
+          polynaryExpr->exprBase.decl.array = Decl->array;
+      }
+
       polynaryExpr->operands = TypeCastArgs->operands;
       TypeCastArgs->operands = gcvNULL; /* ensure that the operands not be freed */
       gcmVERIFY_OK(cloIR_OBJECT_Destroy(Compiler, &TypeCastArgs->exprBase.base));
@@ -4234,17 +4252,20 @@ cluCONSTANT_VALUE *ValEnd
             }
         }
         else {
+            cluCONSTANT_VALUE *expectedValEnd;
+
+            expectedValEnd = valStart + valueCount;
+            gcmASSERT(expectedValEnd <= valEnd);
             status = _MakeTypeCastArgsAsConstant(Compiler,
                                                  (cloIR_TYPECAST_ARGS) member,
                                                  braced ? Dim + 1 : Dim,
                                                  constantDecl,
                                                  valStart,
-                                                 valEnd);
+                                                 expectedValEnd);
             if (gcmIS_ERROR(status)) {
                 return gcvSTATUS_INVALID_DATA;
             }
-            valStart += clsDECL_GetSize(constantDecl);
-            gcmASSERT(valStart <= valEnd);
+            valStart += valueCount;
         }
 
         break;
@@ -6258,6 +6279,60 @@ clParseSelectionExpr(
     return &selection->exprBase;
 }
 
+static gctBOOL
+_IsOperandTypeForBuiltinFuncCall(
+    IN cloCOMPILER Compiler,
+    IN cloIR_EXPR LeftOperand,
+    IN cloIR_EXPR RightOperand
+    )
+{
+    if(clmDECL_IsPackedType(&LeftOperand->decl) &&
+       clmDECL_IsVectorType(&RightOperand->decl) &&
+       (cloIR_OBJECT_GetType(&RightOperand->base) == clvIR_POLYNARY_EXPR) &&
+       (clmDATA_TYPE_vectorSize_GET(LeftOperand->decl.dataType) ==
+        clmDATA_TYPE_vectorSize_GET(RightOperand->decl.dataType))) {
+        cloIR_POLYNARY_EXPR polynaryExpr;
+
+        switch(LeftOperand->decl.dataType->elementType) {
+        case clvTYPE_CHAR_PACKED:
+            if(RightOperand->decl.dataType->elementType != clvTYPE_CHAR)
+                return gcvFALSE;
+            break;
+
+        case clvTYPE_UCHAR_PACKED:
+            if(RightOperand->decl.dataType->elementType != clvTYPE_UCHAR)
+                return gcvFALSE;
+            break;
+
+        case clvTYPE_SHORT_PACKED:
+            if(RightOperand->decl.dataType->elementType != clvTYPE_SHORT)
+                return gcvFALSE;
+            break;
+
+        case clvTYPE_USHORT_PACKED:
+            if(RightOperand->decl.dataType->elementType != clvTYPE_USHORT)
+                return gcvFALSE;
+            break;
+
+        case clvTYPE_HALF_PACKED:
+            if(RightOperand->decl.dataType->elementType != clvTYPE_HALF)
+                return gcvFALSE;
+            break;
+
+        default:
+            return gcvFALSE;
+        }
+
+        polynaryExpr = (cloIR_POLYNARY_EXPR) &RightOperand->base;
+        if(polynaryExpr->type == clvPOLYNARY_FUNC_CALL &&
+            polynaryExpr->funcName->isBuiltin &&
+            gcmIS_SUCCESS(gcoOS_StrNCmp(polynaryExpr->funcSymbol, "vload", 5))) {
+            return gcvTRUE;
+        }
+    }
+    return gcvFALSE;
+}
+
 static gceSTATUS
 _CheckAssignmentExpr(
     IN cloCOMPILER Compiler,
@@ -6301,6 +6376,13 @@ _CheckAssignmentExpr(
 
     if (!clsDECL_IsAssignableTo(&LeftOperand->decl, &RightOperand->decl))
     {
+        if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) &&
+           _IsOperandTypeForBuiltinFuncCall(Compiler,
+                                            LeftOperand,
+                                            RightOperand)) {
+            RightOperand->decl.dataType = LeftOperand->decl.dataType;
+            return gcvSTATUS_OK;
+        }
         gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                         RightOperand->base.lineNo,
                         RightOperand->base.stringNo,
@@ -7260,6 +7342,7 @@ OUT clsDECL *Decl
                                  Decl);
     }
     else {
+        clMergePtrDscrToDecl(Compiler, TypeDecl->ptrDscr, decl, TypeDecl->ptrDscr != gcvNULL);
         return cloCOMPILER_CloneDecl(Compiler,
                                      decl->dataType->accessQualifier,
                                      decl->dataType->addrSpaceQualifier,
@@ -7267,6 +7350,33 @@ OUT clsDECL *Decl
                                      Decl);
     }
 }
+
+static gceSTATUS
+_ConvDataTypeToPacked(
+IN cloCOMPILER Compiler,
+IN clsNAME *Var
+)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    clsBUILTIN_DATATYPE_INFO *typeInfo;
+
+    if(Var->decl.dataType == gcvNULL ||
+       clmIsElementTypePacked(Var->decl.dataType->elementType)) return status;
+    typeInfo = clGetBuiltinDataTypeInfo(Var->decl.dataType->type);
+
+    if(typeInfo &&
+       typeInfo->dualType != typeInfo->type) {
+        status = cloCOMPILER_CreateDataType(Compiler,
+                                            typeInfo->dualType,
+                                            Var->decl.dataType->u.generic,
+                                            Var->decl.dataType->accessQualifier,
+                                            Var->decl.dataType->addrSpaceQualifier,
+                                            &Var->decl.dataType);
+    }
+
+    return status;
+}
+
 
 static gceSTATUS
 _ParseFillVariableAttr(
@@ -7280,7 +7390,6 @@ IN clsATTRIBUTE *Attr
    clsATTRIBUTE *attrPtr = Attr;
 
    gcmASSERT(Var);
-   gcmASSERT(Attr);
 
    if(Decl && Decl->dataType->type == T_TYPE_NAME) {
       gceSTATUS status;
@@ -7294,8 +7403,29 @@ IN clsATTRIBUTE *Attr
       if(gcmIS_ERROR(status)) return status;
    }
 
-   if(attrPtr->specifiedAttr & clvATTR_PACKED)  {
+   if(cloCOMPILER_IsBasicTypePacked(Compiler) &&
+      Var->decl.dataType &&
+      clmDATA_TYPE_IsVector(Var->decl.dataType)) {
+       if(!attrPtr) {
+           (void) gcoOS_ZeroMemory((gctPOINTER)attr, sizeof(clsATTRIBUTE));
+           attrPtr = attr;
+       }
+       attrPtr->specifiedAttr |= clvATTR_PACKED;
+       attrPtr->packed = gcvTRUE;
+   }
+   if(!attrPtr) return gcvSTATUS_OK;
+
+   if((attrPtr->specifiedAttr & clvATTR_PACKED) ||
+      (Var->decl.dataType &&
+       clmDATA_TYPE_IsVector(Var->decl.dataType) &&
+       cloCOMPILER_IsBasicTypePacked(Compiler)))  {
      Var->context.packed = attrPtr->packed;
+     if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+         gceSTATUS status;
+
+         status = _ConvDataTypeToPacked(Compiler, Var);
+         if(gcmIS_ERROR(status)) return status;
+     }
    }
    if(attrPtr->specifiedAttr & clvATTR_ALIGNED)  {
      Var->context.alignment = attrPtr->alignment;
@@ -7345,22 +7475,26 @@ IN clsDECL *Decl
 )
 {
     gceSTATUS status;
-    clsDATA_TYPE dataType[1];
+    clsARRAY array[1];
     clsDECL *declPtr;
 
     gcmASSERT(Decl);
     declPtr = Decl;
     switch(declPtr->dataType->type) {
     case T_IMAGE2D_PTR_T:
-        *dataType = *declPtr->dataType;
-        dataType->type = T_IMAGE2D_T;
-        status = cloCOMPILER_CloneDataType(Compiler,
-                                           declPtr->dataType->accessQualifier,
-                                           declPtr->dataType->addrSpaceQualifier,
-                                           dataType,
-                                           &declPtr->dataType);
-        if (gcmIS_ERROR(status)) return gcvNULL;
         status = clParseAddIndirectionOneLevel(Compiler, &declPtr->ptrDscr);
+        if (gcmIS_ERROR(status)) return gcvNULL;
+        break;
+
+    case T_IMAGE2D_DYNAMIC_ARRAY_T:
+        (void) gcoOS_ZeroMemory(array, sizeof(clsARRAY));
+        array->numDim = 1;
+        array->length[0] = cloCOMPILER_GetImageArrayMaxLevel(Compiler);
+        status = cloCOMPILER_CreateArrayDecl(Compiler,
+                                             declPtr->dataType,
+                                             array,
+                                             gcvNULL,
+                                             declPtr);
         if (gcmIS_ERROR(status)) return gcvNULL;
         break;
 
@@ -7449,13 +7583,36 @@ IN clsLexToken * Identifier
             if (gcmIS_ERROR(status)) return status;
         }
     }
+    if(declPtr->dataType->type == T_IMAGE2D_DYNAMIC_ARRAY_T) {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                        Identifier->lineNo,
+                        Identifier->stringNo,
+                        clvREPORT_ERROR,
+                        "unrecognizable type '_viv_image2d_array_t' specified for variable '%s'",
+                        Identifier->u.identifier.name));
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
     if (clmDATA_TYPE_IsImage(declPtr->dataType)) {
         gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                         Identifier->lineNo,
                         Identifier->stringNo,
                         clvREPORT_ERROR,
-                        "varaible '%s' cannot have image type",
+                        "variable '%s' cannot have image type",
                         Identifier->u.identifier.name));
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    if (notTypeDef &&
+        clmDECL_IsStructOrUnion(declPtr) &&
+        declPtr->dataType->u.fieldSpace->scopeName->isBuiltin &&
+        declPtr->dataType->accessQualifier != clvQUALIFIER_UNIFORM) {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                        Identifier->lineNo,
+                        Identifier->stringNo,
+                        clvREPORT_ERROR,
+                        "variable '%s' cannot have struct '%s' type",
+                        Identifier->u.identifier.name,
+                        declPtr->dataType->u.fieldSpace->scopeName->symbol));
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
@@ -7572,8 +7729,19 @@ IN cloIR_EXPR ArrayLengthExpr
                         Identifier->lineNo,
                         Identifier->stringNo,
                         clvREPORT_ERROR,
-                        "varaible '%s' cannot have image type",
+                        "variable '%s' cannot have image type",
                         Identifier->u.identifier.name));
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    if (clmDECL_IsStructOrUnion(declPtr) && declPtr->dataType->u.fieldSpace->scopeName->isBuiltin)  {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                        Identifier->lineNo,
+                        Identifier->stringNo,
+                        clvREPORT_ERROR,
+                        "variable '%s' cannot have struct '%s' type",
+                        Identifier->u.identifier.name,
+                        declPtr->dataType->u.fieldSpace->scopeName->symbol));
         return gcvSTATUS_INVALID_ARGUMENT;
     }
     status = _ParseMergeArrayDecl(Compiler,
@@ -7582,13 +7750,19 @@ IN cloIR_EXPR ArrayLengthExpr
                       arrayDecl);
     if (gcmIS_ERROR(status)) return status;
 
+    status = clMergePtrDscrToDecl(Compiler,
+                                  Identifier->u.identifier.ptrDscr,
+                                  arrayDecl,
+                                  gcvFALSE);
+    if (gcmIS_ERROR(status)) return status;
+
     status = cloCOMPILER_CreateName(Compiler,
                     Identifier->lineNo,
                     Identifier->stringNo,
                     clvVARIABLE_NAME,
                     arrayDecl,
                     Identifier->u.identifier.name,
-                    Identifier->u.identifier.ptrDscr,
+                    gcvNULL,
                     clvEXTENSION_NONE,
                     &DeclOrDeclListPtr->name);
     if (gcmIS_ERROR(status)) return status;
@@ -7676,12 +7850,21 @@ IN cloIR_EXPR ArrayLengthExpr
         }
     }
 
+    if(declPtr->dataType->type == T_IMAGE2D_DYNAMIC_ARRAY_T) {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                        Identifier->lineNo,
+                        Identifier->stringNo,
+                        clvREPORT_ERROR,
+                        "unrecognizable type '_viv_image2d_array_t' specified for variable '%s'",
+                        Identifier->u.identifier.name));
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
     if (clmDATA_TYPE_IsImage(declPtr->dataType)) {
         gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                         Identifier->lineNo,
                         Identifier->stringNo,
                         clvREPORT_ERROR,
-                        "varaible '%s' cannot have image type",
+                        "variable '%s' cannot have image type",
                         Identifier->u.identifier.name));
         return gcvSTATUS_INVALID_ARGUMENT;
     }
@@ -7691,13 +7874,19 @@ IN cloIR_EXPR ArrayLengthExpr
                       arrayDecl);
     if (gcmIS_ERROR(status)) return status;
 
+    status = clMergePtrDscrToDecl(Compiler,
+                                  Identifier->u.identifier.ptrDscr,
+                                  arrayDecl,
+                                  gcvFALSE);
+    if (gcmIS_ERROR(status)) return status;
+
     status = cloCOMPILER_CreateName(Compiler,
                     Identifier->lineNo,
                     Identifier->stringNo,
                     clvVARIABLE_NAME,
                     arrayDecl,
                     Identifier->u.identifier.name,
-                    Identifier->u.identifier.ptrDscr,
+                    gcvNULL,
                     clvEXTENSION_NONE,
                     &DeclOrDeclListPtr->name);
     if (gcmIS_ERROR(status)) return status;
@@ -7708,14 +7897,6 @@ IN cloIR_EXPR ArrayLengthExpr
                                                DeclOrDeclListPtr->name);
         if (gcmIS_ERROR(status)) return status;
     }
-
-    /* Create the lhs for assignment */
-    _clmParseCreateLhs(Compiler,
-               Identifier->lineNo,
-               Identifier->stringNo,
-               DeclOrDeclListPtr,
-               status);
-    if (gcmIS_ERROR(status)) return status;
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                 clvDUMP_PARSER,
@@ -7761,10 +7942,7 @@ IN clsATTRIBUTE *Attr
                     Identifier);
     if (gcmIS_ERROR(status))  return declOrDeclListPtr;
 
-    if(Attr) {
-       status = _ParseFillVariableAttr(Compiler, Decl, declOrDeclListPtr->name, Attr);
-       if (gcmIS_ERROR(status))  return declOrDeclListPtr;
-    }
+    _ParseFillVariableAttr(Compiler, Decl, declOrDeclListPtr->name, Attr);
     return declOrDeclListPtr;
 }
 
@@ -7817,10 +7995,7 @@ IN clsATTRIBUTE *Attr
         return declOrDeclListPtr;
     }
 
-    if(Attr) {
-        status = _ParseFillVariableAttr(Compiler, Decl, declOrDeclListPtr->name, Attr);
-        if (gcmIS_ERROR(status))  return declOrDeclListPtr;
-    }
+    _ParseFillVariableAttr(Compiler, Decl, declOrDeclListPtr->name, Attr);
     return declOrDeclListPtr;
 }
 
@@ -7862,10 +8037,7 @@ IN clsATTRIBUTE *Attr
        }
     }
 
-    if(Attr) {
-        status = _ParseFillVariableAttr(Compiler, &declOrDeclListPtr->decl, declOrDeclListPtr->name, Attr);
-        if (gcmIS_ERROR(status))  return declOrDeclListPtr;
-    }
+    _ParseFillVariableAttr(Compiler, &declOrDeclListPtr->decl, declOrDeclListPtr->name, Attr);
     return declOrDeclListPtr;
 }
 
@@ -7909,10 +8081,7 @@ IN clsATTRIBUTE *Attr
        }
     }
 
-    if(Attr) {
-        status = _ParseFillVariableAttr(Compiler, &declOrDeclListPtr->decl, declOrDeclListPtr->name, Attr);
-        if (gcmIS_ERROR(status))  return declOrDeclListPtr;
-    }
+    _ParseFillVariableAttr(Compiler, &declOrDeclListPtr->decl, declOrDeclListPtr->name, Attr);
     return declOrDeclListPtr;
 }
 
@@ -9029,8 +9198,8 @@ IN cloIR_EXPR InitExpr
 
 AssignLhs:
     status = cloIR_BINARY_EXPR_Construct(Compiler,
-                                         name->lineNo,
-                                         name->stringNo,
+                                         lhs->base.lineNo,
+                                         lhs->base.stringNo,
                                          clvBINARY_ASSIGN,
                                          lhs,
                                          initExpr,
@@ -9105,12 +9274,22 @@ IN clsLexToken *Identifier
         }
     }
 
+    if(declPtr->dataType->type == T_IMAGE2D_DYNAMIC_ARRAY_T) {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                        Identifier->lineNo,
+                        Identifier->stringNo,
+                        clvREPORT_ERROR,
+                        "unrecognizable type '_viv_image2d_array_t' specified for variable '%s'",
+                        Identifier->u.identifier.name));
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
     if (clmDATA_TYPE_IsImage(declPtr->dataType)) {
         gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                         Identifier->lineNo,
                         Identifier->stringNo,
                         clvREPORT_ERROR,
-                        "varaible '%s' cannot have image type",
+                        "variable '%s' cannot have image type",
                         Identifier->u.identifier.name));
         return gcvSTATUS_INVALID_ARGUMENT;
     }
@@ -9134,13 +9313,6 @@ IN clsLexToken *Identifier
         if (gcmIS_ERROR(status)) return status;
     }
 
-    /* Create the lhs for assignment */
-    _clmParseCreateLhs(Compiler,
-               Identifier->lineNo,
-               Identifier->stringNo,
-               DeclOrDeclListPtr,
-               status);
-    if (gcmIS_ERROR(status)) return status;
     return status;
 }
 
@@ -9183,10 +9355,17 @@ IN clsATTRIBUTE *Attr
         return declOrDeclListPtr;
     }
 
-    if(Attr) {
-        status = _ParseFillVariableAttr(Compiler, Decl, declOrDeclListPtr->name, Attr);
-        if (gcmIS_ERROR(status))  return declOrDeclListPtr;
+    status = _ParseFillVariableAttr(Compiler, Decl, declOrDeclListPtr->name, Attr);
+    if (gcmIS_ERROR(status)) {
+        return declOrDeclListPtr;
     }
+
+    /* Create the lhs for assignment */
+    _clmParseCreateLhs(Compiler,
+               Identifier->lineNo,
+               Identifier->stringNo,
+               declOrDeclListPtr,
+               status);
     return declOrDeclListPtr;
 }
 
@@ -9242,10 +9421,17 @@ IN clsATTRIBUTE *Attr
         return declOrDeclListPtr;
     }
 
-    if(Attr) {
-        status = _ParseFillVariableAttr(Compiler, &declOrDeclListPtr->decl, declOrDeclListPtr->name, Attr);
-        if (gcmIS_ERROR(status))  return declOrDeclListPtr;
+    status = _ParseFillVariableAttr(Compiler, &declOrDeclListPtr->decl, declOrDeclListPtr->name, Attr);
+    if (gcmIS_ERROR(status)) {
+        return declOrDeclListPtr;
     }
+
+    /* Create the lhs for assignment */
+    _clmParseCreateLhs(Compiler,
+               Identifier->lineNo,
+               Identifier->stringNo,
+               declOrDeclListPtr,
+               status);
     return declOrDeclListPtr;
 }
 
@@ -9286,12 +9472,18 @@ IN clsATTRIBUTE *Attr
         return declOrDeclListPtr;
     }
 
-    if(Attr) {
-        status = _ParseFillVariableAttr(Compiler, Decl, declOrDeclListPtr->name, Attr);
-        if (gcmIS_ERROR(status))  return declOrDeclListPtr;
+    status = _ParseFillVariableAttr(Compiler, Decl, declOrDeclListPtr->name, Attr);
+    if (gcmIS_ERROR(status)) {
+        return declOrDeclListPtr;
     }
-    return declOrDeclListPtr;
 
+    /* Create the lhs for assignment */
+    _clmParseCreateLhs(Compiler,
+               Identifier->lineNo,
+               Identifier->stringNo,
+               declOrDeclListPtr,
+               status);
+    return declOrDeclListPtr;
 }
 
 clsDeclOrDeclList *
@@ -9348,10 +9540,18 @@ IN clsATTRIBUTE *Attr
         return declOrDeclListPtr;
     }
 
-    if(Attr) {
-        status = _ParseFillVariableAttr(Compiler, &declOrDeclListPtr->decl, declOrDeclListPtr->name, Attr);
-        if (gcmIS_ERROR(status))  return declOrDeclListPtr;
+    status = _ParseFillVariableAttr(Compiler, &declOrDeclListPtr->decl, declOrDeclListPtr->name, Attr);
+    if (gcmIS_ERROR(status)) {
+        return declOrDeclListPtr;
     }
+
+    /* Create the lhs for assignment */
+    _clmParseCreateLhs(Compiler,
+               Identifier->lineNo,
+               Identifier->stringNo,
+               declOrDeclListPtr,
+               status);
+
     return declOrDeclListPtr;
 }
 
@@ -9401,6 +9601,8 @@ IN clsLexToken *Identifier
     if (gcmIS_ERROR(status)) return gcvNULL;
 
     name->derivedType = derivedType;
+    _ParseFillVariableAttr(Compiler, declPtr, name, gcvNULL);
+
     status = cloCOMPILER_CreateNameSpace(Compiler, &name->u.funcInfo.localSpace);
     if (gcmIS_ERROR(status)) return gcvNULL;
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
@@ -11077,6 +11279,15 @@ IN clsLexToken * Identifier
     }
 
     if (clmDATA_TYPE_IsImage(declPtr->dataType)) {
+        if(declPtr->dataType->type == T_IMAGE2D_DYNAMIC_ARRAY_T) {
+            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                            lineNo,
+                            stringNo,
+                            clvREPORT_ERROR,
+                            "unrecognizable type '_viv_image2d_array_t' specified for parameter '%s'",
+                            symbol));
+            return gcvNULL;
+        }
         if(clmDECL_IsArray(declPtr)) {
             gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                             lineNo,
@@ -11095,12 +11306,23 @@ IN clsLexToken * Identifier
                             symbol));
             return gcvNULL;
         }
-        if(Decl->dataType->addrSpaceQualifier == clvQUALIFIER_LOCAL) {
+        if(declPtr->dataType->addrSpaceQualifier == clvQUALIFIER_LOCAL) {
             gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                             lineNo,
                             stringNo,
                             clvREPORT_ERROR,
                             "image parameter '%s' cannot be declared in local address space",
+                            symbol));
+            return gcvNULL;
+        }
+    }
+    else {
+        if(declPtr->dataType->accessQualifier == clvQUALIFIER_UNIFORM) {
+            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                            lineNo,
+                            stringNo,
+                            clvREPORT_ERROR,
+                            "parameter '%s' cannot be declared with \"_viv_uniform\" qualifier",
                             symbol));
             return gcvNULL;
         }
@@ -11118,6 +11340,7 @@ IN clsLexToken * Identifier
     if (gcmIS_ERROR(status)) return gcvNULL;
 
     name->derivedType = derivedType;
+    _ParseFillVariableAttr(Compiler, declPtr, name, gcvNULL);
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                     clvDUMP_PARSER,
                     "<PARAMETER_DECL decl=\"0x%x\" name=\"%s\" />",
@@ -11166,6 +11389,7 @@ IN cloIR_EXPR ArrayLengthExpr
                     &name);
     if (gcmIS_ERROR(status)) return gcvNULL;
 
+    _ParseFillVariableAttr(Compiler, &arrayDecl, name, gcvNULL);
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                 clvDUMP_PARSER,
                 "<PARAMETER_DECL dataType=\"0x%x\" name=\"%s\" />",
@@ -11628,14 +11852,18 @@ IN clsLexToken * TypeName
 }
 
 void
-clParseStructDeclBegin( IN cloCOMPILER Compiler)
+clParseStructDeclBegin(
+IN cloCOMPILER Compiler,
+IN clsLexToken * Identifier
+)
 {
     gceSTATUS    status;
     clsNAME_SPACE *    nameSpace;
 
     status = cloCOMPILER_CreateNameSpace(Compiler, &nameSpace);
     if (gcmIS_ERROR(status)) return;
-    gcmVERIFY_OK(cloCOMPILER_Dump( Compiler, clvDUMP_PARSER, "<STRUCT_DECL>"));
+    nameSpace->symbol = Identifier ? Identifier->u.identifier.name : "";
+    gcmVERIFY_OK(cloCOMPILER_Dump(Compiler, clvDUMP_PARSER, "<STRUCT_DECL>"));
 }
 
 static gctBOOL
@@ -11710,6 +11938,9 @@ IN gceSTATUS ParsingStatus
                      clvEXTENSION_NONE,
                      &prevNameSpace->scopeName);
      if (gcmIS_ERROR(status)) return gcvNULL;
+     if (gcmIS_SUCCESS(gcoOS_StrCmp(Identifier->u.identifier.name, "_vxc_pyramid"))) {
+         prevNameSpace->scopeName->isBuiltin = gcvTRUE;
+     }
   }
   else {
      status = cloCOMPILER_CreateName(Compiler,
@@ -12069,6 +12300,8 @@ IN slsDLINK_LIST * FieldDeclList
    clsDECL *declPtr = Decl;
    clsNAME *derivedType = gcvNULL;
    clsFieldDecl *    fieldDecl = gcvNULL;
+   slsSLINK_LIST *ptrDscr;
+   clsDATA_TYPE *dataType;
 
    if (Decl->dataType == gcvNULL || FieldDeclList == gcvNULL)
        return gcvSTATUS_INVALID_DATA;
@@ -12098,12 +12331,43 @@ IN slsDLINK_LIST * FieldDeclList
           status = gcvSTATUS_INVALID_DATA;
           break;
       }
+
+      if(declPtr->dataType->type == T_IMAGE2D_DYNAMIC_ARRAY_T) {
+          clsNAME_SPACE * currentSpace = cloCOMPILER_GetCurrentSpace(Compiler);
+
+          if(currentSpace &&
+             !gcmIS_SUCCESS(gcoOS_StrCmp(currentSpace->symbol, "_vxc_pyramid"))) {
+               gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                          fieldDecl->field->lineNo,
+                                          fieldDecl->field->stringNo,
+                                          clvREPORT_ERROR,
+                                          "unrecognizable type '_viv_image2d_array_t' specified for struct field '%s'",
+                                          fieldDecl->field->symbol));
+               status = gcvSTATUS_INVALID_DATA;
+               break;
+          }
+      }
+
+      if(clmDECL_IsStructOrUnion(declPtr) &&
+         gcmIS_SUCCESS(gcoOS_StrCmp(declPtr->dataType->u.fieldSpace->scopeName->symbol, "_vxc_pyramid"))) {
+         fieldDecl = slsDLINK_LIST_First(FieldDeclList, clsFieldDecl);
+         gcmASSERT(fieldDecl);
+         gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                         fieldDecl->field->lineNo,
+                                         fieldDecl->field->stringNo,
+                                         clvREPORT_ERROR,
+                                         "struct/union field '%s' cannot have '%s' type",
+                                         fieldDecl->field->symbol,
+                                         "vxc_pyramid"));
+          status = gcvSTATUS_INVALID_DATA;
+          break;
+      }
       if(clmDECL_IsImage(declPtr)) {
           fieldDecl = slsDLINK_LIST_First(FieldDeclList, clsFieldDecl);
           gcmASSERT(fieldDecl);
           gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                          cloCOMPILER_GetCurrentLineNo(Compiler),
-                                          cloCOMPILER_GetCurrentStringNo(Compiler),
+                                          fieldDecl->field->lineNo,
+                                          fieldDecl->field->stringNo,
                                           clvREPORT_ERROR,
                                           "struct/union field '%s' cannot have image type",
                                           fieldDecl->field->symbol));
@@ -12115,8 +12379,8 @@ IN slsDLINK_LIST * FieldDeclList
           fieldDecl = slsDLINK_LIST_First(FieldDeclList, clsFieldDecl);
           gcmASSERT(fieldDecl);
           gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                          cloCOMPILER_GetCurrentLineNo(Compiler),
-                                          cloCOMPILER_GetCurrentStringNo(Compiler),
+                                          fieldDecl->field->lineNo,
+                                          fieldDecl->field->stringNo,
                                           clvREPORT_ERROR,
                                           "struct field '%s' cannot have storage qualifier '%s'",
                                           fieldDecl->field->symbol,
@@ -12125,19 +12389,30 @@ IN slsDLINK_LIST * FieldDeclList
           break;
       }
 
+      ptrDscr = declPtr->ptrDscr;
+      dataType = declPtr->dataType;
       FOR_EACH_DLINK_NODE(FieldDeclList, clsFieldDecl, fieldDecl) {
-          fieldDecl->field->decl.array.numDim = 0;
-          slmSLINK_LIST_Prepend(fieldDecl->field->decl.ptrDscr, declPtr->ptrDscr);
-          fieldDecl->field->decl.ptrDscr = declPtr->ptrDscr;
-          if (fieldDecl->array.numDim == 0) {
-              fieldDecl->field->decl.dataType = declPtr->dataType;
+          declPtr->dataType = dataType;
+          if(!slmSLINK_LIST_IsEmpty(ptrDscr)) {
+              status = cloCOMPILER_ClonePtrDscr(Compiler,
+                                                ptrDscr,
+                                                &declPtr->ptrDscr);
+              if (gcmIS_ERROR(status)) return status;
           }
-          else {
-              status = cloCOMPILER_CreateArrayDecl(Compiler,
-                                                   declPtr->dataType,
-                                                   &fieldDecl->array,
-                                                   fieldDecl->field->decl.ptrDscr,
-                                                   &fieldDecl->field->decl);
+          status = clMergePtrDscrToDecl(Compiler,
+                                        fieldDecl->field->decl.ptrDscr,
+                                        declPtr,
+                                        fieldDecl->array.numDim == 0);
+          if (gcmIS_ERROR(status)) return status;
+
+          fieldDecl->field->decl = *declPtr;
+
+          if (fieldDecl->array.numDim != 0) {
+              /* may need to handle array of pointers to array */
+              status = _ParseMergeArrayDecl(Compiler,
+                                            &fieldDecl->field->decl,
+                                            &fieldDecl->array,
+                                            &fieldDecl->field->decl);
               if (gcmIS_ERROR(status)) {
                   fieldDecl->field->decl.dataType = declPtr->dataType;
                   break;
@@ -12146,6 +12421,14 @@ IN slsDLINK_LIST * FieldDeclList
           if(derivedType) {
               gcmONERROR(_ParseMergeTypeAttrToVariable(derivedType, fieldDecl->field));
               fieldDecl->field->derivedType = derivedType;
+          }
+
+          if(clmDECL_IsUnderlyingVectorType(&fieldDecl->field->decl) && cloCOMPILER_IsBasicTypePacked(Compiler)) {
+              fieldDecl->field->context.packed = gcvTRUE;
+          }
+          if(fieldDecl->field->context.packed &&
+             cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+              gcmONERROR(_ConvDataTypeToPacked(Compiler, fieldDecl->field));
           }
       }
    } while (gcvFALSE);
@@ -12252,12 +12535,7 @@ IN clsATTRIBUTE *Attr
                       Identifier->lineNo,
                       Identifier->stringNo,
                       Identifier->u.identifier.name));
-    if(Attr) {
-       status = _ParseFillVariableAttr(Compiler, gcvNULL, field, Attr);
-       if (gcmIS_ERROR(status)) {
-        return fieldDecl;
-       }
-    }
+    _ParseFillVariableAttr(Compiler, gcvNULL, field, Attr);
     return fieldDecl;
 }
 

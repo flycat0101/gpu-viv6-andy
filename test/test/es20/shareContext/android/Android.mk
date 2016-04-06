@@ -87,13 +87,8 @@ LOCAL_C_INCLUDES := \
 LOCAL_SHARED_LIBRARIES := \
 	libutils \
 	libEGL \
-	libGLESv2
-
-ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 18),1)
-LOCAL_SHARED_LIBRARIES += \
-        liblog
-endif
-
+	libGLESv2 \
+    liblog
 
 LOCAL_MODULE := libgl2shareContext
 

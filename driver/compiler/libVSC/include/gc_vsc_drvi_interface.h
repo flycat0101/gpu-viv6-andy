@@ -175,6 +175,8 @@ typedef gcsGLSLCaps VSC_GL_API_CONFIG, *PVSC_GL_API_CONFIG;
 
 #define VSC_COMPILER_OPT_FULL                          0x0000000000013FFF
 
+#define VSC_COMPILER_OPT_MIN_COMP_TIME                 0x1000000000000000ULL   /* for dEQP compile-time purpose, skip some opts */
+
 /* Compiler flag for special purpose */
 #define VSC_COMPILER_FLAG_COMPILE_TO_HL                0x00000001   /* Compile IR to HL, including doing all opts in HL */
 #define VSC_COMPILER_FLAG_COMPILE_TO_ML                0x00000002   /* Compile IR to ML, including doing all opts in HL&ML */

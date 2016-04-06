@@ -1951,21 +1951,23 @@ _AllocLogicalRegOrArray(
                     return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
                 }
             }
-            status = slNewOutput(Compiler,
-                                 Name->lineNo,
-                                 Name->stringNo,
-                                 Symbol,
-                                 binaryDataType,
-                                 binaryPrecision,
-                                 Name->dataType->arrayLength != 0,
-                                 logicalRegCount,
-                                 tempRegIndex,
-                                 FieldIndex ? *FieldIndex : -1,
-                                 isInvariant,
-                                 isPrecise,
-                                 shaderMode,
-                                 _ConvOutputBlendSupport(slmDATA_TYPE_layoutId_GET(Name->dataType)),
-                                 &output);
+
+            status = slNewOutputWithLocation(Compiler,
+                                             Name->lineNo,
+                                             Name->stringNo,
+                                             Symbol,
+                                             binaryDataType,
+                                             binaryPrecision,
+                                             Name->dataType->arrayLength != 0,
+                                             logicalRegCount,
+                                             tempRegIndex,
+                                             GetOutputDefaultLocation(binary),
+                                             FieldIndex ? *FieldIndex : -1,
+                                             isInvariant,
+                                             isPrecise,
+                                             shaderMode,
+                                             _ConvOutputBlendSupport(slmDATA_TYPE_layoutId_GET(Name->dataType)),
+                                             &output);
 
             for (i = 0; i < logicalRegCount; i++)
             {

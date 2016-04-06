@@ -248,6 +248,12 @@ OnError:
     {
         *ErrcodeRet = status;
     }
+
+    if(buffer != gcvNULL)
+    {
+        clReleaseMemObject(buffer);
+    }
+
     gcmFOOTER_ARG("%d", status);
     return gcvNULL;
 }
@@ -575,6 +581,9 @@ OnError:
         image->u.image.texture,
         image->u.image.surface);
     }
+
+    gcmOS_SAFE_FREE(gcvNULL, image);
+
     if (ErrcodeRet) {
         *ErrcodeRet = status;
     }

@@ -462,6 +462,41 @@ extern "C" {
 #define   MODULE_HOST_INTERFACE_COUNTER_NUM               30
 #endif
 
+#if VIVANTE_PROFILER_PROBE
+#define   MODULE_FRONT_END_COUNTER_NUM                    0x5
+#define   MODULE_VERTEX_SHADER_COUNTER_NUM                0x9
+#define   MODULE_PRIMITIVE_ASSEMBLY_COUNTER_NUM           0xC
+#define   MODULE_SETUP_COUNTER_NUM                        0xD
+#define   MODULE_RASTERIZER_COUNTER_NUM                   0xE
+#define   MODULE_PIXEL_SHADER_COUNTER_NUM                 0x9
+#define   MODULE_TEXTURE_COUNTER_NUM                      0x8
+#define   MODULE_PIXEL_ENGINE_COUNTER_NUM                 0x8
+#define   MODULE_MEMORY_CONTROLLER_COLOR_COUNTER_NUM      0xC
+#define   MODULE_MEMORY_CONTROLLER_DEPTH_COUNTER_NUM      0xC
+#define   MODULE_HOST_INTERFACE0_COUNTER_NUM              0x9
+#define   MODULE_HOST_INTERFACE1_COUNTER_NUM              0x7
+#define   MODULE_GPUL2_CACHE_COUNTER_NUM                  0xE
+
+typedef enum _gceCOUNTER
+{
+    gcvCOUNTER_FRONT_END,
+    gcvCOUNTER_VERTEX_SHADER,
+    gcvCOUNTER_PRIMITIVE_ASSEMBLY,
+    gcvCOUNTER_SETUP,
+    gcvCOUNTER_RASTERIZER,
+    gcvCOUNTER_PIXEL_SHADER,
+    gcvCOUNTER_TEXTURE,
+    gcvCOUNTER_PIXEL_ENGINE,
+    gcvCOUNTER_MEMORY_CONTROLLER_COLOR,
+    gcvCOUNTER_MEMORY_CONTROLLER_DEPTH,
+    gcvCOUNTER_HOST_INTERFACE0,
+    gcvCOUNTER_HOST_INTERFACE1,
+    gcvCOUNTER_GPUL2_CACHE,
+    gcvCOUNTER_COUNT
+}
+gceCOUNTER;
+#endif
+
 /* HW profile information. */
 typedef struct _gcsPROFILER_COUNTERS
 {
@@ -653,6 +688,7 @@ typedef struct _gcsPROFILER
 #if VIVANTE_PROFILER_PROBE
     gctHANDLE       newCounterBuf[NumOfDrawBuf];
     gctUINT32       curBufId;
+    gctFILE         probeFile;
 #endif
 
 }
@@ -712,6 +748,11 @@ gceSTATUS
 gcoPROFILER_EndFrame(
     IN gcoHAL Hal
     );
+
+gceSTATUS
+gcoPROFILER_BeginDraw(
+IN gcoHAL Hal
+);
 
 /* Call to signal end of draw. */
 gceSTATUS

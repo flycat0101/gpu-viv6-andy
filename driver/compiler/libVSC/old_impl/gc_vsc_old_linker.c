@@ -8002,6 +8002,11 @@ _PreviousMOV(
         return gcvFALSE;
     }
 
+    if(gcmSL_SOURCE_GET(current->source0, Neg) || gcmSL_SOURCE_GET(current->source0, Abs))
+    {
+        return gcvFALSE;
+    }
+
     if (!isPrevOpcodeTargetComponentWised && enableCurrent != prevEnable)
     {
         return gcvFALSE;
@@ -8637,6 +8642,8 @@ gcLINKTREE_Optimize(
                 case gcSL_NOP:
                     /* fall through */
                 case gcSL_RET:
+                    /* fall through */
+                case gcSL_END_PRIMITIVE:
                     userTemp = gcvNULL;
                     break;
                 default:
@@ -9017,34 +9024,38 @@ gcLINKTREE_Optimize(
         }
 
         else
-        switch (gcmSL_OPCODE_GET(code->opcode, Opcode))
         {
-        case gcSL_JMP:
-            /* fall through */
-        case gcSL_CALL:
-            /* fall through */
-        case gcSL_KILL:
-            /* fall through */
-        case gcSL_NOP:
-            /* fall through */
-        case gcSL_RET:
-            break;
-
-        default:
+            switch (gcmSL_OPCODE_GET(code->opcode, Opcode))
             {
-                gcSL_OPCODE  opcode = gcmSL_OPCODE_GET(code->opcode, Opcode);
-                /* Mark entire register as non optimizable. */
-                if (!gcSL_isOpcodeTexldModifier(opcode))
-                {
-                    gcLINKTREE_TEMP temp = &Tree->tempArray[code->tempIndex];
+            case gcSL_JMP:
+                /* fall through */
+            case gcSL_CALL:
+                /* fall through */
+            case gcSL_KILL:
+                /* fall through */
+            case gcSL_NOP:
+                /* fall through */
+            case gcSL_RET:
+                /* fall through */
+            case gcSL_END_PRIMITIVE:
+                break;
 
-                    temp->constUsage[0] =
-                    temp->constUsage[1] =
-                    temp->constUsage[2] =
-                    temp->constUsage[3] = -1;
+            default:
+                {
+                    gcSL_OPCODE  opcode = gcmSL_OPCODE_GET(code->opcode, Opcode);
+                    /* Mark entire register as non optimizable. */
+                    if (!gcSL_isOpcodeTexldModifier(opcode))
+                    {
+                        gcLINKTREE_TEMP temp = &Tree->tempArray[code->tempIndex];
+
+                        temp->constUsage[0] =
+                        temp->constUsage[1] =
+                        temp->constUsage[2] =
+                        temp->constUsage[3] = -1;
+                    }
                 }
+                break;
             }
-            break;
         }
     }
 
@@ -10748,26 +10759,62 @@ gcLINKTREE_FindModelViewProjection(
     gctSIZE_T count = 0;
     gctBOOL_PTR tempArray = gcvNULL;
     gctINT matchCount = 0;
-    gctINT positionIndex = -1;
+    gcOUTPUT positionOutput = gcvNULL;
+    gctINT positionTempHolding = 0;
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
 
-    /* Get the gl_Position index. */
+    gcoHAL_GetPatchID(gcvNULL, &patchId);
+
+    /* Find the output position. */
     for (i = 0; i < VertexTree->outputCount; ++i)
     {
-        if (VertexTree->shader->outputs[i] /* removed output could be null */ &&
+        if (VertexTree->shader->outputs[i] &&
             VertexTree->shader->outputs[i]->nameLength == gcSL_POSITION)
         {
-            positionIndex = VertexTree->outputArray[i].tempHolding;
-            break;
+            positionOutput = VertexTree->shader->outputs[i];
+            positionTempHolding = VertexTree->outputArray[i].tempHolding;
+			break;
         }
     }
 
-    if (positionIndex == -1)
+    if (positionOutput == gcvNULL)
+    {
         return;
+    }
+
+#if gcdUSE_WCLIP_PATCH
+    if (patchId == gcvPATCH_DEQP)
+    {
+        /* Check that direct position first. */
+        for (i = 0; i < VertexTree->shader->codeCount; i++)
+        {
+            gcSL_INSTRUCTION inst = &VertexTree->shader->code[i];
+            gctUINT16 attrIndex;
+
+            if (gcmSL_OPCODE_GET(inst->opcode, Opcode) != gcSL_MOV)
+            {
+                continue;
+            }
+
+            if ((inst->tempIndex != positionOutput->tempIndex) ||
+                (gcmSL_SOURCE_GET(inst->source0, Type) != gcSL_ATTRIBUTE))
+            {
+                continue;
+            }
+
+            attrIndex = gcmSL_INDEX_GET(inst->source0Index, Index);
+
+            gcmASSERT((gctUINT32)attrIndex < VertexTree->shader->attributeCount);
+            gcmATTRIBUTE_SetIsDirectPosition(VertexTree->shader->attributes[attrIndex], gcvTRUE);
+            break;
+        }
+    }
+#endif
 
     /*
     ** Check if there is Pos.w = Pos.z. This is a very rough check.
     */
-    _TraceWChannelEqualToZ(VertexTree, positionIndex);
+    _TraceWChannelEqualToZ(VertexTree, positionTempHolding);
 
     /* Check if there is no mat4 uniform. */
     for (i = 0; i < VertexTree->shader->uniformCount; i++)
@@ -10792,7 +10839,7 @@ gcLINKTREE_FindModelViewProjection(
     gcoOS_ZeroMemory(tempArray, bytes);
 
     /* Check the MVP dependency. */
-    _TraceStrictModelViewProjection(VertexTree, positionIndex, 0, &matchCount);
+    _TraceStrictModelViewProjection(VertexTree, positionTempHolding, 0, &matchCount);
 
     if (VertexTree->strictWClipMatch)
     {
@@ -10803,7 +10850,7 @@ gcLINKTREE_FindModelViewProjection(
         count = 0;
     }
 
-    _TraceModelViewProjection(VertexTree, tempArray, positionIndex, 0);
+    _TraceModelViewProjection(VertexTree, tempArray, positionTempHolding, 0);
 
     gcoOS_Free(gcvNULL, tempArray);
 }
@@ -13719,7 +13766,8 @@ OnError:
 
 static gceSTATUS
 _convertImageReadToTexld(
-    IN gcSHADER         Shader
+    IN gcSHADER         Shader,
+    IN gceSHADER_FLAGS  Flags
     )
 {
     gceSTATUS           status = gcvSTATUS_OK;
@@ -13731,7 +13779,7 @@ _convertImageReadToTexld(
     gcUNIFORM           uniform;
     gctUINT8            imageNum;
     gctBOOL             isConstantSamplerType;
-    gctUINT32           samplerType;
+    gctUINT32           samplerType = 0;
     gctUINT32           coordFormat;
     gctBOOL             isCodeChanged = gcvFALSE;
     gctBOOL             computeOnlyGpu = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_COMPUTE_ONLY);
@@ -13953,10 +14001,13 @@ _convertImageReadToTexld(
              gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE) ||
              gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE_V2)) &&
              isConstantSamplerType &&
-             (coordFormat != gcSL_FLOAT))
+             (samplerType != 0) &&
+             (coordFormat != gcSL_FLOAT) &&
+             ((Flags & gcvSHADER_IMAGE_PATCHING) != gcvSHADER_IMAGE_PATCHING))
         {
            /* Use img_load for now. */
-           /* No Action needed. */
+           /* Change IMAGE_SAMPLER to NOP. */
+            gcSL_SetInst2NOP(inst);
         }
         else
         {
@@ -14523,6 +14574,11 @@ gcLinkTreeThruVirShaders(
             {
                 scParam.cfg.cFlags |= VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO;
             }
+
+            if (Flags & gcvSHADER_MIN_COMP_TIME)
+            {
+                scParam.cfg.optFlags |= VSC_COMPILER_OPT_MIN_COMP_TIME;
+            }
         }
         else
         {
@@ -14573,6 +14629,11 @@ gcLinkTreeThruVirShaders(
             if (Flags & gcvSHADER_DISABLE_DUAL16)
             {
                 pgComParam.cfg.optFlags &= ~VSC_COMPILER_OPT_DUAL16;
+            }
+
+            if (Flags & gcvSHADER_MIN_COMP_TIME)
+            {
+                pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_MIN_COMP_TIME;
             }
 
             pgComParam.cfg.pHwCfg = &hwCfg;
@@ -14773,6 +14834,8 @@ gcLinkTreeThruVirShaders(
                     _DumpLinkTree("After VIR kernel tree.", *CsTree, gcvFALSE);
                 }
             }
+
+            theVSCOption.reset = gcvTRUE;
         }
 
         vscPMP_Finalize(&pmp);
@@ -14882,6 +14945,10 @@ gcGoThroughVIRPass_Compile(
                             VSC_COMPILER_FLAG_COMPILE_CODE_GEN;
     shComParam.cfg.clientAPI = Shader->clientApiVersion;
     shComParam.cfg.optFlags = VSC_COMPILER_OPT_FULL;
+    if ((*Tree)->flags & gcvSHADER_MIN_COMP_TIME)
+    {
+        shComParam.cfg.optFlags |= VSC_COMPILER_OPT_MIN_COMP_TIME;
+    }
     shComParam.cfg.pHwCfg = &hwCfg;
     status = vscCompileShader(&shComParam, gcvNULL);
 
@@ -15654,6 +15721,7 @@ _gcCreateConstantUBO(
     blockInfo->precision = gcSHADER_PRECISION_DEFAULT;
     blockInfo->arraySize = 1;
     blockInfo->u.numBlockElement = 0;
+    blockInfo->firstChild = -1;
     blockInfo->prevSibling = -1;
     blockInfo->nextSibling = -1;
     blockInfo->parent = -1;
@@ -17258,8 +17326,15 @@ _gcConvert32BitModulus(
     gctUINT lastInst = Shader->lastInstruction;
     gctBOOL changed = gcvFALSE;
 
-    if (Shader->lastInstruction == 0 || Shader->codeCount == 0)
+    if(!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI0))
+    {
         return status;
+    }
+
+    if (Shader->lastInstruction == 0 || Shader->codeCount == 0)
+    {
+        return status;
+    }
 
     for (i = (gctINT)Shader->lastInstruction - 1; i >= 0; i--)
     {
@@ -19567,7 +19642,7 @@ gcLinkKernel(
         /* Read_image patching. */
         /* Create image-sampler pairs, */
         /*    and replace IMAGE_SAMPLER-IMAGE_RD pairs with TEXLD. */
-        gcmONERROR(_convertImageReadToTexld(Kernel));
+        gcmONERROR(_convertImageReadToTexld(Kernel, Flags));
     }
 
     if (Flags & gcvSHADER_OPTIMIZER)

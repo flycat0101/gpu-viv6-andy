@@ -62,6 +62,8 @@ static char *extension_w_atomic = "cl_khr_byte_addressable_store "
                                   "cl_khr_local_int32_base_atomics "
                                   "cl_khr_local_int32_extended_atomics ";
 
+static char *extension_without_atomic = "cl_khr_byte_addressable_store ";
+
 cl_device_id clgDefaultDevice = gcvNULL;
 
 
@@ -178,11 +180,13 @@ clGetDeviceIDs(
             gctUINT32 chipRevision;
             gcePATCH_ID patchId = gcvPATCH_INVALID;
             gctUINT offset;
-
 #if BUILD_OPENCL_FP
             gctSTRING epProfile = "EMBEDDED_PROFILE";
             gctBOOL chipEnableFP = gcvFALSE;
+#endif
+
             gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
+#if BUILD_OPENCL_FP
             chipEnableFP = ((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008));
             if((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) != gcvSTATUS_TRUE) || (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) != gcvSTATUS_TRUE)
                 || (chipEnableFP == gcvFALSE))
@@ -201,9 +205,21 @@ clGetDeviceIDs(
                 device[i].extensions = extension_w_atomic;
             }
 
-#if !BUILD_OPENCL_FP
-            gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
-#endif
+            if(chipModel == gcv3000 && chipRevision == 0x5450)
+            {
+                 gctSTRING productName = gcvNULL;
+
+                gcoHAL_GetProductName(gcvNULL, &productName);
+
+                if (gcmIS_SUCCESS(gcoOS_StrCmp(productName, "GC2000+")))
+                {
+                    device[i].extensions = extension_without_atomic;
+                }
+
+                gcmOS_SAFE_FREE(gcvNULL, productName);
+
+            }
+
             gcoHAL_GetPatchID(gcvNULL, &patchId);
 
             offset = 0;

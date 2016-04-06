@@ -3888,7 +3888,9 @@ clReleaseMemObject(
                     }
                 }
 
+#if cldSYNC_MEMORY
                 gcmVERIFY_OK(gcoCL_Commit(gcvTRUE));
+#endif
 
                 /* Invoke and free callbacks */
                 memObjCallback = MemObj->memObjCallback;
@@ -3936,7 +3938,9 @@ clReleaseMemObject(
                 gcoCL_DestroyTexture(MemObj->u.image.texture,
                                      MemObj->u.image.surface);
 
+#if cldSYNC_MEMORY
                 gcmVERIFY_OK(gcoCL_Commit(gcvTRUE));
+#endif
 
                 MemObj->u.image.texture = gcvNULL;
                 MemObj->u.image.surface = gcvNULL;

@@ -823,7 +823,8 @@ clParseNamedType(
 
 void
 clParseStructDeclBegin(
-    IN cloCOMPILER Compiler
+    IN cloCOMPILER Compiler,
+    IN clsLexToken * Identifier
     );
 
 clsDATA_TYPE *

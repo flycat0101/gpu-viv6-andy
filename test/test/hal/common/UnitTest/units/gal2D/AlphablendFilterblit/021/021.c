@@ -210,7 +210,6 @@ static void CDECL Destroy(Test2D *t2d)
 
 const gceFEATURE FeatureList[]=
 {
-    gcvFEATURE_SCALER,
     gcvFEATURE_2D_FILTERBLIT_PLUS_ALPHABLEND,
 };
 

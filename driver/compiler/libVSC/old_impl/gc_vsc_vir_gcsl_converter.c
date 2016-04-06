@@ -3266,6 +3266,18 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                 {
                     ResetUniformFlag(mappingGCSLUniform, gcvUNIFORM_FLAG_USED_IN_SHADER);
                 }
+
+                if (VIR_Symbol_HasFlag(virUniformSym, VIR_SYMUNIFORMFLAG_COMPILETIME_INITIALIZED))
+                {
+                    VIR_ConstId initializerId = VIR_Uniform_GetInitializer(virUniform);
+                    VIR_Const* initializerConst = VIR_Shader_GetConstFromId(VirShader, initializerId);
+                    gctUINT i;
+
+                    for(i = 0; i < 4; i++)
+                    {
+                        mappingGCSLUniform->initializer.u32_v4[i] = initializerConst->value.vecVal.u32Value[i];
+                    }
+                }
             }
 
             if (VIR_Symbol_HasFlag(virUniformSym, VIR_SYMUNIFORMFLAG_MOVED_TO_CUBO))

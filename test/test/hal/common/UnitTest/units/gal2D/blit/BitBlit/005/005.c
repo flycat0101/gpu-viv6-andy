@@ -492,7 +492,7 @@ static void CDECL Destroy(Test2D *t2d)
 const gceFEATURE FeatureList[]=
 {
     gcvFEATURE_2D_BITBLIT_FULLROTATION,
-    gcvFEATURE_2D_ALL_QUAD,
+    gcvFEATURE_2D_ONE_PASS_FILTER,
 };
 
 static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)

@@ -38,6 +38,7 @@ clsLOOKUP;
 static clsLOOKUP clgLookup[] =
 {
     clmMAKE_LOOKUP(clIcdGetPlatformIDsKHR),
+#if gcdENABLE_CL_GL
     clmMAKE_LOOKUP(clGetGLContextInfoKHR),
     clmMAKE_LOOKUP(clCreateFromGLBuffer),
     clmMAKE_LOOKUP(clCreateFromGLTexture2D),
@@ -47,6 +48,7 @@ static clsLOOKUP clgLookup[] =
     clmMAKE_LOOKUP(clGetGLTextureInfo),
     clmMAKE_LOOKUP(clEnqueueAcquireGLObjects),
     clmMAKE_LOOKUP(clEnqueueReleaseGLObjects),
+#endif
     { gcvNULL, gcvNULL }
 };
 

@@ -456,6 +456,42 @@ OnError:
 }
 #endif
 
+static gceSTATUS
+_DummyDraw(
+    IN gckCOMMAND Command
+    )
+{
+#if gcdSECURITY
+    return gcvSTATUS_OK;
+#else
+    gceSTATUS status;
+    gckHARDWARE hardware = Command->kernel->hardware;
+
+    gctUINT8_PTR pointer;
+    gctUINT32 bufferSize;
+
+    gctUINT32 dummyDrawBytes;
+
+    gckHARDWARE_DummyDraw(hardware, gcvNULL, Command->queues[0].address, &dummyDrawBytes);
+
+    /* Reserve space. */
+    gcmkONERROR(gckCOMMAND_Reserve(
+        Command,
+        dummyDrawBytes,
+        (gctPOINTER *)&pointer,
+        &bufferSize
+        ));
+
+    gckHARDWARE_DummyDraw(hardware, pointer, Command->queues[0].address, &dummyDrawBytes);
+
+    gcmkONERROR(gckCOMMAND_Execute(Command, dummyDrawBytes));
+
+    return gcvSTATUS_OK;
+OnError:
+    return status;
+#endif
+}
+
 static void
 _DumpBuffer(
     IN gctPOINTER Buffer,
@@ -1663,6 +1699,11 @@ gckCOMMAND_Commit(
     if (gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_FENCE) && asyncCommandStamp != 0)
     {
         gcmkONERROR(_WaitForAsyncCommandStamp(Command, asyncCommandStamp));
+    }
+
+    if (gckHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_FE_NEED_DUMMYDRAW) && Command->currContext == gcvNULL)
+    {
+        gcmkONERROR(_DummyDraw(Command));
     }
 
     /* Get the current offset. */

@@ -26,6 +26,7 @@
 *****************************************************************************/
 
 
+
 /*
  *  Feature:    Filter Blit - one pass filter color format conversion with TILE
  *  API:        gco2D_FilterBlit
@@ -333,7 +334,6 @@ static void CDECL Destroy(Test2D *t2d)
 
 const gceFEATURE FeatureList[]=
 {
-    gcvFEATURE_SCALER,
     gcvFEATURE_2D_OPF_YUV_OUTPUT,
     gcvFEATURE_2D_TILING,
 };

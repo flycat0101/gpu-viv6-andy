@@ -13,6 +13,8 @@
 
 #include "vir/transform/gc_vsc_vir_cpp.h"
 
+#define VSC_CPP_MAX_TEMP 3500
+
 typedef struct VSC_CPP_USAGE
 {
     VIR_Instruction *inst;
@@ -1781,6 +1783,22 @@ VSC_ErrCode VSC_CPP_PerformOnShader(
         VSC_OPTN_CPPOptions_TRACE_INPUT))
     {
         VIR_Shader_Dump(gcvNULL, "Shader before Copy Propagation", shader, gcvTRUE);
+    }
+
+    if (!ENABLE_FULL_NEW_LINKER)
+    {
+        /* too large shader, don't do CPP */
+        if (VIR_Shader_GetVirRegCount(shader) > VSC_CPP_MAX_TEMP)
+        {
+            if (VSC_UTILS_MASK(VSC_OPTN_CPPOptions_GetTrace(VSC_CPP_GetOptions(cpp)),
+                VSC_OPTN_CPPOptions_TRACE_OUTPUT))
+            {
+                VIR_Dumper* pDumper = shader->dumper;
+                VIR_LOG(pDumper, "Copy propagation skips shader(%d)\n", VIR_Shader_GetId(shader));
+                VIR_LOG_FLUSH(pDumper);
+            }
+            return errcode;
+        }
     }
 
     /* don't perform global CPP when the cfg has too many nodes*/

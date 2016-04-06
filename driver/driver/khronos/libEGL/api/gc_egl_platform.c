@@ -495,6 +495,7 @@ OnError:
 
 static void
 _FreeWindowBuffers(
+    VEGLSurface Surface,
     NativeWindowType Window,
     VEGLWindowInfo Info
     )
@@ -502,6 +503,14 @@ _FreeWindowBuffers(
     if (Info->bufferList)
     {
         VEGLNativeBuffer buffer;
+
+        /* Make sure all workers have been processed. */
+        if (Surface->workerDoneSignal != gcvNULL)
+        {
+            gcmVERIFY_OK(gcoOS_WaitSignal(gcvNULL,
+                                          Surface->workerDoneSignal,
+                                          gcvINFINITE));
+        }
 
         /* Lock buffers. */
         gcoOS_AcquireMutex(gcvNULL, Info->bufferListMutex, gcvINFINITE);
@@ -706,7 +715,7 @@ veglDisconnectWindow(
     gcmASSERT(info);
 
     /* Free native window buffers. */
-    _FreeWindowBuffers(win, info);
+    _FreeWindowBuffers(Surface, win, info);
 
     /* Delete the mutex. */
     gcoOS_DeleteMutex(gcvNULL, info->bufferListMutex);
@@ -763,8 +772,6 @@ veglBindWindow(
                                    &format,
                                    &type);
 
-    (void) type;
-
     if (gcmIS_ERROR(status))
     {
         /* Bad native window. */
@@ -776,7 +783,7 @@ veglBindWindow(
         (info->height != (gctUINT)height) ||
         (info->format != format))
     {
-        /* Window changed. */
+        /* Native window internally changed. */
         winChanged = EGL_TRUE;
     }
 
@@ -804,7 +811,7 @@ veglBindWindow(
                 break;
             }
 
-            switch (info->format)
+            switch (format)
             {
             case gcvSURF_A8R8G8B8:
             case gcvSURF_A8B8G8R8:
@@ -861,13 +868,14 @@ veglBindWindow(
         }
         while (gcvFALSE);
 
-        if (info->type != gcvSURF_BITMAP)
+        if ((type != gcvSURF_BITMAP) ||
+            (info->type != gcvSURF_BITMAP))
         {
             /* Request linear buffer for hardware OpenVG. */
             status = gcoOS_SetWindowFormat(Display->hdc,
                                            win,
                                            gcvSURF_BITMAP,
-                                           info->format);
+                                           format);
 
             if (gcmIS_ERROR(status))
             {
@@ -875,8 +883,7 @@ veglBindWindow(
                 return EGL_FALSE;
             }
 
-            /* Update window buffer type. */
-            info->type = gcvSURF_BITMAP;
+            /* Window type is changed. */
             winChanged = EGL_TRUE;
         }
 
@@ -886,7 +893,7 @@ veglBindWindow(
             _QueryWindowInfo(Display, win, info);
 
             /* Recreate window buffers. */
-            _FreeWindowBuffers(win, info);
+            _FreeWindowBuffers(Surface, win, info);
             gcmONERROR(_CreateWindowBuffers(win, info));
         }
     }
@@ -900,6 +907,7 @@ veglBindWindow(
             /* Check if direct rendering is available. */
             EGLBoolean fcFill = EGL_FALSE;
             EGLBoolean formatSupported;
+            gceSURF_FORMAT reqFormat = format;
 
             EGLint i;
             gcePATCH_ID patchId = gcvPATCH_INVALID;
@@ -950,14 +958,14 @@ veglBindWindow(
             }
 
             /* Check window format. */
-            switch (info->format)
+            switch (format)
             {
             case gcvSURF_A8B8G8R8:
-                format = gcvSURF_A8R8G8B8;
+                reqFormat = gcvSURF_A8R8G8B8;
                 formatSupported = EGL_TRUE;
                 break;
             case gcvSURF_X8B8G8R8:
-                format = gcvSURF_X8R8G8B8;
+                reqFormat = gcvSURF_X8R8G8B8;
                 formatSupported = EGL_TRUE;
                 break;
             case gcvSURF_A8R8G8B8:
@@ -965,7 +973,6 @@ veglBindWindow(
             case gcvSURF_A4R4G4B4:
             case gcvSURF_X4R4G4B4:
             case gcvSURF_R5G6B5:
-                format = info->format;
                 formatSupported = EGL_TRUE;
                 break;
             default:
@@ -979,118 +986,127 @@ veglBindWindow(
                 break;
             }
 
-            if (info->wrapFB)
-            {
-                if (!fcFill)
-                {
-                    break;
-                }
-
-                type = gcvSURF_RENDER_TARGET_NO_TILE_STATUS;
-
-                if (gcmIS_ERROR(gcoOS_SetWindowFormat(Display->hdc,
-                                                      win,
-                                                      type, format)))
-                {
-                    /* Format or type not supported by window, stop. */
-                    break;
-                }
-
-                /* Update window buffer format. */
-                info->format = format;
-
-                /*
-                 * Will attach tile status for performance, and fc fill still
-                 * can not support compression.
-                 */
-                info->type = type;
-
-                /* Should use direct rendering and fc fill. */
-                renderMode = VEGL_DIRECT_RENDERING_FCFILL;
-                winChanged = EGL_TRUE;
-                break;
-            }
-            else
+            if (!info->wrapFB)
             {
                 /* Try many direct rendering levels here. */
                 /* 1. The best, direct rendering with compression. */
-                type = gcvSURF_RENDER_TARGET;
-
-                if (gcmIS_SUCCESS(gcoOS_SetWindowFormat(Display->hdc,
-                                                        win,
-                                                        type,
-                                                        format)))
+                if ((type != gcvSURF_RENDER_TARGET) ||
+                    (info->type != gcvSURF_RENDER_TARGET)  ||
+                    (info->format != reqFormat))
                 {
-                    /* Update window buffer format,type. */
-                    info->format = format;
-                    info->type   = type;
+                    status = gcoOS_SetWindowFormat(Display->hdc,
+                                                   win,
+                                                   gcvSURF_RENDER_TARGET,
+                                                   reqFormat);
 
-                    /* Should use direct rendering with compression. */
+                    if (gcmIS_SUCCESS(status))
+                    {
+                        /* Should use direct rendering with compression. */
+                        renderMode = VEGL_DIRECT_RENDERING;
+
+                        /* Window is changed. */
+                        winChanged = EGL_TRUE;
+                        break;
+                    }
+
+                    /* Not an error. */
+                    status = gcvSTATUS_OK;
+                }
+                else
+                {
+                    /* Already rendering with compression. */
                     renderMode = VEGL_DIRECT_RENDERING;
-                    winChanged = EGL_TRUE;
-                    break;
                 }
 
                 /* 2. Second, with tile status, no compression. */
-                type = gcvSURF_RENDER_TARGET_NO_COMPRESSION;
-
-                if (gcmIS_SUCCESS(gcoOS_SetWindowFormat(Display->hdc,
-                                                        win,
-                                                        type,
-                                                        format)))
+                if ((type != gcvSURF_RENDER_TARGET_NO_COMPRESSION) ||
+                    (info->type != gcvSURF_RENDER_TARGET_NO_COMPRESSION) ||
+                    (info->format != reqFormat))
                 {
-                    /* Update window buffer format,type. */
-                    info->format = format;
-                    info->type   = type;
 
-                    /* Should use direct rendering with compression. */
+                    status = gcoOS_SetWindowFormat(Display->hdc,
+                                                   win,
+                                                   gcvSURF_RENDER_TARGET_NO_COMPRESSION,
+                                                   reqFormat);
+
+                    if (gcmIS_SUCCESS(status))
+                    {
+                        /* Should use direct rendering without compression. */
+                        renderMode = VEGL_DIRECT_RENDERING_FC_NOCC;
+
+                        /* Window is changed. */
+                        winChanged = EGL_TRUE;
+                        break;
+                    }
+
+                    /* Not an error. */
+                    status = gcvSTATUS_OK;
+                }
+                else
+                {
+                    /* Already direct rendering without compression. */
                     renderMode = VEGL_DIRECT_RENDERING_FC_NOCC;
-                    winChanged = EGL_TRUE;
-                    break;
                 }
+            }
 
-                if (!fcFill)
+            if (!fcFill)
+            {
+                /* Do not need check the next mode. */
+                break;
+            }
+
+            /*
+             * Special for FC-FILL mode: tile status is required.
+             * Final internal render type should be RENDER_TARGET_NO_COMPRESSION.
+             */
+            if ((type != gcvSURF_RENDER_TARGET_NO_TILE_STATUS) ||
+                (info->type != gcvSURF_RENDER_TARGET_NO_COMPRESSION) ||
+                (info->format != reqFormat))
+            {
+                /* Try FC fill. */
+                status = gcoOS_SetWindowFormat(Display->hdc,
+                                               win,
+                                               gcvSURF_RENDER_TARGET_NO_TILE_STATUS,
+                                               reqFormat);
+
+                if (gcmIS_SUCCESS(status))
                 {
-                    break;
-                }
-
-                /* 3. Third, with tile status, no compression, fc-filled. */
-                type = gcvSURF_RENDER_TARGET_NO_TILE_STATUS;
-
-                if (gcmIS_SUCCESS(gcoOS_SetWindowFormat(Display->hdc,
-                                                        win,
-                                                        type,
-                                                        format)))
-                {
-                    /* Update window buffer format,type. */
-                    info->format = format;
-                    info->type   = gcvSURF_RENDER_TARGET_NO_COMPRESSION;
-
-                    /* Should use direct rendering with compression. */
+                    /* Should use direct rendering with fc-fill. */
                     renderMode = VEGL_DIRECT_RENDERING_FCFILL;
+
+                    /* Window is changed. */
                     winChanged = EGL_TRUE;
                     break;
                 }
+
+                /* Not an error. */
+                status = gcvSTATUS_OK;
+            }
+            else
+            {
+                /* Already direct rendering with fc-fill. */
+                renderMode = VEGL_DIRECT_RENDERING_FCFILL;
             }
         }
         while (gcvFALSE);
 #   endif
 
         if ((renderMode == VEGL_INDIRECT_RENDERING) &&
-            (info->type != gcvSURF_BITMAP))
+            ((type != gcvSURF_BITMAP) || (info->type != gcvSURF_BITMAP)))
         {
-            /* Use bitmap for indirect rendering. */
-            if (gcmIS_ERROR(gcoOS_SetWindowFormat(Display->hdc,
-                                                  win,
-                                                  gcvSURF_BITMAP,
-                                                  info->format)))
+            /* Only linear supported in this case. */
+            status = gcoOS_SetWindowFormat(Display->hdc,
+                                           win,
+                                           gcvSURF_BITMAP,
+                                           format);
+
+            if (gcmIS_ERROR(status))
             {
-                /* Can not support this window. */
+                /* Can not support non-bitmap. */
                 return EGL_FALSE;
             }
 
-            /* Update window buffer type. */
-            info->type = gcvSURF_BITMAP;
+            /* Window type is changed. */
             winChanged = EGL_TRUE;
         }
 
@@ -1107,7 +1123,7 @@ veglBindWindow(
             }
 
             /* Recreate window buffers. */
-            _FreeWindowBuffers(win, info);
+            _FreeWindowBuffers(Surface, win, info);
             gcmONERROR(_CreateWindowBuffers(win, info));
         }
 
@@ -1658,15 +1674,30 @@ veglCancelWindowBackBuffer(
     IN struct eglBackBuffer * BackBuffer
     )
 {
-    /* TODO: Not used currently because no direct rendering mode. */
-    EGLint rect[4] =
-    {
-        0, 0,
-        Surface->config.width,
-        Surface->config.height
-    };
+    NativeWindowType win = Surface->hwnd;
+    VEGLWindowInfo info = Surface->winInfo;
+    gcoSURF surface;
+    gceSTATUS status = gcvSTATUS_OK;
 
-    return veglPostWindowBackBuffer(Display, Surface, BackBuffer, 1, rect);
+    gcmASSERT(Surface->type & EGL_WINDOW_BIT);
+    gcmASSERT(info);
+
+    surface = info->wrapFB ? gcvNULL : BackBuffer->surface;
+
+    status = gcoOS_CancelDisplayBackbuffer((HALNativeDisplayType) Display->hdc,
+                                           (HALNativeWindowType) win,
+                                           BackBuffer->context,
+                                           surface,
+                                           0,
+                                           BackBuffer->origin.x,
+                                           BackBuffer->origin.y);
+
+    if (gcmIS_ERROR(status))
+    {
+        return EGL_FALSE;
+    }
+
+    return EGL_TRUE;
 }
 
 EGLBoolean

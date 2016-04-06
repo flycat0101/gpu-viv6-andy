@@ -3141,12 +3141,13 @@ slParseAsmAppendModifier(
     IN slsASM_MODIFIER  *Modifier
     )
 {
+    slsASM_MODIFIERS modifiers;
+
     gcmHEADER_ARG("Modifier=0x%x", Modifier);
     gcmASSERT(Modifier);
 
     if (!Modifiers)
     {
-        slsASM_MODIFIERS modifiers;
 
         gcoOS_MemFill((gctPOINTER)&modifiers, (gctUINT8)-1, sizeof(slsASM_MODIFIERS));
 
@@ -8831,10 +8832,7 @@ gceSTATUS _CreateTempIdentifier(
         Compiler,
         tempSymbol,
         auxiArraySymbol);
-    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-    status = gcmOS_SAFE_FREE(gcvNULL, tempSymbol);
-    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+    gcmOS_SAFE_FREE(gcvNULL, tempSymbol);
 
     gcmFOOTER();
     return status;
@@ -12087,6 +12085,19 @@ slParseFullySpecifiedType(
                                             TypeQualifier->stringNo,
                                             slvREPORT_ERROR,
                                             "the 'out' qualifier can't be used with boolean type."));
+
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return gcvNULL;
+        }
+
+        if(shaderType == slvSHADER_TYPE_COMPUTE)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(
+                                            Compiler,
+                                            TypeQualifier->lineNo,
+                                            TypeQualifier->stringNo,
+                                            slvREPORT_ERROR,
+                                            "compute shader does not have user defined input/output variable."));
 
             gcmFOOTER_ARG("<return>=%s", "<nil>");
             return gcvNULL;

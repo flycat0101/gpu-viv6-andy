@@ -207,6 +207,11 @@ cloCOMPILER_OptimizationEnabled(
     );
 
 gctBOOL
+cloCOMPILER_IsBasicTypePacked(
+IN cloCOMPILER Compiler
+);
+
+gctBOOL
 cloCOMPILER_ExtensionEnabled(
     IN cloCOMPILER Compiler,
     IN cleEXTENSION Extension

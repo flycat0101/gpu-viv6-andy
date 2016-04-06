@@ -26,6 +26,7 @@
 *****************************************************************************/
 
 
+
 /*
  *  Feature:    Filter Blit - NV conversion
  *  API:        gco2D_FilterBlit
@@ -222,7 +223,6 @@ static void CDECL Destroy(Test2D *t2d)
 
 const gceFEATURE FeatureList[]=
 {
-    gcvFEATURE_SCALER,
     gcvFEATURE_2DPE20,
     gcvFEATURE_YUV420_SCALER,
 };

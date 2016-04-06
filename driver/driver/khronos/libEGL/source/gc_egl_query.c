@@ -610,7 +610,7 @@ void GL_APIENTRY glGetBufferPointervOES_Entry(EGLenum target, EGLenum pname, voi
             if (dispatch && dispatch->getProcAddr)
             {
                 thread->getBufferPointervFunc[index] =
-                    dispatch->getProcAddr("glGetBufferPointervFuncOES");
+                    dispatch->getProcAddr("glGetBufferPointervOES");
             }
         }
 

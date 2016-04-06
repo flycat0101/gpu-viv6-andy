@@ -57,8 +57,12 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#ifndef __USE_BSD
 #define __USE_BSD
+#endif
+#ifndef __USE_MISC
 #define __USE_MISC
+#endif
 #include <dirent.h>
 
 /*

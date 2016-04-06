@@ -48,7 +48,6 @@ typedef enum _gcePATCH_ID
     gcvPATCH_ANTUTUGL3,     /* Antutu 3D Rating */
     gcvPATCH_QUADRANT,
     gcvPATCH_GPUBENCH,
-    gcvPATCH_DUOKAN,
     gcvPATCH_GLOFTSXHM,
     gcvPATCH_XRUNNER,
     gcvPATCH_BUSPARKING3D,

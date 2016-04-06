@@ -515,6 +515,33 @@ unsigned *pped_count)
                 if(gcmIS_ERROR(status)) return status;
                 Preprocessoropts.addMacroDef("_VIV_VX_EXTENSION");
             }
+            else if (options.compare(lastPos, 24, "cl-viv-packed-basic-type") == 0) {
+                gceSTATUS status;
+                pos = lastPos + 24;
+
+                status = cloCOMPILER_SetBasicTypePacked(Compiler);
+                if(gcmIS_ERROR(status)) return status;
+            }
+            else if (options.compare(lastPos, 31, "cl-viv-vx-image-array-maxlevel=") == 0) {
+                lastPos += 31;
+
+                if(options.compare(lastPos, 1, " ") == 0) { /* there are spaces in between */
+                   lastPos = options.find_first_not_of(" ", lastPos + 1);
+                }
+
+                pos = options.find_first_of(" ", lastPos);
+                status = cloCOMPILER_SetImageArrayMaxLevel(Compiler,
+                                                           (gctSTRING)options.substr(lastPos, pos - lastPos).c_str());
+                if(gcmIS_ERROR(status)) {
+                    cloCOMPILER_Report(Compiler,
+                                       0,
+                                       0,
+                                       clvREPORT_ERROR,
+                                       "unrecognized image array max level \"%s\" specified in option cl-viv-vx-image-array-maxlevel",
+                                       options.substr(lastPos, pos - lastPos).c_str());
+                    return gcvSTATUS_INTERFACE_ERROR;
+                }
+            }
             else if (options.compare(lastPos, 19, "cl-finite-math-only") == 0) {
                 gceSTATUS status;
                 pos = lastPos + 19;

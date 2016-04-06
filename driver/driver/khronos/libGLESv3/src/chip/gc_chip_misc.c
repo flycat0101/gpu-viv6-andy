@@ -559,7 +559,6 @@ __glChipBindXFB(
 {
     __GLchipXfbHeader *chipXfb = (__GLchipXfbHeader *)xfbObj->privateData;
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-    gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("gc=0x%x xfbObj=0x%x", gc, xfbObj);
 
@@ -569,7 +568,7 @@ __glChipBindXFB(
         {
             chipXfb = (__GLchipXfbHeader *)(gc->imports.calloc)(gc, 1, sizeof(__GLchipXfbHeader));
 
-            status = gcsSURF_NODE_Construct(&chipXfb->headerNode, 64, 64, gcvSURF_TFBHEADER, 0, gcvPOOL_DEFAULT);
+            gcsSURF_NODE_Construct(&chipXfb->headerNode, 64, 64, gcvSURF_TFBHEADER, 0, gcvPOOL_DEFAULT);
 
             gcoSURF_LockNode(&chipXfb->headerNode, gcvNULL, &chipXfb->headerLocked);
 
@@ -583,11 +582,8 @@ __glChipBindXFB(
         }
     }
 
-    status = status;
-
-    gcmFOOTER();
+    gcmFOOTER_NO();
     return;
-
 }
 
 GLvoid
@@ -615,8 +611,6 @@ __glChipDeleteXFB(
         xfbObj->privateData = gcvNULL;
     }
 
-    status = status;
-
 OnError:
     gcmFOOTER();
     return;
@@ -630,18 +624,15 @@ __glChipBeginXFB(
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-    gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
     if (chipCtx->chipFeature.hasHwTFB)
     {
-        status = gco3D_SetXfbCmd(chipCtx->engine, gcvXFBCMD_BEGIN);
+        gco3D_SetXfbCmd(chipCtx->engine, gcvXFBCMD_BEGIN);
     }
 
-    status = status;
-
-    gcmFOOTER();
+    gcmFOOTER_NO();
     return;
 }
 
@@ -739,18 +730,15 @@ __glChipPauseXFB(
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-    gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
     if (chipCtx->chipFeature.hasHwTFB)
     {
-        status = gco3D_SetXfbCmd(chipCtx->engine, gcvXFBCMD_PAUSE);
+        gco3D_SetXfbCmd(chipCtx->engine, gcvXFBCMD_PAUSE);
     }
 
-    status = status;
-
-    gcmFOOTER();
+    gcmFOOTER_NO();
     return;
 }
 
@@ -760,18 +748,15 @@ __glChipResumeXFB(
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-    gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
     if (chipCtx->chipFeature.hasHwTFB)
     {
-        status = gco3D_SetXfbCmd(chipCtx->engine, gcvXFBCMD_RESUME);
+        gco3D_SetXfbCmd(chipCtx->engine, gcvXFBCMD_RESUME);
     }
 
-    status = status;
-
-    gcmFOOTER();
+    gcmFOOTER_NO();
     return;
 }
 

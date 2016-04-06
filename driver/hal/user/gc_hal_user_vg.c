@@ -1746,6 +1746,9 @@ gcoVG_SetScissor(
 
     do
     {
+        gctUINT32  addrs[3];
+        gctPOINTER mems[3];
+
         /* Free any current scissor surface. */
         if (Vg->scissor != gcvNULL)
         {
@@ -1768,9 +1771,11 @@ gcoVG_SetScissor(
         /* Lock scissor surface. */
         gcmERR_GOTO(gcoSURF_Lock(
             Vg->scissor,
-            &Vg->scissorAddress,
-            &Vg->scissorBits
+            addrs,
+            mems
             ));
+        Vg->scissorAddress = addrs[0];
+        Vg->scissorBits = mems[0];
 
         bits = (gctUINT8_PTR) Vg->scissorBits;
 

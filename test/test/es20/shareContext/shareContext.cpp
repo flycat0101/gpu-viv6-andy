@@ -26,17 +26,9 @@
 *****************************************************************************/
 
 
-#if defined(ANDROID_JNI)
-#if ANDROID_SDK_VERSION >= 16
-#include <gui/Surface.h>
-#else
-#include <surfaceflinger/Surface.h>
-#endif
-using namespace android;
+#if defined(ANDROID)
 #include <utils/Log.h>
 #if ANDROID_SDK_VERSION >= 16
-#   include <ui/ANativeObjectBase.h>
-
 #   undef LOGI
 #   undef LOGD
 #   undef LOGW
@@ -45,12 +37,10 @@ using namespace android;
 #   define LOGD(...) ALOGD(__VA_ARGS__)
 #   define LOGW(...) ALOGW(__VA_ARGS__)
 #   define LOGE(...) ALOGE(__VA_ARGS__)
-#else
-#   include <ui/android_native_buffer.h>
 #endif
-#   include <gc_vdk.h>
+using namespace android;
+#   define DEBUG_PRINT         LOGE
 #   include <pthread.h>
-#define DEBUG_PRINT         LOGE
 #elif defined(LINUX)
 #   define DEBUG_PRINT         printf
 #   include <gc_vdk.h>
@@ -60,8 +50,12 @@ using namespace android;
 #    include <gc_vdk.h>
 #    include <windows.h>
 #else
-#include <windows.h>
-#define DEBUG_PRINT         printf
+#   include <windows.h>
+#   define DEBUG_PRINT         printf
+#endif
+
+#if USE_VDK
+#   include <gc_vdk.h>
 #endif
 
 #include <stdlib.h>
@@ -136,12 +130,12 @@ GLsizei     g_attribStride;
     do\
     {\
         eglBindAPI(EGL_OPENGL_ES_API);\
-        eglMakeCurrent(g_eglDisplay, g_eglSurface1, g_eglSurface1, g_eglContext2);\
+        eglMakeCurrent(g_eglDisplay, g_eglSurface2, g_eglSurface2, g_eglContext2);\
     }\
     while (0)
 #define LOSE_CURRENT                    eglMakeCurrent(g_eglDisplay, EGL_NO_CONTEXT, EGL_NO_SURFACE, EGL_NO_SURFACE)
 #define SWAP_BUFFER_CTX1                eglSwapBuffers(g_eglDisplay, g_eglSurface1)
-#define SWAP_BUFFER_CTX2                eglSwapBuffers(g_eglDisplay, g_eglSurface1)
+#define SWAP_BUFFER_CTX2                eglSwapBuffers(g_eglDisplay, g_eglSurface2)
 
 GLboolean LoadTexture()
 {
@@ -159,17 +153,17 @@ GLboolean LoadTexture()
             {
                 if (j < 8)
                 {
-                    *dst ++ = 0x00;
-                    *dst ++ = 0xFF;
-                    *dst ++ = 0x00;
-                    *dst ++ = 0x00;
+                    *dst ++ = (char)0x00;
+                    *dst ++ = (char)0xFF;
+                    *dst ++ = (char)0x00;
+                    *dst ++ = (char)0x00;
                 }
                 else
                 {
-                    *dst ++ = 0x00;
-                    *dst ++ = 0x00;
-                    *dst ++ = 0xFF;
-                    *dst ++ = 0x00;
+                    *dst ++ = (char)0x00;
+                    *dst ++ = (char)0x00;
+                    *dst ++ = (char)0xFF;
+                    *dst ++ = (char)0x00;
                 }
             }
         }
@@ -194,33 +188,7 @@ GLboolean LoadTexture()
     return GL_TRUE;
 }
 
-GLchar *readShaderFile(const char *fileName)
-{
-    FILE    *file = fopen(fileName, "r");
-    GLint   len;
-
-    if (file == NULL)
-    {
-        DEBUG_PRINT("Cannot open shader file!\n");
-        return 0;
-    }
-
-    fseek(file, 0, SEEK_END);
-    len = ftell(file);
-    fseek(file, 0, SEEK_SET);
-
-    GLchar *buffer = (GLchar*)malloc(len);
-
-    int bytes = fread(buffer, 1, len, file);
-
-    buffer[bytes] = 0;
-
-    fclose(file);
-
-    return buffer;
-}
-
-void initEGL(int nativeWindow)
+void initEGL(EGLNativeWindowType nativeWindow, EGLNativeWindowType nativeWindow2)
 {
 #if defined(ANDROID_JNI)
     int iConfigs;
@@ -250,13 +218,13 @@ void initEGL(int nativeWindow)
         return;
     }
 
-    g_eglSurface1 = eglCreateWindowSurface(g_eglDisplay, eglConfig,  (Surface *)nativeWindow, NULL);
-    g_eglSurface2 = eglCreateWindowSurface(g_eglDisplay, eglConfig, (Surface *)nativeWindow, NULL);
+    g_eglSurface1 = eglCreateWindowSurface(g_eglDisplay, eglConfig, nativeWindow, NULL);
+    g_eglSurface2 = eglCreateWindowSurface(g_eglDisplay, eglConfig, nativeWindow2, NULL);
     g_eglContext1 = eglCreateContext(g_eglDisplay, eglConfig, NULL, ai32ContextAttribs);
     g_eglContext2 = eglCreateContext(g_eglDisplay, eglConfig, g_eglContext1, ai32ContextAttribs);
 
-    DEBUG_PRINT("*************************SURF1(0x%08X), CONTEXT(0x%08X)", (GLuint)g_eglSurface1, (GLuint)g_eglContext1);
-    DEBUG_PRINT("*************************SURF2(0x%08X), CONTEXT(0x%08X)", (GLuint)g_eglSurface2, (GLuint)g_eglContext2);
+    DEBUG_PRINT("*************************SURF1(%p), CONTEXT(%p)", g_eglSurface1, g_eglContext1);
+    DEBUG_PRINT("*************************SURF2(%p), CONTEXT(%p)", g_eglSurface2, g_eglContext2);
 
     eglMakeCurrent(g_eglDisplay, g_eglSurface1, g_eglSurface1, g_eglContext1);
 #elif defined(LINUX)
@@ -287,13 +255,13 @@ void initEGL(int nativeWindow)
         return;
     }
 
-    g_eglSurface1 = eglCreateWindowSurface(g_eglDisplay, eglConfig, (_FBWindow*)nativeWindow, NULL);
-    g_eglSurface2 = eglCreateWindowSurface(g_eglDisplay, eglConfig, (_FBWindow*)nativeWindow, NULL);
+    g_eglSurface1 = eglCreateWindowSurface(g_eglDisplay, eglConfig, nativeWindow, NULL);
+    g_eglSurface2 = eglCreateWindowSurface(g_eglDisplay, eglConfig, nativeWindow, NULL);
     g_eglContext1 = eglCreateContext(g_eglDisplay, eglConfig, NULL, ai32ContextAttribs);
     g_eglContext2 = eglCreateContext(g_eglDisplay, eglConfig, g_eglContext1, ai32ContextAttribs);
 
-    DEBUG_PRINT("*************************SURF1(0x%08X), CONTEXT(0x%08X)", (GLuint)g_eglSurface1, (GLuint)g_eglContext1);
-    DEBUG_PRINT("*************************SURF2(0x%08X), CONTEXT(0x%08X)", (GLuint)g_eglSurface2, (GLuint)g_eglContext2);
+    DEBUG_PRINT("*************************SURF1(%p), CONTEXT(%p)", g_eglSurface1, g_eglContext1);
+    DEBUG_PRINT("*************************SURF2(%p), CONTEXT(%p)", g_eglSurface2, g_eglContext2);
 
     eglMakeCurrent(g_eglDisplay, g_eglSurface1, g_eglSurface1, g_eglContext1);
 #elif defined(UNDER_CE)
@@ -329,8 +297,8 @@ void initEGL(int nativeWindow)
     g_eglContext1 = eglCreateContext(g_eglDisplay, eglConfig, NULL, ai32ContextAttribs);
     g_eglContext2 = eglCreateContext(g_eglDisplay, eglConfig, g_eglContext1, ai32ContextAttribs);
 
-    DEBUG_PRINT("*************************SURF1(0x%08X), CONTEXT(0x%08X)", (GLuint)g_eglSurface1, (GLuint)g_eglContext1);
-    DEBUG_PRINT("*************************SURF2(0x%08X), CONTEXT(0x%08X)", (GLuint)g_eglSurface2, (GLuint)g_eglContext2);
+    DEBUG_PRINT("*************************SURF1(%p), CONTEXT(%p)", g_eglSurface1, g_eglContext1);
+    DEBUG_PRINT("*************************SURF2(%p), CONTEXT(%p)", g_eglSurface2, g_eglContext2);
 
     eglMakeCurrent(g_eglDisplay, g_eglSurface1, g_eglSurface1, g_eglContext1);
 #else
@@ -491,7 +459,7 @@ void shutDown(void)
 #endif
 }
 
-GLboolean CheckResult()
+GLboolean CheckResult(int threadId)
 {
     GLuint  *pixels = new GLuint[WINDOW_WIDTH * WINDOW_HEIGHT];
     GLuint  *dst    = pixels;
@@ -506,18 +474,24 @@ GLboolean CheckResult()
         {
             if (j < WINDOW_WIDTH/2)
             {
-                if (dst[j] != 0x0000FF00)
+                if (threadId == 1)
                 {
-                    passed = GL_FALSE;
-                    break;
+                    if (dst[j] != 0x0000FF00)
+                    {
+                        passed = GL_FALSE;
+                        break;
+                    }
                 }
             }
             else
             {
-                if (dst[j] != 0x00FF0000)
+                if (threadId == 2)
                 {
-                    passed = GL_FALSE;
-                    break;
+                    if (dst[j] != 0x00FF0000)
+                    {
+                        passed = GL_FALSE;
+                        break;
+                    }
                 }
             }
         }
@@ -556,7 +530,7 @@ void renderThread1()
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    if (CheckResult())
+    if (CheckResult(1))
     {
         DEBUG_PRINT("Share context test thread1 PASSED\n");
     }
@@ -635,8 +609,6 @@ DWORD WINAPI renderThread2(LPVOID lpParam)
 
     for (i=0; i<1; i++)
     {
-        MAKE_CURRENT_CTX2;
-
         glUseProgram(program);
 
         glBindTexture(GL_TEXTURE_2D, g_texture);
@@ -660,7 +632,7 @@ DWORD WINAPI renderThread2(LPVOID lpParam)
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glBindTexture(GL_TEXTURE_2D, 0);
 
-        if (CheckResult())
+        if (CheckResult(2))
         {
             DEBUG_PRINT("Share context test thread2 PASSED\n");
         }
@@ -670,22 +642,24 @@ DWORD WINAPI renderThread2(LPVOID lpParam)
         }
 
         SWAP_BUFFER_CTX2;
-        LOSE_CURRENT;
     }
 
     glDeleteProgram(program);
     glDeleteShader(vertShader);
     glDeleteShader(fragShader);
 
-    SWAP_BUFFER_CTX2;
     LOSE_CURRENT;
 
     return 0;
 }
 
-void RenderInit(int nativeWindow)
+void RenderInit(EGLNativeWindowType nativeWindow, EGLNativeWindowType nativeWindow2)
 {
-    initEGL(nativeWindow);
+#if defined(ANDROID_JNI)
+    initEGL(nativeWindow, nativeWindow2);
+#else
+    initEGL(nativeWindow, NULL);
+#endif
 
     DEBUG_PRINT("Begin GL init");
     initGL();
@@ -725,7 +699,7 @@ int main(int argc, char** argv)
         goto _Error;
     }
 
-    RenderInit((int)egl.window);
+    RenderInit(egl.window, NULL);
 
     // Main loop
     for (bool done = false; !done;)
@@ -816,7 +790,7 @@ int main(int argc, char **argv)
         goto _Error;
     }
 
-    RenderInit((int)egl.window);
+    RenderInit(egl.window, NULL);
 
     HANDLE hThread = CreateThread(NULL, 0, renderThread2, NULL, 0, NULL);
     if (hThread == NULL)
@@ -960,4 +934,3 @@ int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance, LPSTR lpCmdLine,
     return 0;
 }
 #endif
-

@@ -682,6 +682,18 @@ gceSTATUS CDECL GalLoadDECTPCRawToTSurf(
     );
 
 DLL_API
+gceSTATUS CDECL GalLoadVMSAARawToTSurf(
+    IN gctCONST_STRING DataName,
+    IN gctCONST_STRING TileStatusName,
+    IN gctUINT32 ImageWidth,
+    IN gctUINT32 ImageHeight,
+    IN gceTILING Tiling,
+    IN gceSURF_FORMAT Format,
+    IN gce2D_TILE_STATUS_CONFIG TileStatusConfig,
+    OUT T2D_SURF_PTR *TSurf
+    );
+
+DLL_API
 gctBOOL GalSaveSurfaceToVimg(
    gcoSURF surface,
    const char *FileName);
@@ -728,7 +740,6 @@ DLL_API gceSTATUS AllocVideoNode(
 DLL_API gceSTATUS FreeVideoNode(
     IN gcoHAL Hal,
     IN gctUINT32 Node);
-
 
 #if gcdTEST_DEC200
 gceSTATUS Dec200Compression(

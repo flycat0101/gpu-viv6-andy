@@ -1361,6 +1361,94 @@ IN clsNAME *Name
    return gcvSTATUS_OK;
 }
 
+static gctINT
+_GetTypeQualifierTokenType(
+IN cltQUALIFIER Qualifier
+)
+{
+    gctINT   tokenType = T_EOF;
+
+    switch (Qualifier) {
+    case clvQUALIFIER_CONSTANT:
+        tokenType = T_CONSTANT;
+        break;
+    case clvQUALIFIER_UNIFORM:
+        tokenType = T_UNIFORM;
+        break;
+    case clvQUALIFIER_LOCAL:
+        tokenType = T_LOCAL;
+        break;
+    case clvQUALIFIER_GLOBAL:
+        tokenType = T_GLOBAL;
+        break;
+    case clvQUALIFIER_PRIVATE:
+        tokenType = T_PRIVATE;
+        break;
+
+    case clvQUALIFIER_CONST:
+        tokenType = T_CONST;
+        break;
+
+    case clvQUALIFIER_READ_ONLY:
+        tokenType = T_READ_ONLY;
+        break;
+
+    case clvQUALIFIER_WRITE_ONLY:
+        tokenType = T_WRITE_ONLY;
+        break;
+
+    default:
+        break;
+
+    }
+
+    return tokenType;
+}
+
+gceSTATUS
+clMergePtrDscrToDecl(
+IN cloCOMPILER Compiler,
+IN slsSLINK_LIST *PtrDscr,
+IN clsDECL *Decl,
+IN gctBOOL PtrDominant
+)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    if(!slmSLINK_LIST_IsEmpty(PtrDscr)) {
+        if(slmSLINK_LIST_IsEmpty(Decl->ptrDscr) && Decl->dataType) {
+            gctPOINTER pointer;
+            clsTYPE_QUALIFIER *typeQualifier;
+            gctINT tokenType;
+
+            tokenType = _GetTypeQualifierTokenType(Decl->dataType->addrSpaceQualifier);
+            if(tokenType != T_EOF) {
+                status = cloCOMPILER_Allocate(Compiler,
+                                              (gctSIZE_T)sizeof(clsTYPE_QUALIFIER),
+                                              (gctPOINTER *) &pointer);
+                if(gcmIS_ERROR(status)) return status;
+                typeQualifier = pointer;
+
+                typeQualifier->type = tokenType;
+                typeQualifier->qualifier = Decl->dataType->addrSpaceQualifier;
+                slmSLINK_LIST_InsertFirst(PtrDscr, &typeQualifier->node);
+
+                gcmVERIFY_OK(cloCOMPILER_CloneDataType(Compiler,
+                                                       Decl->dataType->accessQualifier,
+                                                       clvQUALIFIER_NONE,
+                                                       Decl->dataType,
+                                                       &Decl->dataType));
+            }
+        }
+
+        slmSLINK_LIST_Append(PtrDscr, Decl->ptrDscr);
+        if(PtrDominant && clmDECL_IsArray(Decl) && PtrDscr) {
+            Decl->ptrDominant = gcvTRUE;
+        }
+    }
+    return status;
+}
+
 /* Name and Name space. */
 static gceSTATUS
 _clsNAME_Construct(
@@ -1379,7 +1467,6 @@ OUT clsNAME **Name
 {
     gceSTATUS status;
     clsNAME *name;
-
 
     gcmHEADER_ARG("Compiler=0x%x MySpace=0x%x LineNo=%u StringNo=%u Type=%d "
               "Decl=0x%x Symbol=0x%x IsBuiltIn=%d Extension=%d",
@@ -1410,11 +1497,12 @@ OUT clsNAME **Name
         else {
              clmDECL_Initialize(&name->decl, gcvNULL, (clsARRAY *)0, gcvNULL, gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
         }
-        slmSLINK_LIST_Prepend(PtrDscr, name->decl.ptrDscr);
 
-        if(clmDECL_IsArray(&name->decl) && PtrDscr) {
-           name->decl.ptrDominant = gcvTRUE;
-        }
+        gcmONERROR(clMergePtrDscrToDecl(Compiler,
+                                        PtrDscr,
+                                        &name->decl,
+                                        PtrDscr != gcvNULL));
+
         name->derivedType = gcvNULL;
         name->symbol    = Symbol;
         name->isBuiltin    = IsBuiltin;
@@ -1448,7 +1536,8 @@ OUT clsNAME **Name
             name->u.variableInfo.specifiedAttr = 0;
             name->u.variableInfo.hostEndian = gcvFALSE;
             if(name->decl.dataType &&
-               (clmDECL_IsAggregateTypeOverRegLimit(&name->decl) ||
+               ((clmDECL_IsAggregateTypeOverRegLimit(&name->decl) &&
+                (!clmDECL_IsStructOrUnion(&name->decl) || !name->decl.dataType->u.fieldSpace->scopeName->isBuiltin)) ||
                 (!(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
                    gcmOPT_oclPassKernelStructArgByValue()) &&
                  clmDECL_IsAggregateType(&name->decl) &&
@@ -1532,6 +1621,7 @@ OUT clsNAME **Name
         return gcvSTATUS_OK;
     } while (gcvFALSE);
 
+OnError:
     *Name = gcvNULL;
     gcmFOOTER();
     return status;
@@ -3701,7 +3791,8 @@ IN slsSLINK_LIST *PtrDscr
       }
    }
 
-   if(clmDECL_IsPointerType(Decl) || PtrDscr) {
+   if(clmDECL_IsPointerType(Decl) || PtrDscr ||
+      clmDECL_IsArrayOfPointers(Decl)) {
       return gcvSTATUS_OK;
    }
    switch(Decl->dataType->addrSpaceQualifier) {
@@ -10786,6 +10877,7 @@ IN OUT cloIR_CONSTANT ResultConstant
             /* Get the converted constant value */
             switch (ResultConstant->exprBase.decl.dataType->elementType) {
             case clvTYPE_BOOL:
+            case clvTYPE_BOOL_PACKED:
                 gcmVERIFY_OK(cloIR_CONSTANT_GetBoolValue(Compiler,
                                     operandConstant,
                                     i,
@@ -10794,6 +10886,7 @@ IN OUT cloIR_CONSTANT ResultConstant
 
             case clvTYPE_INT:
             case clvTYPE_SHORT:
+            case clvTYPE_SHORT_PACKED:
                 gcmVERIFY_OK(cloIR_CONSTANT_GetIntValue(Compiler,
                                     operandConstant,
                                     i,
@@ -10809,7 +10902,9 @@ IN OUT cloIR_CONSTANT ResultConstant
 
             case clvTYPE_UINT:
             case clvTYPE_USHORT:
+            case clvTYPE_USHORT_PACKED:
             case clvTYPE_UCHAR:
+            case clvTYPE_UCHAR_PACKED:
                 gcmVERIFY_OK(cloIR_CONSTANT_GetUintValue(Compiler,
                                     operandConstant,
                                     i,
@@ -10826,6 +10921,7 @@ IN OUT cloIR_CONSTANT ResultConstant
             case clvTYPE_FLOAT:
             case clvTYPE_DOUBLE:
             case clvTYPE_HALF:
+            case clvTYPE_HALF_PACKED:
                 gcmVERIFY_OK(cloIR_CONSTANT_GetFloatValue(Compiler,
                                       operandConstant,
                                       i,
@@ -10833,6 +10929,7 @@ IN OUT cloIR_CONSTANT ResultConstant
                 break;
 
             case clvTYPE_CHAR:
+            case clvTYPE_CHAR_PACKED:
                 gcmVERIFY_OK(cloIR_CONSTANT_GetCharValue(Compiler,
                                      operandConstant,
                                      i,

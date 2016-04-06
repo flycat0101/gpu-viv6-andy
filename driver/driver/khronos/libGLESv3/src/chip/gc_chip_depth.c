@@ -514,6 +514,14 @@ gcChipSetDepthMode(
                            : gcvDEPTH_NONE;
 
         /* Set the depth mode. */
+
+        if (!gc->frameBuffer.drawFramebufObj->name &&
+            (chipCtx->patchId == gcvPATCH_DEQP) &&
+            chipCtx->drawDepthView.surf &&
+            (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_BUG_FIXES7) == gcvFALSE))
+        {
+            chipCtx->depthMode = gcvDEPTH_Z;
+        }
         gcmERR_BREAK(gco3D_SetDepthMode(chipCtx->engine, chipCtx->depthMode));
     } while (GL_FALSE);
 

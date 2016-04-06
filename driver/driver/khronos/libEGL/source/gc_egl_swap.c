@@ -1514,7 +1514,53 @@ _SwapBuffersRegionNew(
 
                 if (i == draw->swapRect.count)
                 {
-                    gcmASSERT(i < VEGL_MAX_NUM_SURFACE_BUFFERS);
+                    if (i >= draw->swapRect.capacity)
+                    {
+                        /* Enlarge rects/buffers slots, x2. */
+                        gctUINT capacity     = draw->swapRect.capacity * 2;
+                        gcsRECT * rects      = gcvNULL;
+                        gctPOINTER * buffers = gcvNULL;
+                        gctUINT j;
+
+                        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                                                       gcmSIZEOF(gcsRECT) * capacity,
+                                                       (gctPOINTER) &rects)))
+                        {
+                            veglSetEGLerror(thread, EGL_BAD_ALLOC);
+                            break;
+                        }
+
+                        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                                                       gcmSIZEOF(gctPOINTER) * capacity,
+                                                       (gctPOINTER) &buffers)))
+                        {
+                            gcmOS_SAFE_FREE(gcvNULL, rects);
+                            veglSetEGLerror(thread, EGL_BAD_ALLOC);
+                            break;
+                        }
+
+                        /* Copy slots. */
+                        for (j = 0; j < draw->swapRect.capacity; j++)
+                        {
+                            rects[j]   = draw->swapRect.rects[j];
+                            buffers[j] = draw->swapRect.buffers[j];
+                        }
+
+                        for (j = draw->swapRect.capacity; j < capacity; j++)
+                        {
+                            /* Clear new allocated slots. */
+                            buffers[j] = gcvNULL;
+                        }
+
+                        /* Free old slots. */
+                        gcmOS_SAFE_FREE(gcvNULL, draw->swapRect.rects);
+                        gcmOS_SAFE_FREE(gcvNULL, draw->swapRect.buffers);
+
+                        /* Assign new slots. */
+                        draw->swapRect.capacity = capacity;
+                        draw->swapRect.rects    = rects;
+                        draw->swapRect.buffers  = buffers;
+                    }
 
                     /* Swap rectangle for new buffer. */
                     draw->swapRect.rects[i].left   = left;

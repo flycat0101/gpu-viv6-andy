@@ -149,6 +149,7 @@ EXPORTS
     gcoOS_GetDisplayInfoEx
     gcoOS_GetDisplayVirtual
     gcoOS_GetDisplayBackbuffer
+    gcoOS_CancelDisplayBackbuffer;
     gcoOS_SetDisplayVirtual
     gcoOS_SetSwapInterval
     gcoOS_GetSwapInterval
@@ -360,6 +361,9 @@ EXPORTS
 !ENDIF
 
 !IF "$(VIVANTE_ENABLE_3D)" == "1"
+    depr_gcoSURF_Resolve
+    depr_gcoSURF_ResolveRect
+
     gcoSURF_Clear
     gcoSURF_CopyPixels
     gcoSURF_DisableTileStatus
@@ -809,6 +813,7 @@ EXPORTS
     gcoPROFILER_Write
     gcoPROFILER_Flush
     gcoPROFILER_EndFrame
+    gcoPROFILER_BeginDraw
     gcoPROFILER_EndDraw
     gcoPROFILER_ShaderFS
     gcoPROFILER_ShaderVS

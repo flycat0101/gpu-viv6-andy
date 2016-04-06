@@ -1456,7 +1456,7 @@ _CreateImageDMABuf(
 
         if ((offset[0] & 0x3F) ||
             /* 4 pixel alignment in stride. */
-            (pitch[0] & (4 * formatInfo->bitsPerPixel - 1)))
+            (pitch[0] & (4 * formatInfo->bitsPerPixel / 8 - 1)))
         {
             veglSetEGLerror(Thread, EGL_BAD_ACCESS);
             return EGL_NO_IMAGE;

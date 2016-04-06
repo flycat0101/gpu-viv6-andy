@@ -71,15 +71,15 @@ static int clfprintf(FILE *file, const char * msg, ...) {
            any new token for builtin data types needs to be defined before any other */
 %token<token>		T_VOID
 			T_MAT2 T_MAT3 T_MAT4 T_MAT8 T_MAT16
-			T_BOOL T_BOOL2 T_BOOL3 T_BOOL4 T_BOOL8 T_BOOL16
-			T_HALF T_HALF2 T_HALF3 T_HALF4 T_HALF8 T_HALF16
+			T_BOOL T_BOOL2 T_BOOL3 T_BOOL4 T_BOOL8 T_BOOL16 T_BOOL32
+			T_HALF T_HALF2 T_HALF3 T_HALF4 T_HALF8 T_HALF16 T_HALF32
 			T_FLOAT T_FLOAT2 T_FLOAT3 T_FLOAT4 T_FLOAT8 T_FLOAT16
 			T_DOUBLE T_DOUBLE2 T_DOUBLE3 T_DOUBLE4 T_DOUBLE8 T_DOUBLE16
 			T_QUAD T_QUAD2 T_QUAD3 T_QUAD4 T_QUAD8 T_QUAD16
-			T_CHAR T_CHAR2 T_CHAR3 T_CHAR4 T_CHAR8 T_CHAR16
-			T_UCHAR T_UCHAR2 T_UCHAR3 T_UCHAR4 T_UCHAR8 T_UCHAR16
-			T_SHORT T_SHORT2 T_SHORT3 T_SHORT4 T_SHORT8 T_SHORT16
-			T_USHORT T_USHORT2 T_USHORT3 T_USHORT4 T_USHORT8 T_USHORT16
+			T_CHAR T_CHAR2 T_CHAR3 T_CHAR4 T_CHAR8 T_CHAR16 T_CHAR32
+			T_UCHAR T_UCHAR2 T_UCHAR3 T_UCHAR4 T_UCHAR8 T_UCHAR16 T_UCHAR32
+			T_SHORT T_SHORT2 T_SHORT3 T_SHORT4 T_SHORT8 T_SHORT16 T_SHORT32
+			T_USHORT T_USHORT2 T_USHORT3 T_USHORT4 T_USHORT8 T_USHORT16 T_USHORT32
 			T_INT T_INT2 T_INT3 T_INT4 T_INT8 T_INT16
 			T_UINT T_UINT2 T_UINT3 T_UINT4 T_UINT8 T_UINT16
 			T_LONG T_LONG2 T_LONG3 T_LONG4 T_LONG8 T_LONG16
@@ -88,7 +88,7 @@ static int clfprintf(FILE *file, const char * msg, ...) {
 			T_IMAGE1D_T T_IMAGE1D_ARRAY_T T_IMAGE1D_BUFFER_T
 			T_IMAGE2D_ARRAY_T
 			T_IMAGE2D_T T_IMAGE3D_T
-			T_IMAGE2D_PTR_T
+			T_IMAGE2D_PTR_T T_IMAGE2D_DYNAMIC_ARRAY_T
 			T_SIZE_T T_EVENT_T
 			T_PTRDIFF_T T_INTPTR_T T_UINTPTR_T
 			T_GENTYPE T_F_GENTYPE T_IU_GENTYPE T_I_GENTYPE T_U_GENTYPE T_SIU_GENTYPE
@@ -859,6 +859,8 @@ type_name :
 		{ $$ = $1}
 	| T_IMAGE2D_PTR_T
 		{ $$ = $1}
+	| T_IMAGE2D_DYNAMIC_ARRAY_T
+		{ $$ = $1}
 	| T_IMAGE3D_T
 		{ $$ = $1}
 	| T_SAMPLER_T
@@ -885,19 +887,19 @@ struct_or_union : T_STRUCT
 
 struct_union_specifier :
 	struct_or_union T_IDENTIFIER '{'
-		{ clParseStructDeclBegin(Compiler); }
+		{ clParseStructDeclBegin(Compiler, &$2); }
 		struct_declaration_list '}' attribute_specifier_opt
 		{ $$ = clParseStructDeclEnd(Compiler, &$1, &$2, $7, $5); }
 	| struct_or_union '{'
-		{ clParseStructDeclBegin(Compiler); }
+		{ clParseStructDeclBegin(Compiler, gcvNULL); }
 		struct_declaration_list '}' attribute_specifier_opt
 		{ $$ = clParseStructDeclEnd(Compiler, &$1, gcvNULL, $6, $4); }
 	| struct_or_union attribute_specifier T_IDENTIFIER '{'
-		{ clParseStructDeclBegin(Compiler); }
+		{ clParseStructDeclBegin(Compiler, &$3); }
 		struct_declaration_list '}'
 		{ $$ = clParseStructDeclEnd(Compiler, &$1, &$3, $2, $6); }
 	| struct_or_union attribute_specifier '{'
-		{ clParseStructDeclBegin(Compiler); }
+		{ clParseStructDeclBegin(Compiler, gcvNULL); }
 		struct_declaration_list '}'
 		{ $$ = clParseStructDeclEnd(Compiler, &$1, gcvNULL, $2, $5); }
 	;

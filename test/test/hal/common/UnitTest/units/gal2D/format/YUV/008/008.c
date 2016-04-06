@@ -355,6 +355,12 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
         strncat(runtime->wholeDescription, featureName, k==listLen-1 ? strlen(featureName)+1:strlen(featureName));
     }
 
+    if (gcoHAL_IsFeatureAvailable(runtime->hal, gcvFEATURE_2D_YUV420_OUTPUT_LINEAR) == gcvTRUE)
+    {
+        GalOutput(GalOutputType_Result | GalOutputType_Console, "Multi-Dest is not supported.\n");
+        runtime->notSupport = gcvTRUE;
+    }
+
     if (runtime->notSupport)
         return gcvFALSE;
 

@@ -13,6 +13,8 @@
 
 #include "vir/transform/gc_vsc_vir_peephole.h"
 
+#define VSC_PH_MAX_TEMP 3500
+
 void VSC_PH_Peephole_Init(
     IN OUT VSC_PH_Peephole* ph,
     IN VIR_Shader* shader,
@@ -2077,7 +2079,10 @@ static VSC_ErrCode _VSC_PH_PerformOnInst(
                                 currentStep++;
                             }
 
-                            _VSC_PH_ResultInst_Dump(VSC_PH_ResultInstsGetNthInst(&resultInsts, channel), dumper);
+                            if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_TRANSFORMS))
+                            {
+                                _VSC_PH_ResultInst_Dump(VSC_PH_ResultInstsGetNthInst(&resultInsts, channel), dumper);
+                            }
 
                             /* one transformation is enough */
                             break;
@@ -5553,6 +5558,21 @@ VSC_ErrCode VSC_PH_Peephole_PerformOnShader(
             VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
             VIR_LOG(dumper, "Peephole starts for shader(%d)\n", VIR_Shader_GetId(shader));
             VIR_LOG_FLUSH(dumper);
+        }
+    }
+
+    if (!ENABLE_FULL_NEW_LINKER)
+    {
+        /* too large shader, don't do PH */
+        if (VIR_Shader_GetVirRegCount(shader) > VSC_PH_MAX_TEMP)
+        {
+            if(VSC_OPTN_PHOptions_GetTrace(options))
+            {
+                VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+                VIR_LOG(dumper, "Peephole skips shader(%d)\n", VIR_Shader_GetId(shader));
+                VIR_LOG_FLUSH(dumper);
+            }
+            return errcode;
         }
     }
 

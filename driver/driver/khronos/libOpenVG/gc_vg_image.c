@@ -699,7 +699,7 @@ gceSTATUS vgfInitializeImage(
         gctBOOL upsample;
         gctUINT width, height;
         gctINT stride;
-        gctUINT8_PTR buffer;
+        gctUINT8_PTR buffer[3];
 
         /* Query surface format. */
         gcmERR_BREAK(gcoSURF_GetFormat(Surface, gcvNULL, &format));
@@ -718,7 +718,7 @@ gceSTATUS vgfInitializeImage(
 
         /* Lock the surface. */
         gcmASSERT(Image->buffer == gcvNULL);
-        gcmERR_BREAK(gcoSURF_Lock(Surface, gcvNULL, (gctPOINTER *) &buffer));
+        gcmERR_BREAK(gcoSURF_Lock(Surface, gcvNULL, (gctPOINTER*)buffer));
 
         /* Determine color space characteristics. */
         linear        = ((colorType & gcvSURF_COLOR_LINEAR)    != 0);
@@ -768,7 +768,7 @@ gceSTATUS vgfInitializeImage(
         Image->parent        = Image;
         Image->childrenCount = 0;
         Image->surface       = Surface;
-        Image->buffer        = buffer;
+        Image->buffer        = buffer[0];
 
         Image->imageAllocated   = gcvFALSE;
         Image->surfaceAllocated = gcvFALSE;

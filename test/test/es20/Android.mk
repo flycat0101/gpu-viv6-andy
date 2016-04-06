@@ -31,8 +31,7 @@ include $(AQROOT)/Android.mk.def
 
 VIV_ES20_TEST_MAKEFILES := \
 	$(LOCAL_PATH)/vv_launcher/android/Android.mk \
-
-#	$(LOCAL_PATH)/shareContext/android/Android.mk \
+	$(LOCAL_PATH)/shareContext/android/Android.mk \
 
 include $(VIV_ES20_TEST_MAKEFILES)
 

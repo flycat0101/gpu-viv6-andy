@@ -13,6 +13,8 @@
 
 #include "vir/transform/gc_vsc_vir_cse.h"
 
+#define     VSC_LCSE_MAX_TEMP        3500
+
 typedef struct VSC_LCSE_KEY
 {
     VSC_UNI_LIST_NODE   node;
@@ -574,6 +576,22 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBB(
                 break;
             }
 
+            /* disable the following case, because of the phase ordering with PH
+               ADD t1, a, b
+               SAT t2, t1
+               ...
+               ADD t3, a, b
+               SAT t4, t3
+            */
+            if (VIR_Inst_GetNext(instIter) != gcvNULL)
+            {
+                VIR_Instruction *nextInst = VIR_Inst_GetNext(instIter);
+                if (VIR_Inst_GetOpcode(nextInst) == VIR_OP_SAT)
+                {
+                    break;
+                }
+            }
+
             if(_VSC_LCSE_ExpMap_FindExp(&expMap, instIter, &commonEval, &firstEval))
             {
                 if(commonEval)
@@ -706,6 +724,21 @@ VSC_ErrCode VSC_LCSE_PerformOnShader(
             VIR_LOG_FLUSH(pDumper);
         }
         return errCode;
+    }
+
+    if (!ENABLE_FULL_NEW_LINKER)
+    {
+        /* too large shader, don't do LCSE */
+        if (VIR_Shader_GetVirRegCount(shader) > VSC_LCSE_MAX_TEMP)
+        {
+            if(VSC_OPTN_LCSEOptions_GetTrace(options))
+            {
+                VIR_Dumper* pDumper = shader->dumper;
+                VIR_LOG(pDumper, "Local Common Subexpression Elimination skips shader(%d)\n", VIR_Shader_GetId(shader));
+                VIR_LOG_FLUSH(pDumper);
+            }
+            return errCode;
+        }
     }
 
     if(VSC_OPTN_LCSEOptions_GetTrace(options))

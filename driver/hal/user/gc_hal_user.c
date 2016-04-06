@@ -456,7 +456,7 @@ gcoHAL_ConstructEx(
 
 #if gcmIS_DEBUG(gcdDEBUG_TRACE)
     gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_HAL,
-                  "HAL user version %d.%d.%d build %u %s %s",
+                  "HAL user version %d.%d.%d build %u",
                   gcvVERSION_MAJOR, gcvVERSION_MINOR,
                   gcvVERSION_PATCH, gcvVERSION_BUILD);
     gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_HAL,

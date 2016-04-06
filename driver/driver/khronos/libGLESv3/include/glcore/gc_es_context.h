@@ -593,7 +593,7 @@ extern GLvoid __glSetError(__GLcontext *gc, GLenum code);
 
 __GL_INLINE __GLcontext * __glGetGLcontext(GLvoid)
 {
-    gcsTLS_PTR tls;
+    gcsTLS_PTR tls = gcvNULL;
     gcoOS_GetTLS(&tls);
     if (tls == gcvNULL)
         return gcvNULL;
@@ -603,7 +603,7 @@ __GL_INLINE __GLcontext * __glGetGLcontext(GLvoid)
 
 __GL_INLINE GLvoid __glSetGLcontext(GLvoid *context)
 {
-    gcsTLS_PTR tls;
+    gcsTLS_PTR tls = gcvNULL;
     gcoOS_GetTLS(&tls);
     if (tls != gcvNULL)
         tls->esClientCtx = context;

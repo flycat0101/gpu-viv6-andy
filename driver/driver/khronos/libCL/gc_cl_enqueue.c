@@ -1224,6 +1224,11 @@ OnError:
             "OCL-010008: (clEnqueueReadBuffer) Run out of memory.\n");
     }
 
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
+    }
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -1436,6 +1441,11 @@ OnError:
             "OCL-010022: (clEnqueueReadBufferRect) Run out of memory.\n");
     }
 
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
+    }
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -1568,6 +1578,11 @@ OnError:
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010031: (clEnqueueWriteBuffer) Run out of memory.\n");
+    }
+
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -1781,6 +1796,11 @@ OnError:
             "OCL-010045: (clEnqueueWriteBufferRect) Run out of memory.\n");
     }
 
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
+    }
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -1921,6 +1941,11 @@ OnError:
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010056: (clEnqueueCopyBuffer) Run out of memory.\n");
+    }
+
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -2150,6 +2175,11 @@ OnError:
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010072: (clEnqueueCopyBufferRect) Run out of memory.\n");
+    }
+
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -2441,6 +2471,11 @@ OnError:
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010084: (clEnqueueReadImage) Run out of memory.\n");
+    }
+
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -2736,6 +2771,11 @@ OnError:
             "OCL-010096: (clEnqueueWriteImage) Run out of memory.\n");
     }
 
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
+    }
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -2946,6 +2986,11 @@ OnError:
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010253: (clEnqueueFillImage) Run out of memory.\n");
+    }
+
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -3336,6 +3381,11 @@ OnError:
             "OCL-010112: (clEnqueueCopyImage) Run out of memory.\n");
     }
 
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
+    }
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -3589,6 +3639,11 @@ OnError:
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010124: (clEnqueueCopyImageToBuffer) Run out of memory.\n");
+    }
+
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -3846,6 +3901,11 @@ OnError:
             "OCL-010136: (clEnqueueCopyBufferToImage) Run out of memory.\n");
     }
 
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
+    }
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -4007,6 +4067,11 @@ OnError:
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010145: (clEnqueueMapBuffer) Run out of memory.\n");
+    }
+
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
     }
 
     if (ErrCodeRet) {
@@ -4259,7 +4324,6 @@ clEnqueueMapImage(
 
     gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
-    clfONERROR(clfRetainCommand(command));
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
         clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(gctPOINTER) * NumEventsInWaitList, &pointer), CL_OUT_OF_HOST_MEMORY);
@@ -4336,8 +4400,6 @@ clEnqueueMapImage(
         *ErrCodeRet = CL_SUCCESS;
     }
 
-    clfONERROR(clfReleaseCommand(command));
-
     gcmFOOTER_ARG("%d Command=0x%x mappedPtr=0x%x",
                   CL_SUCCESS, command,mappedPtr);
     return mappedPtr;
@@ -4347,6 +4409,11 @@ OnError:
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010158: (clEnqueueMapImage) Run out of memory.\n");
+    }
+
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
     }
 
     if (ErrCodeRet) {
@@ -4448,6 +4515,11 @@ OnError:
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010164: (clEnqueueUnmapMemObject) Run out of memory.\n");
+    }
+
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -4956,7 +5028,7 @@ clEnqueueNDRangeKernel(
             {
                 gcSL_INSTRUCTION code   = GetShaderInstruction(kernelBinary, i);
                 gcSL_OPCODE      opcode = gcmSL_OPCODE_GET(GetInstOpcode(code), Opcode);
-                if (opcode == gcSL_IMAGE_WR)
+                if (gcSL_isOpcodeImageWrite(opcode))
                 {
                     gctUINT samplerId = gcmSL_INDEX_GET(GetInstSource0Index(code), Index);
                     gctUINT j;
@@ -5321,6 +5393,11 @@ OnError:
             "OCL-010182: (clEnqueueNDRangeKernel) Run out of memory.\n");
     }
 
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
+    }
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -5453,6 +5530,11 @@ OnError:
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010189: (clEnqueueTask) Run out of memory.\n");
+    }
+
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -5607,6 +5689,11 @@ OnError:
             "OCL-010200: (clEnqueueNativeKernel) Run out of memory.\n");
     }
 
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
+    }
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -5758,6 +5845,11 @@ OnError:
             "OCL-010200: (clEnqueueNativeKernel) Run out of memory.\n");
     }
 
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
+    }
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -5806,6 +5898,11 @@ OnError:
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010203: (clEnqueueMarker) Run out of memory.\n");
+    }
+
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -5869,6 +5966,11 @@ OnError:
             "OCL-010307: (clEnqueueMarkerWithWaitList) Run out of memory.\n");
     }
 
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
+    }
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -5927,6 +6029,11 @@ OnError:
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010310: (clEnqueueBarrierWithWaitList) Run out of memory.\n");
+    }
+
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -6005,6 +6112,11 @@ OnError:
             "OCL-010207: (clEnqueueWaitForEvents) Run out of memory.\n");
     }
 
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
+    }
+
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -6044,6 +6156,11 @@ OnError:
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010209: (clEnqueueBarrier) Run out of memory.\n");
+    }
+
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -6164,6 +6281,11 @@ OnError:
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010318: (clEnqueueFillBuffer) Run out of memory.\n");
+    }
+
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
     }
 
     gcmFOOTER_ARG("%d", status);

@@ -701,7 +701,7 @@ typedef struct _gcsPESTATES
     gctUINT32                   maxDepth;
 
     /* Dither. */
-    gctUINT32                   ditherTable[2][2];
+    gctUINT32                   ditherTable[3][2];
     gctBOOL                     ditherEnable;
 
     /* True if either one RT or DS bpp is <= 16 */
@@ -1086,6 +1086,9 @@ struct _gcoHARDWARE
     gceWHERE                    stallDestination;
     /* Stall signal. */
     gctSIGNAL                   stallSignal;
+
+    /* Idle flag, idle when stalled. */
+    gctBOOL                     idle;
 
     /***************************************************************************
     ** 2D states.

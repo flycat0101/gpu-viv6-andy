@@ -1613,6 +1613,21 @@ gcoOS_SetDisplayVirtualEx(
 }
 
 gceSTATUS
+gcoOS_CancelDisplayBackbuffer(
+    IN HALNativeDisplayType Display,
+    IN HALNativeWindowType Window,
+    IN gctPOINTER Context,
+    IN gcoSURF Surface,
+    IN gctUINT Offset,
+    IN gctINT X,
+    IN gctINT Y
+    )
+{
+    /* VIV: Quick fix. */
+    return gcoOS_SetDisplayVirtualEx(Display, Window, Context, Surface, Offset, X, Y);
+}
+
+gceSTATUS
 gcoOS_SetSwapInterval(
     IN HALNativeDisplayType Display,
     IN gctINT Interval

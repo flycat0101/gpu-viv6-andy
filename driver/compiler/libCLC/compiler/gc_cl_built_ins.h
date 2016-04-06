@@ -53,6 +53,7 @@ clsBUILTIN_FUNCTION_INFO;
 typedef struct _clsBUILTIN_DATATYPE_INFO
 {
     gctINT    type;
+    gctINT    dualType;  /* e.g. T_SHORT2 type and T_SHORT2_PACKED are duals of each other */
     gctINT    componentType;  /* component type of vector or matrix */
     clsGEN_CODE_DATA_TYPE dataType;
     clePOLYNARY_EXPR_TYPE constructorType;

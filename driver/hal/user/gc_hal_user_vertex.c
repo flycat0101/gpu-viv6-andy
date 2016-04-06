@@ -1600,7 +1600,7 @@ _RebuildStream(
     gctUINT32 sort[16] = {0}, count;
     gceSTATUS status;
     gctUINT maxStride;
-    gctUINT32 mapping[16];
+    gctUINT32 mapping[16] = {0};
 
 #if gcdDEBUG_REBUILD
     gcmPRINT("++%s: Stream=%p", __FUNCTION__, StreamArray[Stream]);

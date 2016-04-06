@@ -2082,7 +2082,7 @@ static void _VSC_IS_BW_Heuristic_Init(
     VSC_IS_Heuristic_SetIS(heur, is);
     vscPMP_Intialize(VSC_IS_Heuristic_GetPmp(heur), gcvNULL, 512, sizeof(void*), gcvTRUE);
     VSC_IS_BW_Heuristic_SetHeurFuncInfos(heur, hfis);
-    gcoOS_ZeroMemory(VSC_IS_BW_Heuristic_GetResults(heur), sizeof(VSC_IS_Heuristic_Result) * VSC_OPTN_ISOptions_FW_HEUR_LAST);
+    gcoOS_ZeroMemory(VSC_IS_BW_Heuristic_GetResults(heur), sizeof(VSC_IS_Heuristic_Result) * VSC_OPTN_ISOptions_BW_HEUR_LAST);
     VSC_IS_Heuristic_SetInSet(heur, gcvNULL);
     VSC_IS_Heuristic_SetOutSet(heur, gcvNULL);
     VSC_IS_Heuristic_SetToSchedule(heur, VSC_IS_DepDag_GetNodeCount(VSC_IS_InstSched_GetCurrDepDag(is)) - 1);

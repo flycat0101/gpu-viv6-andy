@@ -284,7 +284,10 @@ _GetDispatch(
             break;
         }
 #else /*gcdSTATIC_LINK*/
-        veglGetModule(gcvNULL, _GetAPIIndex(Context), &Context->dispatch);
+        if (gcvNULL == veglGetModule(gcvNULL, _GetAPIIndex(Context), &Context->dispatch))
+        {
+            return gcvNULL;
+        }
 #endif
     }
 
@@ -1797,11 +1800,6 @@ veglMakeCurrent(
             {
                 VEGLSurface sur = current->draw;
 
-                /* Make sure all workers have been processed. */
-                gcmVERIFY_OK(gcoOS_WaitSignal(gcvNULL,
-                                              sur->workerDoneSignal,
-                                              gcvINFINITE));
-
                 if (sur->type & EGL_WINDOW_BIT)
                 {
                     if (sur->newSwapModel && sur->backBuffer.surface)
@@ -2212,8 +2210,8 @@ veglMakeCurrent(
         }
     }
 
-    /* Step 3: process draw and read. */
-    if (draw && (draw->type & EGL_WINDOW_BIT))
+    /* Step 3: bind native window. */
+    if (draw && (draw->type & EGL_WINDOW_BIT) && !draw->bound)
     {
         /* Bind native window for rendering. */
         result = veglBindWindow(dpy, draw, &draw->renderMode);
@@ -2354,7 +2352,10 @@ veglMakeCurrent(
 
             gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
         }
+    }
 
+    if (draw && (draw->type & EGL_WINDOW_BIT))
+    {
         /* Detect native window resize. */
         result = veglGetWindowSize(dpy, draw, &width, &height);
 
@@ -2787,10 +2788,32 @@ _SyncImage(
 #endif
 }
 
+static void
+_SyncSwapWorker(
+    VEGLThreadData Thread,
+    VEGLDisplay Dpy
+    )
+{
+    if ((Dpy->workerThread != gcvNULL)
+    &&  (Thread->context != gcvNULL)
+    &&  (Thread->context->draw != gcvNULL)
+    &&  (Thread->context->draw->type & EGL_WINDOW_BIT)
+    )
+    {
+        VEGLSurface surface = Thread->context->draw;
+
+        /* Make sure all workers have been processed. */
+        gcmVERIFY_OK(gcoOS_WaitSignal(gcvNULL,
+                                      surface->workerDoneSignal,
+                                      gcvINFINITE));
+    }
+}
+
 /*
  * Sync EGL objects to native objects, includes,
  * 1. native pixmap of PixmapSurface
  * 2. native object of EGLImage source sibling.
+ * 3. the swap worker thread.
  *
  * Notice:
  * This function is asyncrhonized.
@@ -2814,6 +2837,9 @@ veglSyncNative(
 
     /* Sync EGLImage source to native objects. */
     _SyncImage(Thread, Dpy);
+
+    /* Sync swap worker thread. */
+    _SyncSwapWorker(Thread, Dpy);
 }
 
 /*

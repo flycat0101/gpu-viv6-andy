@@ -30,9 +30,6 @@
 #include "gc_hal_engine.h"
 #include "gc_egl_common.h"
 
-/* Swap rectangle extension on android. */
-#define VEGL_MAX_NUM_SURFACE_BUFFERS            8
-
 /* Always Disable 2xAA EGL configs by default. */
 #define VEGL_ENABLE_2xAA_CONFIG                 0
 
@@ -480,10 +477,11 @@ struct eglSurface
 
 #if gcdSUPPORT_SWAP_RECTANGLE
         gctUINT                 count;
+        gctUINT                 capacity;
 
         /* Accumulated swap rectangles. */
-        gcsRECT                 rects[VEGL_MAX_NUM_SURFACE_BUFFERS];
-        gctPOINTER              buffers[VEGL_MAX_NUM_SURFACE_BUFFERS];
+        gcsRECT *               rects;
+        gctPOINTER *            buffers;
 #   endif
     }
     swapRect;

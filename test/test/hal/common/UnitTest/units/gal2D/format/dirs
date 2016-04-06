@@ -35,5 +35,6 @@ DIRS=\
 	Gamma \
     Compressed2D \
     CompressedTPC \
-    CompressedDEC
+    CompressedDEC \
+    10Bit
 

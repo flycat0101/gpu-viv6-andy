@@ -201,7 +201,6 @@ typedef enum _cleELEMENT_TYPE
     clvTYPE_SHORT_PACKED,
     clvTYPE_USHORT_PACKED,
     clvTYPE_HALF_PACKED,
-    clvTYPE_IMAGE2D_PTR_T,
     clvTYPE_SIU_GEN,  /* All non generic types should be defined before this */
     clvTYPE_I_GEN,
     clvTYPE_U_GEN,
@@ -263,13 +262,26 @@ typedef enum _cleELEMENT_TYPE
 #define clmIsElementTypeSampler(EType) \
  ((EType) == clvTYPE_SAMPLER_T)
 
-#define clmIsElementTypeImage(EType) \
+/* Check if it is a image type. */
+#define clmIsElementTypeImage1D(EType) \
+    ((EType) == clvTYPE_IMAGE1D_T)
+
+#define clmIsElementTypeImage2D(EType) \
     ((EType) == clvTYPE_IMAGE2D_T || \
-     (EType) == clvTYPE_IMAGE3D_T || \
-     (EType) == clvTYPE_IMAGE1D_T || \
-     (EType) == clvTYPE_IMAGE2D_ARRAY_T || \
-     (EType) == clvTYPE_IMAGE1D_ARRAY_T || \
-     (EType) == clvTYPE_IMAGE1D_BUFFER_T)
+     (EType) == clvTYPE_IMAGE1D_ARRAY_T)
+
+#define clmIsElementTypeImage3D(EType) \
+    ((EType) == clvTYPE_IMAGE3D_T || \
+     (EType) == clvTYPE_IMAGE2D_ARRAY_T)
+
+#define clmIsElementTypeImageBuffer(EType) \
+    ((EType) == clvTYPE_IMAGE1D_BUFFER_T)
+
+#define clmIsElementTypeImage(EType) \
+    (clmIsElementTypeImage1D(EType) || \
+     clmIsElementTypeImage2D(EType) || \
+     clmIsElementTypeImage3D(EType) || \
+     clmIsElementTypeImageBuffer(EType))
 
 #define clmIsElementTypeEvent(EType) \
  ((EType) == clvTYPE_EVENT_T)
@@ -336,6 +348,9 @@ typedef enum _cleELEMENT_TYPE
  ((Decl)->array.numDim == 0  &&  \
   (Decl)->ptrDscr && \
   clmDATA_TYPE_vectorSize_GET((Decl)->dataType) != 0)
+
+#define clmDECL_IsUnderlyingVectorType(Decl) \
+    clmDATA_TYPE_IsVector((Decl)->dataType)
 
 #define clmDECL_IsPackedType(Decl) \
  ((Decl)->ptrDscr == gcvNULL && \
@@ -588,6 +603,10 @@ IN clsDECL * RDecl
 #define clmDATA_TYPE_IsHighPrecision(DataType) \
     clmIsElementTypeHighPrecision(clmDATA_TYPE_elementType_GET(DataType))
 
+#define clmDATA_TYPE_IsVector(DataType) \
+ (clmIsElementTypeArithmetic((DataType)->elementType) && \
+  clmDATA_TYPE_vectorSize_GET(DataType) != 0)
+
 #define clmGetArrayElementCount(Array, dim, ElementCount) \
     do { \
     if((Array).numDim > (dim)) { \
@@ -633,6 +652,9 @@ IN clsDECL * RDecl
 
 #define clmDECL_IsArray(Decl) \
     (!(Decl)->ptrDominant && (Decl)->array.numDim != 0)
+
+#define clmDECL_IsArrayOfPointers(Decl) \
+    (clmDECL_IsArray(Decl) && (Decl)->ptrDscr != gcvNULL)
 
 /* This is different from clmDECL_IsArray() in that the declared array may
    not be primary and/or being pointed to */
@@ -1002,6 +1024,7 @@ typedef struct _clsNAME_SPACE
 {
 slsDLINK_NODE    node;
 struct _clsNAME *scopeName;
+cltPOOL_STRING symbol;
 struct _clsNAME_SPACE *    parent;
 slsDLINK_LIST    names;
 slsDLINK_LIST    subSpaces;
@@ -2161,6 +2184,14 @@ cltPOOL_STRING
 clCreateMangledFuncName(
 IN cloCOMPILER Compiler,
 IN clsNAME *FuncName
+);
+
+gceSTATUS
+clMergePtrDscrToDecl(
+IN cloCOMPILER Compiler,
+IN slsSLINK_LIST *PtrDscr,
+IN clsDECL *Decl,
+IN gctBOOL PtrDominant
 );
 
 /* Visitor */

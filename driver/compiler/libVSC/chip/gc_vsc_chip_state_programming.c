@@ -3623,6 +3623,7 @@ static VSC_ErrCode _ProgramPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     pStatesPgmer->pHints->useDSX = pPsSEP->exeHints.derivedHints.prvStates.ps.bDerivRTx;
     pStatesPgmer->pHints->useDSY = pPsSEP->exeHints.derivedHints.prvStates.ps.bDerivRTy;
     pStatesPgmer->pHints->yInvertAware = ((pPsSEP->inputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_ISFRONTFACE].ioIndexMask != 0) ||
+                                          (pPsSEP->inputMapping.ioVtxPxl.usage2IO[SHADER_IO_USAGE_SAMPLE_POSITION].ioIndexMask != 0) ||
                                           (pPsSEP->exeHints.derivedHints.prvStates.ps.inputPosChannelValid & (1 << CHANNEL_Y)) ||
                                           (pPsSEP->exeHints.derivedHints.prvStates.ps.inputPntCoordChannelValid & (1 << CHANNEL_Y)) ||
                                           pPsSEP->exeHints.derivedHints.prvStates.ps.bDerivRTy);

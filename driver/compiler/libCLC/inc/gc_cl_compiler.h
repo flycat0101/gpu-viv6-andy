@@ -48,6 +48,8 @@ extern "C" {
                         cldFpFAST_RELAXED_MATH | \
                         cldFpFINITE_MATH_ONLY)
 
+#define cldVxImageArrayMaxLevelDefault  10
+
 #if gcdDEBUG
 
 #define clmVERIFY_OBJECT(obj, objType) \
@@ -151,6 +153,17 @@ typedef enum _cleSHADER_TYPE
     clvSHADER_TYPE_CL            = gcSHADER_TYPE_CL
 }
 cleSHADER_TYPE;
+
+gceSTATUS
+cloCOMPILER_SetImageArrayMaxLevel(
+    IN cloCOMPILER Compiler,
+    IN gctSTRING MaxLevel
+);
+
+gctUINT32
+cloCOMPILER_GetImageArrayMaxLevel(
+    IN cloCOMPILER Compiler
+);
 
 gceSTATUS
 cloCOMPILER_SetLanguageVersion(
@@ -389,6 +402,11 @@ cloCOMPILER_EnableExtension(
     IN cleEXTENSION Extension,
     IN gctBOOL Enable
     );
+
+gceSTATUS
+cloCOMPILER_SetBasicTypePacked(
+IN cloCOMPILER Compiler
+);
 
 #ifdef __cplusplus
 }

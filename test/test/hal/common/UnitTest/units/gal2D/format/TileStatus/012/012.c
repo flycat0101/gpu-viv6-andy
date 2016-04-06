@@ -69,7 +69,7 @@ static gctCONST_STRING s_CaseDescription =
 "     Compression [V4 compressed]\n" \
 "Dst: Size        [configurable]\n"\
 "     Rect        [configurable]\n"\
-"     Format      [RGB565/ARGB8888/ARGB4444/ARGB1555]\n"\
+"     Format      [RGB565/ARGB8888/XRGB8888/ARGB1555]\n"\
 "     Rotation    [0/90/180/270/FlipX/FlipY]\n"\
 "     Tile        [tile/superTileXmajor/superTileYmajor]\n"\
 "     Compression [V4 compressed]\n" \
@@ -211,10 +211,6 @@ sTileComb;
 
 sTileComb sTileList[] =
 {
-    {gcvTILED, gcv2D_TSC_ENABLE},
-    {gcvSUPERTILED, gcv2D_TSC_ENABLE},
-    {gcvYMAJOR_SUPERTILED, gcv2D_TSC_ENABLE},
-
     {gcvTILED, gcv2D_TSC_V4_COMPRESSED},
     {gcvSUPERTILED, gcv2D_TSC_V4_COMPRESSED},
     {gcvYMAJOR_SUPERTILED, gcv2D_TSC_V4_COMPRESSED},
@@ -222,10 +218,6 @@ sTileComb sTileList[] =
     {gcvTILED, gcv2D_TSC_V4_COMPRESSED | gcv2D_TSC_DOWN_SAMPLER},
     {gcvSUPERTILED, gcv2D_TSC_V4_COMPRESSED | gcv2D_TSC_DOWN_SAMPLER},
     {gcvYMAJOR_SUPERTILED, gcv2D_TSC_V4_COMPRESSED | gcv2D_TSC_DOWN_SAMPLER},
-
-    {gcvTILED, gcv2D_TSC_ENABLE},
-    {gcvSUPERTILED, gcv2D_TSC_ENABLE},
-    {gcvYMAJOR_SUPERTILED, gcv2D_TSC_ENABLE},
 
     {gcvTILED, gcv2D_TSC_V4_COMPRESSED_256B},
     {gcvSUPERTILED, gcv2D_TSC_V4_COMPRESSED_256B},
@@ -239,8 +231,19 @@ sTileComb sTileList[] =
 gceSURF_FORMAT sFormat[] =
 {
     gcvSURF_A1R5G5B5,
-    gcvSURF_A4R4G4B4,
+    gcvSURF_R5G6B5,
     gcvSURF_A8R8G8B8,
+
+    gcvSURF_A1R5G5B5,
+    gcvSURF_R5G6B5,
+    gcvSURF_X8R8G8B8,
+
+    gcvSURF_A8R8G8B8,
+    gcvSURF_X8R8G8B8,
+    gcvSURF_A1R5G5B5,
+
+    gcvSURF_A8R8G8B8,
+    gcvSURF_X8R8G8B8,
     gcvSURF_R5G6B5,
 };
 
@@ -542,7 +545,9 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 
     gcmONERROR(gco2D_SetStateU32(runtime->engine2d,
                                  gcv2D_STATE_MULTI_SRC_BLIT_BILINEAR_FILTER,
-                                 gcvTRUE));
+                                 gcvFALSE));
+
+    gcmONERROR(gco2D_SetStateU32(runtime->engine2d, gcv2D_STATE_XRGB_ENABLE, gcvTRUE));
 
     gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
                                         &t2d->dstWidth,

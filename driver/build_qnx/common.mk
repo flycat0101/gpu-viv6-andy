@@ -20,6 +20,7 @@ CUSTOM_PIXMAP?=0
 USE_NEW_LINUX_SIGNAL?=1
 USE_FB_DOUBLE_BUFFER?=0
 BUILD_OPENCL_FP?=1
+ENABLE_CL_GL ?=0
 
 # This prevents the platform/board name from getting appended to every build target name.
 # This happens automatically as the build directory structure now includes the board above the
@@ -85,6 +86,12 @@ ifeq ($(BUILD_OPENCL_FP), 1)
 	CCFLAGS += -DBUILD_OPENCL_FP=1
 else
 	CCFLAGS += -DBUILD_OPENCL_FP=0
+endif
+
+ifeq ($(ENABLE_CL_GL), 1)
+	CCFLAGS += -DENABLE_CL_GL=1
+else
+	CCFLAGS += -DENABLE_CL_GL=0
 endif
 
 ifeq ($(VIVANTE_ENABLE_VG), 1)

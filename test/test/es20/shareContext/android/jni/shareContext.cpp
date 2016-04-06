@@ -49,19 +49,15 @@
 #include <fcntl.h>
 #include <string.h>
 
-#ifndef _NDK_
 #include <nativehelper/jni.h>
 #include <utils/Log.h>
+#if ANDROID_SDK_VERSION >= 16
+#   include <gui/Surface.h>
 #else
-#include <jni.h>
-#include <android/log.h>
+#   include <surfaceflinger/Surface.h>
 #endif
-#include <sys/time.h>
-#include <stdio.h>
 
 #if ANDROID_SDK_VERSION >= 16
-#   include <ui/ANativeObjectBase.h>
-
 #   undef LOGI
 #   undef LOGD
 #   undef LOGW
@@ -70,13 +66,11 @@
 #   define LOGD(...) ALOGD(__VA_ARGS__)
 #   define LOGW(...) ALOGW(__VA_ARGS__)
 #   define LOGE(...) ALOGE(__VA_ARGS__)
-#else
-#   include <ui/android_native_buffer.h>
 #endif
-
 #ifndef LOG_TAG
 #define LOG_TAG "GL2shareContext"
 #endif
+using namespace android;
 
 extern int          frames;
 extern int          width;
@@ -95,29 +89,71 @@ enum
     KEYPAD_BACK = 4,
 };
 
-extern void RenderInit(int nativeWindow);
+extern void RenderInit(EGLNativeWindowType nativeWindow, EGLNativeWindowType nativeWindow2);
 extern void Render();
+void shutDown(void);
 
 extern "C"
 {
-    JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_shareContext_GL2JNILib_init(JNIEnv * env, jobject obj, jobject surface);
+    JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_shareContext_GL2JNILib_init(JNIEnv * env, jobject obj, jobject surface, jobject surface2);
     JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_shareContext_GL2JNILib_repaint(JNIEnv * env, jobject obj);
     JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_shareContext_GL2JNILib_key(JNIEnv * env, jobject obj, jint k, jboolean d);
+    JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_shareContext_GL2JNILib_finish(JNIEnv * env, jobject obj);
 };
 
-JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_shareContext_GL2JNILib_init(JNIEnv * env, jobject obj, jobject surface)
+JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_shareContext_GL2JNILib_init(JNIEnv * env, jobject obj, jobject surface, jobject surface2)
 {
-	int     i = 0;
-	int     nativeWindow;
-	int     ret;
-	char    Log[256];
+    int     i = 0;
+    EGLNativeWindowType    nativeWindow;
+    EGLNativeWindowType    nativeWindow2;
+    int     ret;
+    char    Log[256];
 
-	jclass      surface_class           = env->FindClass("android/view/Surface");
-    jfieldID    surface_SurfaceFieldID  = env->GetFieldID(surface_class,"mNativeSurface", "I");
-	nativeWindow = env->GetIntField(surface, surface_SurfaceFieldID);
+    jclass surface_class = env->FindClass("android/view/Surface");
+    jclass version_class = env->FindClass("android/os/Build$VERSION");
+    jfieldID sdkIntFieldID = env->GetStaticFieldID(version_class, "SDK_INT", "I");
+    jfieldID surface_SurfaceFieldID = NULL;
+    int sdkInt = env->GetStaticIntField(version_class, sdkIntFieldID);
+    sp <Surface> sur;
+    sp <Surface> sur2;
+    if (sdkInt <= 8)
+    {
+           surface_SurfaceFieldID = env->GetFieldID(surface_class,"mSurface", "I");
+    }
+    else
+    {
+        if (sdkInt > 18)
+        {
+            /*surface_SurfaceFieldID = env->GetFieldID(surface_class,"mNativeObject", "I");*/
+            if (sdkInt >= 21) {
+                surface_SurfaceFieldID = env->GetFieldID(surface_class,"mNativeObject", "J");
+            }
+            else {
+                surface_SurfaceFieldID = env->GetFieldID(surface_class,"mNativeObject", "I");
+            }
+        }
+        else
+        {
+            surface_SurfaceFieldID = env->GetFieldID(surface_class,"mNativeSurface", "I");
+        }
+    }
+    if (surface_SurfaceFieldID == NULL) {
+        LOGI("failed to get SurfaceFieldID");
+        return false;
+    }
+    if (sdkInt >= 21) {
+        sur = (Surface *)(khronos_uintptr_t)env->GetLongField(surface, surface_SurfaceFieldID);
+        sur2 = (Surface *)(khronos_uintptr_t)env->GetLongField(surface2, surface_SurfaceFieldID);
+    }
+    else {
+        sur = (Surface *)(khronos_uintptr_t)env->GetIntField(surface, surface_SurfaceFieldID);
+        sur2 = (Surface *)(khronos_uintptr_t)env->GetIntField(surface2, surface_SurfaceFieldID);
+    }
 
-    RenderInit(nativeWindow);
+    nativeWindow = (EGLNativeWindowType)(static_cast<ANativeWindow *>(sur.get()));
+    nativeWindow2 = (EGLNativeWindowType)(static_cast<ANativeWindow *>(sur2.get()));
 
+    RenderInit(nativeWindow, nativeWindow2);
     return true;
 }
 
@@ -125,7 +161,6 @@ JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_shareContext_GL2JNILib_
     JNIEnv * env, jobject obj)
 {
     Render();
-
     return true;
 }
 
@@ -138,3 +173,11 @@ JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_shareContext_GL2JNILib_
 
     return true;
 }
+
+JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_shareContext_GL2JNILib_finish(
+    JNIEnv * env, jobject obj)
+{
+    shutDown();
+    return true;
+}
+

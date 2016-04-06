@@ -258,6 +258,7 @@ gcOPTIMIZER_OPTION theOptimizerOption =
      */
 
     VIRCG_WITH_TREECG, /* useVIRCodeGen; */
+    VIRCG_WITH_TREECG, /* origUseVIRCodeGen; */
 
     0, /* _vircgStart; */
     0x7fffffff, /* _vircgEnd */
@@ -2357,9 +2358,15 @@ _BuildGlobalUsage(
     }
 
     enableDefArray = (gctUINT8*)malloc(Optimizer->tempCount * sizeof(gctUINT8));
-    enableUseArray = (gctUINT8*)malloc(Optimizer->tempCount * sizeof(gctUINT8));
-    if(enableDefArray == gcvNULL || enableUseArray == gcvNULL)
+    if(enableDefArray == gcvNULL)
     {
+        gcmFOOTER();
+        return gcvSTATUS_OUT_OF_MEMORY;
+    }
+    enableUseArray = (gctUINT8*)malloc(Optimizer->tempCount * sizeof(gctUINT8));
+    if(enableDefArray == gcvNULL)
+    {
+        free(enableDefArray);
         gcmFOOTER();
         return gcvSTATUS_OUT_OF_MEMORY;
     }

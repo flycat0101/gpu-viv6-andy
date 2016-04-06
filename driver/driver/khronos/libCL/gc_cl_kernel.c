@@ -162,7 +162,6 @@ clfLoadKernelArgValues(
     gceUNIFORM_FLAGS    flags;
     gctINT              status;
     clsMemAllocInfo_PTR privateBuf = gcvNULL;
-    static clsKernel_PTR previousKernel = gcvNULL;
 
     gcmHEADER_ARG("Kernel=0x%x Arg=0x%x WorkDim=%d",
                   Kernel, Arg, WorkDim);
@@ -762,8 +761,7 @@ clfLoadKernelArgValues(
                                       Arg->data),
                    CL_INVALID_VALUE);
     }
-    else if (isUniformLocalAddressSpace(Arg->uniform) ||
-             isUniformPrivateAddressSpace(Arg->uniform))
+    else if (isUniformLocalAddressSpace(Arg->uniform))
     {
         clsMemAllocInfo_PTR memAllocInfo = (clsMemAllocInfo_PTR) Arg->data;
 
@@ -771,6 +769,53 @@ clfLoadKernelArgValues(
         if (memAllocInfo->allocatedSize > 0)
         {
             gctINT * data;
+
+            gctINT totalNumGroups = GlobalWorkSize[0] / (LocalWorkSize[0] ? LocalWorkSize[0] : 1)
+                                  * (WorkDim > 1 ? (GlobalWorkSize[1] / (LocalWorkSize[1] ? LocalWorkSize[1] : 1)) : 1)
+                                  * (WorkDim > 2 ? (GlobalWorkSize[2] / (LocalWorkSize[2] ? LocalWorkSize[2] : 1)) : 1);
+
+            gctINT totalNumItems  = GlobalWorkSize[0]
+                                  * (WorkDim > 1 ? GlobalWorkSize[1] : 1)
+                                  * (WorkDim > 2 ? GlobalWorkSize[2] : 1);
+
+            clmASSERT(Arg->isMemAlloc == gcvTRUE, CL_INVALID_VALUE);
+
+            memAllocInfo->allocatedSize *= isUniformPrivateAddressSpace(Arg->uniform) ? totalNumItems : totalNumGroups;
+
+            /* Allocate the physical buffer */
+            clmONERROR(gcoCL_AllocateMemory(&memAllocInfo->allocatedSize,
+                                            &memAllocInfo->physical,
+                                            &memAllocInfo->logical,
+                                            &memAllocInfo->node),
+                       CL_INVALID_VALUE);
+
+            if (gcmOPT_hasFeature(FB_FORCE_LS_ACCESS) /* triage option */)
+            {
+                /* Local memory address starts at 0. */
+                gctPHYS_ADDR physical = 0;
+                data = (gctINT *) &physical;
+                clmONERROR(gcUNIFORM_SetValue(Arg->uniform, length, data),
+                           CL_INVALID_VALUE);
+            }
+            else
+            {
+                data = (gctINT *) &memAllocInfo->physical;
+                clmONERROR(gcUNIFORM_SetValue(Arg->uniform, length, data),
+                           CL_INVALID_VALUE);
+            }
+        }
+    }
+    else if(isUniformPrivateAddressSpace(Arg->uniform))
+    {
+        clsMemAllocInfo_PTR memAllocInfo = (clsMemAllocInfo_PTR) Arg->data;
+
+        /* Size may be zero if declared but never used */
+        if (memAllocInfo->allocatedSize > 0)
+        {
+            gctINT * data;
+            gctUINT argIdx;
+            clsArgument_PTR tempArg;
+            gctBOOL isFirstPrivateArg = gcvTRUE;
 
             gctINT totalNumGroups = GlobalWorkSize[0] / (LocalWorkSize[0] ? LocalWorkSize[0] : 1)
                                   * (WorkDim > 1 ? (GlobalWorkSize[1] / (LocalWorkSize[1] ? LocalWorkSize[1] : 1)) : 1)
@@ -807,21 +852,48 @@ clfLoadKernelArgValues(
                 clsPrivateBuffer_PTR node = gcvNULL;
                 gctBOOL found = gcvFALSE;
 
+                /* check previous arguments to see if it's the first private argument in the kernel */
+                for (argIdx = 0; argIdx < numArg; argIdx++)
+                {
+                    tempArg = baseArg + argIdx;
+                    if (!(tempArg->uniform) || isUniformInactive(tempArg->uniform))
+                        continue;
+                    if (isUniformKernelArg(tempArg->uniform) || isUniformKernelArgConstant(tempArg->uniform))
+                        continue;
+                    if (isUniformWorkDim(tempArg->uniform))
+                        continue;
+                    if (isUniformGlobalSize(tempArg->uniform))
+                        continue;
+                    if (isUniformNumGroups(tempArg->uniform))
+                        continue;
+                    if (isUniformLocalSize(tempArg->uniform))
+                        continue;
+                    if (isUniformGlobalOffset(tempArg->uniform))
+                        continue;
+                    if (isUniformLocalAddressSpace(tempArg->uniform))
+                        continue;
+                    if (isUniformPrivateAddressSpace(tempArg->uniform))
+                    {
+                        if (tempArg!= Arg)
+                        {
+                            isFirstPrivateArg = gcvFALSE;
+                            break;
+                        }
+                    }
+                }
+
                 /* search in the list */
                 for (node = (*privateBufList); node != gcvNULL; node = node->next)
                 {
-                    if (Kernel != previousKernel)
+                    if (isFirstPrivateArg)
                     {
-                        /* find previous kernel's private buffer and re-use it */
-                        if (previousKernel == node->kernel)
-                        {
-                            found = gcvTRUE;
-                            privateBuf = node->buffer;
-                            /* update node */
-                            node->kernel = Kernel;
-                            node->uniform = Arg->uniform;
-                            break;
-                        }
+                        /* re-use the first buffer in the list */
+                        found = gcvTRUE;
+                        privateBuf = node->buffer;
+                        /* update node */
+                        node->kernel = Kernel;
+                        node->uniform = Arg->uniform;
+                        break;
                     }
                     else
                     {
@@ -847,7 +919,7 @@ clfLoadKernelArgValues(
                                          privateBuf->allocatedSize,
                                          privateBuf->node);
 
-                        /* Allocate the physical buffer */
+                        /* re-allocate the physical buffer */
                         clmONERROR(gcoCL_AllocateMemory(&memAllocInfo->allocatedSize,
                                                         &memAllocInfo->physical,
                                                         &memAllocInfo->logical,
@@ -864,28 +936,33 @@ clfLoadKernelArgValues(
                 }
                 else
                 {
-                    /* insert a new buffer to the list */
-                    node = (*privateBufList);
-                    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsPrivateBuffer), (gctPOINTER *)privateBufList), CL_OUT_OF_HOST_MEMORY);
-                    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsMemAllocInfo), (gctPOINTER *)&privateBuf), CL_OUT_OF_HOST_MEMORY);
+                    /* append a new buffer to the list */
+                    clsPrivateBuffer_PTR tempNode = gcvNULL;
+                    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsPrivateBuffer), (gctPOINTER *)&tempNode), CL_OUT_OF_HOST_MEMORY);
 
+                    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsMemAllocInfo), (gctPOINTER *)&privateBuf), CL_OUT_OF_HOST_MEMORY);
                     clmONERROR(gcoCL_AllocateMemory(&memAllocInfo->allocatedSize,
                                                     &memAllocInfo->physical,
                                                     &memAllocInfo->logical,
                                                     &memAllocInfo->node),
                                CL_INVALID_VALUE);
-
                     gcoOS_MemCopy(privateBuf, memAllocInfo,  sizeof(clsMemAllocInfo));
 
-                    (*privateBufList)->buffer = privateBuf;
-                    (*privateBufList)->next = node;
-                    (*privateBufList)->kernel = Kernel;
-                    (*privateBufList)->uniform = Arg->uniform;
+                    tempNode->buffer = privateBuf;
+                    tempNode->next = gcvNULL;
+                    tempNode->kernel = Kernel;
+                    tempNode->uniform = Arg->uniform;
+
+                    for (node = (*privateBufList); node != gcvNULL; node = node->next)
+                    {
+                        if (node->next == gcvNULL)
+                        {
+                            node->next = tempNode;
+                            break;
+                        }
+                    }
                 }
             }
-
-            /* update previous Kernel */
-            previousKernel = Kernel;
 
             if (gcmOPT_hasFeature(FB_FORCE_LS_ACCESS) /* triage option */)
             {
@@ -925,6 +1002,12 @@ clfLoadKernelArgValues(
         /* Copy the constant data to the buffer */
         gcoOS_MemCopy(memAllocInfo->logical, Kernel->constantMemBuffer, Kernel->constantMemSize);
 
+        gcmDUMP_BUFFER(gcvNULL,
+                       "memory",
+                       gcmPTR2INT( memAllocInfo->physical),
+                       memAllocInfo->logical,
+                       0,
+                       Kernel->constantMemSize);
     }
     else if (isUniformPrintfAddress(Arg->uniform))
     {
@@ -2518,6 +2601,13 @@ clfFreeKernelArgs(
         if (Args[i].isMemAlloc)
         {
             clsMemAllocInfo_PTR memAllocInfo = (clsMemAllocInfo_PTR) Args[i].data;
+            if (!isUniformPrivateAddressSpace(Args[i].uniform))
+            {
+                gcoCL_FreeMemory(memAllocInfo->physical,
+                             memAllocInfo->logical,
+                             memAllocInfo->allocatedSize,
+                             memAllocInfo->node);
+            }
             if (FreeAllocData && memAllocInfo->data) gcmOS_SAFE_FREE(gcvNULL, memAllocInfo->data);
         }
         if (Args[i].data)
@@ -2599,7 +2689,7 @@ clCreateKernel(
     )
 {
     clsKernel_PTR   kernel      = gcvNULL;
-    gctPOINTER      pointer;
+    gctPOINTER      pointer     = gcvNULL;
     gctSIZE_T       length;
     gceSTATUS       status;
     gctPOINTER      buffer      = gcvNULL;
@@ -2610,8 +2700,6 @@ clCreateKernel(
     gcSHADER        tmpBinary = gcvNULL;
     gctUINT         tmpBinarySize = 0;
     gctPOINTER      savedTmpBinary = gcvNULL;
-    gceCHIPMODEL    chipModel;
-    gctUINT32       chipRevision;
 #endif
     gctUINT         binarySize;
     gctUINT         i, j;
@@ -2620,7 +2708,10 @@ clCreateKernel(
     gctSIZE_T       propertyValues[3] = {0};
     gceSHADER_FLAGS flags;
     gcKERNEL_FUNCTION kernelFunction;
-    gctBOOL hasBarrier = gcvFALSE, hasImageWrite = gcvFALSE;
+    gceCHIPMODEL    chipModel;
+    gctUINT32       chipRevision;
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
+    gctBOOL hasBarrier = gcvFALSE, hasImageWrite = gcvFALSE, supportImageInst = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMG_INSTRUCTION);
 
     gcmHEADER_ARG("Program=0x%x KernelName=%s",
                   Program, KernelName);
@@ -2704,7 +2795,7 @@ clCreateKernel(
             "OCL-007003: (clCreateKernel) Cannot extract kernel from program.\n");
         clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
     }
-    gcoOS_Free(gcvNULL, pointer);
+    gcmOS_SAFE_FREE(gcvNULL, pointer);
     /* Load kernel binary uniforms with the given kernel name */
     status = gcSHADER_LoadKernel(kernelBinary, kernel->name);
     if (gcmIS_ERROR(status))
@@ -2754,7 +2845,7 @@ clCreateKernel(
         /* Check imageSampler. */
         if (GetKFunctionISamplerCount(kernelFunction))
         {
-            if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMG_INSTRUCTION))
+            if(supportImageInst == gcvTRUE)
             {
                 kernel->patchNeeded = gcvFALSE;
             }
@@ -2790,7 +2881,7 @@ clCreateKernel(
 
             if (i < GetShaderUniformCount(kernelBinary))
             {
-                if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMG_INSTRUCTION) && (type == gcSHADER_IMAGE_2D || type == gcSHADER_IMAGE_1D))
+                if((supportImageInst == gcvTRUE) && (type == gcSHADER_IMAGE_2D || type == gcSHADER_IMAGE_1D))
                 {
                     kernel->patchNeeded = gcvFALSE;
                 }
@@ -2822,10 +2913,11 @@ clCreateKernel(
 
     gcmASSERT(kernel->context->platform->compiler11);
     gcSetCLCompiler(kernel->context->platform->compiler11);
+    gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
+    gcoHAL_GetPatchID(gcvNULL, &patchId);
 
 #if BUILD_OPENCL_FP
-    gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
-    if((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008))
+    if((chipModel == gcv3000 && chipRevision == 0x5435) || (supportImageInst == gcvTRUE))
     {
         clmONERROR(gcSHADER_SaveEx(pgmBinary, gcvNULL, &tmpBinarySize), CL_INVALID_VALUE);
         clmONERROR(gcoOS_Allocate(gcvNULL, tmpBinarySize, &savedTmpBinary), CL_OUT_OF_HOST_MEMORY);
@@ -2840,9 +2932,64 @@ clCreateKernel(
                           &hints);
 
 #if BUILD_OPENCL_FP
-    if((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008))
+    if((chipModel == gcv3000 && chipRevision == 0x5435) || (supportImageInst == gcvTRUE))
     {
-        if((status == gcvSTATUS_NOT_FOUND || status == gcvSTATUS_OUT_OF_RESOURCES) &&  gcmOPT_INLINELEVEL() != 4)
+        if((kernel->patchNeeded == gcvFALSE) && (patchId == gcvPATCH_OCLCTS))
+        {
+            gctUINT format = gcSL_INT8;
+            for (j = 0; j < GetShaderCodeCount(kernelBinary); j++)
+            {
+                gcSL_INSTRUCTION inst   = GetShaderInstruction(kernelBinary, j);
+
+                if(gcSL_isOpcodeImageWrite(gcmSL_OPCODE_GET(inst->opcode, Opcode)))
+                {
+                    format = gcmSL_TARGET_GET(GetInstTemp(inst), Format);
+                    break;
+                }
+            }
+
+            /* as HW didn't support rte while using img_store instruction, fall back to the old path which used store instead */
+            if(format == gcSL_FLOAT)
+            {
+                gcmASSERT(savedTmpBinary);
+
+                kernel->patchNeeded = gcvTRUE;
+
+                /* Construct kernel binary. */
+                if(tmpBinary == gcvNULL)
+                    clmONERROR(gcSHADER_Construct(gcvNULL, gcSHADER_TYPE_CL, &tmpBinary), CL_OUT_OF_HOST_MEMORY);
+
+                /* Load kernel binary from program binary */
+                status = gcSHADER_LoadEx(tmpBinary, savedTmpBinary, tmpBinarySize);
+                if (gcmIS_ERROR(status))
+                {
+                    clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+                }
+                /* Load temp binary uniforms with the given kernel name */
+                clmONERROR(gcSHADER_LoadKernel(tmpBinary, kernel->name), CL_OUT_OF_HOST_MEMORY);
+
+                gcoOS_Free(gcvNULL, savedTmpBinary);
+                savedTmpBinary = gcvNULL;
+                tmpBinarySize = 0;
+                bufferSize = 0;
+
+                status = gcLinkKernel(tmpBinary,
+                        flags | gcvSHADER_REMOVE_UNUSED_UNIFORMS | gcvSHADER_IMAGE_PATCHING,
+                        &bufferSize,
+                        &buffer,
+                        &hints);
+
+                if (gcmIS_ERROR(status))
+                {
+                    gcSHADER_Destroy(tmpBinary);
+                    clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+                }
+
+                gcSHADER_Destroy(kernelBinary);
+                kernelBinary = tmpBinary;
+            }
+        }
+        else if((status == gcvSTATUS_NOT_FOUND || status == gcvSTATUS_OUT_OF_RESOURCES) &&  gcmOPT_INLINELEVEL() != 4)
         {
             gcmASSERT(savedTmpBinary);
 
@@ -2921,7 +3068,7 @@ OnSkipOutOfSampler:
                 hasBarrier = gcvTRUE;
             }
 
-            if(gcmSL_OPCODE_GET(inst->opcode, Opcode) == gcSL_IMAGE_WR)
+            if(gcSL_isOpcodeImageWrite(gcmSL_OPCODE_GET(inst->opcode, Opcode)))
             {
                 hasImageWrite = gcvTRUE;
             }
@@ -2962,13 +3109,6 @@ OnSkipOutOfSampler:
     }
 
     {
-        gceCHIPMODEL  chipModel;
-        gctUINT32 chipRevision;
-        gcePATCH_ID patchId = gcvPATCH_INVALID;
-
-        gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
-        gcoHAL_GetPatchID(gcvNULL, &patchId);
-
         if((chipModel == gcv4000) && (chipRevision == 0x5245)
             && (patchId == gcvPATCH_OCLCTS))
         {
@@ -3033,13 +3173,15 @@ OnError:
             {
                 if (kernel->args[i].data)
                 {
-                    gcoOS_Free(gcvNULL, kernel->args[i].data);
+                    gcmOS_SAFE_FREE(gcvNULL, kernel->args[i].data);
                 }
             }
-            gcoOS_Free(gcvNULL, kernel->args);
+            gcmOS_SAFE_FREE(gcvNULL, kernel->args);
         }
-        gcoOS_Free(gcvNULL, kernel);
+        gcmOS_SAFE_FREE(gcvNULL, kernel);
     }
+
+    if(pointer != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, pointer);
 
     gcmFOOTER_ARG("%d", status);
     return gcvNULL;

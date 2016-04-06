@@ -32,7 +32,7 @@
 
 #define _GC_OBJ_ZONE    gcvZONE_COMPILER
 
-#define SHADER_TOO_MANY_CODE        5000
+#define SHADER_TOO_MANY_CODE        4500
 #define SHADER_TOO_MANY_JMP         600
 
 /******************************************************************************\
@@ -1944,12 +1944,15 @@ gcOpt_OptimizeMOVInstructions(
         status = gcvSTATUS_CHANGED;
     }
 
-    if (status == gcvSTATUS_CHANGED)
+    if (!gcdHasOptimization(Optimizer->option, gcvOPTIMIZATION_MIN_COMP_TIME))
     {
-        /* Rebuild flow graph. */
-        gcmONERROR(gcOpt_RebuildFlowGraph(Optimizer));
+        if (status == gcvSTATUS_CHANGED)
+        {
+            /* Rebuild flow graph. */
+            gcmONERROR(gcOpt_RebuildFlowGraph(Optimizer));
 
-        DUMP_OPTIMIZER("Optimize MOV instructions in the shader", Optimizer);
+            DUMP_OPTIMIZER("Optimize MOV instructions in the shader", Optimizer);
+        }
     }
 
     gcmFOOTER();
@@ -4527,13 +4530,16 @@ gcOpt_InlineFunctions(
 
     gcmHEADER_ARG("Optimizer=0x%x", Optimizer);
 
+    if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_LEVEL_0) ||
+        Optimizer->functionCount == 0)
+    {
+        gcmFOOTER();
+        return status;
+    }
+
     imagePatch = gcdHasOptimization(Optimizer->option, gcvOPTIMIZATION_IMAGE_PATCHING);
 
-    if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_LEVEL_0))
-    {
-        inlineLevel = 0;
-    }
-    else if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_LEVEL_1))
+    if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_LEVEL_1))
     {
         inlineLevel = 1;
     }
@@ -5070,8 +5076,16 @@ gcOpt_OptimizeCallStackDepth(
     gctINT  currentBudget = (inlineLevel == 4) ? 0x7fffffff
                                                : _GetInlineBudget(Optimizer);
     gctUINT savedShaderTempCount = Optimizer->shader->_tempRegCount;
+    gctUINT option = Optimizer->shader->optimizationOption;
 
     gcmHEADER_ARG("Optimizer=0x%x", Optimizer);
+
+    if (Optimizer->functionCount == 0 ||
+        gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_LEVEL_0))
+    {
+        gcmFOOTER();
+        return status;
+    }
 
     /* Update the call stack information. */
     status = gcOpt_UpdateCallStackDepth(Optimizer, gcvFALSE);
@@ -6664,7 +6678,7 @@ gcOpt_PropagateConstants(
 
                         gcmASSERT(uniform);
 
-                        codeUser->instruction.source0 = gcmSL_SOURCE_SET(0, Type, GetUniformType(uniform))
+                        codeUser->instruction.source0 = gcmSL_SOURCE_SET(0, Type, gcSL_UNIFORM)
                                                       | gcmSL_SOURCE_SET(0, Indexed, gcSL_NOT_INDEXED)
                                                       | gcmSL_SOURCE_SET(0, Precision, GetUniformPrecision(uniform))
                                                       | gcmSL_SOURCE_SET(0, Format, GetUniformFormat(uniform))
@@ -10170,7 +10184,10 @@ gcOptimizeShader(
         /* Construct the optimizer. */
         gcmERR_BREAK(gcOpt_ConstructOptimizer(Shader, &optimizer));
 
-        gcmERR_BREAK(gcOpt_RemoveDeadCode(optimizer));
+        if (gcdHasOptimization(option, gcvOPTIMIZATION_DEAD_CODE))
+        {
+            gcmERR_BREAK(gcOpt_RemoveDeadCode(optimizer));
+        }
 
 #if _REMAP_TEMP_INDEX_FOR_FUNCTION_
         gcmERR_BREAK(gcOpt_RemapTempIndex(&optimizer));
@@ -10248,7 +10265,8 @@ gcOptimizeShader(
                 }
                 gcOpt_UpdatePrecision(optimizer);
                 if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_EXPANSION) &&
-                    (gcmOPT_UseVIRCodeGen() == VIRCG_None || gcmOPT_INLINERKIND() == GCSL_INLINER_KIND))
+                    (gcmOPT_UseVIRCodeGen() == VIRCG_None || gcmOPT_INLINERKIND() == GCSL_INLINER_KIND) &&
+                    !gcdHasOptimization(option, gcvOPTIMIZATION_MIN_COMP_TIME))
                 {
                     if (status == gcvSTATUS_CHANGED)
                     {
@@ -10306,7 +10324,8 @@ gcOptimizeShader(
                     gcmERR_BREAK(gcOpt_RemoveNOP(optimizer));
                 }
 
-                if (gcdHasOptimization(option, gcvOPTIMIZATION_INTRINSICS))
+                if (gcdHasOptimization(option, gcvOPTIMIZATION_INTRINSICS) &&
+                    !gcdHasOptimization(option, gcvOPTIMIZATION_MIN_COMP_TIME))
                 {
                     /* optimize the instrinsics. */
                     gcmERR_BREAK(gcOpt_OptimizeIntrinsics(optimizer));
@@ -10320,6 +10339,7 @@ gcOptimizeShader(
                         gcOpt_OptimizeMOVInstructions(optimizer);
                     }
                 }
+
             }
             else
             {
@@ -10327,7 +10347,8 @@ gcOptimizeShader(
             }
 
             if (gcdHasOptimization(option, gcvOPTIMIZATION_LOOP_REROLLING) &&
-                (optimizer->codeTail->id + 1) > REROLL_CODE_COUNT)
+                (optimizer->codeTail->id + 1) > REROLL_CODE_COUNT &&
+                !gcdHasOptimization(option, gcvOPTIMIZATION_MIN_COMP_TIME))
             {
                 /* Optimize MOV instructions. */
                 gcmERR_BREAK(gcOpt_OptimizeMOVInstructions(optimizer));
@@ -10354,7 +10375,8 @@ gcOptimizeShader(
                     gcmERR_BREAK(gcOpt_RemoveDeadCode(optimizer));
                 }
 
-                if (gcdHasOptimization(option, gcvOPTIMIZATION_REDUNDANT_MOVE))
+                if (gcdHasOptimization(option, gcvOPTIMIZATION_REDUNDANT_MOVE) &&
+                    !gcdHasOptimization(option, gcvOPTIMIZATION_MIN_COMP_TIME))
                 {
                     /* Optimize MOV instructions. */
                     gcmERR_BREAK(gcOpt_OptimizeMOVInstructions(optimizer));
@@ -10392,7 +10414,8 @@ gcOptimizeShader(
 
             gcmERR_BREAK(status);
 
-            if (gcdHasOptimization(option, gcvOPTIMIZATION_REDUNDANT_MOVE))
+            if (gcdHasOptimization(option, gcvOPTIMIZATION_REDUNDANT_MOVE) &&
+                !gcdHasOptimization(option, gcvOPTIMIZATION_MIN_COMP_TIME))
             {
                 /* Optimize MOV instructions. */
                 gcmERR_BREAK(gcOpt_OptimizeMOVInstructions(optimizer));
@@ -10416,7 +10439,8 @@ gcOptimizeShader(
             /* After merge separate vector instructions, maybe some constants are merge together,
             ** we should do propagate constants again.
             */
-            if (gcdHasOptimization(option, gcvOPTIMIZATION_CONSTANT_PROPAGATION))
+            if (gcdHasOptimization(option, gcvOPTIMIZATION_CONSTANT_PROPAGATION) &&
+                !gcdHasOptimization(option, gcvOPTIMIZATION_MIN_COMP_TIME))
             {
                 /* Propagate constants. */
                 gcmERR_BREAK(gcOpt_PropagateConstants(optimizer));

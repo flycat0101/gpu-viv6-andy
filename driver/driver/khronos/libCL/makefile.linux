@@ -53,7 +53,6 @@ OBJECTS			=	$(OBJ_DIR)/gc_cl.o \
 					$(OBJ_DIR)/gc_cl_enqueue.o \
 					$(OBJ_DIR)/gc_cl_event.o \
 					$(OBJ_DIR)/gc_cl_extension.o \
-					$(OBJ_DIR)/gc_cl_gl.o \
 					$(OBJ_DIR)/gc_cl_icd.o \
 					$(OBJ_DIR)/gc_cl_kernel.o \
 					$(OBJ_DIR)/gc_cl_mem.o \
@@ -61,6 +60,10 @@ OBJECTS			=	$(OBJ_DIR)/gc_cl.o \
 					$(OBJ_DIR)/gc_cl_program.o \
 					$(OBJ_DIR)/gc_cl_profiler.o \
 					$(OBJ_DIR)/gc_cl_sampler.o
+
+ifeq ($(ENABLE_CL_GL), 1)
+    OBJECTS += $(OBJ_DIR)/gc_cl_gl.o
+endif
 
 
 ################################################################################
@@ -72,6 +75,10 @@ endif
 
 ifeq ($(BUILD_OPENCL_FP), 1)
 CFLAGS += -DBUILD_OPENCL_FP=1
+endif
+
+ifeq ($(ENABLE_CL_GL), 1)
+CFLAGS += -DENABLE_CL_GL=1
 endif
 
 ifneq ($(USE_ARMCC), 1)

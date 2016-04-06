@@ -26,6 +26,7 @@
 *****************************************************************************/
 
 
+
 /*
  *  Feature:    Filter Blit, Dither
  *  API:        gco2D_FilterBlit, gco2D_EnableDither

@@ -987,9 +987,10 @@ gctINT32 TessellateStroke(
 
         if (patternLen < 0 || dashLen <= 0)
         {
+            OVG_SAFE_FREE(context->os, memStart);
+
             if (context->strokeCapStyle == VG_CAP_BUTT)
             {
-                OVG_SAFE_FREE(context->os, memStart);
                 gcmFOOTER_ARG("return=%d", 0);
                 return 0;
             }
@@ -3981,6 +3982,9 @@ gctINT32 _FlattenPath(
 
                 ++currentSegment;
 
+                ellipse.center.x = 0.0f;
+                ellipse.center.y = 0.0f;
+                ellipse.angle = 0.0f;
                 /* Setup the ellipse object for flattening. */
                 ellipse.hAxis = TESS_ABS(TESS_MUL(getValue(dataPointer),  pathScale) + pathBias);    dataPointer += dataTypeSize;
                 ellipse.vAxis = TESS_ABS(TESS_MUL(getValue(dataPointer),  pathScale) + pathBias);    dataPointer += dataTypeSize;
@@ -7082,6 +7086,15 @@ on_memory:
     _VGTessellationContextDtor(context);
     _VGTessellationContextCtor(os, tContext);
 
+    if (mountainsLengths != gcvNULL)
+    {
+#if LOCAL_MEM_OPTIM
+        _FreeInt(tContext->IntPool, mountainsLengths);
+#else
+        OVG_SAFE_FREE(context->os, mountainsLengths);
+#endif
+    }
+
     gcmFOOTER_ARG("return=0x%x", gcvNULL);
     return gcvNULL;
 }
@@ -7465,7 +7478,12 @@ gceSTATUS _AddEdge(
                 if (gcvSTATUS_OK !=
                     _BreakEdgeBunch(context, otherRegions, otherRegionsLength, currPoint, 0))
                 {
+#if LOCAL_MEM_OPTIM
+                    _FreeInt(tContext->IntPool, otherRegions);
+#else
                     OVG_SAFE_FREE(context->os, otherRegions);
+#endif
+
                     gcmFOOTER_ARG("status=%d", gcvSTATUS_OUT_OF_MEMORY);
 
                     return gcvSTATUS_OUT_OF_MEMORY;
@@ -7709,6 +7727,7 @@ gceSTATUS _AddEdge(
                 /* locate other region */
                 if (TESS_ABS((gctFLOAT)currIntersection) < 3)
                 {
+                    gceSTATUS status = gcvSTATUS_OK;
                     otherRegionsLength = 0;
                     otherRegions = _FindOtherRegions(context, currRegion, leftIndex, (gctINT32)TESS_SIGN((long long)currIntersection), tContext->regions[currRegion].lowerVertex, &otherRegionsLength);
 
@@ -7726,6 +7745,16 @@ gceSTATUS _AddEdge(
                         /* Out-of-Memory. */
                         if (-9999 == _AddPoint(context, leftIndex))
                         {
+#if LOCAL_MEM_OPTIM
+                            if (otherRegions != gcvNULL)
+                            {
+                                _FreeInt(tContext->IntPool, otherRegions);
+                                otherRegions = gcvNULL;
+                            }
+#else
+                            OVG_SAFE_FREE(context->os, otherRegions);
+#endif
+
                             gcmFOOTER_ARG("status=%d", gcvSTATUS_OUT_OF_MEMORY);
 
                             return gcvSTATUS_OUT_OF_MEMORY;
@@ -7739,6 +7768,15 @@ gceSTATUS _AddEdge(
                         {
                             gcmFOOTER_ARG("status=%d", gcvSTATUS_OUT_OF_MEMORY);
 
+#if LOCAL_MEM_OPTIM
+                            if (otherRegions != gcvNULL)
+                            {
+                                _FreeInt(tContext->IntPool, otherRegions);
+                                otherRegions = gcvNULL;
+                            }
+#else
+                            OVG_SAFE_FREE(context->os, otherRegions);
+#endif
                             return gcvSTATUS_OUT_OF_MEMORY;
                         }
 
@@ -7749,7 +7787,7 @@ gceSTATUS _AddEdge(
                         {
                             gcmFOOTER_ARG("status=%d", gcvSTATUS_OUT_OF_MEMORY);
 
-                            return gcvSTATUS_OUT_OF_MEMORY;
+                            status = gcvSTATUS_OUT_OF_MEMORY;
                         }
 
                         toContinue = gcvTRUE;    /* need to insert lower half */
@@ -7762,7 +7800,7 @@ gceSTATUS _AddEdge(
                         {
                             gcmFOOTER_ARG("status=%d", gcvSTATUS_OUT_OF_MEMORY);
 
-                            return gcvSTATUS_OUT_OF_MEMORY;
+                            status = gcvSTATUS_OUT_OF_MEMORY;
                         }
                     }
 #if LOCAL_MEM_OPTIM
@@ -7774,6 +7812,10 @@ gceSTATUS _AddEdge(
 #else
                     OVG_SAFE_FREE(context->os, otherRegions);
 #endif
+                    if(status != gcvSTATUS_OK)
+                    {
+                        return status;
+                    }
                 }
                 else
                 {

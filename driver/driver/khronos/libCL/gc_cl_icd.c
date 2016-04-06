@@ -129,6 +129,7 @@ cl_int cliIcdDispatchTableCreate(CLIicdDispatchTable **outDispatchTable)
     ICD_DISPATCH_TABLE_ENTRY ( clEnqueueWaitForEvents        );
     ICD_DISPATCH_TABLE_ENTRY ( clEnqueueBarrier              );
     ICD_DISPATCH_TABLE_ENTRY ( clGetExtensionFunctionAddress );
+#if gcdENABLE_CL_GL
     ICD_DISPATCH_TABLE_ENTRY ( clCreateFromGLBuffer          );
     ICD_DISPATCH_TABLE_ENTRY ( clCreateFromGLTexture2D       );
     ICD_DISPATCH_TABLE_ENTRY ( clCreateFromGLTexture3D       );
@@ -137,9 +138,18 @@ cl_int cliIcdDispatchTableCreate(CLIicdDispatchTable **outDispatchTable)
     ICD_DISPATCH_TABLE_ENTRY ( clGetGLTextureInfo            );
     ICD_DISPATCH_TABLE_ENTRY ( clEnqueueAcquireGLObjects     );
     ICD_DISPATCH_TABLE_ENTRY ( clEnqueueReleaseGLObjects     );
-
-    /* cl_khr_gl_sharing */
     ICD_DISPATCH_TABLE_ENTRY ( clGetGLContextInfoKHR         );
+#else
+    ICD_DISPATCH_TABLE_ENTRY ( NULL );
+    ICD_DISPATCH_TABLE_ENTRY ( NULL );
+    ICD_DISPATCH_TABLE_ENTRY ( NULL );
+    ICD_DISPATCH_TABLE_ENTRY ( NULL );
+    ICD_DISPATCH_TABLE_ENTRY ( NULL );
+    ICD_DISPATCH_TABLE_ENTRY ( NULL );
+    ICD_DISPATCH_TABLE_ENTRY ( NULL );
+    ICD_DISPATCH_TABLE_ENTRY ( NULL );
+    ICD_DISPATCH_TABLE_ENTRY ( NULL );
+#endif
 
     /* cl_khr_d3d10_sharing (windows-only) */
     ICD_DISPATCH_TABLE_ENTRY( NULL );
@@ -164,7 +174,11 @@ cl_int cliIcdDispatchTableCreate(CLIicdDispatchTable **outDispatchTable)
     ICD_DISPATCH_TABLE_ENTRY ( /*clReleaseDevice*/NULL);
 
 #if CL_VERSION_1_2
+#if gcdENABLE_CL_GL
     ICD_DISPATCH_TABLE_ENTRY ( clCreateEventFromGLsyncKHR);
+#else
+    ICD_DISPATCH_TABLE_ENTRY( NULL );
+#endif
 
     ICD_DISPATCH_TABLE_ENTRY ( clCreateSubDevices);
     ICD_DISPATCH_TABLE_ENTRY ( clRetainDevice);

@@ -8681,6 +8681,12 @@ gcoHARDWARE_FlushSampling(
     /* Determine enable value. */
     msaaEnable = Hardware->MsaaStates->sampleMask & Hardware->MsaaStates->sampleEnable;
 
+    if 	(!Hardware->features[gcvFEATURE_PSIO_MSAA_CL_FIX] &&
+		(Hardware->SHStates->programState.hints->stageBits & gcvPROGRAM_STAGE_COMPUTE_BIT))
+    {
+        msaaEnable = gcvFALSE;
+    }
+
     if (Hardware->features[gcvFEATURE_MSAA_SHADING])
     {
         if (msaaEnable && (Hardware->MsaaStates->sampleShading || Hardware->MsaaStates->sampleShadingByPS || Hardware->MsaaStates->isSampleIn))
@@ -9817,10 +9823,10 @@ _GetPsOutputSetting(
  1:1)));
 
         *outputMode |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) ((gctUINT32) (_GetPsOutPutMode(Hardware, Hardware->PEStates->colorStates.target[i].surface)) & ((gctUINT32) ((((1 ?
- 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0)));
+ 3:0) - (0 ? 3:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
+ 3:0))) | (((gctUINT32) ((gctUINT32) (_GetPsOutPutMode(Hardware, Hardware->PEStates->colorStates.target[i].surface)) & ((gctUINT32) ((((1 ?
+ 3:0) - (0 ? 3:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
+ 3:0)));
         break;
 
         case 1:
@@ -9831,10 +9837,10 @@ _GetPsOutputSetting(
  2:2)));
 
         *outputMode |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:4) - (0 ? 6:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:4) - (0 ? 6:4) + 1))))))) << (0 ?
- 6:4))) | (((gctUINT32) ((gctUINT32) (_GetPsOutPutMode(Hardware, Hardware->PEStates->colorStates.target[i].surface)) & ((gctUINT32) ((((1 ?
- 6:4) - (0 ? 6:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:4) - (0 ? 6:4) + 1))))))) << (0 ?
- 6:4)));
+ 7:4) - (0 ? 7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
+ 7:4))) | (((gctUINT32) ((gctUINT32) (_GetPsOutPutMode(Hardware, Hardware->PEStates->colorStates.target[i].surface)) & ((gctUINT32) ((((1 ?
+ 7:4) - (0 ? 7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
+ 7:4)));
         break;
 
         case 2:
@@ -9845,10 +9851,10 @@ _GetPsOutputSetting(
  3:3)));
 
         *outputMode |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 10:8) - (0 ? 10:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 10:8) - (0 ? 10:8) + 1))))))) << (0 ?
- 10:8))) | (((gctUINT32) ((gctUINT32) (_GetPsOutPutMode(Hardware, Hardware->PEStates->colorStates.target[i].surface)) & ((gctUINT32) ((((1 ?
- 10:8) - (0 ? 10:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 10:8) - (0 ? 10:8) + 1))))))) << (0 ?
- 10:8)));
+ 11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
+ 11:8))) | (((gctUINT32) ((gctUINT32) (_GetPsOutPutMode(Hardware, Hardware->PEStates->colorStates.target[i].surface)) & ((gctUINT32) ((((1 ?
+ 11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
+ 11:8)));
         break;
 
         case 3:
@@ -9859,10 +9865,10 @@ _GetPsOutputSetting(
  4:4)));
 
         *outputMode |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 14:12) - (0 ? 14:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 14:12) - (0 ? 14:12) + 1))))))) << (0 ?
- 14:12))) | (((gctUINT32) ((gctUINT32) (_GetPsOutPutMode(Hardware, Hardware->PEStates->colorStates.target[i].surface)) & ((gctUINT32) ((((1 ?
- 14:12) - (0 ? 14:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 14:12) - (0 ? 14:12) + 1))))))) << (0 ?
- 14:12)));
+ 15:12) - (0 ? 15:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:12) - (0 ? 15:12) + 1))))))) << (0 ?
+ 15:12))) | (((gctUINT32) ((gctUINT32) (_GetPsOutPutMode(Hardware, Hardware->PEStates->colorStates.target[i].surface)) & ((gctUINT32) ((((1 ?
+ 15:12) - (0 ? 15:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:12) - (0 ? 15:12) + 1))))))) << (0 ?
+ 15:12)));
         break;
 
         case 4:
@@ -9873,10 +9879,10 @@ _GetPsOutputSetting(
  7:7)));
 
         *outputMode |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 18:16) - (0 ? 18:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ?
- 18:16))) | (((gctUINT32) ((gctUINT32) (_GetPsOutPutMode(Hardware, Hardware->PEStates->colorStates.target[i].surface)) & ((gctUINT32) ((((1 ?
- 18:16) - (0 ? 18:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:16) - (0 ? 18:16) + 1))))))) << (0 ?
- 18:16)));
+ 19:16) - (0 ? 19:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ?
+ 19:16))) | (((gctUINT32) ((gctUINT32) (_GetPsOutPutMode(Hardware, Hardware->PEStates->colorStates.target[i].surface)) & ((gctUINT32) ((((1 ?
+ 19:16) - (0 ? 19:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ?
+ 19:16)));
         break;
 
         case 5:
@@ -9887,10 +9893,10 @@ _GetPsOutputSetting(
  15:15)));
 
         *outputMode |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 22:20) - (0 ? 22:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ?
- 22:20))) | (((gctUINT32) ((gctUINT32) (_GetPsOutPutMode(Hardware, Hardware->PEStates->colorStates.target[i].surface)) & ((gctUINT32) ((((1 ?
- 22:20) - (0 ? 22:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 22:20) - (0 ? 22:20) + 1))))))) << (0 ?
- 22:20)));
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 23:20) - (0 ? 23:20) + 1))))))) << (0 ?
+ 23:20))) | (((gctUINT32) ((gctUINT32) (_GetPsOutPutMode(Hardware, Hardware->PEStates->colorStates.target[i].surface)) & ((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 23:20) - (0 ? 23:20) + 1))))))) << (0 ?
+ 23:20)));
         break;
 
         case 6:
@@ -9901,10 +9907,10 @@ _GetPsOutputSetting(
  23:23)));
 
         *outputMode |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:24) - (0 ? 26:24) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ?
- 26:24))) | (((gctUINT32) ((gctUINT32) (_GetPsOutPutMode(Hardware, Hardware->PEStates->colorStates.target[i].surface)) & ((gctUINT32) ((((1 ?
- 26:24) - (0 ? 26:24) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:24) - (0 ? 26:24) + 1))))))) << (0 ?
- 26:24)));
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 27:24) - (0 ? 27:24) + 1))))))) << (0 ?
+ 27:24))) | (((gctUINT32) ((gctUINT32) (_GetPsOutPutMode(Hardware, Hardware->PEStates->colorStates.target[i].surface)) & ((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 27:24) - (0 ? 27:24) + 1))))))) << (0 ?
+ 27:24)));
         break;
 
         case 7:
@@ -9915,10 +9921,10 @@ _GetPsOutputSetting(
  31:31)));
 
         *outputMode |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 30:28) - (0 ? 30:28) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ?
- 30:28))) | (((gctUINT32) ((gctUINT32) (_GetPsOutPutMode(Hardware, Hardware->PEStates->colorStates.target[i].surface)) & ((gctUINT32) ((((1 ?
- 30:28) - (0 ? 30:28) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 30:28) - (0 ? 30:28) + 1))))))) << (0 ?
- 30:28)));
+ 31:28) - (0 ? 31:28) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:28) - (0 ? 31:28) + 1))))))) << (0 ?
+ 31:28))) | (((gctUINT32) ((gctUINT32) (_GetPsOutPutMode(Hardware, Hardware->PEStates->colorStates.target[i].surface)) & ((gctUINT32) ((((1 ?
+ 31:28) - (0 ? 31:28) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:28) - (0 ? 31:28) + 1))))))) << (0 ?
+ 31:28)));
         break;
 
         default:
@@ -11044,7 +11050,7 @@ gcoHARDWARE_FlushShaders(
  15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0E22, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0E22, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  6:0) - (0 ? 6:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
  6:0))) | (((gctUINT32) ((gctUINT32) (hints->ptSzAttrIndex * 4) & ((gctUINT32) ((((1 ?
  6:0) - (0 ? 6:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?

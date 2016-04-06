@@ -246,15 +246,29 @@ typedef slsSLINK_NODE    slsSLINK_LIST;
 
 #define slmSLINK_LIST_Prepend(list, toList) \
       do { \
-    if( !slmSLINK_LIST_IsEmpty(list) ) { \
-      if(slmSLINK_LIST_IsEmpty(toList)) (toList) = (list); \
-      else { \
-        slsSLINK_NODE *tmp; \
-        tmp = (list)->next; \
-        (list)->next = (toList)->next; \
-            (toList)->next = tmp; \
-      } \
-    } \
+          if( !slmSLINK_LIST_IsEmpty(list) ) { \
+            if(slmSLINK_LIST_IsEmpty(toList)) (toList) = (list); \
+            else { \
+              slsSLINK_NODE *tmp; \
+              tmp = (list)->next; \
+              (list)->next = (toList)->next; \
+                  (toList)->next = tmp; \
+            } \
+          } \
+      } while (gcvFALSE)
+
+
+#define slmSLINK_LIST_Append(list, toList) \
+      do { \
+          if( !slmSLINK_LIST_IsEmpty(list) ) { \
+            if(!slmSLINK_LIST_IsEmpty(toList)) { \
+              slsSLINK_NODE *tmp; \
+              tmp = (toList)->next; \
+              (toList)->next = (list)->next; \
+              (list)->next = tmp; \
+            } \
+            (toList) = (list); \
+          } \
       } while (gcvFALSE)
 
 #endif /* __gc_cl_list_h_ */

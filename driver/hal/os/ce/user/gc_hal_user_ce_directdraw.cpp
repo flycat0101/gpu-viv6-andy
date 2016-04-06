@@ -873,6 +873,21 @@ gcoOS_SetDisplayVirtualEx(
 }
 
 gceSTATUS
+gcoOS_CancelDisplayBackbuffer(
+    IN HALNativeDisplayType Display,
+    IN HALNativeWindowType Window,
+    IN gctPOINTER Context,
+    IN gcoSURF Surface,
+    IN gctUINT Offset,
+    IN gctINT X,
+    IN gctINT Y
+    )
+{
+    gcmPRINT("%s: TODO", __FUNCTION__);
+    return gcvSTATUS_NOT_SUPPORTED;
+}
+
+gceSTATUS
 gcoOS_DrawImageEx(
     IN HALNativeDisplayType Display,
     IN HALNativeWindowType Window,

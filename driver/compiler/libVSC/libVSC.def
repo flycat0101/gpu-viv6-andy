@@ -60,6 +60,8 @@ EXPORTS
     gcSHADER_AddOutputLocation
     gcSHADER_AddRoundingMode
     gcSHADER_AddSaturation
+    gcSHADER_UpdateTargetPacked
+    gcSHADER_UpdateSourcePacked
     gcSHADER_NewTempRegs
     gcSHADER_AddSource
     gcSHADER_AddSourceAttribute
@@ -222,7 +224,9 @@ EXPORTS
 	gcSHADER_Has64BitOperation
 	gceLAYOUT_QUALIFIER_HasHWNotSupportingBlendMode
     gcCreateDepthComparisonDirective
-    gcCreateYFlippedTextureDirective
+    gcCreateyFlippedTextureDirective
+    gcCreateAlphaBlendDirective
+    gcCreateDepthBiasDirective
     gcIsSameDepthComparisonDirectiveExist
 	gcIsSameInputDirectiveExist
     gcCreateInputConversionDirective
@@ -268,6 +272,7 @@ EXPORTS
     gcSHADER_CheckClipW
     gcSHADER_ConvertIntOrUIntAttribute
     gcSHADER_FreeRecompilerLibrary
+    gcSHADER_FreeBlendLibrary
     gcLoadCLPatchLibrary
     gcSHADER_DumpSource
     gcSHADER_DoPatch

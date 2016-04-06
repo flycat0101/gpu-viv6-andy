@@ -310,6 +310,12 @@ typedef struct
 /*    global image2d_t* levels;*/
 } vx_pyramid;
 
+typedef struct _vxc_pyramid
+{
+    int level;
+    _viv_image2d_array_t  imageArray;
+} vxc_pyramid;
+
 typedef vxc_512bits VXC_512Bits;
 typedef vxc_modifier VXC_Modifier_t ;
 typedef vxc_round_mode VXC_RoundMode;

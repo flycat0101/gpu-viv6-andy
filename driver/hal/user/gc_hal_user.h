@@ -2883,8 +2883,8 @@ gceSTATUS
 gcoHARDWARE_ProbeCounter(
     IN gcoHARDWARE Hardware,
     IN gctUINT32 address,
-    IN gctUINT32 module,
-    IN gctUINT32 counter
+    IN gceCOUNTER module,
+    IN gctBOOL enable
     );
 #endif
 
@@ -2985,6 +2985,11 @@ gcoBUFFER_Commit(
     IN gcoQUEUE Queue,
     OUT gctPOINTER *DumpLogical,
     OUT gctUINT32 *DumpBytes
+    );
+
+gceSTATUS
+gcoBUFFER_IsEmpty(
+    IN gcoBUFFER Buffer
     );
 
 #if gcdENABLE_3D

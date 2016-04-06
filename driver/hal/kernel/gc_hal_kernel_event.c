@@ -2356,6 +2356,7 @@ gckEVENT_Notify(
         if (pending & 0x80000000)
         {
             gcmkPRINT("AXI BUS ERROR");
+            gckHARDWARE_DumpGPUState(Event->kernel->hardware);
             pending &= 0x7FFFFFFF;
         }
 

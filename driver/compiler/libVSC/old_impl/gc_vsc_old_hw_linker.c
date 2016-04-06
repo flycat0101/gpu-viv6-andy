@@ -3791,6 +3791,16 @@ _MapAttributesRAEnabled(
                     continue;
                 }
 
+                /* Check for special SAMPLE_POSITION attribute. */
+                if (attribute->nameLength == gcSL_SAMPLE_POSITION)
+                {
+                    gcmASSERT(CodeGen->shaderType == gcSHADER_TYPE_FRAGMENT);
+
+                    gcmASSERT(Hints != gcvNULL);
+                    Hints->useSamplePosition = gcvTRUE;
+                    continue;
+                }
+
                 if (attribute->nameLength == gcSL_POINT_COORD)
                 {
                     gctINT j;
@@ -3927,6 +3937,16 @@ _MapAttributes(
                                                                             attribute->index,
                                                                             gcmComposeSwizzle(j, j, j, j));
                     }
+                    continue;
+                }
+
+                /* Check for special SAMPLE_POSITION attribute. */
+                if (attribute->nameLength == gcSL_SAMPLE_POSITION)
+                {
+                    gcmASSERT(CodeGen->shaderType == gcSHADER_TYPE_FRAGMENT);
+
+                    gcmASSERT(Hints != gcvNULL);
+                    Hints->useSamplePosition = gcvTRUE;
                     continue;
                 }
 
@@ -4109,6 +4129,16 @@ _MapAttributesDual16RAEnabled(
                     continue;
                 }
 
+                /* Check for special SAMPLE_POSITION attribute. */
+                if (attribute->nameLength == gcSL_SAMPLE_POSITION)
+                {
+                    gcmASSERT(CodeGen->shaderType == gcSHADER_TYPE_FRAGMENT);
+
+                    gcmASSERT(Hints != gcvNULL);
+                    Hints->useSamplePosition = gcvTRUE;
+                    continue;
+                }
+
                 /* Check for special FRONT_FACING attribute. */
                 if (attribute->nameLength == gcSL_FRONT_FACING)
                 {
@@ -4237,6 +4267,16 @@ _MapAttributesDual16(
                                                                                 attribute->index,
                                                                                 gcmComposeSwizzle(j, j, j, j));
                         }
+                        continue;
+                    }
+
+                    /* Check for special SAMPLE_POSITION attribute. */
+                    if (attribute->nameLength == gcSL_SAMPLE_POSITION)
+                    {
+                        gcmASSERT(CodeGen->shaderType == gcSHADER_TYPE_FRAGMENT);
+
+                        gcmASSERT(Hints != gcvNULL);
+                        Hints->useSamplePosition = gcvTRUE;
                         continue;
                     }
 
@@ -4383,6 +4423,16 @@ _MapAttributesDual16(
                                                                             attribute->index,
                                                                             gcmComposeSwizzle(j, j, j, j));
                     }
+                    continue;
+                }
+
+                /* Check for special SAMPLE_POSITION attribute. */
+                if (attribute->nameLength == gcSL_SAMPLE_POSITION)
+                {
+                    gcmASSERT(CodeGen->shaderType == gcSHADER_TYPE_FRAGMENT);
+
+                    gcmASSERT(Hints != gcvNULL);
+                    Hints->useSamplePosition = gcvTRUE;
                     continue;
                 }
 
@@ -15388,6 +15438,7 @@ _GenerateStates(
     gctUINT32_PTR constAddr = gcvNULL;
     gctINT32  output2RTIndex[gcdMAX_DRAW_BUFFERS];
     gctUINT32 shaderConfigData = 0;
+    gctPOINTER instPtr = gcvNULL;
 
     gcoHAL_GetHardware(gcvNULL, &Hardware);
     gcmASSERT(Hardware);
@@ -18716,7 +18767,6 @@ _GenerateStates(
 #endif
         if (Hints != gcvNULL)
         {
-            gctPOINTER instPtr = gcvNULL;
 
             gcmONERROR(gcoOS_Allocate(gcvNULL,
                        size,
@@ -18795,6 +18845,7 @@ _GenerateStates(
             }
 
             gcoOS_Free(gcvNULL, instPtr);
+            instPtr = gcvNULL;
         }
 
         /* Set I-Cache states. */
@@ -19025,6 +19076,12 @@ OnError:
    if (BinaryShaderCode)
        gcoOS_Free(gcvNULL, BinaryShaderCode);
 #endif
+
+    if (instPtr != gcvNULL)
+    {
+        gcoOS_Free(gcvNULL, instPtr);
+    }
+
 
     /* Return the status. */
     return status;
@@ -19662,6 +19719,7 @@ gcLINKTREE_GenerateStates(
     (*Hints)->useDSX = (codeInfo.codeCounter[gcSL_DSX] != 0);
     (*Hints)->useDSY = (codeInfo.codeCounter[gcSL_DSY] != 0);
     (*Hints)->yInvertAware = (*Hints)->useFragCoord[1]   ||
+                             (*Hints)->useSamplePosition    ||
                              (*Hints)->useFrontFacing    ||
                              (*Hints)->usePointCoord[1]  ||
                              (*Hints)->useDSY;

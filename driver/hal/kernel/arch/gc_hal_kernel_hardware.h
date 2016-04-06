@@ -327,6 +327,14 @@ gckHARDWARE_GetFrameInfo(
     }\
     while (0) ; \
 
+gceSTATUS
+gckHARDWARE_DummyDraw(
+    IN gckHARDWARE Hardware,
+    IN gctPOINTER Logical,
+    IN gctUINT32 Address,
+    IN OUT gctUINT32 * Bytes
+    );
+
 #ifdef __cplusplus
 }
 #endif

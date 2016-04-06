@@ -409,10 +409,10 @@ install: $(TARGET_OUTPUT) extra_install
 extra_install: $(TARGET_OUTPUT)
 	@-mkdir -p $(INSTALL_DIR)
 ifeq ($(gcdSTATIC_LINK), 0)
-  ifeq ($(EGL_API_FB)_$(EGL_API_WL), 1_0)
+  ifeq ($(EGL_API_FB)_$(EGL_API_WL), 1_1)
 	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.wl.so
   endif # EGL_API_FB
-  ifeq ($(EGL_API_FB)_$(EGL_API_WL), 1_1)
+  ifeq ($(EGL_API_FB)_$(EGL_API_WL), 1_0)
 	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.fb.so
   endif # EGL_API_WL
   ifeq ($(EGL_API_DRI), 1)

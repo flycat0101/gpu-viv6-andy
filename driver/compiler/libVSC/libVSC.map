@@ -44,6 +44,8 @@
     gcSHADER_AddOutputLocation;
     gcSHADER_AddRoundingMode;
     gcSHADER_AddSaturation;
+    gcSHADER_UpdateTargetPacked;
+    gcSHADER_UpdateSourcePacked;
     gcSHADER_NewTempRegs;
     gcSHADER_AddSource;
     gcSHADER_AddSourceAttribute;
@@ -195,7 +197,7 @@
     gcSHADER_GetVertexInstIdInputIndex;
     gcSHADER_FindNextUsedLabelId;
     gcCreateDepthComparisonDirective;
-    gcCreateYFlippedTextureDirective;
+    gcCreateyFlippedTextureDirective;
     gcIsSameInputDirectiveExist;
     gcIsSameDepthComparisonDirectiveExist;
     gcCreateInputConversionDirective;
@@ -213,6 +215,8 @@
     gcQueryFormatConvertionDirectiveSampler;
     gcCreateYFlippedShaderDirective;
     gcCreateSampleMaskDirective;
+	gcCreateAlphaBlendDirective;
+	gcCreateDepthBiasDirective;
     gcCreateTcsInputMismatch;
     gcQueryOutputConversionDirective;
     gcSHADER_DynamicPatch;
@@ -238,6 +242,7 @@
     gcSHADER_FindListByData;
 	gcSHADER_GetNotStagesRelatedLinkError;
 	gcSHADER_SetNotStagesRelatedLinkError;
+	gcSHADER_FreeBlendLibrary;
 	gcSHADER_Has64BitOperation;
 	gceLAYOUT_QUALIFIER_HasHWNotSupportingBlendMode;
     gcLoadCLPatchLibrary;

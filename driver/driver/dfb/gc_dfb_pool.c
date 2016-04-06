@@ -418,16 +418,6 @@ galDeallocateBuffer( CoreSurfacePool       *pool,
     int ret=0;
     GalAllocationData *alloc = alloc_data;
 
-    D_ASSERT( pool        != NULL );
-    D_ASSERT( pool_data   != NULL );
-    D_ASSERT( pool_local  != NULL );
-    D_ASSERT( buffer      != NULL );
-    D_ASSERT( allocation  != NULL );
-    D_ASSERT( alloc_data  != NULL );
-    D_ASSERT( alloc->surf != NULL );
-
-    D_MAGIC_ASSERT( pool, CoreSurfacePool );
-    D_MAGIC_ASSERT( buffer, CoreSurfaceBuffer );
     D_MAGIC_ASSERT( alloc, GalAllocationData );
 
     D_DEBUG_ENTER( Gal_Pool,
@@ -441,10 +431,12 @@ galDeallocateBuffer( CoreSurfacePool       *pool,
     */
 
     /* fusion_call_execute the DFB slave form the master through fusion_call_execute*/
-    ret = fusion_call_execute( &alloc->call, FCEF_ONEWAY, 0, alloc->surf, NULL );
+    if (alloc->surf) {
+        ret = fusion_call_execute( &alloc->call, FCEF_ONEWAY, 0, alloc->surf, NULL );
 
-    if (ret)
-        D_WARN( "SurfPool/Gal: Could not call buffer Slave owner to free it there!\n" );
+        if (ret)
+            D_WARN( "SurfPool/Gal: Could not call buffer Slave owner to free it there!\n" );
+    }
 
     alloc->surf = NULL;
     alloc->prealloc_addr = gcvNULL;

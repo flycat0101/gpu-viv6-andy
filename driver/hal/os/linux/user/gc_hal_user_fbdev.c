@@ -1006,6 +1006,75 @@ gcoOS_SetDisplayVirtualEx(
 }
 
 gceSTATUS
+gcoOS_CancelDisplayBackbuffer(
+    IN HALNativeDisplayType Display,
+    IN HALNativeWindowType Window,
+    IN gctPOINTER Context,
+    IN gcoSURF Surface,
+    IN gctUINT Offset,
+    IN gctINT X,
+    IN gctINT Y
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    struct _FBDisplay* display;
+
+    gcmHEADER_ARG("Display=0x%x Window=0x%x Offset=%u X=%d Y=%d", Display, Window, Offset, X, Y);
+
+    /*
+     * This section may be called in a different thread, while main thread is
+     * trying to free the display struct.
+     * We must protect the display struct when the thread is running inside.
+     */
+    pthread_mutex_lock(&displayMutex);
+
+    for (display = displayStack; display != NULL; display = display->next)
+    {
+        if (display == (struct _FBDisplay*) Display)
+        {
+            /* Found display. */
+            break;
+        }
+    }
+
+    if (display == NULL)
+    {
+        pthread_mutex_unlock(&displayMutex);
+        status = gcvSTATUS_INVALID_ARGUMENT;
+        gcmFOOTER();
+        return status;
+    }
+
+    if (display->multiBuffer > 1)
+    {
+        gctINT next;
+        pthread_mutex_lock(&display->condMutex);
+
+        next = (Y + display->height);
+        if (next >= (int) display->varInfo.yres_virtual)
+        {
+            next = 0;
+        }
+
+        if (next != display->backBufferY)
+        {
+            gcmPRINT("%s: Canceling non-last buffer", __func__);
+        }
+
+        /* Roll back the buffer. */
+        display->backBufferY = Y;
+
+        pthread_mutex_unlock(&display->condMutex);
+    }
+
+    pthread_mutex_unlock(&displayMutex);
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return status;
+}
+
+gceSTATUS
 gcoOS_SetSwapInterval(
     IN HALNativeDisplayType Display,
     IN gctINT Interval

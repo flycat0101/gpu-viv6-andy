@@ -928,6 +928,38 @@ gcoSURF CDECL GalLoadDIB2Surface(gcoHAL hal, const char *filename)
                     surfDepth = 4;
                     biDepth = 4;
                 }
+                else if (info->mask[0] == 0xFFC00000
+                    && info->mask[1] == 0x003FF000
+                    && info->mask[2] == 0x00000FFC)
+                {
+                    format = gcvSURF_R10G10B10A2;
+                    surfDepth = 4;
+                    biDepth = 4;
+                }
+                else if (info->mask[0] == 0x00000FFC
+                    && info->mask[1] == 0x003FF000
+                    && info->mask[2] == 0xFFC00000)
+                {
+                    format = gcvSURF_B10G10R10A2;
+                    surfDepth = 4;
+                    biDepth = 4;
+                }
+                else if (info->mask[0] == 0x3FF00000
+                    && info->mask[1] == 0x000FFC00
+                    && info->mask[2] == 0x000003FF)
+                {
+                    format = gcvSURF_A2R10G10B10;
+                    surfDepth = 4;
+                    biDepth = 4;
+                }
+                else if (info->mask[0] == 0x000003FF
+                    && info->mask[1] == 0x000FFC00
+                    && info->mask[2] == 0x3FF00000)
+                {
+                    format = gcvSURF_A2B10G10R10;
+                    surfDepth = 4;
+                    biDepth = 4;
+                }
                 else
                 {
                     GalOutput(GalOutputType_Error, "*ERROR* unsupported format");
@@ -2506,6 +2538,34 @@ gceSTATUS GalSaveTSurfToDIB(
         bitCount = 16;
         break;
 
+    case gcvSURF_R10G10B10A2:
+        bitmap.mask[0] = 0xFFC00000;
+        bitmap.mask[1] = 0x003FF000;
+        bitmap.mask[2] = 0x00000FFC;
+        bitCount = 32;
+        break;
+
+    case gcvSURF_B10G10R10A2:
+        bitmap.mask[0] = 0x00000FFC;
+        bitmap.mask[1] = 0x003FF000;
+        bitmap.mask[2] = 0xFFC00000;
+        bitCount = 32;
+        break;
+
+    case gcvSURF_A2R10G10B10:
+        bitmap.mask[0] = 0x3FF00000;
+        bitmap.mask[1] = 0x000FFC00;
+        bitmap.mask[2] = 0x000003FF;
+        bitCount = 32;
+        break;
+
+    case gcvSURF_A2B10G10R10:
+        bitmap.mask[0] = 0x000003FF;
+        bitmap.mask[1] = 0x000FFC00;
+        bitmap.mask[2] = 0x3FF00000;
+        bitCount = 32;
+        break;
+
     default:
         gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
@@ -3346,6 +3406,14 @@ gceSTATUS GalQueryBpp(gceSURF_FORMAT Format, gctUINT *Bpp)
     case gcvSURF_B8G8R8A8:
     case gcvSURF_X8B8G8R8:
     case gcvSURF_A8B8G8R8:
+    case gcvSURF_A2B10G10R10:
+    case gcvSURF_A2R10G10B10:
+    case gcvSURF_R10G10B10A2:
+    case gcvSURF_B10G10R10A2:
+    case gcvSURF_NV12_10BIT:
+    case gcvSURF_NV21_10BIT:
+    case gcvSURF_NV16_10BIT:
+    case gcvSURF_NV61_10BIT:
         *Bpp = 4;
         break;
 
@@ -3433,7 +3501,7 @@ gceSTATUS GalCreateTSurfWithPool(
         {
             if (Tiling == gcvTILED)
             {
-                if (TileStatusConfig == gcv2D_TSC_V4_COMPRESSED_256B)
+                if (TileStatusConfig & gcv2D_TSC_V4_COMPRESSED_256B)
                 {
                     alignedWidth = gcmALIGN(Width, 256);
                     alignedHeight = gcmALIGN(Height, 256);
@@ -3502,7 +3570,8 @@ gceSTATUS GalCreateTSurfWithPool(
     }
     surf->vNode.pool = Pool;
 
-    if (TileStatusConfig & gcv2D_TSC_DOWN_SAMPLER)
+    if ((TileStatusConfig & gcv2D_TSC_DOWN_SAMPLER) &&
+        !(TileStatusConfig & gcv2D_TSC_V4_COMPRESSED))
     {
         alignedBase = 1024;
         surf->vNode.size *= 4;
@@ -3605,7 +3674,8 @@ gceSTATUS GalCreateTSurfWithPool(
             surf->tileStatusNode.size);
 #endif
 
-        if (TileStatusConfig & gcv2D_TSC_DOWN_SAMPLER)
+        if ((TileStatusConfig & gcv2D_TSC_DOWN_SAMPLER) &&
+            !(TileStatusConfig & gcv2D_TSC_V4_COMPRESSED))
         {
             surf->stride[0] *= 2;
         }
@@ -3688,6 +3758,34 @@ gceSTATUS GalCreateTSurfWithPool(
                     surf->stride[0] = alignedWidth;
                     surf->stride[1] = alignedWidth;
                 }
+
+                size = surf->stride[0] * alignedHeight;
+                surf->address[1] = surf->address[0] + size + offset;
+                surf->logical[1] = GAL_POINTER_OFFSET(surf->logical[0], size + offset);
+            }
+            break;
+
+        case gcvSURF_NV12_10BIT:
+        case gcvSURF_NV21_10BIT:
+            {
+                gctUINT32 size;
+
+                surf->validAddressNum = surf->validStrideNum = 2;
+                surf->stride[0] = surf->stride[1] = (gctUINT32)((float)alignedWidth * 1.25);
+
+                size = surf->stride[0] * alignedHeight;
+                surf->address[1] = surf->address[0] + size + offset;
+                surf->logical[1] = GAL_POINTER_OFFSET(surf->logical[0], size + offset);
+            }
+            break;
+
+        case gcvSURF_NV16_10BIT:
+        case gcvSURF_NV61_10BIT:
+            {
+                gctUINT32 size;
+
+                surf->validAddressNum = surf->validStrideNum = 2;
+                surf->stride[0] = surf->stride[1] = (gctUINT32)((float)alignedWidth * 1.25);
 
                 size = surf->stride[0] * alignedHeight;
                 surf->address[1] = surf->address[0] + size + offset;
@@ -4040,6 +4138,19 @@ gceSTATUS GalLoadVimgToTSurfWithPool(
 	    }
 	}
 
+	if (surf->format == gcvSURF_YV12)
+	{
+		gctUINT32 phyT;
+		gctPOINTER logT;
+		phyT = surf->address[1];
+		surf->address[1] = surf->address[2];
+		surf->address[2] = phyT;
+
+		logT = surf->logical[1];
+		surf->logical[1] = surf->logical[2];
+		surf->logical[2] = logT;
+	}
+
         if (v2 != gcvNULL)
         {
             gcmONERROR(gcoOS_Seek(
@@ -4111,7 +4222,7 @@ gceSTATUS CDECL GalLoadVimgToSurface(
         gctUINT32 address[3] = {0, 0, 0};
         gctUINT32 width[3] = {0, 0, 0};
         gctUINT32 height[3] = {0, 0, 0};
-        gctUINT32 bpp[3] = {0, 0, 0};
+        gctFLOAT bpp[3] = {0.0, 0.0, 0.0};
         gctUINT nPlane, n, i;
         gcoSURF surf;
         gceSURF_FORMAT format;
@@ -4248,6 +4359,17 @@ gceSTATUS CDECL GalLoadVimgToSurface(
             bpp[1] = 2;
             break;
 
+        case gcvSURF_NV61:
+            format = gcvSURF_NV61;
+            nPlane = 2;
+            width[0] = head.imageWidth;
+            height[0] = head.imageHeight;
+            bpp[0] = 1;
+            width[1] = head.imageWidth / 2;
+            height[1] = head.imageHeight;
+            bpp[1] = 2;
+            break;
+
         case gcvSURF_NV12:
             format = gcvSURF_NV12;
             nPlane = 2;
@@ -4270,15 +4392,49 @@ gceSTATUS CDECL GalLoadVimgToSurface(
             bpp[1] = 2;
             break;
 
-        case gcvSURF_NV61:
-            format = gcvSURF_NV61;
+
+        case gcvSURF_NV16_10BIT:
+            format = gcvSURF_NV16_10BIT;
             nPlane = 2;
             width[0] = head.imageWidth;
             height[0] = head.imageHeight;
-            bpp[0] = 1;
+            bpp[0] = 1.25;
             width[1] = head.imageWidth / 2;
             height[1] = head.imageHeight;
-            bpp[1] = 2;
+            bpp[1] = 2.5;
+            break;
+
+        case gcvSURF_NV61_10BIT:
+            format = gcvSURF_NV16_10BIT;
+            nPlane = 2;
+            width[0] = head.imageWidth;
+            height[0] = head.imageHeight;
+            bpp[0] = 1.25;
+            width[1] = head.imageWidth / 2;
+            height[1] = head.imageHeight;
+            bpp[1] = 2.5;
+            break;
+
+        case gcvSURF_NV12_10BIT:
+            format = gcvSURF_NV12_10BIT;
+            nPlane = 2;
+            width[0] = head.imageWidth;
+            height[0] = head.imageHeight;
+            bpp[0] = 1.25;
+            width[1] = head.imageWidth / 2;
+            height[1] = head.imageHeight;
+            bpp[1] = 2.5;
+            break;
+
+        case gcvSURF_NV21_10BIT:
+            format = gcvSURF_NV21_10BIT;
+            nPlane = 2;
+            width[0] = head.imageWidth;
+            height[0] = head.imageHeight;
+            bpp[0] = 1.25;
+            width[1] = head.imageWidth / 2;
+            height[1] = head.imageHeight;
+            bpp[1] = 2.5;
             break;
 
         default:
@@ -4299,8 +4455,8 @@ gceSTATUS CDECL GalLoadVimgToSurface(
             gcmONERROR(gcvSTATUS_INVALID_DATA);
         }
 
-        aStride = alignedWidth * bpp[0];
-        lineSize = width[0] * bpp[0];
+        aStride = (gctUINT32)((gctFLOAT)alignedWidth * bpp[0]);
+        lineSize = (gctUINT32)((gctFLOAT)width[0] * bpp[0]);
 
         gcmONERROR(gcoOS_Seek(
                 gcvNULL,
@@ -4336,8 +4492,8 @@ gceSTATUS CDECL GalLoadVimgToSurface(
 
         if (nPlane > 1)
         {
-            gctUINT aStride1 = (alignedWidth/2) * bpp[1];
-            gctUINT lineSize1 = width[1] * bpp[1];
+            gctUINT aStride1 = (gctUINT32)((gctFLOAT)(alignedWidth/2) * bpp[1]);
+            gctUINT lineSize1 = (gctUINT32)((gctFLOAT)width[1] * bpp[1]);
 
             if (memory[1] == gcvNULL)
             {
@@ -4384,8 +4540,8 @@ gceSTATUS CDECL GalLoadVimgToSurface(
                     gcmONERROR(gcvSTATUS_INVALID_DATA);
                 }
 
-                aStride2 = (alignedWidth/2) * bpp[2];
-                lineSize2 = width[2] * bpp[2];
+                aStride2 = (gctUINT32)((alignedWidth/2) * bpp[2]);
+                lineSize2 = (gctUINT32)(width[2] * bpp[2]);
                 for (n = 0; n < height[2]; n++)
                 {
                     /* Fill plane 3. */
@@ -5230,6 +5386,10 @@ gceSTATUS CDECL GalQueryUVStride(
     case gcvSURF_NV12:
     case gcvSURF_NV61:
     case gcvSURF_NV21:
+    case gcvSURF_NV16_10BIT:
+    case gcvSURF_NV61_10BIT:
+    case gcvSURF_NV12_10BIT:
+    case gcvSURF_NV21_10BIT:
         *uStride = yStride;
         *vStride = 0;
         break;
@@ -5256,6 +5416,10 @@ GalIsYUVFormat(IN gceSURF_FORMAT Format)
     case gcvSURF_NV12:
     case gcvSURF_NV61:
     case gcvSURF_NV21:
+    case gcvSURF_NV16_10BIT:
+    case gcvSURF_NV61_10BIT:
+    case gcvSURF_NV12_10BIT:
+    case gcvSURF_NV21_10BIT:
 
         return gcvSTATUS_TRUE;
 
@@ -5882,7 +6046,6 @@ gctBOOL CDECL GalIsBigEndian()
     return (*(gctUINT8 *)&data == 0xff);
 }
 
-
 gceSTATUS CDECL GalLoadFileToTSurf(
     IN gctCONST_STRING FileName,
     IN T2D_SURF_PTR *TSurf)
@@ -6170,7 +6333,7 @@ gceSTATUS CDECL GalLoadFileToTSurfWithPool(
 }
 
 static
-gceSTATUS CDECL GalLoadDECTPCRawToTSurfWithPool(
+gceSTATUS CDECL GalLoadSpecialRawToTSurfWithPool(
     IN gctCONST_STRING DataName0,
     IN gctCONST_STRING DataName1,
     IN gctCONST_STRING DataName2,
@@ -6181,7 +6344,7 @@ gceSTATUS CDECL GalLoadDECTPCRawToTSurfWithPool(
     IN gctUINT32 ImageHeight,
     IN gceTILING Tiling,
     IN gceSURF_FORMAT Format,
-    IN gctBOOL Compressed,
+    IN gce2D_TILE_STATUS_CONFIG TileStatusConfig,
     IN gcePOOL Pool,
     OUT T2D_SURF_PTR *TSurf
     )
@@ -6211,6 +6374,21 @@ gceSTATUS CDECL GalLoadDECTPCRawToTSurfWithPool(
             bpp[1] = 2;
             break;
 
+        case gcvSURF_R5G6B5:
+            nPlane = 1;
+            width[0] = ImageWidth;
+            height[0] = ImageHeight;
+            bpp[0] = 2;
+            break;
+
+        case gcvSURF_A8R8G8B8:
+        case gcvSURF_X8R8G8B8:
+            nPlane = 1;
+            width[0] = ImageWidth;
+            height[0] = ImageHeight;
+            bpp[0] = 4;
+            break;
+
         default:
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
             break;
@@ -6219,7 +6397,7 @@ gceSTATUS CDECL GalLoadDECTPCRawToTSurfWithPool(
     gcmONERROR(GalCreateTSurfWithPool(
         gcvNULL,
         Format, Tiling,
-        Compressed ? gcv2D_TSC_DEC_TPC_TILED_COMPRESSED : gcv2D_TSC_DEC_TPC_TILED,
+        TileStatusConfig,
         ImageWidth, ImageHeight,
         Pool, &surf));
 
@@ -6547,13 +6725,41 @@ gceSTATUS CDECL GalLoadDECTPCRawToTSurf(
     OUT T2D_SURF_PTR *TSurf
     )
 {
-    return GalLoadDECTPCRawToTSurfWithPool(
+    return GalLoadSpecialRawToTSurfWithPool(
         DataName0, DataName1, DataName2,
         TableName0, TableName1, TableName2,
         ImageWidth, ImageHeight,
-        Tiling, Format, Compressed,
+        Tiling, Format,
+        Compressed ? gcv2D_TSC_DEC_TPC_TILED_COMPRESSED : gcv2D_TSC_DEC_TPC_TILED,
         gcvPOOL_DEFAULT,
         TSurf);
+}
+
+gceSTATUS CDECL GalLoadVMSAARawToTSurf(
+    IN gctCONST_STRING DataName,
+    IN gctCONST_STRING TileStatusName,
+    IN gctUINT32 ImageWidth,
+    IN gctUINT32 ImageHeight,
+    IN gceTILING Tiling,
+    IN gceSURF_FORMAT Format,
+    IN gce2D_TILE_STATUS_CONFIG TileStatusConfig,
+    OUT T2D_SURF_PTR *TSurf
+    )
+{
+    gceSTATUS status;
+
+    status = GalLoadSpecialRawToTSurfWithPool(
+        DataName, gcvNULL, gcvNULL,
+        TileStatusName, gcvNULL, gcvNULL,
+        ImageWidth, ImageHeight,
+        Tiling, Format,
+        TileStatusConfig,
+        gcvPOOL_DEFAULT,
+        TSurf);
+
+    (*TSurf)->tileStatusClear = 0xDEADDEAD;
+
+    return status;
 }
 
 #define POOL_SIZE 1024
@@ -7149,16 +7355,15 @@ const struct FeatureInfo
     {"gcvFEATURE_2DPE20 " , "PE2.0 and related function", gcvFEATURE_2DPE20, gcvFALSE},
     {"gcvFEATURE_2D_BITBLIT_FULLROTATION " , "Flip_Y or Full rotation", gcvFEATURE_2D_BITBLIT_FULLROTATION, gcvFALSE},
     {"gcvFEATURE_2D_DITHER " , "Dither", gcvFEATURE_2D_DITHER, gcvFALSE},
-    {"gcvFEATURE_2D_ALL_QUAD " , "One pass filterblit", gcvFEATURE_2D_ALL_QUAD, gcvFALSE},
     {"gcvFEATURE_YUV420_SCALER " , "YUV420 scaler", gcvFEATURE_YUV420_SCALER, gcvFALSE},
     {"gcvFEATURE_2D_OPF_YUV_OUTPUT " , "YUV output of opf", gcvFEATURE_2D_OPF_YUV_OUTPUT, gcvFALSE},
     {"gcvFEATURE_2D_TILING " , "Tilling", gcvFEATURE_2D_TILING, gcvFALSE},
     {"gcvFEATURE_2D_FILTERBLIT_FULLROTATION " , "Filterblit full rotation", gcvFEATURE_2D_FILTERBLIT_FULLROTATION, gcvFALSE},
     {"gcvFEATURE_2D_FILTERBLIT_A8_ALPHA " , "Filterblit with A8 alphablend", gcvFEATURE_2D_FILTERBLIT_A8_ALPHA, gcvFALSE},
     {"gcvFEATURE_2D_FILTERBLIT_PLUS_ALPHABLEND " , "Filter with alphablend", gcvFEATURE_2D_FILTERBLIT_PLUS_ALPHABLEND, gcvFALSE},
-    {"gcvFEATURE_SCALER " , "Filterblit", gcvFEATURE_SCALER, gcvFALSE},
-    {"gcvFEATURE_2D_ONE_PASS_FILTER " , "2D one pass filter", gcvFEATURE_2D_ONE_PASS_FILTER, gcvFALSE},
-    {"gcvFEATURE_2D_ONE_PASS_FILTER_TAP " , "One pass filter with 7/9 tap", gcvFEATURE_2D_ONE_PASS_FILTER_TAP, gcvFALSE},
+    {"gcvFEATURE_SCALER " , "2D two pass filterblit", gcvFEATURE_SCALER, gcvFALSE},
+    {"gcvFEATURE_2D_ONE_PASS_FILTER " , "2D one pass filterblit", gcvFEATURE_2D_ONE_PASS_FILTER, gcvFALSE},
+    {"gcvFEATURE_2D_ONE_PASS_FILTER_TAP " , "2D one pass filterblit with 7/9 tap", gcvFEATURE_2D_ONE_PASS_FILTER_TAP, gcvFALSE},
     {"gcvFEATURE_2D_MULTI_SOURCE_BLT " , "2D MultisrcBlit v1 or some YUV output", gcvFEATURE_2D_MULTI_SOURCE_BLT, gcvFALSE},
     {"gcvFEATURE_2D_MULTI_SOURCE_BLT_EX " , "2D MultisrcBlit v1.5 (8 source)", gcvFEATURE_2D_MULTI_SOURCE_BLT_EX, gcvFALSE},
     {"gcvFEATURE_2D_MULTI_SRC_BLT_TO_UNIFIED_DST_RECT " , "2D MultiSourceBlit v1.5 (Dest Rect)", gcvFEATURE_2D_MULTI_SRC_BLT_TO_UNIFIED_DST_RECT, gcvFALSE},
@@ -7193,6 +7398,9 @@ const struct FeatureInfo
     {"gcvFEATURE_2D_MULTI_SRC_BLT_BILINEAR_FILTER " , "MultiSrc bilinear filter", gcvFEATURE_2D_MULTI_SRC_BLT_BILINEAR_FILTER, gcvFALSE},
     {"gcvFEATURE_2D_MAJOR_SUPER_TILE " , "supertile output and ymajor supertile", gcvFEATURE_2D_MAJOR_SUPER_TILE, gcvFALSE},
     {"gcvFEATURE_2D_V4COMPRESSION " , "2D V4 compression", gcvFEATURE_2D_V4COMPRESSION, gcvFALSE},
+    {"gcvFEATURE_2D_VMSAA " , "2D VMSAA", gcvFEATURE_2D_VMSAA, gcvFALSE},
+    {"gcvFEATURE_2D_10BIT_OUTPUT_LINEAR " , "2D 10bit output", gcvFEATURE_2D_10BIT_OUTPUT_LINEAR, gcvFALSE},
+    {"gcvFEATURE_2D_YUV420_OUTPUT_LINEAR " , "2D YUV420 output", gcvFEATURE_2D_YUV420_OUTPUT_LINEAR, gcvFALSE},
 };
 
 gceSTATUS GalQueryFeatureStr(

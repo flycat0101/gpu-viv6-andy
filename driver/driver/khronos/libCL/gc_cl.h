@@ -212,6 +212,8 @@ extern const gctSTRING clgEmptyStr;
 /* Use sequential execution mode--no thread. */
 #define cldSEQUENTIAL_EXECUTION     0
 
+#define cldSYNC_MEMORY              0
+
 #ifdef __cplusplus
 }
 #endif

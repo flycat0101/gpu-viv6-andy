@@ -542,7 +542,7 @@ veglCreateContext(
         gcmERR_BREAK(vgsPATHSTORAGE_Construct(
             context,
             gcmKB2BYTES(context->sCache),
-            gcmMB2BYTES(2),
+            gcmMB2BYTES(3),
             &context->strokeStorage
             ));
 #else
@@ -558,7 +558,7 @@ veglCreateContext(
         gcmERR_BREAK(vgsPATHSTORAGE_Construct(
             context,
             gcmKB2BYTES(64),
-            gcmMB2BYTES(2),
+            gcmMB2BYTES(3),
             &context->strokeStorage
             ));
 #endif
@@ -1173,6 +1173,8 @@ veglSetBuffer(
     Context = Thread->context;
     do
     {
+        gctPOINTER mems[3];
+
         /* Draw surface cannot be NULL. */
         gcmASSERT(Draw != gcvNULL);
 
@@ -1205,8 +1207,9 @@ veglSetBuffer(
         gcmERR_BREAK(gcoSURF_Lock(
             Draw,
             gcvNULL,
-            (gctPOINTER *) &Context->targetImage.buffer
+            mems
             ));
+        Context->targetImage.buffer = (gctUINT8_PTR)mems[0];
 
         if (Context->targetImage.surface != gcvNULL)
         {

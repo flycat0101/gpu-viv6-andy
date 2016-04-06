@@ -85,6 +85,11 @@
 
 #include <linux/clk.h>
 
+#if IMX8_SCU_CONTROL
+#include <soc/imx8/sc/sci.h>
+extern sc_ipc_t ccm_ipcHandle;
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
 #include <mach/hardware.h>
 #endif
@@ -350,6 +355,7 @@ static DRIVER_ATTR(gpu3DMinClock, S_IRUGO | S_IWUSR, show_gpu3DMinClock, update_
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,5,0)
 static const struct of_device_id mxs_gpu_dt_ids[] = {
     { .compatible = "fsl,imx6q-gpu", },
+    { .compatible = "fsl,imx8x-gpu", },
     {/* sentinel */}
 };
 MODULE_DEVICE_TABLE(of, mxs_gpu_dt_ids);
@@ -373,6 +379,11 @@ struct imx_priv {
     struct clk         *clk_2d_core;
     struct clk         *clk_2d_axi;
     struct clk         *clk_vg_axi;
+
+    struct clk         *clk_core_3d_0;
+    struct clk         *clk_shader_3d_0;
+    struct clk         *clk_core_3d_1;
+    struct clk         *clk_shader_3d_1;
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,5,0) || LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
@@ -567,8 +578,10 @@ _GetPower(
 {
     struct device* pdev = &Platform->device->dev;
     struct imx_priv *priv = Platform->priv;
+#ifdef CONFIG_RESET_CONTROLLER
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
     struct reset_control *rstc;
+#endif
 #endif
 
 #ifdef CONFIG_PM
@@ -577,7 +590,7 @@ _GetPower(
     priv->pmdev = pdev;
 #endif
 
-
+#ifdef CONFIG_RESET_CONTROLLER
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
     rstc = devm_reset_control_get(pdev, "gpu3d");
     priv->rstc[gcvCORE_MAJOR] = IS_ERR(rstc) ? NULL : rstc;
@@ -585,6 +598,7 @@ _GetPower(
     priv->rstc[gcvCORE_2D] = IS_ERR(rstc) ? NULL : rstc;
     rstc = devm_reset_control_get(pdev, "gpuvg");
     priv->rstc[gcvCORE_VG] = IS_ERR(rstc) ? NULL : rstc;
+#endif
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
@@ -892,7 +906,6 @@ _SetClock(
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,5,0)
 #ifdef CONFIG_PM
-#ifdef CONFIG_PM_RUNTIME
 static int gpu_runtime_suspend(struct device *dev)
 {
     release_bus_freq(BUS_FREQ_HIGH);
@@ -904,7 +917,6 @@ static int gpu_runtime_resume(struct device *dev)
     request_bus_freq(BUS_FREQ_HIGH);
     return 0;
 }
-#endif
 
 static struct dev_pm_ops gpu_pm_ops;
 #endif
@@ -929,7 +941,7 @@ _AdjustDriver(
     memcpy(&gpu_pm_ops, driver->driver.pm, sizeof(struct dev_pm_ops));
 
     /* Add runtime PM callback. */
-#ifdef CONFIG_PM_RUNTIME
+#ifdef CONFIG_PM
     gpu_pm_ops.runtime_suspend = gpu_runtime_suspend;
     gpu_pm_ops.runtime_resume = gpu_runtime_resume;
     gpu_pm_ops.runtime_idle = NULL;
@@ -1001,11 +1013,262 @@ gcsPLATFORM_OPERATIONS platformOperations = {
     .name          = _Name,
 };
 
+/* the following code is implemented for imx8x gpu specifically */
+gceSTATUS
+_GetPower_imx8x(
+    IN gckPLATFORM Platform
+    )
+{
+    struct device* pdev = &Platform->device->dev;
+    struct imx_priv *priv = Platform->priv;
+
+#ifdef CONFIG_PM
+    /*Init runtime pm for gpu*/
+    pm_runtime_enable(pdev);
+    pm_runtime_get_sync(pdev);
+    priv->pmdev = pdev;
+#endif
+
+    /*Initialize the clock structure*/
+    priv->clk_core_3d_0 = clk_get(pdev, "clk_core_3d_0");
+    if (!IS_ERR(priv->clk_core_3d_0)) {
+         priv->clk_shader_3d_0 = clk_get(pdev, "clk_shader_3d_0");
+         if (IS_ERR(priv->clk_shader_3d_0)) {
+                   clk_put(priv->clk_core_3d_0);
+                   priv->clk_core_3d_0 = NULL;
+                   priv->clk_shader_3d_0 = NULL;
+                   gckOS_Print("galcore: clk_get clk_shader_3d_0 failed, disable 3d_0!\n");
+         } else {
+             clk_prepare(priv->clk_core_3d_0);
+             clk_set_rate(priv->clk_core_3d_0, 800000000);
+             clk_unprepare(priv->clk_core_3d_0);
+
+             clk_prepare(priv->clk_shader_3d_0);
+             clk_set_rate(priv->clk_shader_3d_0, 800000000);
+             clk_unprepare(priv->clk_shader_3d_0);
+         }
+    } else {
+        priv->clk_core_3d_0 = NULL;
+        priv->clk_shader_3d_0 = NULL;
+        gckOS_Print("galcore: clk_get clk_core_3d_0 failed, disable 3d_0!\n");
+    }
+
+    priv->clk_core_3d_1 = clk_get(pdev, "clk_core_3d_1");
+    if (!IS_ERR(priv->clk_core_3d_1)) {
+         priv->clk_shader_3d_1 = clk_get(pdev, "clk_shader_3d_1");
+         if (IS_ERR(priv->clk_shader_3d_1)) {
+                   clk_put(priv->clk_core_3d_1);
+                   priv->clk_core_3d_1 = NULL;
+                   priv->clk_shader_3d_1 = NULL;
+                   gckOS_Print("galcore: clk_get clk_shader_3d_1 failed, disable 3d_1!\n");
+         } else {
+             clk_prepare(priv->clk_core_3d_1);
+             clk_set_rate(priv->clk_core_3d_1, 800000000);
+             clk_unprepare(priv->clk_core_3d_1);
+
+             clk_prepare(priv->clk_shader_3d_1);
+             clk_set_rate(priv->clk_shader_3d_1, 800000000);
+             clk_unprepare(priv->clk_shader_3d_1);
+         }
+    } else {
+        priv->clk_core_3d_1 = NULL;
+        priv->clk_shader_3d_1 = NULL;
+        gckOS_Print("galcore: clk_get clk_core_3d_1 failed, disable 3d_1!\n");
+    }
+
+    if (priv->clk_core_3d_0 == NULL && priv->clk_core_3d_1 == NULL)
+    {
+        return gcvSTATUS_OUT_OF_RESOURCES;
+    }
+
+#if IMX8_SCU_CONTROL
+    sc_misc_set_control(ccm_ipcHandle, SC_R_GPU_0_PID0, SC_C_GPU_ID, 0);
+    sc_misc_set_control(ccm_ipcHandle, SC_R_GPU_1_PID0, SC_C_GPU_ID, 1);
+
+    /* check dual core mode */
+    if (priv->clk_core_3d_0 != NULL && priv->clk_core_3d_1 != NULL)
+    {
+        sc_misc_set_control(ccm_ipcHandle, SC_R_GPU_0_PID0, SC_C_GPU_SINGLE_MODE, 0);
+        sc_misc_set_control(ccm_ipcHandle, SC_R_GPU_1_PID0, SC_C_GPU_SINGLE_MODE, 0);
+    }
+    /* check single core mode */
+    else if (priv->clk_core_3d_0 != NULL || priv->clk_core_3d_1 != NULL)
+    {
+        sc_misc_set_control(ccm_ipcHandle, SC_R_GPU_0_PID0, SC_C_GPU_SINGLE_MODE, 1);
+        sc_misc_set_control(ccm_ipcHandle, SC_R_GPU_1_PID0, SC_C_GPU_SINGLE_MODE, 1);
+    }
+    else ; /* caution, do NOT call SCU control without gpu core enabled !!! */
+#endif
+
+#if gcdENABLE_FSCALE_VAL_ADJUST && defined(CONFIG_DEVICE_THERMAL)
+    pdevice = Platform->device;
+    REG_THERMAL_NOTIFIER(&thermal_hot_pm_notifier);
+    {
+        int ret = 0;
+        ret = driver_create_file(pdevice->dev.driver, &driver_attr_gpu3DMinClock);
+        if(ret)
+            dev_err(&pdevice->dev, "create gpu3DMinClock attr failed (%d)\n", ret);
+    }
+#endif
+
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+_PutPower_imx8x(
+    IN gckPLATFORM Platform
+    )
+{
+    struct imx_priv *priv = Platform->priv;
+
+    /*Disable clock*/
+    if (priv->clk_core_3d_0) {
+       clk_put(priv->clk_core_3d_0);
+       priv->clk_core_3d_0 = NULL;
+    }
+
+    if (priv->clk_shader_3d_0) {
+       clk_put(priv->clk_shader_3d_0);
+       priv->clk_shader_3d_0 = NULL;
+    }
+
+    if (priv->clk_core_3d_1) {
+       clk_put(priv->clk_core_3d_1);
+       priv->clk_core_3d_1 = NULL;
+    }
+
+    if (priv->clk_shader_3d_1) {
+       clk_put(priv->clk_shader_3d_1);
+       priv->clk_shader_3d_1 = NULL;
+    }
+
+#if gcdENABLE_FSCALE_VAL_ADJUST && defined(CONFIG_DEVICE_THERMAL)
+    UNREG_THERMAL_NOTIFIER(&thermal_hot_pm_notifier);
+
+    driver_remove_file(pdevice->dev.driver, &driver_attr_gpu3DMinClock);
+#endif
+
+#ifdef CONFIG_PM
+    if(priv->pmdev)
+        pm_runtime_disable(priv->pmdev);
+#endif
+
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+_SetPower_imx8x(
+    IN gckPLATFORM Platform,
+    IN gceCORE GPU,
+    IN gctBOOL Enable
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+_SetClock_imx8x(
+    IN gckPLATFORM Platform,
+    IN gceCORE GPU,
+    IN gctBOOL Enable
+    )
+{
+    struct imx_priv* priv = Platform->priv;
+    struct clk *clk_core_3d_0 = priv->clk_core_3d_0;
+    struct clk *clk_shader_3d_0 = priv->clk_shader_3d_0;
+    struct clk *clk_core_3d_1 = priv->clk_core_3d_1;
+    struct clk *clk_shader_3d_1 = priv->clk_shader_3d_1;
+
+    if (Enable) {
+        switch (GPU) {
+        case gcvCORE_MAJOR:
+            if (clk_core_3d_0 && clk_shader_3d_0) {
+                clk_prepare(clk_core_3d_0);
+                clk_enable(clk_core_3d_0);
+                clk_prepare(clk_shader_3d_0);
+                clk_enable(clk_shader_3d_0);
+            }
+            break;
+        case gcvCORE_3D1:
+            if (clk_core_3d_1 && clk_shader_3d_1) {
+                clk_prepare(clk_core_3d_1);
+                clk_enable(clk_core_3d_1);
+                clk_prepare(clk_shader_3d_1);
+                clk_enable(clk_shader_3d_1);
+            }
+            break;
+        default:
+            break;
+        }
+    } else {
+        switch (GPU) {
+        case gcvCORE_MAJOR:
+            if (clk_core_3d_0 && clk_shader_3d_0) {
+                clk_disable(clk_core_3d_0);
+                clk_unprepare(clk_core_3d_0);
+                clk_disable(clk_shader_3d_0);
+                clk_unprepare(clk_shader_3d_0);
+            }
+            break;
+        case gcvCORE_3D1:
+            if (clk_core_3d_1 && clk_shader_3d_1) {
+                clk_disable(clk_core_3d_1);
+                clk_unprepare(clk_core_3d_1);
+                clk_disable(clk_shader_3d_1);
+                clk_unprepare(clk_shader_3d_1);
+            }
+            break;
+        default:
+            break;
+        }
+    }
+
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+_Reset_imx8x(
+    IN gckPLATFORM Platform,
+    gceCORE GPU
+    )
+{
+    return gcvSTATUS_OK;
+}
+
+gcsPLATFORM_OPERATIONS platformOperations_imx8x = {
+    .adjustParam  = gckPLATFORM_AdjustParam,
+    .allocPriv    = _AllocPriv,
+    .freePriv     = _FreePriv,
+    .getPower     = _GetPower_imx8x,
+    .putPower     = _PutPower_imx8x,
+    .setPower     = _SetPower_imx8x,
+    .setClock     = _SetClock_imx8x,
+    .adjustDriver = _AdjustDriver,
+    .reset        = _Reset_imx8x,
+#ifdef CONFIG_GPU_LOW_MEMORY_KILLER
+    .shrinkMemory = _ShrinkMemory,
+#endif
+    .name          = _Name,
+};
+
 void
 gckPLATFORM_QueryOperations(
     IN gcsPLATFORM_OPERATIONS ** Operations
     )
 {
-     *Operations = &platformOperations;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
+     struct device_node *np;
+
+     np = of_find_compatible_node(NULL, NULL, "fsl,imx8x-gpu");
+     if (np)
+     {
+         *Operations = &platformOperations_imx8x;
+     }
+     else
+#endif
+     {
+         *Operations = &platformOperations;
+     }
 }
 

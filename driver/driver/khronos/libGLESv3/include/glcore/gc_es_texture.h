@@ -418,9 +418,6 @@ typedef struct __GLsamplerMachineRec
 
 /* Bind texture object function */
 extern GLvoid __glBindTexture(__GLcontext *gc, GLuint unitIdx, GLuint targetIndex, GLuint texture);
-extern GLboolean __glSetMipmapLevelInfo(__GLcontext *gc, __GLtextureObject *tex, GLint face,
-                                        GLint lod, GLint internalFormat, GLenum format,
-                                        GLenum type, GLsizei width, GLsizei height, GLsizei depth);
 extern GLvoid __glSetFBOAttachedTexDirty(__GLcontext *gc, GLbitfield mask, GLint drawbuffer);
 
 enum __GL_IMAGE_TYPE

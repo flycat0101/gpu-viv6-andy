@@ -394,6 +394,23 @@ _CreateSurfaceObjects(
             gcvTRUE
             ));
 
+#if defined(ANDROID) && gcdSUPPORT_SWAP_RECTANGLE
+        /* Allocate rect/buffer slots. */
+        Surface->swapRect.capacity = 8;
+
+        gcmERR_BREAK(gcoOS_Allocate(
+            gcvNULL,
+            gcmSIZEOF(gcsRECT) * 8,
+            (gctPOINTER) &Surface->swapRect.rects
+            ));
+
+        gcmERR_BREAK(gcoOS_Allocate(
+            gcvNULL,
+            gcmSIZEOF(gctPOINTER) * 8,
+            (gctPOINTER) &Surface->swapRect.buffers
+            ));
+#endif
+
         /* Success. */
         return EGL_SUCCESS;
     }
@@ -405,6 +422,23 @@ _CreateSurfaceObjects(
     /* Roll back. */
     do
     {
+#if defined(ANDROID) && gcdSUPPORT_SWAP_RECTANGLE
+        if (Surface->swapRect.rects != gcvNULL)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, Surface->swapRect.rects);
+            Surface->swapRect.rects = gcvNULL;
+        }
+
+        if (Surface->swapRect.buffers != gcvNULL)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, Surface->swapRect.buffers);
+            Surface->swapRect.buffers = gcvNULL;
+        }
+
+        Surface->swapRect.count    = 0;
+        Surface->swapRect.capacity = 0;
+#endif
+
         if (Surface->workerMutex != gcvNULL)
         {
             gcmERR_BREAK(
@@ -485,6 +519,23 @@ _DestroySurfaceObjects(
             gcmERR_BREAK(
                 gcoOS_DeleteMutex(gcvNULL, Surface->workerMutex));
         }
+
+#if defined(ANDROID) && gcdSUPPORT_SWAP_RECTANGLE
+        if (Surface->swapRect.rects != gcvNULL)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, Surface->swapRect.rects);
+            Surface->swapRect.rects = gcvNULL;
+        }
+
+        if (Surface->swapRect.buffers != gcvNULL)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, Surface->swapRect.buffers);
+            Surface->swapRect.buffers = gcvNULL;
+        }
+
+        Surface->swapRect.count    = 0;
+        Surface->swapRect.capacity = 0;
+#endif
 
         if (Surface->workerAvaiableSignal != gcvNULL)
         {
@@ -1320,7 +1371,10 @@ _CreateSurface(
         Surface->swapRect.height = height;
 
         /* Reset buffer count. */
-        Surface->swapRect.count  = 0;
+        Surface->swapRect.count    = 0;
+        Surface->swapRect.capacity = 0;
+        Surface->swapRect.rects    = gcvNULL;
+        Surface->swapRect.buffers  = gcvNULL;
 #endif
 
         /* Determine whether OpenVG pipe is present and OpenVG API is active. */

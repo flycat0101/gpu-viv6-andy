@@ -1,5 +1,4 @@
 
-
 package com.vivantecorp.graphics.shareContext;
 
 import android.content.Context;
@@ -34,18 +33,14 @@ class GL2JNIView extends SurfaceView implements SurfaceHolder.Callback
 {
 	private SurfaceHolder   mHolder;
 	private Context         context;
-
 	private boolean         mHasSurface;
-	private boolean         mDone;
-    private boolean         first_run;
-	private RenderThread    mthread;
 
 	public GL2JNIView(Context context)
 	{
 		super(context);
 		this.context=context;
-        first_run = true;
-		init();
+		mHolder = getHolder();
+		mHolder.addCallback(this);
 	}
 
 	public void surfaceCreated(SurfaceHolder holder)
@@ -56,83 +51,23 @@ class GL2JNIView extends SurfaceView implements SurfaceHolder.Callback
 	public void surfaceDestroyed(SurfaceHolder holder)
 	{
 		mHasSurface = false;
-		mDone = true;
-		try
-        {
-			mthread.join();
-		}
-        catch (InterruptedException ex)
-        {
-			mthread.interrupt();
-		}
 	}
+
+    public boolean isSurfaceCreated()
+    {
+        return mHasSurface;
+    }
+
+    public Object getSurface()
+    {
+        if (mHasSurface)
+        {
+            return mHolder.getSurface();
+        }
+        return null;
+    }
 
 	public void surfaceChanged(SurfaceHolder holder,int format, int w, int h)
 	{
 	}
-
-	public void start()
-	{
-		mthread = new RenderThread();
-		mthread.start();
-	}
-
-	private void init()
-	{
-		mHolder = getHolder();
-		mHolder.addCallback(this);
-	}
-
-	public void caseRun()
-	{
-        while(!mDone)
-        {
-            if(first_run == true)
-            {
-                GL2JNILib.init(mHolder.getSurface());
-                first_run = false;
-            }
-            else
-            {
-                GL2JNILib.repaint();
-            }
-        }
-	}
-
-    public boolean needToWait()
-    {
-        return (!mHasSurface)&&(!mDone);
-    }
-
-    class RenderThread extends Thread
-    {
-        RenderThread()
-        {
-        }
-
-        public void run()
-        {
-            try
-            {
-                guardedRun();
-            }
-            catch(InterruptedException e)
-            {
-                e.printStackTrace();
-            }
-        }
-        public void guardedRun() throws InterruptedException
-        {
-            while (needToWait())
-            {
-            }
-
-            if (!mDone)
-            {
-                caseRun();
-            }
-
-            ((Activity)(context)).finish();
-        }
-    }
 }

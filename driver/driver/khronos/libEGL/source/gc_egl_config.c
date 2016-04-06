@@ -769,6 +769,7 @@ eglChooseConfig(
     EGLint config;
     EGLint candidates[128];
     EGLint matchCount;
+    gceSURF_FORMAT configFormat = gcvSURF_A8R8G8B8;
     gceSTATUS status;
 
     gcmHEADER_ARG("Dpy=0x%x attrib_list=0x%x configs=0x%x config_size=%d",
@@ -1209,6 +1210,7 @@ eglChooseConfig(
 
     if ((matchCount >= 1) && (config_size >= 1) && (configs != gcvNULL))
     {
+        EGLint hiCandidate = 0;
         /* Sort the matching configurations. */
         veglSort(dpy->config, candidates, matchCount, &criteria);
 
@@ -1219,6 +1221,8 @@ eglChooseConfig(
             configs[config] = (EGLConfig) gcmINT2PTR(candidates[config] + 1);
         }
 
+        hiCandidate = candidates[0];
+        veglGetFormat(thread, &dpy->config[hiCandidate], &configFormat, gcvNULL);
         /* Obtain num_config. */
         *num_config = config;
     }
@@ -1228,6 +1232,8 @@ eglChooseConfig(
         *num_config = matchCount;
     }
 
+    /* Set it to PLS to fetch it later. */
+    gcoOS_SetPLSValue(gcePLS_VALUE_EGL_CONFIG_FORMAT_INFO, gcmINT2PTR(configFormat));
 
     VEGL_UNLOCK_DISPLAY(dpy);
     /* Success. */

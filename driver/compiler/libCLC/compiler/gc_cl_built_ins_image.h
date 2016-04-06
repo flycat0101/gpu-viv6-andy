@@ -213,6 +213,16 @@ _GenReadImageSamplerCode(
     )
 {
     gceSTATUS   status;
+    cleOPCODE   opcode;
+
+    if (clmIsElementTypeImage3D(clmGEN_CODE_elementType_GET(OperandsParameters[0].rOperands[0].dataType)))
+    {
+        opcode = clvOPCODE_IMAGE_READ_3D;
+    }
+    else
+    {
+        opcode = clvOPCODE_IMAGE_READ;
+    }
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
@@ -235,7 +245,7 @@ _GenReadImageSamplerCode(
         status = clGenGenericCode2(Compiler,
                                    PolynaryExpr->exprBase.base.lineNo,
                                    PolynaryExpr->exprBase.base.stringNo,
-                                   clvOPCODE_IMAGE_READ,
+                                   opcode,
                                    IOperand,
                                    &OperandsParameters[0].rOperands[0],
                                    &OperandsParameters[2].rOperands[0]);
@@ -258,7 +268,7 @@ _GenReadImageSamplerCode(
         status = clGenGenericCode2(Compiler,
                                    PolynaryExpr->exprBase.base.lineNo,
                                    PolynaryExpr->exprBase.base.stringNo,
-                                   clvOPCODE_IMAGE_READ,
+                                   opcode,
                                    IOperand,
                                    &OperandsParameters[0].rOperands[0],
                                    &OperandsParameters[1].rOperands[0]);
@@ -386,7 +396,7 @@ _GenTextureCode(
 
 #if _USE_NEW_INSTRUCTION_FOR_IMAGE_WR_SAMPLER
 static gceSTATUS
-_GenImageWrCode(
+_GenWriteImageCode(
     IN cloCOMPILER Compiler,
     IN cloCODE_GENERATOR CodeGenerator,
     IN cloIR_POLYNARY_EXPR PolynaryExpr,
@@ -397,6 +407,16 @@ _GenImageWrCode(
     gceSTATUS status;
     clsIOPERAND iOperand[1];
     clsLOPERAND lOperand[1];
+    cleOPCODE   opcode;
+
+    if (clmIsElementTypeImage3D(clmGEN_CODE_elementType_GET(OperandsParameters[0].rOperands[0].dataType)))
+    {
+        opcode = clvOPCODE_IMAGE_WRITE_3D;
+    }
+    else
+    {
+        opcode = clvOPCODE_IMAGE_WRITE;
+    }
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
@@ -416,7 +436,7 @@ _GenImageWrCode(
     return clGenGenericCode2(Compiler,
                              PolynaryExpr->exprBase.base.lineNo,
                              PolynaryExpr->exprBase.base.stringNo,
-                             clvOPCODE_IMAGE_WRITE,
+                             opcode,
                              iOperand,
                              &OperandsParameters[0].rOperands[0],
                              &OperandsParameters[1].rOperands[0]);
@@ -3591,11 +3611,11 @@ _GenReadImageFCode(
 
 #if _USE_NEW_INSTRUCTION_FOR_IMAGE_RD_SAMPLER
     return _GenReadImageSamplerCode(Compiler,
-                                        CodeGenerator,
-                                        PolynaryExpr,
-                                        OperandCount,
-                                        OperandsParameters,
-                                        IOperand);
+                                    CodeGenerator,
+                                    PolynaryExpr,
+                                    OperandCount,
+                                    OperandsParameters,
+                                    IOperand);
 #else
 #if _USE_TEXLD_FOR_IMAGE_SAMPLER
 
@@ -4908,11 +4928,11 @@ _GenReadImageICode(
 
 #if _USE_NEW_INSTRUCTION_FOR_IMAGE_RD_SAMPLER
     return _GenReadImageSamplerCode(Compiler,
-                                        CodeGenerator,
-                                        PolynaryExpr,
-                                        OperandCount,
-                                        OperandsParameters,
-                                        IOperand);
+                                    CodeGenerator,
+                                    PolynaryExpr,
+                                    OperandCount,
+                                    OperandsParameters,
+                                    IOperand);
 #else
 #if _USE_TEXLD_FOR_IMAGE_SAMPLER
 
@@ -6227,11 +6247,11 @@ _GenReadImageUICode(
 
 #if _USE_NEW_INSTRUCTION_FOR_IMAGE_RD_SAMPLER
     return _GenReadImageSamplerCode(Compiler,
-                                        CodeGenerator,
-                                        PolynaryExpr,
-                                        OperandCount,
-                                        OperandsParameters,
-                                        IOperand);
+                                    CodeGenerator,
+                                    PolynaryExpr,
+                                    OperandCount,
+                                    OperandsParameters,
+                                    IOperand);
 #else
 #if _USE_TEXLD_FOR_IMAGE_SAMPLER
 
@@ -6873,11 +6893,11 @@ _GenWriteImageFCode(
 
 #if _USE_NEW_INSTRUCTION_FOR_IMAGE_WR_SAMPLER
 
-    return _GenImageWrCode(Compiler,
-                           CodeGenerator,
-                           PolynaryExpr,
-                           OperandCount,
-                           OperandsParameters);
+    return _GenWriteImageCode(Compiler,
+                              CodeGenerator,
+                              PolynaryExpr,
+                              OperandCount,
+                              OperandsParameters);
 #else
     return _GenSoftWriteImageFCode(Compiler,
                                    CodeGenerator,
@@ -7244,11 +7264,11 @@ _GenWriteImageICode(
     }
 
 #if _USE_NEW_INSTRUCTION_FOR_IMAGE_WR_SAMPLER
-    return _GenImageWrCode(Compiler,
-                           CodeGenerator,
-                           PolynaryExpr,
-                           OperandCount,
-                           OperandsParameters);
+    return _GenWriteImageCode(Compiler,
+                              CodeGenerator,
+                              PolynaryExpr,
+                              OperandCount,
+                              OperandsParameters);
 #else
     return _GenSoftWriteImageICode(Compiler,
                                    CodeGenerator,
@@ -7587,11 +7607,11 @@ _GenWriteImageUICode(
 
 #if _USE_NEW_INSTRUCTION_FOR_IMAGE_WR_SAMPLER
 
-    return _GenImageWrCode(Compiler,
-                           CodeGenerator,
-                           PolynaryExpr,
-                           OperandCount,
-                           OperandsParameters);
+    return _GenWriteImageCode(Compiler,
+                              CodeGenerator,
+                              PolynaryExpr,
+                              OperandCount,
+                              OperandsParameters);
 #else
     return _GenSoftWriteImageUICode(Compiler,
                                     CodeGenerator,

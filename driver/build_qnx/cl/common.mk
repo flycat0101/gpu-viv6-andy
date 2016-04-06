@@ -41,7 +41,6 @@ SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_device.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_enqueue.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_event.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_extension.o
-SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_gl.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_icd.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_kernel.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_mem.o
@@ -49,8 +48,12 @@ SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_platform.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_program.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_profiler.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_sampler.o
-EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libCL
 
+ifeq ($(ENABLE_CL_GL), 1)
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_gl.o
+endif
+
+EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libCL
 EXTRA_LIBVPATH += $(LOCAL_INSTALL)
 
 OBJECTS_FROM_SRCVPATH := $(basename $(wildcard $(foreach dir, $(EXTRA_SRCVPATH), $(addprefix $(dir)/*., s S c cc cpp))))

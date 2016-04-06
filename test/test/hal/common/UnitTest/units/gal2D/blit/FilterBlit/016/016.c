@@ -50,7 +50,7 @@ static gctCONST_STRING s_CaseDescription = \
 "     Tile        [linear]\n"\
 "     Compression [None]\n" \
 "Brush: [None]\n"\
-"KernelSize: [3/5]\n" \
+"KernelSize: [1/3/5]\n" \
 "Alphablend: [disable]\n" \
 "HW feature dependency: ";
 
@@ -184,7 +184,7 @@ static void CDECL Destroy(Test2D *t2d)
 const gceFEATURE FeatureList[]=
 {
     gcvFEATURE_SCALER,
-    gcvFEATURE_2D_ALL_QUAD,
+    gcvFEATURE_2D_ONE_PASS_FILTER,
 };
 
 static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)

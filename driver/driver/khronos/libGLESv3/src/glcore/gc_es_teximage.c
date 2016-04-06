@@ -544,13 +544,20 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
         case GL_DEPTH_COMPONENT24:
         case GL_DEPTH_COMPONENT32_OES:
         case GL_DEPTH_COMPONENT32F:
-        case GL_STENCIL_INDEX8:
         case GL_DEPTH_STENCIL:
         case GL_DEPTH24_STENCIL8:
         case GL_DEPTH32F_STENCIL8:
 
             break;
+        case GL_STENCIL_INDEX8:
+           {
+                if(!__glExtension[__GL_EXTID_OES_texture_stencil8].bEnabled && gc->apiVersion < __GL_API_VERSION_ES30 )
+                {
+                    invalid = GL_TRUE;
+                }
+                break;
 
+            }
         default:
             invalid = GL_TRUE;
             break;
@@ -591,7 +598,6 @@ GLboolean __glCheckTexImgFmtArg(__GLcontext *gc,
         case GL_LUMINANCE:
         case GL_LUMINANCE_ALPHA:
         case GL_ALPHA:
-        case GL_STENCIL_INDEX:
         case GL_VIV_YV12:
         case GL_VIV_I420:
         case GL_VIV_NV12:
@@ -601,6 +607,12 @@ GLboolean __glCheckTexImgFmtArg(__GLcontext *gc,
         case GL_BGRA_EXT:
             break;
 
+        case GL_STENCIL_INDEX:
+            if(!__glExtension[__GL_EXTID_OES_texture_stencil8].bEnabled && gc->apiVersion < __GL_API_VERSION_ES30 )
+            {
+                invalid = GL_TRUE;
+            }
+            break;
         default:
             invalid = GL_TRUE;
             break;
@@ -1360,7 +1372,7 @@ static GLboolean __glCheckTexCopyImgFmt(__GLcontext *gc, __GLtextureObject * tex
     case GL_ALPHA:
     case GL_LUMINANCE_ALPHA:
     case GL_BGRA_EXT:
-        if (GL_RGBA != rtFormatInfo->baseFormat)
+        if (GL_RGBA != rtFormatInfo->baseFormat && (GL_BGRA_EXT != rtFormatInfo->baseFormat))
         {
             __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
         }
@@ -1377,6 +1389,7 @@ static GLboolean __glCheckTexCopyImgFmt(__GLcontext *gc, __GLtextureObject * tex
         (internalFormat != GL_RG) &&
         (internalFormat != GL_RGB) &&
         (internalFormat != GL_RGBA) &&
+        (internalFormat != GL_BGRA_EXT) &&
         (internalFormat != GL_ALPHA) &&
         (internalFormat != GL_LUMINANCE_ALPHA) &&
         compSizeMatch
@@ -1677,9 +1690,9 @@ GLsizei __glCompressedTexImageSize(GLint lods, GLint internalFormat, GLint width
     return (GLsizei) (countX * countY * blockSize * depth);
 }
 
-GLboolean __glSetMipmapLevelInfo(__GLcontext *gc, __GLtextureObject *tex, GLint face,
-                                 GLint lod, GLint internalFormat, GLenum format,
-                                 GLenum type, GLsizei width, GLsizei height, GLsizei depth)
+GLvoid __glSetMipmapLevelInfo(__GLcontext *gc, __GLtextureObject *tex, GLint face,
+                              GLint lod, GLint internalFormat, GLenum format,
+                              GLenum type, GLsizei width, GLsizei height, GLsizei depth)
 {
     GLint arrays = 1;
     __GLmipMapLevel *mipmap;
@@ -1768,6 +1781,7 @@ GLboolean __glSetMipmapLevelInfo(__GLcontext *gc, __GLtextureObject *tex, GLint 
         case GL_HALF_FLOAT_OES:
             formatInfo = &__glFormatInfoTable[__GL_FMT_RGBA16F];
             requestedFormat = GL_RGBA16F;
+            break;
         default:
             formatInfo = &__glFormatInfoTable[__GL_FMT_RGBA8];
             break;
@@ -1867,8 +1881,6 @@ GLboolean __glSetMipmapLevelInfo(__GLcontext *gc, __GLtextureObject *tex, GLint 
             currentMipmap->height = h;
         }
     }
-
-    return GL_TRUE;
 }
 
 GLvoid __glClearMipmapLevelInfo(__GLcontext *gc, __GLtextureObject *tex, GLint face, GLint level)
@@ -1934,12 +1946,11 @@ GLboolean __glIsCubeBaselevelConsistent(__GLcontext *gc, __GLtextureObject *tex)
 
 EGLenum __glCheckEglImageTexArg(__GLcontext *gc,
                                EGLenum target,
-                               __GLtextureObject *texObj,
                                khrIMAGE_TYPE *type,
                                GLint *face)
 {
     /* Test target parameter. */
-    switch(target)
+    switch (target)
     {
     case EGL_GL_TEXTURE_2D_KHR:
         *face = 0;
@@ -1960,12 +1971,6 @@ EGLenum __glCheckEglImageTexArg(__GLcontext *gc,
         return EGL_BAD_PARAMETER;
     }
 
-    if ((texObj == gcvNULL) ||
-        (texObj->privateData == gcvNULL))
-    {
-        return EGL_BAD_PARAMETER;
-    }
-
     return EGL_SUCCESS;
 }
 
@@ -1981,14 +1986,19 @@ EGLenum __glCreateEglImageTexture(__GLcontext* gc,
     EGLenum result;
     __GLtextureObject *texObj = gcvNULL;
 
-    if(gc->texture.shared == gcvNULL)
+    if (gc->texture.shared == gcvNULL)
     {
         return EGL_BAD_PARAMETER;
     }
+
     /* Find the texture object by name. */
     texObj = (__GLtextureObject *)__glGetObject(gc, gc->texture.shared, texture);
+    if ((texObj == gcvNULL) || (texObj->privateData == gcvNULL))
+    {
+        return EGL_BAD_PARAMETER;
+    }
 
-    result = __glCheckEglImageTexArg(gc, target, texObj, &type, &face);
+    result = __glCheckEglImageTexArg(gc, target, &type, &face);
 
     if (result != EGL_SUCCESS)
     {
@@ -2038,11 +2048,7 @@ __glBindTexImage(
 {
     __GLtextureObject *tex = gc->texture.units[gc->state.texture.activeTexIndex].boundTextures[__GL_TEXTURE_2D_INDEX];
 
-    if (__glSetMipmapLevelInfo(gc, tex, 0, level, format, format,
-                               GL_UNSIGNED_BYTE, width, height, 1) == GL_FALSE)
-    {
-        return GL_FALSE;
-    }
+    __glSetMipmapLevelInfo(gc, tex, 0, level, format, format, GL_UNSIGNED_BYTE, width, height, 1);
 
     if (gc->dp.bindTexImage(gc, tex, level, surface, pBinder) == GL_FALSE)
     {
@@ -2218,11 +2224,7 @@ GLvoid GL_APIENTRY __gles_TexImage3D(__GLcontext *gc,
     }
 
     /* Init the mipmap info which will be queried by app */
-    if (__glSetMipmapLevelInfo(gc, tex, 0, lod, internalFormat,
-                               format, type, width, height, depth) == GL_FALSE)
-    {
-        __GL_EXIT();
-    }
+    __glSetMipmapLevelInfo(gc, tex, 0, lod, internalFormat, format, type, width, height, depth);
 
     if (!(*gc->dp.texImage3D)(gc, tex, lod, buf))
     {
@@ -2299,11 +2301,7 @@ GLvoid GL_APIENTRY __gles_TexImage2D(__GLcontext *gc,
     }
 
     /* Init the mipmap info which will be queried by app */
-    if (__glSetMipmapLevelInfo(gc, tex, face, lod, internalFormat,
-                               format, type, width, height, 1) == GL_FALSE)
-    {
-        __GL_EXIT();
-    }
+    __glSetMipmapLevelInfo(gc, tex, face, lod, internalFormat, format, type, width, height, 1);
 
     if (!(*gc->dp.texImage2D)(gc, tex, face, lod, buf))
     {
@@ -2536,11 +2534,7 @@ GLvoid GL_APIENTRY __gles_CopyTexImage2D(__GLcontext *gc,
     }
 
     /* Init the mipmap info which will be queried by app */
-    if (__glSetMipmapLevelInfo(gc, tex, face, lod, internalFormat,
-                               GL_RGBA, GL_UNSIGNED_BYTE, width, height, 1) == GL_FALSE)
-    {
-        __GL_EXIT();
-    }
+    __glSetMipmapLevelInfo(gc, tex, face, lod, internalFormat, GL_RGBA, GL_UNSIGNED_BYTE, width, height, 1);
 
     __glEvaluateDrawableChange(gc, __GL_BUFFER_READ_BIT);
 
@@ -2782,11 +2776,7 @@ GLvoid GL_APIENTRY __gles_CompressedTexImage3D(__GLcontext *gc,
     }
 
     /* Init the mipmap info which will be queried by app */
-    if (__glSetMipmapLevelInfo(gc, tex, 0, lod, internalFormat,
-                               0, 0, width, height, depth) == GL_FALSE)
-    {
-        __GL_EXIT();
-    }
+    __glSetMipmapLevelInfo(gc, tex, 0, lod, internalFormat, 0, 0, width, height, depth);
 
     mipmap = &tex->faceMipmap[0][lod];
 
@@ -2902,11 +2892,7 @@ GLvoid GL_APIENTRY __gles_CompressedTexImage2D(__GLcontext *gc,
     }
 
     /* Init the mipmap info which will be queried by app */
-    if (__glSetMipmapLevelInfo(gc, tex, face, lod, internalFormat,
-                               0, 0, width, height, 1) == GL_FALSE)
-    {
-        __GL_EXIT();
-    }
+    __glSetMipmapLevelInfo(gc, tex, face, lod, internalFormat, 0, 0, width, height, 1);
 
     mipmap = &tex->faceMipmap[face][level];
     if (imageSize != mipmap->compressedSize)
@@ -3540,11 +3526,7 @@ GLvoid GL_APIENTRY __gles_TexStorage2D(__GLcontext *gc, GLenum target, GLsizei l
         for (lod = 0; lod < levels; ++lod)
         {
             /* Init the mipmap info which will be queried by app */
-            if (__glSetMipmapLevelInfo(gc, tex, face, lod, internalformat,
-                                       GL_NONE, GL_NONE, w, h, 1) == GL_FALSE)
-            {
-                __GL_EXIT();
-            }
+            __glSetMipmapLevelInfo(gc, tex, face, lod, internalformat, GL_NONE, GL_NONE, w, h, 1);
 
             /* The dp function should also handle compressed format */
             if (!(*gc->dp.texImage2D)(gc, tex, face, lod, NULL))
@@ -3609,11 +3591,7 @@ GLvoid GL_APIENTRY __gles_TexStorage3D(__GLcontext *gc,
     for (lod = 0; lod < levels; ++lod)
     {
         /* Init the mipmap info which will be queried by app */
-        if (__glSetMipmapLevelInfo(gc, tex, 0, lod, internalformat,
-                                   GL_NONE, GL_NONE, width, height, depth) == GL_FALSE)
-        {
-            __GL_EXIT();
-        }
+        __glSetMipmapLevelInfo(gc, tex, 0, lod, internalformat, GL_NONE, GL_NONE, width, height, depth);
 
         if (!(*gc->dp.texImage3D)(gc, tex, lod, NULL))
         {
@@ -3682,11 +3660,7 @@ GLvoid GL_APIENTRY __gles_TexStorage2DMultisample(__GLcontext *gc, GLenum target
     tex->params.mipHint = __GL_TEX_MIP_HINT_AUTO;
 
     /* Init the mipmap info which will be queried by app */
-    if (__glSetMipmapLevelInfo(gc, tex, 0, 0, internalformat,
-                               GL_NONE, GL_NONE, width, height, 1) == GL_FALSE)
-    {
-        __GL_EXIT();
-    }
+    __glSetMipmapLevelInfo(gc, tex, 0, 0, internalformat, GL_NONE, GL_NONE, width, height, 1);
 
     /* The dp function should also handle compressed format */
     if (!(*gc->dp.texImage2D)(gc, tex, 0, 0, NULL))
@@ -3745,11 +3719,7 @@ GLvoid GL_APIENTRY __gles_TexStorage3DMultisample(__GLcontext *gc, GLenum target
     tex->params.mipHint = __GL_TEX_MIP_HINT_AUTO;
 
     /* Init the mipmap info which will be queried by app */
-    if (__glSetMipmapLevelInfo(gc, tex, 0, 0, sizedinternalformat,
-                               GL_NONE, GL_NONE, width, height, depth) == GL_FALSE)
-    {
-        __GL_EXIT();
-    }
+    __glSetMipmapLevelInfo(gc, tex, 0, 0, sizedinternalformat, GL_NONE, GL_NONE, width, height, depth);
 
     if (!(*gc->dp.texImage3D)(gc, tex, 0, NULL))
     {
@@ -3965,19 +3935,7 @@ GLvoid GL_APIENTRY __gles_EGLImageTargetTexture2DOES(__GLcontext *gc, GLenum tar
     texObj->canonicalFormat = GL_TRUE;
 
     /* Init the mipmap info which will be queried by app */
-    if (__glSetMipmapLevelInfo(gc,
-                               texObj,
-                               0,
-                               0,
-                               internalFormat,
-                               format,
-                               type,
-                               width,
-                               height,
-                               1) == GL_FALSE)
-    {
-        __GL_EXIT();
-    }
+    __glSetMipmapLevelInfo(gc, texObj, 0, 0, internalFormat, format, type, width, height, 1);
 
     /* When egl image's content changed, set the __GL_TEX_IMAGE_CONTENT_CHANGED_BIT dirty bit */
     __glSetTexImageDirtyBit(gc, texObj, __GL_TEX_IMAGE_CONTENT_CHANGED_BIT);
@@ -4057,11 +4015,7 @@ GLvoid GL_APIENTRY __gles_TexDirectVIV(__GLcontext *gc, GLenum target, GLsizei w
     }
 
     /* Init the mipmap info which will be queried by app */
-    if (__glSetMipmapLevelInfo(gc, tex, face, 0, GL_RGBA8,
-                               format, GL_NONE, width, height, 1) == GL_FALSE)
-    {
-        __GL_ERROR_EXIT(GL_INVALID_ENUM);
-    }
+    __glSetMipmapLevelInfo(gc, tex, face, 0, GL_RGBA8, format, GL_NONE, width, height, 1);
 
     if (!(*gc->dp.texDirectVIV)(gc, tex, width, height, format, pixels))
     {
@@ -4098,7 +4052,7 @@ GLvoid GL_APIENTRY __gles_TexDirectInvalidateVIV(__GLcontext *gc, GLenum target)
     __GL_TEXIMAGE2D_GET_OBJECT();
 
     /* A texture has to be bound. */
-    if (tex == gcvNULL || face >= 6)
+    if (face >= 6)
     {
         __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }
@@ -4145,11 +4099,7 @@ GLvoid GL_APIENTRY __gles_TexDirectVIVMap(__GLcontext *gc, GLenum target, GLsize
     }
 
     /* Init the mipmap info which will be queried by app */
-    if (__glSetMipmapLevelInfo(gc, tex, face, 0, format,
-                               format, GL_NONE, width, height, 1) == GL_FALSE)
-    {
-        __GL_ERROR_EXIT(GL_INVALID_ENUM);
-    }
+    __glSetMipmapLevelInfo(gc, tex, face, 0, format, format, GL_NONE, width, height, 1);
 
     if (!(*gc->dp.texDirectVIVMap)(gc, tex, target, width, height, format, logical, physical, tiled))
     {
@@ -4482,11 +4432,7 @@ GLvoid GL_APIENTRY __gles_TexBuffer(__GLcontext *gc, GLenum target, GLenum inter
     texelSize = size / bppPerTexel;
 
     /* Init the mipmap info which will be queried by app */
-    if (__glSetMipmapLevelInfo(gc, tex, 0, 0, internalformat,
-        format, type, texelSize, 1, 1) == GL_FALSE)
-    {
-        return;
-    }
+    __glSetMipmapLevelInfo(gc, tex, 0, 0, internalformat, format, type, texelSize, 1, 1);
 
     tex->bufObj = bufObj;
     tex->bufOffset = 0;
@@ -4567,11 +4513,7 @@ GLvoid GL_APIENTRY __gles_TexBufferRange(__GLcontext *gc, GLenum target, GLenum 
     texelSize = (GLint)size / bppPerTexel;
 
     /* Init the mipmap info which will be queried by app */
-    if (__glSetMipmapLevelInfo(gc, tex, 0, 0, internalformat,
-        format, type, texelSize, 1, 1) == GL_FALSE)
-    {
-        return;
-    }
+    __glSetMipmapLevelInfo(gc, tex, 0, 0, internalformat, format, type, texelSize, 1, 1);
 
     tex->bufObj = bufObj;
     tex->bufOffset = (GLint)offset;

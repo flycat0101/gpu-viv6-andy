@@ -36,7 +36,7 @@ clCreateProgramWithSource(
     gctUINT         length;
     gctUINT *       sizes = gcvNULL;
     gctUINT         i;
-    gctSTRING       source;
+    gctSTRING       source = gcvNULL;
     gctPOINTER      pointer = gcvNULL;
     gctINT          status;
 
@@ -141,7 +141,7 @@ clCreateProgramWithSource(
         *ErrcodeRet = CL_SUCCESS;
     }
 
-    gcoOS_Free(gcvNULL, sizes);
+    gcmOS_SAFE_FREE(gcvNULL, sizes);
 
     gcmFOOTER_ARG("%d program=0x%x", CL_SUCCESS, program);
     return program;
@@ -153,9 +153,10 @@ OnError:
             "OCL-006003: (clCreateProgramWithSource) cannot create program.  Maybe run out of memory.\n");
     }
 
-    if (sizes) gcoOS_Free(gcvNULL, sizes);
-    if(program != gcvNULL && program->devices != gcvNULL) gcoOS_Free(gcvNULL, program->devices);
-    if(program != gcvNULL) gcoOS_Free(gcvNULL, program);
+    if(sizes) gcmOS_SAFE_FREE(gcvNULL, sizes);
+    if(source != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, source);
+    if(program != gcvNULL && program->devices != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, program->devices);
+    if(program != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, program);
 
     if (ErrcodeRet)
     {
@@ -210,12 +211,12 @@ clCreateProgramWithBinary(
         }
     }
 
+    /* TODO - support multiple devices */
+    clmASSERT(NumDevices == 1, CL_INVALID_VALUE);
+
     /* Allocate program. */
     clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsProgram), &pointer), CL_OUT_OF_HOST_MEMORY);
     gcoOS_ZeroMemory(pointer, sizeof(clsProgram));
-
-    /* TODO - support multiple devices */
-    clmASSERT(NumDevices == 1, CL_INVALID_VALUE);
 
     program                  = (clsProgram_PTR) pointer;
     program->dispatch        = Context->dispatch;

@@ -236,6 +236,15 @@ _StallHw(
 
     do
     {
+        if (Hardware->features[gcvFEATURE_USC])
+        {
+            if ((Hardware->prevProgramStageBits & gcvPROGRAM_STAGE_COMPUTE_BIT) !=
+                (hints->stageBits & gcvPROGRAM_STAGE_COMPUTE_BIT))
+            {
+                reconfigUSC = gcvTRUE;
+            }
+        }
+
         if (((Hardware->config->instructionCount > 256) &&
              (Hardware->config->instructionCount <= 1024) &&
              (!Hardware->features[gcvFEATURE_BUG_FIXES7]))
@@ -252,14 +261,6 @@ _StallHw(
             stallDraw = gcvTRUE;
         }
 
-        if (Hardware->features[gcvFEATURE_USC])
-        {
-            if ((Hardware->prevProgramStageBits & gcvPROGRAM_STAGE_COMPUTE_BIT) !=
-                (hints->stageBits & gcvPROGRAM_STAGE_COMPUTE_BIT))
-            {
-                reconfigUSC = gcvTRUE;
-            }
-        }
 
         if (prevProgUnifiedStatus->useIcache != hints->unifiedStatus.useIcache)
         {
@@ -488,6 +489,13 @@ gcoHARDWARE_LoadProgram(
     }
 
     Hardware->SHDirty->shaderDirty = gcvTRUE;
+
+    if ((Hardware->prevProgramStageBits & gcvPROGRAM_STAGE_COMPUTE_BIT) !=
+        (Hardware->SHStates->programState.hints->stageBits & gcvPROGRAM_STAGE_COMPUTE_BIT) &&
+		!Hardware->features[gcvFEATURE_PSIO_MSAA_CL_FIX])
+    {
+        Hardware->MsaaDirty->msaaConfigDirty = gcvTRUE;
+    }
 
     /* Need to reprogram centroid table for some DEQP cases. */
     if (Hardware->patchID == gcvPATCH_DEQP)
@@ -1308,6 +1316,12 @@ gcoHARDWARE_InvokeThreadWalkerGL(
         gcmONERROR(gcoHARDWARE_FlushDepthOnly(Hardware));
         /* Flush shader states. */
         gcmONERROR(gcoHARDWARE_FlushShaders(Hardware, gcvPRIMITIVE_TRIANGLE_LIST, (gctPOINTER*)&memory));
+    }
+
+    if (Hardware->MsaaDirty->msaaConfigDirty)
+    {
+        /* Flush anti-alias states. */
+        gcmONERROR(gcoHARDWARE_FlushSampling(Hardware, (gctPOINTER*)&memory));
     }
 
     if (Hardware->features[gcvFEATURE_SH_INSTRUCTION_PREFETCH])

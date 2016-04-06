@@ -10099,8 +10099,7 @@ gcoSURF_FillFromTile(
     &&  (!Surface->isMsaa)
     &&  (Surface->compressed == gcvFALSE)
     &&  (Surface->tileStatusNode.pool != gcvPOOL_UNKNOWN)
-    &&  (Surface->tileStatusDisabled == gcvFALSE)
-    &&  ((Surface->node.size & 0x3fff) == 0))
+    &&  (Surface->tileStatusDisabled == gcvFALSE))
     {
         /*
          * Call underlying tile status disable to do FC fill:
@@ -12504,6 +12503,337 @@ OnError:
     gcmFOOTER();
     return status;
 }
+
+
+/*******************************************************************************
+**
+**  depr_gcoSURF_Resolve
+**
+**  Resolve the surface to the frame buffer.  Resolve means that the frame is
+**  finished and should be displayed into the frame buffer, either by copying
+**  the data or by flipping to the surface, depending on the hardware's
+**  capabilities.
+**
+**  INPUT:
+**
+**      gcoSURF SrcSurface
+**          Pointer to a gcoSURF object that represents the source surface
+**          to be resolved.
+**
+**      gcoSURF DstSurface
+**          Pointer to a gcoSURF object that represents the destination surface
+**          to resolve into, or gcvNULL if the resolve surface is
+**          a physical address.
+**
+**      gctUINT32 DstAddress
+**          Physical address of the destination surface.
+**
+**      gctPOINTER DstBits
+**          Logical address of the destination surface.
+**
+**      gctINT DstStride
+**          Stride of the destination surface.
+**          If 'DstSurface' is not gcvNULL, this parameter is ignored.
+**
+**      gceSURF_TYPE DstType
+**          Type of the destination surface.
+**          If 'DstSurface' is not gcvNULL, this parameter is ignored.
+**
+**      gceSURF_FORMAT DstFormat
+**          Format of the destination surface.
+**          If 'DstSurface' is not gcvNULL, this parameter is ignored.
+**
+**      gctUINT DstWidth
+**          Width of the destination surface.
+**          If 'DstSurface' is not gcvNULL, this parameter is ignored.
+**
+**      gctUINT DstHeight
+**          Height of the destination surface.
+**          If 'DstSurface' is not gcvNULL, this parameter is ignored.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+depr_gcoSURF_Resolve(
+    IN gcoSURF SrcSurface,
+    IN gcoSURF DstSurface,
+    IN gctUINT32 DstAddress,
+    IN gctPOINTER DstBits,
+    IN gctINT DstStride,
+    IN gceSURF_TYPE DstType,
+    IN gceSURF_FORMAT DstFormat,
+    IN gctUINT DstWidth,
+    IN gctUINT DstHeight
+    )
+{
+    gcsPOINT rectOrigin;
+    gcsPOINT rectSize;
+    gceSTATUS status;
+
+    gcmHEADER_ARG("SrcSurface=0x%x DstSurface=0x%x DstAddress=%08x DstBits=0x%x "
+              "DstStride=%d DstType=%d DstFormat=%d DstWidth=%u "
+              "DstHeight=%u",
+              SrcSurface, DstSurface, DstAddress, DstBits, DstStride,
+              DstType, DstFormat, DstWidth, DstHeight);
+
+    /* Validate the source surface. */
+    gcmVERIFY_OBJECT(SrcSurface, gcvOBJ_SURF);
+
+    /* Fill in coordinates. */
+    rectOrigin.x = 0;
+    rectOrigin.y = 0;
+
+    if (DstSurface == gcvNULL)
+    {
+        rectSize.x = DstWidth;
+        rectSize.y = DstHeight;
+    }
+    else
+    {
+        rectSize.x = DstSurface->alignedW;
+        rectSize.y = DstSurface->alignedH;
+    }
+
+    /* Call generic function. */
+    status = depr_gcoSURF_ResolveRect(
+        SrcSurface, DstSurface,
+        DstAddress, DstBits, DstStride, DstType, DstFormat,
+        DstWidth, DstHeight,
+        &rectOrigin, &rectOrigin, &rectSize
+        );
+    gcmFOOTER();
+    return status;
+}
+
+/*******************************************************************************
+**
+**  depr_gcoSURF_ResolveRect
+**
+**  Resolve a rectangular area of a surface to another surface.
+**
+**  INPUT:
+**
+**      gcoSURF SrcSurface
+**          Pointer to a gcoSURF object that represents the source surface
+**          to be resolved.
+**
+**      gcoSURF DstSurface
+**          Pointer to a gcoSURF object that represents the destination surface
+**          to resolve into, or gcvNULL if the resolve surface is
+**          a physical address.
+**
+**      gctUINT32 DstAddress
+**          Physical address of the destination surface.
+**          If 'DstSurface' is not gcvNULL, this parameter is ignored.
+**
+**      gctPOINTER DstBits
+**          Logical address of the destination surface.
+**
+**      gctINT DstStride
+**          Stride of the destination surface.
+**          If 'DstSurface' is not gcvNULL, this parameter is ignored.
+**
+**      gceSURF_TYPE DstType
+**          Type of the destination surface.
+**          If 'DstSurface' is not gcvNULL, this parameter is ignored.
+**
+**      gceSURF_FORMAT DstFormat
+**          Format of the destination surface.
+**          If 'DstSurface' is not gcvNULL, this parameter is ignored.
+**
+**      gctUINT DstWidth
+**          Width of the destination surface.
+**          If 'DstSurface' is not gcvNULL, this parameter is ignored.
+**
+**      gctUINT DstHeight
+**          Height of the destination surface.
+**          If 'DstSurface' is not gcvNULL, this parameter is ignored.
+**
+**      gcsPOINT_PTR SrcOrigin
+**          The origin of the source area to be resolved.
+**
+**      gcsPOINT_PTR DstOrigin
+**          The origin of the destination area to be resolved.
+**
+**      gcsPOINT_PTR RectSize
+**          The size of the rectangular area to be resolved.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+depr_gcoSURF_ResolveRect(
+    IN gcoSURF SrcSurface,
+    IN gcoSURF DstSurface,
+    IN gctUINT32 DstAddress,
+    IN gctPOINTER DstBits,
+    IN gctINT DstStride,
+    IN gceSURF_TYPE DstType,
+    IN gceSURF_FORMAT DstFormat,
+    IN gctUINT DstWidth,
+    IN gctUINT DstHeight,
+    IN gcsPOINT_PTR SrcOrigin,
+    IN gcsPOINT_PTR DstOrigin,
+    IN gcsPOINT_PTR RectSize
+    )
+{
+    gceSTATUS status;
+    gctPOINTER destination[3] = {gcvNULL};
+    gctPOINTER mapInfo = gcvNULL;
+    gcoSURF dstSurf;
+    struct _gcoSURF wrapSurf;
+    gctUINT32 address;
+
+    gcmHEADER_ARG("SrcSurface=0x%x DstSurface=0x%x DstAddress=%08x DstBits=0x%x "
+              "DstStride=%d DstType=%d DstFormat=%d DstWidth=%u "
+              "DstHeight=%u SrcOrigin=0x%x DstOrigin=0x%x RectSize=0x%x",
+              SrcSurface, DstSurface, DstAddress, DstBits, DstStride,
+              DstType, DstFormat, DstWidth, SrcOrigin, DstOrigin,
+              RectSize);
+
+    /* Validate the source surface. */
+    gcmVERIFY_OBJECT(SrcSurface, gcvOBJ_SURF);
+
+    do
+    {
+        gcsSURF_VIEW srcView = {SrcSurface, 0, 1};
+        gcsSURF_VIEW dstView = {DstSurface, 0, 1};
+        gcsSURF_RESOLVE_ARGS rlvArgs = {0};
+
+        /* Destination surface specified? */
+        if (DstSurface != gcvNULL)
+        {
+            /* Set the pointer to the structure. */
+            dstSurf = DstSurface;
+
+            /* Lock the surface. */
+            if (DstBits == gcvNULL)
+            {
+                gcmERR_BREAK(
+                    gcoSURF_Lock(DstSurface,
+                                 gcvNULL,
+                                 destination));
+            }
+        }
+
+        /* Create a surface wrapper. */
+        else
+        {
+            gcoOS_ZeroMemory(&wrapSurf, gcmSIZEOF(wrapSurf));
+
+            dstSurf = &wrapSurf;
+            /* Fill the surface info structure. */
+            dstSurf->type          = DstType;
+            dstSurf->format        = DstFormat;
+            dstSurf->requestW      = DstWidth;
+            dstSurf->requestH      = DstHeight;
+            dstSurf->requestD      = 1;
+            dstSurf->allocedW      = DstWidth;
+            dstSurf->allocedH      = DstHeight;
+            dstSurf->alignedW      = DstWidth;
+            dstSurf->alignedH      = DstHeight;
+            dstSurf->rotation      = gcvSURF_0_DEGREE;
+            dstSurf->orientation   = gcvORIENTATION_TOP_BOTTOM;
+            dstSurf->stride        = DstStride;
+            dstSurf->sliceSize     =
+            dstSurf->layerSize     =
+            dstSurf->size          = DstStride * DstHeight;
+            dstSurf->node.valid    = gcvTRUE;
+            dstSurf->node.pool     = gcvPOOL_UNKNOWN;
+            gcsSURF_NODE_SetHardwareAddress(&(dstSurf->node), DstAddress);
+            dstSurf->node.logical  = DstBits;
+            dstSurf->sampleInfo    = g_sampleInfos[1];
+            dstSurf->isMsaa        = gcvFALSE;
+            dstSurf->colorSpace    = gcd_QUERY_COLOR_SPACE(DstFormat);
+
+            gcmERR_BREAK(gcoHARDWARE_ConvertFormat(DstFormat, &dstSurf->bitsPerPixel, gcvNULL));
+            gcmERR_BREAK(
+                gcoHARDWARE_AlignToTileCompatible(gcvNULL,
+                                                  DstType,
+                                                  0,
+                                                  DstFormat,
+                                                  &dstSurf->alignedW,
+                                                  &dstSurf->alignedH,
+                                                  1,
+                                                  &dstSurf->tiling,
+                                                  &dstSurf->superTiled,
+                                                  &dstSurf->hAlignment));
+
+            /* Map the user memory. */
+            if (DstBits != gcvNULL)
+            {
+                gcmERR_BREAK(
+                    gcoOS_MapUserMemory(gcvNULL,
+                                        DstBits,
+                                        dstSurf->size,
+                                        &mapInfo,
+                                        &address));
+
+                gcsSURF_NODE_SetHardwareAddress(&dstSurf->node, address);
+            }
+
+            dstSurf->pfGetAddr = gcoHARDWARE_GetProcCalcPixelAddr(gcvNULL, dstSurf);
+            dstView.surf = &wrapSurf;
+        }
+
+        rlvArgs.version = gcvHAL_ARG_VERSION_V2;
+        rlvArgs.uArgs.v2.numSlices = 1;
+        rlvArgs.uArgs.v2.srcOrigin = *SrcOrigin;
+        rlvArgs.uArgs.v2.dstOrigin = *DstOrigin;
+
+        /* Determine the resolve size. */
+        if ((DstOrigin->x == 0)
+        &&  (DstOrigin->y == 0)
+        &&  (RectSize->x == (gctINT)dstSurf->requestW)
+        &&  (RectSize->y == (gctINT)dstSurf->requestH)
+        )
+        {
+            /* Full destination resolve, a special case. */
+            rlvArgs.uArgs.v2.rectSize.x = dstSurf->alignedW;
+            rlvArgs.uArgs.v2.rectSize.y = dstSurf->alignedH;
+        }
+        else
+        {
+            rlvArgs.uArgs.v2.rectSize.x = RectSize->x;
+            rlvArgs.uArgs.v2.rectSize.y = RectSize->y;
+        }
+
+        /* Perform resolve. */
+        gcmERR_BREAK(gcoHARDWARE_ResolveRect(gcvNULL, &srcView, &dstView, &rlvArgs));
+    }
+    while (gcvFALSE);
+
+    /* Unlock the surface. */
+    if (destination[0] != gcvNULL)
+    {
+        /* Unlock the resolve buffer. */
+        gcmVERIFY_OK(
+            gcoSURF_Unlock(DstSurface,
+                           destination[0]));
+    }
+
+    /* Unmap the surface. */
+    if (mapInfo != gcvNULL)
+    {
+        gcmGETHARDWAREADDRESS(dstSurf->node, address);
+
+        /* Unmap the user memory. */
+        gcmVERIFY_OK(
+            gcoHAL_ScheduleUnmapUserMemory(gcvNULL,
+                                           mapInfo,
+                                           dstSurf->size,
+                                           address,
+                                           DstBits));
+    }
+
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
 #endif
 
 gceSTATUS

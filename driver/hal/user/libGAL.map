@@ -147,6 +147,7 @@
         gcoOS_GetDisplayInfoEx;
         gcoOS_GetDisplayVirtual;
         gcoOS_GetDisplayBackbuffer;
+        gcoOS_CancelDisplayBackbuffer;
         gcoOS_SetDisplayVirtual;
         gcoOS_SetSwapInterval;
         gcoOS_SetSwapIntervalEx;
@@ -323,6 +324,9 @@
         gcfDump2DSurface;
         gcfAddMemoryInfo;
         gcfDelMemoryInfo;
+
+	    depr_gcoSURF_Resolve;
+    	depr_gcoSURF_ResolveRect;
 
         gcoSURF_AppendTileStatus;
         gcoSURF_Blend;
@@ -854,6 +858,7 @@
         gcoPROFILER_Write;
         gcoPROFILER_Flush;
         gcoPROFILER_EndFrame;
+        gcoPROFILER_BeginDraw;
         gcoPROFILER_EndDraw;
         gcoPROFILER_ShaderFS;
         gcoPROFILER_ShaderVS;

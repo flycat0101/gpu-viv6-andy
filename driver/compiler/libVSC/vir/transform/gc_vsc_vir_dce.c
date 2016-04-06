@@ -15,6 +15,8 @@
 
 static const VSC_DCE_Mark emptyMark = { 0 };
 
+#define   VSC_DCE_CONTROL_MAX_TEMP     3500
+
 static gctUINT
 _VSC_DCE_GetInstChannelNum(
     IN VIR_OpCode opcode
@@ -982,6 +984,17 @@ _VSC_DCE_PerformOnShader(
         VSC_OPTN_DCEOptions_TRACE_INPUT))
     {
         VIR_Shader_Dump(gcvNULL, "DCE Begin", shader, gcvTRUE);
+    }
+
+    if (!ENABLE_FULL_NEW_LINKER)
+    {
+        /* too large shader, don't do control DCE */
+        if (VIR_Shader_GetVirRegCount(shader) > VSC_DCE_CONTROL_MAX_TEMP)
+        {
+            gctUINT32 opts = VSC_OPTN_DCEOptions_GetOPTS(options);
+            opts = opts & (~VSC_OPTN_DCEOptions_OPTS_CONTROL);
+            VSC_OPTN_DCEOptions_SetOPTS(options, opts);
+        }
     }
 
     if(VSC_UTILS_MASK(VSC_OPTN_DCEOptions_GetOPTS(options),

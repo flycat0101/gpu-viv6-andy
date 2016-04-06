@@ -963,12 +963,6 @@ gc_gralloc_lock_ycbcr(
              hnd, Usage, handle->allocUsage);
     }
 
-    if (handle->format != HAL_PIXEL_FORMAT_YCbCr_420_888)
-    {
-        /* Only aviable for HAL_PIXEL_FORMAT_YCbCr_420_888 */
-        return -EINVAL;
-    }
-
     handle->lockUsage = (int) Usage;
 
     /* Get hardware type. */
@@ -980,7 +974,7 @@ gc_gralloc_lock_ycbcr(
     /* Obtain HAL surface. */
     surface = (gcoSURF) handle->surface;
 
-    /* Must be NV12. */
+    /* Lock to get plane memory. */
     gcmVERIFY_OK(
         gcoSURF_Lock(surface, gcvNULL, vaddr));
 
@@ -988,24 +982,116 @@ gc_gralloc_lock_ycbcr(
     gcmVERIFY_OK(
         gcoSURF_Unlock(surface, gcvNULL));
 
-    /*
-     * Notice: The following is only for NV12.
-     * Modify if HAL_PIXEL_FORMAT_YCbCr_420_888 is not NV12!
-     */
-    YCbCr->y  = (void *) vaddr[0];
-    YCbCr->cb = (void *) vaddr[1];
-    YCbCr->cr = (void *)((intptr_t) vaddr[1] + 1);
-
     gcmVERIFY_OK(
         gcoSURF_GetAlignedSize(surface, gcvNULL, gcvNULL, &stride));
-
-    YCbCr->ystride = stride;
-    YCbCr->cstride = stride;
-    YCbCr->chroma_step = 2;
 
     /* Restore hardware type. */
     gcoHAL_SetHardwareType(gcvNULL, hwType);
 
+    /* Fill in addresses. */
+    switch (handle->halFormat)
+    {
+    case gcvSURF_YUY2:
+        YCbCr->y  = (void *)((uintptr_t) vaddr[0] + 0);
+        YCbCr->cb = (void *)((uintptr_t) vaddr[0] + 1);
+        YCbCr->cr = (void *)((uintptr_t) vaddr[0] + 3);
+        break;
+    case gcvSURF_UYVY:
+        YCbCr->y  = (void *)((uintptr_t) vaddr[0] + 1);
+        YCbCr->cb = (void *)((uintptr_t) vaddr[0] + 0);
+        YCbCr->cr = (void *)((uintptr_t) vaddr[0] + 2);
+        break;
+    case gcvSURF_YVYU:
+        YCbCr->y  = (void *)((uintptr_t) vaddr[0] + 0);
+        YCbCr->cb = (void *)((uintptr_t) vaddr[0] + 3);
+        YCbCr->cr = (void *)((uintptr_t) vaddr[0] + 1);
+        break;
+    case gcvSURF_VYUY:
+        YCbCr->y  = (void *)((uintptr_t) vaddr[0] + 2);
+        YCbCr->cb = (void *)((uintptr_t) vaddr[0] + 0);
+        YCbCr->cr = (void *)((uintptr_t) vaddr[0] + 1);
+        break;
+    case gcvSURF_NV16:
+    case gcvSURF_NV12:
+        YCbCr->y  = (void *)((uintptr_t) vaddr[0] + 0);
+        YCbCr->cb = (void *)((uintptr_t) vaddr[1] + 0);
+        YCbCr->cr = (void *)((uintptr_t) vaddr[1] + 1);
+        break;
+    case gcvSURF_NV61:
+    case gcvSURF_NV21:
+        YCbCr->y  = (void *)((uintptr_t) vaddr[0] + 0);
+        YCbCr->cb = (void *)((uintptr_t) vaddr[1] + 1);
+        YCbCr->cr = (void *)((uintptr_t) vaddr[1] + 0);
+        break;
+    case gcvSURF_YV12:
+    case gcvSURF_I420:
+        YCbCr->y  = (void *)((uintptr_t) vaddr[0] + 0);
+        YCbCr->cb = (void *)((uintptr_t) vaddr[1] + 0);
+        YCbCr->cr = (void *)((uintptr_t) vaddr[2] + 0);
+        break;
+    case gcvSURF_A8R8G8B8:
+    case gcvSURF_X8R8G8B8:
+    case gcvSURF_A8B8G8R8:
+    case gcvSURF_X8B8G8R8:
+    case gcvSURF_R5G6B5:
+    case gcvSURF_R5G5B5A1:
+    case gcvSURF_A1R5G5B5:
+    case gcvSURF_A4R4G4B4:
+    case gcvSURF_R4G4B4A4:
+        YCbCr->y  = vaddr[0];
+        YCbCr->cb = NULL;
+        YCbCr->cr = NULL;
+        break;
+    default:
+        /* Not support for other formats currently. */
+        return -EINVAL;
+    }
+
+    /* Fill in strides. */
+    switch (handle->halFormat)
+    {
+    case gcvSURF_YUY2:
+    case gcvSURF_UYVY:
+    case gcvSURF_YVYU:
+    case gcvSURF_VYUY:
+        /* Interleaved 422 formats. */
+        YCbCr->ystride = stride;
+        YCbCr->cstride = stride;
+        YCbCr->chroma_step = 4;
+        break;
+    case gcvSURF_NV16:
+    case gcvSURF_NV61:
+    case gcvSURF_NV12:
+    case gcvSURF_NV21:
+        /* Semi-planar 422/420 formats. */
+        YCbCr->ystride = stride;
+        YCbCr->cstride = stride;
+        YCbCr->chroma_step = 2;
+        break;
+    case gcvSURF_YV12:
+    case gcvSURF_I420:
+        /* Planar 420 formats. */
+        YCbCr->ystride = stride;
+        YCbCr->cstride = ((stride / 2) + 0xf) & ~0xf;
+        YCbCr->chroma_step = 1;
+        break;
+    case gcvSURF_A8R8G8B8:
+    case gcvSURF_X8R8G8B8:
+    case gcvSURF_A8B8G8R8:
+    case gcvSURF_X8B8G8R8:
+    case gcvSURF_R5G6B5:
+    case gcvSURF_R5G5B5A1:
+    case gcvSURF_A1R5G5B5:
+    case gcvSURF_A4R4G4B4:
+    case gcvSURF_R4G4B4A4:
+        YCbCr->ystride = stride;
+        YCbCr->cstride = 0;
+        YCbCr->chroma_step = 0;
+        break;
+    default:
+        /* Not support for other formats currently. */
+        return -EINVAL;
+    }
     return 0;
 }
 #endif

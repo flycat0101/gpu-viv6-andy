@@ -24,14 +24,18 @@ LOCAL_SRC_FILES := \
 	gc_cl_enqueue.c \
 	gc_cl_event.c \
 	gc_cl_extension.c \
-	gc_cl_gl.c \
 	gc_cl_icd.c \
 	gc_cl_kernel.c \
 	gc_cl_mem.c \
 	gc_cl_platform.c \
 	gc_cl_program.c \
 	gc_cl_profiler.c \
-	gc_cl_sampler.c
+	gc_cl_sampler.c \
+
+ifeq ($(ENABLE_CL_GL), 1)
+    LOCAL_SRC_FILES += \
+                    gc_cl_gl.c
+endif
 
 LOCAL_CFLAGS := \
 	$(CFLAGS)
@@ -68,6 +72,10 @@ endif
 
 ifeq ($(BUILD_OPENCL_FP),1)
 LOCAL_CFLAGS         += -DBUILD_OPENCL_FP=1
+endif
+
+ifeq ($(ENABLE_CL_GL), 1)
+LOCAL_CFLAGS         += -DENABLE_CL_GL=1
 endif
 
 LOCAL_MODULE_TAGS    := optional

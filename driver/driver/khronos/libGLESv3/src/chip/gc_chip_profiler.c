@@ -65,6 +65,33 @@ gctBOOL __glesIsSyncMode = gcvTRUE;
     } \
     while (gcvFALSE)
 
+#if VIVANTE_PROFILER_PROBE
+#define gcmWRITE_XML_STRING(String) \
+    do \
+        { \
+    gceSTATUS status; \
+    gctINT32 length; \
+    length = (gctINT32) gcoOS_StrLen((gctSTRING) String, gcvNULL); \
+    gcmERR_BREAK(gcoPROFILER_Write(GLFFPROFILER_HAL, length, String)); \
+        } \
+            while (gcvFALSE)
+
+#define gcmWRITE_XML_Value(Counter,Value,Dec) \
+    do \
+        { \
+    char buffer[256]; \
+    gctUINT offset = 0; \
+    gceSTATUS status; \
+    gcmERR_BREAK(gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), \
+    &offset, \
+    Dec?"<%s>%d</%s>\n":"<%s>%x</%s>\n", \
+    Counter, \
+    Value, \
+    Counter)); \
+    gcmWRITE_XML_STRING(buffer); \
+        } \
+            while (gcvFALSE)
+#endif
 
 #define PRO_NODE_SIZE 8
 typedef struct _program_list{
@@ -468,6 +495,16 @@ gcChipDestroyProfiler(
             gcoOS_Free(gcvNULL, GLFFPROFILER_HAL);
 #endif
     }
+    else
+    {
+#if VIVANTE_PROFILER_PROBE
+        gcmVERIFY_OK(gcoPROFILER_Destroy(GLFFPROFILER_HAL));
+#if VIVANTE_PROFILER_CONTEXT
+        if (GLFFPROFILER_HAL != gcvNULL)
+            gcoOS_Free(gcvNULL, GLFFPROFILER_HAL);
+#endif
+#endif
+    }
 }
 
 /* Function for printing frame number only once */
@@ -498,6 +535,26 @@ beginFrame(
 
             Context->profiler.frameBegun = 1;
         }
+    }
+    else
+    {
+#if VIVANTE_PROFILER_PROBE
+        if (!Context->profiler.frameBegun)
+        {
+            /* write screen size */
+            if (Context->profiler.frameNumber == 0 && Context->drawablePrivate)
+            {
+                gceCHIPMODEL chipModel;
+                gctUINT32 chipRevision;
+                gcmVERIFY_OK(gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL));
+                gcmWRITE_XML_STRING("<DrawCounter>\n");
+                gcmWRITE_XML_STRING("\t"); gcmWRITE_XML_Value("ChipID", chipModel, 0);
+                gcmWRITE_XML_STRING("\t"); gcmWRITE_XML_Value("ChipRevision", chipRevision, 0);
+            }
+
+            Context->profiler.frameBegun = 1;
+        }
+#endif
     }
 }
 
@@ -732,7 +789,13 @@ endFrame(
 #if VIVANTE_PROFILER_PROBE
     else
     {
+        beginFrame(Context);
         gcoPROFILER_EndFrame(GLFFPROFILER_HAL);
+        gcoPROFILER_Flush(GLFFPROFILER_HAL);
+
+        /* Next frame. */
+        Context->profiler.frameNumber++;
+        Context->profiler.frameBegun = 0;
     }
 #endif
 }
@@ -791,6 +854,7 @@ static void beginDraw(IN __GLcontext *Context)
          gcmWRITE_COUNTER(VPC_ES30_DRAW_NO, Context->profiler.drawCount);
      }
 #endif
+     gcoPROFILER_BeginDraw(GLFFPROFILER_HAL);
 }
 
 static void endDraw(IN __GLcontext *Context){
@@ -917,8 +981,9 @@ __glChipProfiler(
         }
 #if VIVANTE_PROFILER_PERDRAW
         beginFrame(Context);
-#endif
+#elif defined VIVANTE_PROFILER_PROBE
         beginDraw(Context);
+#endif
 #endif
         break;
     case GL3_PROFILER_DRAW_END:

@@ -427,14 +427,14 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     gceSTATUS status;
     gctINT i;
     const char *sBasicFile[] = {
-        "resource/source_YUV420_400x400_Linear.vimg",
         "resource/android_720x1280_icons.bmp",
         "resource/zero2_UYVY_1920x1080_Linear.vimg",
-        "resource/Boston_YV12_640x480_Linear.vimg",
-        "resource/GoneFishing2.bmp",
-        "resource/zero2_NV12_1920x1080_Linear.vimg",
-        "resource/Crew_NV16_1280x720_Linear.vimg",
+        "resource/VV_Background.bmp",
+        "resource/source_YUV420_400x400_Linear.vimg",
         "resource/zero2_ARGB4.bmp",
+        "resource/GoneFishing2.bmp",
+        "resource/zero2_YUY2_640X480_Linear.vimg",
+        "resource/smooth_720p.bmp",
         };
 
     gctUINT32 k, listLen = sizeof(FeatureList)/sizeof(gctINT);

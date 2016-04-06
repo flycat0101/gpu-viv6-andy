@@ -1704,7 +1704,7 @@ gcChipValidateProgramSamplersCB(
                 chipCtx->texture.halTexture[unit].magFilter = gcvTEXTURE_POINT;
         }
 
-        if (pgInstance->extraSamplerMap[sampler].subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_ADVANCED_BLEND_SAMPLER)
+        if (pgInstance->extraSamplerMap[sampler].subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_ADVANCED_BLEND_SAMPLER || pgInstance->extraSamplerMap[sampler].subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_SAMPLER )
         {
             gcsTEXTURE texParams;
             if (gcvNULL == chipCtx->rtTexture)
@@ -2381,7 +2381,8 @@ gcChipSetAlphaBlend(
 
             GLboolean hwBlend = (!shaderBlendPatch &&
                                  !chipCtx->advBlendInShader &&
-                                 gc->state.enables.colorBuffer.blend[i]);
+                                 gc->state.enables.colorBuffer.blend[i] &&
+                                 (!fsInstance->pgStateKeyMask.s.hasAlphaBlend));
 
             gcmONERROR(gco3D_EnableBlendingIndexed(chipCtx->engine, halRTIndex, hwBlend));
 
@@ -2998,6 +2999,24 @@ gcChipRecompileShader(
         }
     }
 
+      /* 12, shader blend */
+    if (pgStateKeyMask->s.hasAlphaBlend)
+    {
+        if (pgStateKey->staticKey->alphaBlend)
+        {
+            gcmONERROR(gcCreateAlphaBlendDirective(0, &pgInstance->recompilePatchInfo.recompilePatchDirectivePtr));
+        }
+    }
+
+     /* 13, shader polygon offset */
+    if (pgStateKeyMask->s.hasPolygonOffset)
+    {
+        if (pgStateKey->staticKey->ShaderPolygonOffset)
+        {
+            gcmONERROR(gcCreateDepthBiasDirective(&pgInstance->recompilePatchInfo.recompilePatchDirectivePtr));
+        }
+    }
+
     if (recompileInfo->recompilePatchDirectivePtr)
     {
         /* Do first kind of recompile */
@@ -3120,6 +3139,18 @@ gcChipNeedRecompile(
         {
             pgStateKey->staticKey->colorKill = gcvTRUE;
             pgStateKeyMask->s.hasColorKill = 1;
+        }
+
+        if (pgKeyState->staticKey->alphaBlend)
+        {
+            pgStateKey->staticKey->alphaBlend = GL_TRUE;
+            pgStateKeyMask->s.hasAlphaBlend = 1;
+        }
+
+        if (pgKeyState->staticKey->ShaderPolygonOffset)
+        {
+            pgStateKey->staticKey->ShaderPolygonOffset = GL_TRUE;
+            pgStateKeyMask->s.hasPolygonOffset = 1;
         }
     }
 
@@ -3761,6 +3792,62 @@ gcChipRecompileEvaluateKeyStates(
         }
     }
 
+
+    if ((chipCtx->patchId == gcvPATCH_DEQP) &&
+        (gc->apiVersion == __GL_API_VERSION_ES20) &&
+        (gc->globalDirtyState[__GL_DIRTY_ATTRS_1] & __GL_ALPHABLEND_ATTR_BITS) &&
+        (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_HALF_FLOAT_PIPE) == gcvFALSE)
+        )
+    {
+        if (gc->state.enables.colorBuffer.blend[0] &&
+            (!gc->frameBuffer.drawFramebufObj->name) &&
+            (program->progFlags.alphaBlend == 1) &&
+            (gc->vertexArray.indexCount == 6))
+        {
+            if(pgKeyState->staticKey->alphaBlend != gcvTRUE)
+            {
+                pgKeyDirty = gcvTRUE;
+            }
+            pgKeyState->staticKey->alphaBlend = gcvTRUE;
+
+        }
+        else
+        {
+            if(pgKeyState->staticKey->alphaBlend != gcvFALSE)
+            {
+                pgKeyDirty = gcvTRUE;
+            }
+            pgKeyState->staticKey->alphaBlend = gcvFALSE;
+
+        }
+    }
+
+
+
+    if ((gc->globalDirtyState[__GL_DIRTY_ATTRS_1] & __GL_POLYGONOFFSET_FILL_ENDISABLE_BIT) &&
+        (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_DEPTH_BIAS_FIX) == gcvFALSE))
+    {
+        if (gc->state.enables.polygon.polygonOffsetFill)
+        {
+            if(pgKeyState->staticKey->ShaderPolygonOffset != gcvTRUE)
+            {
+                pgKeyDirty = gcvTRUE;
+            }
+            pgKeyState->staticKey->ShaderPolygonOffset = gcvTRUE;
+
+        }
+        else
+        {
+            if(pgKeyState->staticKey->ShaderPolygonOffset != gcvFALSE)
+            {
+                pgKeyDirty = gcvTRUE;
+            }
+            pgKeyState->staticKey->ShaderPolygonOffset = gcvFALSE;
+
+        }
+    }
+
+
     status = pgKeyDirty ? gcvSTATUS_TRUE : gcvSTATUS_FALSE;
 
 OnError:
@@ -3837,6 +3924,16 @@ gcChipValidateRecompileStateCB(
                     gcmONERROR(gcChipRecompileShader(gc, chipCtx, progObj, program));
                 }
 
+                  /* If program change, the sampler dirty is full, but when only instance change
+                recompile could have more sampler, which we need dirty the
+                mapDirty to trigger the validate texture.
+                In __glBuildTexEnableDim, we don't get new pgInstance yet.
+                */
+                if (newPgInstance->pgStateKey->staticKey->alphaBlend)
+                {
+                    __glBitmaskSet(&gc->shaderProgram.samplerMapDirty,  newPgInstance->rtSampler);
+                }
+
                 pgInstanceChanged = GL_TRUE;
             }
         }
@@ -3861,6 +3958,9 @@ gcChipValidateRecompileStateCB(
             GLint i;
             gcePROGRAM_STAGE halStage = gcvPROGRAM_STAGE_VERTEX;
             gcePROGRAM_STAGE_BIT stageBits = program->stageBits;
+
+            /* set dirty.*/
+            chipCtx->chipDirty.uDefer.sDefer.pgInsChanged = 1;
 
             /* Decrease ref of replaced one */
             gcChipUtilsObjectReleaseRef(oldPgInstance->ownerCacheObj);
@@ -3941,6 +4041,35 @@ gcChipValidateRecompileStateCB(
                 newPgInstance->privateUniforms[i].dirty = GL_TRUE;
             }
         }
+    }
+
+     if (program->curPgInstance->pgStateKey->staticKey->alphaBlend &&
+        chipCtx->rtTexture)
+    {
+        gcoSURF rt = chipCtx->drawRtViews[0].surf;
+        gcoSURF tex = gcvNULL;
+        gcsSURF_VIEW mipView;
+        gcsSURF_RESOLVE_ARGS rlvArgs = {0};
+        gcmONERROR(gcoTEXTURE_GetMipMap(chipCtx->rtTexture, 0, &tex));
+
+        rlvArgs.version = gcvHAL_ARG_VERSION_V2;
+        rlvArgs.uArgs.v2.yInverted  = gcoSURF_QueryFlags(rt, gcvSURF_FLAG_CONTENT_YINVERTED);
+        rlvArgs.uArgs.v2.rectSize.x = (gctINT)chipCtx->drawRTWidth;
+        rlvArgs.uArgs.v2.rectSize.y = (gctINT)chipCtx->drawRTHeight;
+        rlvArgs.uArgs.v2.numSlices  = 1;
+        mipView.surf = tex;
+        mipView.firstSlice = 0;
+        mipView.numSlices = 1;
+
+        /* Flush all cache in pipe */
+        gcmONERROR(gcoSURF_Flush(rt));
+
+        /* Sync texture surface from current RT */
+        gcmONERROR(gcoSURF_ResolveRect(&chipCtx->drawRtViews[0], &mipView, &rlvArgs));
+
+        gcmONERROR(gcoTEXTURE_Flush(chipCtx->rtTexture));
+
+        gcmONERROR(gco3D_Semaphore(chipCtx->engine, gcvWHERE_RASTER, gcvWHERE_PIXEL, gcvHOW_SEMAPHORE));
     }
 
     /* This draw does not need recompile, but previous recompile really failed */

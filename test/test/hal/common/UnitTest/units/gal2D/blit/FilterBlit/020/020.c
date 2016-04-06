@@ -369,11 +369,10 @@ static void CDECL Destroy(Test2D *t2d)
 
 const gceFEATURE FeatureList[]=
 {
-    gcvFEATURE_SCALER,
+    gcvFEATURE_2D_ONE_PASS_FILTER,
     gcvFEATURE_2D_FILTERBLIT_FULLROTATION,
     gcvFEATURE_2DPE20,
     gcvFEATURE_YUV420_SCALER,
-    gcvFEATURE_2D_ALL_QUAD,
 };
 
 static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)

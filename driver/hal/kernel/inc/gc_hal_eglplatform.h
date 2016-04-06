@@ -89,7 +89,7 @@ typedef int                             EGLNativeDisplayType;
 typedef void *                          EGLNativeWindowType;
 typedef void *                          EGLNativePixmapType;
 
-#elif defined(WL_EGL_PLATFORM) /* Wayland */
+#elif defined(WL_EGL_PLATFORM) || defined(EGL_API_WL) /* Wayland */
 
 #if defined(__GNUC__)
 #   define inline            __inline__  /* GNU keyword. */
@@ -338,6 +338,17 @@ gcoOS_SetDisplayVirtual(
 
 gceSTATUS
 gcoOS_SetDisplayVirtualEx(
+    IN HALNativeDisplayType Display,
+    IN HALNativeWindowType Window,
+    IN gctPOINTER Context,
+    IN gcoSURF Surface,
+    IN gctUINT Offset,
+    IN gctINT X,
+    IN gctINT Y
+    );
+
+gceSTATUS
+gcoOS_CancelDisplayBackbuffer(
     IN HALNativeDisplayType Display,
     IN HALNativeWindowType Window,
     IN gctPOINTER Context,

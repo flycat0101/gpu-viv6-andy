@@ -71,7 +71,8 @@ enum gceRecompileKind
     gceRK_PATCH_SIGNEXTENT,
     gceRK_PATCH_TCS_INPUT_COUNT_MISMATCH,
     gceRK_PATCH_CL_LONGULONG,
-    gceRK_PATCH_COLOR_KILL
+    gceRK_PATCH_COLOR_KILL,
+    gceRK_PATCH_ALPHA_BLEND
 };
 
 typedef enum _gceConvertFunctionKind
@@ -296,17 +297,23 @@ typedef struct _gcsPatchLongULong
 }
 gcsPatchLongULong;
 
-typedef struct _gcsPatchYFilppedTexture
+typedef struct _gcsPatchyFlippedTexture
 {
     gcUNIFORM yFlippedTexture;  /* uniform need to filp y component. */
 }
-gcsPatchYFilppedTexture;
+gcsPatchyFlippedTexture;
 
-typedef struct _gcsPatchYFilppedShader
+typedef struct _gcsPatchYFlippedShader
 {
     gcUNIFORM rtHeight;  /* uniform contains render target height to filp y component. */
 }
-gcsPatchYFilppedShader;
+gcsPatchYFlippedShader;
+
+typedef struct _gcsPatchFlippedSamplePosition
+{
+    gctFLOAT  value;  /* change gl_SamplePosition to (value - gl_SamplePosition); */
+}
+gcsPatchFlippedSamplePosition;
 
 typedef struct _gcsPatchRemoveAssignmentForAlphaChannel
 {
@@ -351,6 +358,19 @@ typedef struct _gcsPatchColorKill
 }
 gcsPatchColorKill;
 
+typedef struct _gcsPatchAlphaBlend
+{
+    gctINT      outputLocation;
+    gcOUTPUT    outputs[4];
+    gcUNIFORM   alphaBlendEquation;
+    gcUNIFORM   alphaBlendFunction;
+    gcUNIFORM   rtWidthHeight;
+    gcUNIFORM   blendConstColor;
+    gcUNIFORM   rtSampler;     /* sampler */
+    gcUNIFORM   yInvert;
+}
+gcsPatchAlphaBlend;
+
 typedef struct _gcRecompileDirective * gcPatchDirective_PTR;
 typedef struct _gcRecompileDirective
 {
@@ -368,14 +388,15 @@ typedef struct _gcRecompileDirective
         gcsPatchGlobalWorkSize *  globalWorkSize;
         gcsPatchReadImage *       readImage;
         gcsPatchWriteImage *      writeImage;
-        gcsPatchYFilppedTexture * yFilppedTexture;
+        gcsPatchyFlippedTexture * yFlippedTexture;
         gcsPatchRemoveAssignmentForAlphaChannel * removeOutputAlpha;
-        gcsPatchYFilppedShader *  yFilppedShader;
+        gcsPatchYFlippedShader *  yFlippedShader;
         gcsPatchSampleMask *      sampleMask;
         gcsPatchSignExtent *      signExtent;
         gcsPatchTCSInputCountMismatch *  inputMismatch;
         gcsPatchLongULong   *     longULong;
         gcsPatchColorKill *       colorKill;
+        gcsPatchAlphaBlend *      alphaBlend;
     } patchValue;
     gcPatchDirective_PTR    next;  /* pointer to next patch directive */
 }
@@ -579,6 +600,7 @@ struct _gcsHINT
     gcePROGRAM_STAGE_BIT  stageBits;
 
     gctUINT     usedSamplerMask;
+    gctUINT     useSamplePosition;
     gctUINT     usedRTMask;
 
     /* For CL and CS, global/group/local id order. */
@@ -802,6 +824,12 @@ typedef enum _gceSHADER_FLAGS
 
     /* Has image in kernel source code of OCL kernel program */
     gcSHADER_HAS_IMAGE_IN_KERNEL        = 0x10000000,
+
+    gcvSHADER_VIRCG_NONE                = 0x20000000,
+    gcvSHADER_VIRCG_ONE                 = 0x40000000,
+
+    gcvSHADER_MIN_COMP_TIME             = 0x80000000,
+
 }
 gceSHADER_FLAGS;
 
@@ -887,6 +915,10 @@ typedef enum _gceSHADER_OPTIMIZATION
     gcvOPTIMIZATION_INLINE_LEVEL_3              = 1 << 19,
     gcvOPTIMIZATION_INLINE_LEVEL_4              = 1 << 20,
 
+    /* limit some optimization for minimal compile-time */
+    /* VIV: specifically for dEQP-GLES3.functional.uniform_api.random.83 */
+    gcvOPTIMIZATION_MIN_COMP_TIME              = 1 << 21,
+
     /*  Full optimization. */
     /*  Note that gcvOPTIMIZATION_LOAD_SW_W is off. */
     gcvOPTIMIZATION_FULL                        = 0x7FFFFFFF &
@@ -898,7 +930,8 @@ typedef enum _gceSHADER_OPTIMIZATION
                                                   ~gcvOPTIMIZATION_INLINE_LEVEL_1 &
                                                   ~gcvOPTIMIZATION_INLINE_LEVEL_2 &
                                                   ~gcvOPTIMIZATION_INLINE_LEVEL_3 &
-                                                  ~gcvOPTIMIZATION_INLINE_LEVEL_4
+                                                  ~gcvOPTIMIZATION_INLINE_LEVEL_4 &
+                                                  ~gcvOPTIMIZATION_MIN_COMP_TIME
 ,
 
     /* Optimization Unit Test flag. */
@@ -1260,6 +1293,8 @@ typedef struct _gcOPTIMIZER_OPTION
      *
      */
     gctBOOL     useVIRCodeGen;
+    /* useVIRCodeGen maybe changed for specific test, we need to save the orignal option */
+    gctBOOL     origUseVIRCodeGen;
     gctINT      _vircgStart;
     gctINT      _vircgEnd;
 
@@ -4743,6 +4778,57 @@ gcSHADER_FindFunctionByLabel(
     IN gctUINT Label,
     OUT gcFUNCTION * Function
     );
+
+/*****************************************************************************************************
+**  gcSHADER_UpdateTargetPacked
+**
+**  Update instruction target's PackedComponents field to indicate the number of packed components
+**
+**  INPUT:
+**
+**      gcSHADER Shader
+**          Pointer to a gcSHADER object.
+**
+**      gctINT Components
+**          Number of packed components.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcSHADER_UpdateTargetPacked(
+    IN gcSHADER Shader,
+    IN gctINT Components
+    );
+
+/*******************************************************************************
+**  gcSHADER_UpdateSourcePacked
+**
+**  Update source's PackedComponents field to indicate the number of packed components
+**
+**  INPUT:
+**
+**      gcSHADER Shader
+**          Pointer to a gcSHADER object.
+**
+**      gcSHADER_INSTRUCTION_INDEX InstIndex
+**          Instruction argument index: gcSHADER_SOURCE0/gcSHADER_SOURCE1.
+**
+**      gctINT Components
+**          Number of packed components.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcSHADER_UpdateSourcePacked(
+    IN gcSHADER Shader,
+    IN gcSHADER_INSTRUCTION_INDEX InstrIndex,
+    IN gctINT Components
+    );
+
 /*******************************************************************************
 **  gcSHADER_AddRoundingMode
 **
@@ -5817,7 +5903,8 @@ gcSHADER_GetVariableTempTypes(
 gceSTATUS
 gcATTRIBUTE_IsPosition(
         IN gcATTRIBUTE Attribute,
-        OUT gctBOOL * IsPosition
+        OUT gctBOOL * IsPosition,
+        OUT gctBOOL * IsDirectPosition
         );
 
 /*******************************************************************************
@@ -7115,6 +7202,11 @@ gcCreateAlphaBlendingDirective(
     );
 
 gceSTATUS
+gcCreateDepthBiasDirective(
+    OUT gcPatchDirective  **   PatchDirectivePtr
+);
+
+gceSTATUS
 gcCreateNP2TextureDirective(
     IN gctINT TextureCount,
     IN gcNPOT_PATCH_PARAM_PTR NP2Texture,
@@ -7196,6 +7288,12 @@ gcCreateColorKillDirective(
     IN gctFLOAT                Value,
     OUT gcPatchDirective  **   PatchDirectivePtr
     );
+
+gceSTATUS
+gcCreateAlphaBlendDirective(
+IN  gctINT                 OutputLocation,
+OUT gcPatchDirective  **   PatchDirectivePtr
+);
 
 gceSTATUS
 gcDestroyPatchDirective(
@@ -7542,6 +7640,11 @@ gceSTATUS
 gcSHADER_FreeRecompilerLibrary(
     void
     );
+
+gceSTATUS
+gcSHADER_FreeBlendLibrary(
+void
+);
 
 gceSTATUS
 gcSHADER_InsertList(

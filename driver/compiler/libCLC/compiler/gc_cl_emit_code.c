@@ -250,7 +250,9 @@ IN gcSL_OPCODE Opcode
     case gcSL_KILL:     return "gcSL_KILL";
     case gcSL_TEXLD:    return "gcSL_TEXLD";
     case gcSL_IMAGE_WR: return "gcSL_IMAGE_WR";
+    case gcSL_IMAGE_WR_3D: return "gcSL_IMAGE_WR_3D";
     case gcSL_IMAGE_RD: return "gcSL_IMAGE_RD";
+    case gcSL_IMAGE_RD_3D: return "gcSL_IMAGE_RD_3D";
     case gcSL_IMAGE_SAMPLER: return "gcSL_IMAGE_SAMPLER";
     case gcSL_CALL:     return "gcSL_CALL";
     case gcSL_RET:      return "gcSL_RET";
@@ -2422,6 +2424,14 @@ _EmitOpcodeAndTarget(
                                    Target->indexRegIndex);
     }
 
+    if (clmIsElementTypePacked(Target->dataType.elementType))
+    {
+        gcSHADER binary;
+        gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
+        gcSHADER_UpdateTargetPacked(binary,
+                                    clmGEN_CODE_vectorSize_GET(Target->dataType));
+    }
+
     if (gcmIS_ERROR(status)) {
         cloCOMPILER_Report(Compiler,
                            LineNo,
@@ -2722,79 +2732,92 @@ _EmitSource(
     IN gcsSOURCE * Source
     )
 {
+    gceSTATUS status = gcvSTATUS_OK;
+    gcSHADER binary = gcvNULL;
+    gcSHADER_INSTRUCTION_INDEX instrIndex = gcSHADER_OPCODE;
     gcmASSERT(Source);
+
+    if (clmIsElementTypePacked(Source->dataType.elementType))
+    {
+        gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
+        instrIndex = binary->instrIndex;
+    }
 
     switch (Source->type) {
     case gcvSOURCE_TEMP:
-        return _EmitSourceTemp(Compiler,
-                       LineNo,
-                       StringNo,
-                       Source->dataType,
-                       &Source->u.sourceReg);
+        status = _EmitSourceTemp(Compiler,
+                                 LineNo,
+                                 StringNo,
+                                 Source->dataType,
+                                 &Source->u.sourceReg);
+        break;
 
     case gcvSOURCE_ATTRIBUTE:
-        return _EmitSourceAttribute(Compiler,
-                        LineNo,
-                        StringNo,
-                            Source->dataType,
-                        &Source->u.sourceReg);
+        status = _EmitSourceAttribute(Compiler,
+                                      LineNo,
+                                      StringNo,
+                                      Source->dataType,
+                                      &Source->u.sourceReg);
+        break;
 
     case gcvSOURCE_UNIFORM:
-        return _EmitSourceUniform(Compiler,
-                      LineNo,
-                      StringNo,
-                          Source->dataType,
-                      &Source->u.sourceReg);
+        status =  _EmitSourceUniform(Compiler,
+                                     LineNo,
+                                     StringNo,
+                                     Source->dataType,
+                                     &Source->u.sourceReg);
+        break;
 
     case gcvSOURCE_CONSTANT:
         {
-        void * constantPtr;
-        gctFLOAT floatConstant[1];
-        gctINT32 intConstant[1];
-        gctUINT32 uintConstant[1];
-        gcSL_FORMAT format;
-        cltELEMENT_TYPE elementType;
+            void * constantPtr;
+            gctFLOAT floatConstant[1];
+            gctINT32 intConstant[1];
+            gctUINT32 uintConstant[1];
+            gcSL_FORMAT format;
+            cltELEMENT_TYPE elementType;
 
-        elementType = clmGEN_CODE_elementType_GET(Source->dataType);
+            elementType = clmGEN_CODE_elementType_GET(Source->dataType);
 
-        if(clmIsElementTypeFloating(elementType)) {
-            floatConstant[0] = Source->u.sourceConstant.floatValue;
-            format = gcSL_FLOAT;
-            constantPtr = (void *)floatConstant;
-        }
-        else if(clmIsElementTypeBoolean(elementType)) {
-            intConstant[0] = Source->u.sourceConstant.boolValue;
-            format = gcSL_BOOLEAN;
-            constantPtr = (void *)intConstant;
-        }
-        else if(clmIsElementTypeInteger(elementType)) {
-            if(clmIsElementTypeUnsigned(elementType)) {
-            uintConstant[0] = Source->u.sourceConstant.uintValue;
-            format = gcSL_UINT32;
-            constantPtr = (void *)uintConstant;
+            if(clmIsElementTypeFloating(elementType)) {
+                floatConstant[0] = Source->u.sourceConstant.floatValue;
+                format = gcSL_FLOAT;
+                constantPtr = (void *)floatConstant;
+            }
+            else if(clmIsElementTypeBoolean(elementType)) {
+                intConstant[0] = Source->u.sourceConstant.boolValue;
+                format = gcSL_BOOLEAN;
+                constantPtr = (void *)intConstant;
+            }
+            else if(clmIsElementTypeInteger(elementType)) {
+                if(clmIsElementTypeUnsigned(elementType)) {
+                    uintConstant[0] = Source->u.sourceConstant.uintValue;
+                    format = gcSL_UINT32;
+                    constantPtr = (void *)uintConstant;
+                }
+                else {
+                    intConstant[0] = Source->u.sourceConstant.intValue;
+                    format = gcSL_INTEGER;
+                    constantPtr = (void *)intConstant;
+                }
+            }
+            else if(clmIsElementTypeEvent(elementType) ||
+                    clmIsElementTypeSampler(elementType)) {
+                uintConstant[0] = Source->u.sourceConstant.uintValue;
+                format = gcSL_UINT32;
+                constantPtr = (void *)uintConstant;
             }
             else {
-            intConstant[0] = Source->u.sourceConstant.intValue;
-            format = gcSL_INTEGER;
-            constantPtr = (void *)intConstant;
-            }
-        }
-        else if(clmIsElementTypeEvent(elementType) ||
-                clmIsElementTypeSampler(elementType)) {
-            uintConstant[0] = Source->u.sourceConstant.uintValue;
-            format = gcSL_UINT32;
-            constantPtr = (void *)uintConstant;
-        }
-        else {
-            gcmASSERT(0);
-            return gcvSTATUS_INVALID_ARGUMENT;
+                gcmASSERT(0);
+                return gcvSTATUS_INVALID_ARGUMENT;
             }
 
-        return _EmitSourceConstant(Compiler,
-                       LineNo,
-                       StringNo,
-                       constantPtr,
-                       format);
+            status =  _EmitSourceConstant(Compiler,
+                                          LineNo,
+                                          StringNo,
+                                          constantPtr,
+                                          format);
+            break;
         }
 
     case gcvSOURCE_TARGET_FORMAT:
@@ -2802,11 +2825,12 @@ _EmitSource(
             gctUINT32 format[1];
 
             format[0] = (gctUINT32)_ConvDataTypeToFormat(Source->dataType);
-            return _EmitSourceConstant(Compiler,
-                                       LineNo,
-                                       StringNo,
-                                       (void *)format,
-                                       gcSL_UINT32);
+            status =  _EmitSourceConstant(Compiler,
+                                          LineNo,
+                                          StringNo,
+                                          (void *)format,
+                                          gcSL_UINT32);
+            break;
 
         }
 
@@ -2814,6 +2838,18 @@ _EmitSource(
         gcmASSERT(0);
         return gcvSTATUS_INVALID_ARGUMENT;
     }
+
+    if (gcmIS_ERROR(status)) return status;
+
+    if (instrIndex != gcSHADER_OPCODE)
+    {
+        gcmASSERT(binary);
+        status =  gcSHADER_UpdateSourcePacked(binary,
+                                              instrIndex,
+                                              clmGEN_CODE_vectorSize_GET(Source->dataType));
+    }
+
+    return status;
 }
 
 gceSTATUS
@@ -3686,7 +3722,9 @@ _ConvOpcode(
 
     case clvOPCODE_TEXTURE_LOAD:     return gcSL_TEXLD;
     case clvOPCODE_IMAGE_WRITE:      return gcSL_IMAGE_WR;
+    case clvOPCODE_IMAGE_WRITE_3D:   return gcSL_IMAGE_WR_3D;
     case clvOPCODE_IMAGE_READ:       return gcSL_IMAGE_RD;
+    case clvOPCODE_IMAGE_READ_3D:    return gcSL_IMAGE_RD_3D;
     case clvOPCODE_IMAGE_SAMPLER:    return gcSL_IMAGE_SAMPLER;
 
     case clvOPCODE_FLOAT_TO_INT:     return gcSL_F2I;
@@ -7694,10 +7732,10 @@ _EmitCodeImpl2(
     }
     else
     {
+		gcSHADER binary;
+
         /* need to set the instruction modifiers first before emitting the instruction */
         if (clmIsOpcodeConv(Opcode) && Opcode != clvOPCODE_CONV) {
-            gcSHADER binary;
-
             gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
 
             /*update the opcode modifiers */
@@ -7737,6 +7775,20 @@ _EmitCodeImpl2(
             default:
                 gcmASSERT(0);
                 break;
+            }
+        }
+        else if(Opcode == clvOPCODE_IMAGE_READ_3D ||
+                Opcode == clvOPCODE_IMAGE_READ)
+        {
+            gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
+            if(clmIsElementTypeFloating(Target->dataType.elementType))
+            {
+                /* according to OCL spec: set default rounding mode for floating point tpye to RTE */
+                gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTN);
+            }
+            else
+            {
+                gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTZ);
             }
         }
         status = _EmitCode(

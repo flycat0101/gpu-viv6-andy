@@ -2678,7 +2678,7 @@ sloCOMPILER_CreateAuxiliaryName(
     )
 {
     gceSTATUS                   status = gcvSTATUS_OK;
-    sltPOOL_STRING              auxiArraySymbol, tempSymbol;
+    sltPOOL_STRING              auxiArraySymbol = gcvNULL, tempSymbol = gcvNULL;
     gctPOINTER                  pointer = gcvNULL;
     slsNAME*                    name = gcvNULL;
 
@@ -2706,38 +2706,32 @@ sloCOMPILER_CreateAuxiliaryName(
         gcoOS_StrCopySafe(tempSymbol, symbolSize+1, refName->symbol);
         gcoOS_StrCatSafe(tempSymbol, symbolSize+16, "_scalarArray");
 
-        status = sloCOMPILER_AllocatePoolString(Compiler,
-                                                tempSymbol,
-                                                &auxiArraySymbol);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        gcmONERROR(sloCOMPILER_AllocatePoolString(Compiler,
+                                                  tempSymbol,
+                                                  &auxiArraySymbol));
 
-        status = slsNAME_SPACE_Search(Compiler,
-                                      refName->mySpace,
-                                      auxiArraySymbol,
-                                      gcvFALSE,
-                                      gcvFALSE,
-                                      &name);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        gcmONERROR(slsNAME_SPACE_Search(Compiler,
+                                        refName->mySpace,
+                                        auxiArraySymbol,
+                                        gcvFALSE,
+                                        gcvFALSE,
+                                        &name));
 
         if (name == gcvNULL)
         {
-            status = slsNAME_SPACE_CreateName(Compiler,
-                                             refName->mySpace,
-                                             refName->lineNo,
-                                             refName->stringNo,
-                                             slvVARIABLE_NAME, /* We can not use other types since it is auxiliary
+            gcmONERROR(slsNAME_SPACE_CreateName(Compiler,
+                                                refName->mySpace,
+                                                refName->lineNo,
+                                                refName->stringNo,
+                                                slvVARIABLE_NAME, /* We can not use other types since it is auxiliary
                                                                   variable, so DONOT use refName->type here */
-                                             DataType,
-                                             auxiArraySymbol,
-                                             gcvFALSE,
-                                             refName->extension,
-                                             gcvFALSE,
-                                             &name);
-            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+                                                DataType,
+                                                auxiArraySymbol,
+                                                gcvFALSE,
+                                                refName->extension,
+                                                gcvFALSE,
+                                                &name));
         }
-
-        gcoOS_Free(gcvNULL, pointer);
-        pointer= gcvNULL;
     }
     else
     {
@@ -2755,41 +2749,39 @@ sloCOMPILER_CreateAuxiliaryName(
         gcoOS_GetTime(&curTime);
         gcoOS_PrintStrSafe(tempSymbol, 256, &offset, "%u_scalarArray", curTime);
 
-        status = sloCOMPILER_AllocatePoolString(
-                                            Compiler,
-                                            tempSymbol,
-                                            &auxiArraySymbol);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        gcmONERROR(sloCOMPILER_AllocatePoolString(Compiler,
+                                                  tempSymbol,
+                                                  &auxiArraySymbol));
 
-        status = slsNAME_SPACE_Search(Compiler,
-                                      Compiler->context.currentSpace,
-                                      auxiArraySymbol,
-                                      gcvFALSE,
-                                      gcvFALSE,
-                                      &name);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        gcmONERROR(slsNAME_SPACE_Search(Compiler,
+                                        Compiler->context.currentSpace,
+                                        auxiArraySymbol,
+                                        gcvFALSE,
+                                        gcvFALSE,
+                                        &name));
 
         if (name == gcvNULL)
         {
-            status = slsNAME_SPACE_CreateName(Compiler,
-                                             Compiler->context.currentSpace,
-                                             LineNo,
-                                             StringNo,
-                                             slvVARIABLE_NAME,
-                                             DataType,
-                                             auxiArraySymbol,
-                                             gcvFALSE,
-                                             slvEXTENSION_NONE,
-                                             gcvFALSE,
-                                             &name);
-            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+            gcmONERROR(slsNAME_SPACE_CreateName(Compiler,
+                                                Compiler->context.currentSpace,
+                                                LineNo,
+                                                StringNo,
+                                                slvVARIABLE_NAME,
+                                                DataType,
+                                                auxiArraySymbol,
+                                                gcvFALSE,
+                                                slvEXTENSION_NONE,
+                                                gcvFALSE,
+                                                &name));
         }
+    }
 
+OnError:
+    if (Name != gcvNULL) *Name = name;
+    if (pointer) {
         gcoOS_Free(gcvNULL, pointer);
         pointer= gcvNULL;
     }
-
-    if (Name != gcvNULL) *Name = name;
 
     gcmFOOTER();
     return status;

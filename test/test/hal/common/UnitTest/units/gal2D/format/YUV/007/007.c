@@ -223,7 +223,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         t2d->dstTemp->stride, t2d->dstTemp->validStrideNum,
         t2d->dstTemp->tiling, t2d->dstTemp->format, t2d->dstTemp->rotation,
         t2d->dstTemp->width, t2d->dstTemp->height,
-        &Rect, &Rect));
+        &Rect, gcvNULL));
 
     /* render the medial result to dst surface. */
     gcmONERROR(gco2D_SetSource(egn2D, &Rect));
@@ -355,6 +355,12 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
             runtime->notSupport = gcvTRUE;
         }
         strncat(runtime->wholeDescription, featureName, k==listLen-1 ? strlen(featureName)+1:strlen(featureName));
+    }
+
+    if (gcoHAL_IsFeatureAvailable(runtime->hal, gcvFEATURE_2D_YUV420_OUTPUT_LINEAR) == gcvTRUE)
+    {
+        GalOutput(GalOutputType_Result | GalOutputType_Console, "Multi-Dest is not supported.\n");
+        runtime->notSupport = gcvTRUE;
     }
 
     if (runtime->notSupport)

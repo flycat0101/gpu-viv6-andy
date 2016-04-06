@@ -453,16 +453,9 @@ gcChipFboSyncFromShadow(
             {
                 __GLtextureObject *texObj = (__GLtextureObject*)attachPoint->object;
                 __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)texObj->privateData;
-                __GLchipFmtMapInfo *fmtMapInfo = texInfo->mipLevels[attachPoint->level].formatMapInfo;
 
                 if ((texInfo->eglImage.image) ||
-                    (texInfo->direct.source)  ||
-                    (fmtMapInfo &&
-                     (fmtMapInfo->flags & (__GL_CHIP_FMTFLAGS_FMT_DIFF_READ_WRITE |
-                                           __GL_CHIP_FMTFLAGS_LAYOUT_DIFF_READ_WRITE)
-                     )
-                    )
-                   )
+                    (texInfo->direct.source))
                 {
                     gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc,
                                                                texObj,
@@ -920,6 +913,10 @@ __glChipIsFramebufferComplete(
             formatInfo = mipmap->formatInfo;
             attribFlag |= __GL_FRAMEBUFFER_ATTACH_TEX;
             break;
+
+        default:
+            GL_ASSERT(GL_FALSE);
+            break;
         }
 
         fbUIntMask = ((GL_UNSIGNED_INT == formatInfo->category)? 0x1: 0x0) << i;
@@ -991,7 +988,7 @@ __glChipIsFramebufferComplete(
         ** And our HW indeed didn't support it. But we already claimed supporting OES_stencilx
         ** extension and need pass conform test, so we should allow the case.
         */
-        if (gc->apiVersion == __GL_API_VERSION_ES30 && depthObjSet && stencilObjSet)
+        if (depthObjSet && stencilObjSet)
         {
             if ((depthObjType != stencilObjType) ||
                 (depthObjName != stencilObjName))
@@ -1642,9 +1639,6 @@ GLvoid __glChipBlitFramebuffer(__GLcontext *gc,
                    gc, srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1,
                    mask, xReverse, yReverse, filter);
 
-    /* make compiler happy */
-    chipCtx = chipCtx;
-
     if (chipCtx->drawYInverted)
     {
         GLint temp = dstY1;
@@ -1961,7 +1955,16 @@ __glChipRenderbufferStorage(
         patchCase = __GL_CHIP_FMT_PATCH_8BIT_MSAA;
     }
 
+    if (drvFormat == __GL_FMT_RGBA4 &&
+        chipCtx->patchId == gcvPATCH_DEQP &&
+        gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_DITHER_FIX2) == gcvFALSE)
+    {
+        drvFormat = __GL_FMT_RGBA8;
+    }
+
     formatMapInfo = gcChipGetFormatMapInfo(gc, drvFormat, patchCase);
+
+    chipRBO->formatMapInfo = formatMapInfo;
 
     if (rbo->samples > 0)
     {
@@ -1980,8 +1983,6 @@ __glChipRenderbufferStorage(
     {
         rbo->samplesUsed = rbo->samples;
     }
-
-    chipRBO->formatMapInfo = formatMapInfo;
 
     GL_ASSERT((formatMapInfo->flags & __GL_CHIP_FMTFLAGS_CANT_FOUND_HAL_FORMAT) == GL_FALSE);
     GL_ASSERT(formatMapInfo->writeFormat != gcvSURF_UNKNOWN);

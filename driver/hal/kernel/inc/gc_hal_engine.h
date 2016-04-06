@@ -379,6 +379,36 @@ gcoSURF_Preserve(
     IN gcsRECT_PTR MaskRect
     );
 
+/* TO BE REMOVED */
+gceSTATUS
+depr_gcoSURF_Resolve(
+    IN gcoSURF SrcSurface,
+    IN gcoSURF DestSurface,
+    IN gctUINT32 DestAddress,
+    IN gctPOINTER DestBits,
+    IN gctINT DestStride,
+    IN gceSURF_TYPE DestType,
+    IN gceSURF_FORMAT DestFormat,
+    IN gctUINT DestWidth,
+    IN gctUINT DestHeight
+    );
+
+gceSTATUS
+depr_gcoSURF_ResolveRect(
+    IN gcoSURF SrcSurface,
+    IN gcoSURF DstSurface,
+    IN gctUINT32 DstAddress,
+    IN gctPOINTER DstBits,
+    IN gctINT DstStride,
+    IN gceSURF_TYPE DstType,
+    IN gceSURF_FORMAT DstFormat,
+    IN gctUINT DstWidth,
+    IN gctUINT DstHeight,
+    IN gcsPOINT_PTR SrcOrigin,
+    IN gcsPOINT_PTR gcoSURF,
+    IN gcsPOINT_PTR RectSize
+    );
+
 /* Resample surface. */
 gceSTATUS
 gcoSURF_Resample(

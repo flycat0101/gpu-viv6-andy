@@ -2136,6 +2136,10 @@ clfFlushCommandQueue(
     /* Delete the used commit request */
     gcmVERIFY_OK(clfDeleteCommitRequest(commitRequest));
 
+#if !cldSYNC_MEMORY
+    if (Stall) gcmONERROR(gcoCL_Flush(gcvTRUE));
+#endif
+
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
@@ -2364,6 +2368,10 @@ clfSubmitCommand(
 
         commandEvent->commandType = clmGET_COMMANDTYPE(Command->type);
         commandEvent->queue = CommandQueue;
+
+#if cldSYNC_MEMORY
+        clRetainCommandQueue(CommandQueue);
+#endif
 
         if (Blocking) clRetainEvent(commandEvent);
 
@@ -2617,21 +2625,6 @@ clCreateCommandQueue(
                                  &queue->syncPointListMutex),
                CL_OUT_OF_HOST_MEMORY);
 
-    /* Lock the command queue list in the context. */
-    clfLockCommandQueueList(Context);
-
-    /* Insert to context's queue list. */
-    queue->next            = Context->queueList;
-    Context->queueList     = queue;
-
-    if (queue->next)
-    {
-        queue->next->previous = queue;
-    }
-
-    /* Unlock the command queue list in the context. */
-    clfUnlockCommandQueueList(Context);
-
 #if cldSEQUENTIAL_EXECUTION
     queue->workerStartSignal  = gcvNULL;
     queue->workerStopSignal   = gcvNULL;
@@ -2656,6 +2649,21 @@ clCreateCommandQueue(
                                   &queue->workerThread),
                CL_OUT_OF_HOST_MEMORY);
 #endif
+
+    /* Lock the command queue list in the context. */
+    clfLockCommandQueueList(Context);
+
+    /* Insert to context's queue list. */
+    queue->next            = Context->queueList;
+    Context->queueList     = queue;
+
+    if (queue->next)
+    {
+        queue->next->previous = queue;
+    }
+
+    /* Unlock the command queue list in the context. */
+    clfUnlockCommandQueueList(Context);
 
     if (ErrcodeRet)
     {
@@ -2739,34 +2747,39 @@ clReleaseCommandQueue(
     }
     gcoCL_SetHardware();
 
-    if (CommandQueue->privateBufList)
-    {
-         clsPrivateBuffer_PTR privateBuf = gcvNULL;
-         clsPrivateBuffer_PTR tmpPrivateBuf = gcvNULL;
-
-         for (privateBuf = CommandQueue->privateBufList; privateBuf != gcvNULL; )
-         {
-             tmpPrivateBuf = privateBuf->next;
-             if (privateBuf->buffer)
-             {
-                 gcoCL_FreeMemory(privateBuf->buffer->physical,
-                                  privateBuf->buffer->logical,
-                                  privateBuf->buffer->allocatedSize,
-                                  privateBuf->buffer->node);
-                 gcoOS_Free(gcvNULL, privateBuf->buffer);
-             }
-             gcoOS_Free(gcvNULL, privateBuf);
-             privateBuf = tmpPrivateBuf;
-         }
-         CommandQueue->privateBufList = gcvNULL;
-    }
-
     gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, CommandQueue->referenceCount, &oldReference));
 
     if (oldReference == 1)
     {
         /* Implicit flush. */
         gcmONERROR(clfFlushCommandQueue(CommandQueue, gcvFALSE));
+
+        /* Clean up the private buffer list. */
+        if (CommandQueue->privateBufList)
+        {
+             clsPrivateBuffer_PTR privateBuf = gcvNULL;
+             clsPrivateBuffer_PTR tmpPrivateBuf = gcvNULL;
+
+             for (privateBuf = CommandQueue->privateBufList; privateBuf != gcvNULL; )
+             {
+                 tmpPrivateBuf = privateBuf->next;
+
+                 if (privateBuf->buffer)
+                 {
+                     gcoCL_FreeMemory(privateBuf->buffer->physical,
+                                      privateBuf->buffer->logical,
+                                      privateBuf->buffer->allocatedSize,
+                                      privateBuf->buffer->node);
+                     gcoOS_Free(gcvNULL, privateBuf->buffer);
+                 }
+
+                 gcoOS_Free(gcvNULL, privateBuf);
+
+                 privateBuf = tmpPrivateBuf;
+             }
+
+             CommandQueue->privateBufList = gcvNULL;
+        }
 
         /* Lock the command queue list in the context. */
         clfLockCommandQueueList(CommandQueue->context);

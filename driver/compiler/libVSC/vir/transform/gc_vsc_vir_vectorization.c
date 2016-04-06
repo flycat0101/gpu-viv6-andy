@@ -16,6 +16,7 @@
 
 #define MAX_CANDIDATE_SEARCH_ITERATE_COUNT    20000
 #define MAX_VECTORIZED_VEC_IMM                330
+#define VSC_VEC_MAX_TEMP                      1024
 
 typedef struct VIR_VECTORIZER_INFO
 {
@@ -3534,6 +3535,13 @@ VSC_ErrCode vscVIR_DoLocalVectorization(VIR_Shader* pShader, VIR_DEF_USAGE_INFO*
         {VIR_OPND_VECTORIZE_TYPE_SIMM_2_VIMM, _Simm2VimmOpndsVectorizabilityCheck, gcvNULL, _VectorizeSimm2VimmOpnds    },
         {VIR_OPND_VECTORIZE_TYPE_VIMM_2_VIMM, _Vimm2VimmOpndsVectorizabilityCheck, gcvNULL, _VectorizeVimm2VimmOpnds    },
     };
+
+    /* too large shader in dEQP, don't do vectorization */
+    if (VIR_Shader_GetVirRegCount(pShader) > VSC_VEC_MAX_TEMP &&
+        pShader->patchID == gcvPATCH_DEQP)
+    {
+        return errCode;
+    }
 
     vscHTBL_Initialize(&vectorizerInfo.vectorizedVImmHashTable,
                        &pShader->mempool,

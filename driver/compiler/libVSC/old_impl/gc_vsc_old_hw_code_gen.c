@@ -16241,6 +16241,32 @@ const gcsSL_PATTERN patterns_TAN[] =
         { -2, 0x0C, gcSL_CG_TEMP2, 0, 0, gcSL_CG_TEMP2, 0, },
         { -1, 0x03, 1, gcSL_CG_TEMP1, gcSL_CG_TEMP2, 0, 0, },
 
+    /* tan(x) = sin(x) / cos(x) */
+    { 1, gcSL_TAN, 1, 2 },
+        /* mad TEMP1, 2, rcppi2, dot5
+           frc TEMP1, TEMP1
+           mad TEMP1, TEMP1, 2pi, -pi
+        */
+        { -16, 0x02, gcSL_CG_TEMP1, 2, gcSL_CG_CONSTANT, gcSL_CG_CONSTANT, 0, rcppi2_1_dot5_2 },
+        { -15, 0x13, gcSL_CG_TEMP1, 0, 0, gcSL_CG_TEMP1, 0 },
+        { -14, 0x02, gcSL_CG_TEMP1, gcSL_CG_TEMP1, gcSL_CG_CONSTANT, -gcSL_CG_CONSTANT, 0, pi2_1_pi_2 },
+        /* sin(x) = TEMP3 */
+        { -13, 0x03, gcSL_CG_TEMP2, gcSL_CG_TEMP1, gcSL_CG_TEMP1, 0, 0 },
+        { -12, 0x02, gcSL_CG_TEMP3, gcSL_CG_TEMP2, gcSL_CG_CONSTANT, -gcSL_CG_CONSTANT, 0, sin_factor9_1_factor7_2 },
+        { -11, 0x02, gcSL_CG_TEMP3, gcSL_CG_TEMP2, gcSL_CG_TEMP3, gcSL_CG_CONSTANT, 0, sin_factor5_2 },
+        { -10, 0x02, gcSL_CG_TEMP3, gcSL_CG_TEMP2, gcSL_CG_TEMP3, -gcSL_CG_CONSTANT, 0, sin_factor3_2 },
+        { -9, 0x02, gcSL_CG_TEMP3, gcSL_CG_TEMP2, gcSL_CG_TEMP3, gcSL_CG_CONSTANT, 0, sin_one_2 },
+        { -8, 0x03, gcSL_CG_TEMP3, gcSL_CG_TEMP3, gcSL_CG_TEMP1, 0, 0 },
+        /* cos(x) = TEMP2 */
+        { -7, 0x03, gcSL_CG_TEMP1, gcSL_CG_TEMP1, gcSL_CG_TEMP1, 0, 0 },
+        { -6, 0x02, gcSL_CG_TEMP2, gcSL_CG_TEMP1, gcSL_CG_CONSTANT, -gcSL_CG_CONSTANT, 0, cos_factor8_1_factor6_2 },
+        { -5, 0x02, gcSL_CG_TEMP2, gcSL_CG_TEMP1, gcSL_CG_TEMP2, gcSL_CG_CONSTANT, 0, cos_factor4_2 },
+        { -4, 0x02, gcSL_CG_TEMP2, gcSL_CG_TEMP1, gcSL_CG_TEMP2, -gcSL_CG_CONSTANT, 0, cos_factor2_2 },
+        { -3, 0x02, gcSL_CG_TEMP2, gcSL_CG_TEMP1, gcSL_CG_TEMP2, gcSL_CG_CONSTANT, 0, one_2 },
+        /* tan(x) = TEMP3 / TEMP2 */
+        { -2, 0x0C, gcSL_CG_TEMP2, 0, 0, gcSL_CG_TEMP2, 0, value_type0_from_src0 },
+        { -1, 0x03, 1, gcSL_CG_TEMP3, gcSL_CG_TEMP2, 0, 0, value_type0 },
+
     /*
         TAN 1, 2
             mad TEMP1, 2, rcppi2, dot5

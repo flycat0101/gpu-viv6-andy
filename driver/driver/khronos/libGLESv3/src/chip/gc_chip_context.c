@@ -528,6 +528,10 @@ gcChipInitExtension(
         }
     }
 
+    if(constants->majorVersion < 3)
+    {
+        __glFormatInfoTable[__GL_FMT_RGB10_A2].renderable = gcvFALSE;
+    }
 
     /* extension enabled only for context 3.1 and later */
     if (constants->majorVersion == 3 && constants->minorVersion >= 1)
@@ -1602,6 +1606,7 @@ __glChipDestroyContext(
     gcmVERIFY_OK(gcoOS_Destroy(chipCtx->os));
 
     gcmVERIFY_OK(gcSHADER_FreeRecompilerLibrary());
+    gcmVERIFY_OK(gcSHADER_FreeBlendLibrary());
 
     dpGlobalInfo.numContext--;
 

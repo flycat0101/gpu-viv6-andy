@@ -1640,6 +1640,48 @@ OnError:
     return status;
 }
 
+/*******************************************************************************
+**
+**  gcoBUFFER_IsEmpty
+**
+**  Check if no command acculated in the buffer.
+**
+**  INPUT:
+**
+**      gcoBUFFER Buffer
+**          Pointer to a gcoBUFFER object
+**
+**  OUTPUT:
+**
+**      None.
+*/
+gceSTATUS
+gcoBUFFER_IsEmpty(
+    gcoBUFFER Buffer
+    )
+{
+    gceSTATUS status;
+    gcoCMDBUF commandBuffer;
+    gcmHEADER_ARG("Buffer=0x%x", Buffer);
+
+    commandBuffer = Buffer->commandBufferTail;
+
+    if (commandBuffer == gcvNULL)
+    {
+        status = gcvSTATUS_TRUE;
+    }
+    else if (commandBuffer->offset - commandBuffer->startOffset <= Buffer->info.reservedHead)
+    {
+        status = gcvSTATUS_TRUE;
+    }
+    else
+    {
+        status = gcvSTATUS_FALSE;
+    }
+
+    gcmFOOTER_ARG("status=%d", status);
+    return status;
+}
 
 /*******************************************************************************
 **

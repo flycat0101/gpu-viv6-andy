@@ -4343,11 +4343,11 @@ _MergeOneKernel(
     gctUINT32 length;
     gcUNIFORM uniform;
     gcVARIABLE variable;
-    gctUINT  *indexMap;
+    gctUINT  *indexMap = gcvNULL;
     gctUINT  *tempIndexMap;
     gctUINT tempIndexOffset;
     gctUINT tempIndex;
-    gcKERNEL_FUNCTION kernelFunction;
+    gcKERNEL_FUNCTION kernelFunction = gcvNULL;
     gcFUNCTION function;
     gctUINT32 currentFunctionCount = BuiltinIndex->currentFunctionCount;
     gctPOINTER pointer = gcvNULL;
@@ -4924,6 +4924,7 @@ _MergeOneKernel(
             }
 
             To->kernelFunctions[To->kernelFunctionCount++] = kernelFunction;
+            kernelFunction = gcvNULL;
         }
     }
 
@@ -5124,6 +5125,16 @@ _MergeOneKernel(
     SetShaderHasExternVariable(To, GetShaderHasExternVariable(From));
 
 OnError:
+
+    if (indexMap != gcvNULL)
+    {
+        gcoOS_Free(gcvNULL, indexMap);
+    }
+
+    if (kernelFunction != gcvNULL)
+    {
+        gcoOS_Free(gcvNULL, kernelFunction);
+    }
 
     gcmFOOTER();
     return status;
@@ -15277,7 +15288,7 @@ gcSHADER_GetAttributeByName(
         {
             gcATTRIBUTE attribute = Shader->attributes[idx];
 
-            if (attribute->nameLength == (gctINT) NameLength)
+            if (attribute && attribute->nameLength == (gctINT) NameLength)
             {
                 if (Name == gcvNULL)
                 {
@@ -15514,6 +15525,8 @@ gcSHADER_AddUniform(
 
         if (gcmIS_ERROR(status))
         {
+            gcoOS_Free(gcvNULL, pointer);
+
             /* Error. */
             gcmFOOTER();
             return status;
@@ -16261,10 +16274,10 @@ gcSHADER_AddUniformBlock(
     )
 {
     gctUINT32 nameLength=0, bytes;
-    gcsUNIFORM_BLOCK uniformBlock;
+    gcsUNIFORM_BLOCK uniformBlock = gcvNULL;
     gcUNIFORM blockAddressUniform;
     gceSTATUS status;
-    gctPOINTER pointer;
+    gctPOINTER pointer = gcvNULL;
     gctUINT16 thisIdx;
     gctBOOL isDefaultUBO = gcvFALSE;
     gctBOOL isConstantUBO = gcvFALSE;
@@ -16350,6 +16363,10 @@ gcSHADER_AddUniformBlock(
         {
             /* Error. */
             gcmFOOTER();
+            if(uniformBlock != gcvNULL)
+            {
+                gcoOS_Free(gcvNULL, uniformBlock);
+            }
             return status;
         }
 
@@ -16591,6 +16608,8 @@ gcSHADER_AddStorageBlock(
                                  &blockAddressUniform);
     if (gcmIS_ERROR(status))
     {
+        gcoOS_Free(gcvNULL, pointer);
+
         /* Error. */
         gcmFOOTER();
         return status;
@@ -22229,6 +22248,227 @@ gcSHADER_AddLabel(
     return gcvSTATUS_OK;
 }
 
+/*****************************************************************************************************
+**  gcSHADER_UpdateTargetPacked
+**
+**  Set instruction target's PackedComponents field to indicate the number of packed components
+**
+**  INPUT:
+**
+**      gcSHADER Shader
+**          Pointer to a gcSHADER object.
+**
+**      gcSHADER_INSTRUCTION_INDEX InstIndex
+**          Instruction argument index
+**
+**      gctINT Components
+**          Number of packed components.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcSHADER_SetTargetPacked(
+    IN gcSHADER Shader,
+    IN gcSHADER_INSTRUCTION_INDEX InstIndex,
+    IN gctINT Components
+    )
+{
+    gcSL_INSTRUCTION code;
+    gctUINT lastInstruction;
+
+    gcmHEADER_ARG("Shader=0x%x InstIndex=%d  Components=%d",
+                   Shader, InstIndex, Components);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Shader, gcvOBJ_SHADER);
+
+    lastInstruction = Shader->lastInstruction +
+                      (Shader->instrIndex > gcSHADER_SOURCE0);
+
+    /* Did we reach the end of the allocated instruction array? */
+    if (lastInstruction >= Shader->codeCount)
+    {
+        gceSTATUS status;
+
+        /* Allocate 32 extra instruction slots. */
+        status = _ExpandCode(Shader, 32);
+
+        if (gcmIS_ERROR(status))
+        {
+            /* Error. */
+            gcmFOOTER();
+            return status;
+        }
+    }
+
+    /* Point to the current instruction. */
+    code = Shader->code + lastInstruction;
+
+    /* Set the rounding mode portion of the instruction. */
+    code->temp = gcmSL_TARGET_SET(code->temp, PackedComponents, Components);
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+/*****************************************************************************************************
+**  gcSHADER_UpdateTargetPacked
+**
+**  Update instruction target's PackedComponents field to indicate the number of packed components
+**
+**  INPUT:
+**
+**      gcSHADER Shader
+**          Pointer to a gcSHADER object.
+**
+**      gctINT Components
+**          Number of packed components.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcSHADER_UpdateTargetPacked(
+    IN gcSHADER Shader,
+    IN gctINT Components
+    )
+{
+    gcSL_INSTRUCTION code;
+    gctUINT lastInstruction;
+
+    gcmHEADER_ARG("Shader=0x%x Components=%d",
+                   Shader, Components);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Shader, gcvOBJ_SHADER);
+
+    lastInstruction = Shader->lastInstruction;
+    if(Shader->instrIndex == gcSHADER_OPCODE) {
+        lastInstruction--;
+        if(lastInstruction < 0) {
+            gcmASSERT(0);
+            gcmFOOTER_NO();
+            return gcvSTATUS_INVALID_DATA;
+        }
+    }
+
+    /* Did we reach the end of the allocated instruction array? */
+    if (lastInstruction >= Shader->codeCount)
+    {
+        gceSTATUS status;
+
+        /* Allocate 32 extra instruction slots. */
+        status = _ExpandCode(Shader, 32);
+
+        if (gcmIS_ERROR(status))
+        {
+            /* Error. */
+            gcmFOOTER();
+            return status;
+        }
+    }
+
+    /* Point to the current instruction. */
+    code = Shader->code + lastInstruction;
+
+    /* Set the rounding mode portion of the instruction. */
+    code->temp = gcmSL_TARGET_SET(code->temp, PackedComponents, Components);
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+/*******************************************************************************
+**  gcSHADER_UpdateSourcePacked
+**
+**  Update source's PackedComponents field to indicate the number of packed components
+**
+**  INPUT:
+**
+**      gcSHADER Shader
+**          Pointer to a gcSHADER object.
+**
+**      gcSHADER_INSTRUCTION_INDEX InstIndex
+**          Instruction argument index: gcSHADER_SOURCE0/gcSHADER_SOURCE1.
+**
+**      gctINT Components
+**          Number of packed components.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcSHADER_UpdateSourcePacked(
+    IN gcSHADER Shader,
+    IN gcSHADER_INSTRUCTION_INDEX InstrIndex,
+    IN gctINT Components
+    )
+{
+    gcSL_INSTRUCTION code;
+    gctUINT lastInstruction;
+
+    gcmHEADER_ARG("Shader=0x%x InstrIndex=%d  Components=%d",
+                   Shader, InstrIndex, Components);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Shader, gcvOBJ_SHADER);
+
+    lastInstruction = Shader->lastInstruction;
+    if(InstrIndex == gcSHADER_SOURCE1 &&
+       Shader->instrIndex == gcSHADER_OPCODE) {
+        lastInstruction--;
+        if(lastInstruction < 0) {
+            gcmASSERT(0);
+            gcmFOOTER_NO();
+            return gcvSTATUS_INVALID_DATA;
+        }
+    }
+
+    /* Did we reach the end of the allocated instruction array? */
+    if (lastInstruction >= Shader->codeCount)
+    {
+        gceSTATUS status;
+
+        /* Allocate 32 extra instruction slots. */
+        status = _ExpandCode(Shader, 32);
+
+        if (gcmIS_ERROR(status))
+        {
+            /* Error. */
+            gcmFOOTER();
+            return status;
+        }
+    }
+
+    /* Point to the current instruction. */
+    code = Shader->code + lastInstruction;
+
+    switch(InstrIndex) {
+    case gcSHADER_SOURCE0:
+        code->source0 = gcmSL_TARGET_SET(code->source0, PackedComponents, Components);
+        break;
+
+    case gcSHADER_SOURCE1:
+        code->source1 = gcmSL_TARGET_SET(code->source1, PackedComponents, Components);
+        break;
+
+    default:
+        gcmASSERT(0);
+        gcmFOOTER_NO();
+        return gcvSTATUS_INVALID_DATA;
+    }
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
 /*******************************************************************************
 **  gcSHADER_AddRoundingMode
 **
@@ -26230,6 +26470,7 @@ gcGetOptionFromEnv(
             Option->useVIRCodeGen = VIRCG_FULL;
         }
         envChecked = 1;
+        Option->origUseVIRCodeGen = Option->useVIRCodeGen;
 
         if (!dual16Specified &&  Option->useVIRCodeGen == VIRCG_FULL)
         {
@@ -26294,7 +26535,23 @@ gcSetOptimizerOption(
     if (Flags & gcvSHADER_RECOMPILER)
         opt |= gcvOPTIMIZATION_RECOMPILER;
 
+    if (Flags & gcvSHADER_MIN_COMP_TIME)
+        opt |= gcvOPTIMIZATION_MIN_COMP_TIME;
+
     theOptimizerOption.optFlags = opt;
+
+    if ((Flags & gcvSHADER_VIRCG_NONE) !=0)
+    {
+        theOptimizerOption.useVIRCodeGen = VIRCG_None;
+    }
+    else if ((Flags & gcvSHADER_VIRCG_ONE) !=0)
+    {
+        theOptimizerOption.useVIRCodeGen = VIRCG_WITH_TREECG;
+    }
+    else
+    {
+        theOptimizerOption.useVIRCodeGen = theOptimizerOption.origUseVIRCodeGen;
+    }
 
     return;
 } /* gcSetOptimizerOption */
@@ -26397,11 +26654,12 @@ gcSHADER_SetOptimizationOption(
 gceSTATUS
 gcATTRIBUTE_IsPosition(
     IN gcATTRIBUTE Attribute,
-    OUT gctBOOL * IsPosition
+    OUT gctBOOL * IsPosition,
+    OUT gctBOOL * IsDirectPosition
     )
 {
 #if gcdUSE_WCLIP_PATCH
-    gcmHEADER_ARG("Attribute=0x%x IsPosition=0x%x", Attribute, IsPosition);
+    gcmHEADER_ARG("Attribute=0x%x IsPosition=0x%x IsDirectPosition=0x%x", Attribute, IsPosition, IsDirectPosition);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Attribute, gcvOBJ_ATTRIBUTE);
@@ -26410,6 +26668,12 @@ gcATTRIBUTE_IsPosition(
     {
         /* Return enabled state. */
         *IsPosition = gcmATTRIBUTE_isPosition(Attribute);
+    }
+
+    if (IsDirectPosition != gcvNULL)
+    {
+        /* Return enabled state. */
+        *IsDirectPosition = gcmATTRIBUTE_isDirectPosition(Attribute);
     }
 
     gcmFOOTER_NO();
@@ -26932,8 +27196,13 @@ gcATTRIBUTE_GetNameEx(
         /* Return pointer to name. */
         *Name = retName;
     }
+    else
+    {
+        gcoOS_Free(gcvNULL, retName);
+    }
 
 OnError:
+
     gcmFOOTER_NO();
     return status;
 }
@@ -32677,14 +32946,14 @@ gcCreateWriteImageDirective(
 }
 
 gceSTATUS
-gcCreateYFlippedTextureDirective(
+gcCreateyFlippedTextureDirective(
     IN gcUNIFORM               Sampler,
     OUT gcPatchDirective  **   PatchDirectivePtr
     )
 {
     gceSTATUS          status = gcvSTATUS_OK;
     gcPatchDirective * pointer;
-    gcsPatchYFilppedTexture *fc;
+    gcsPatchyFlippedTexture *fc;
 
     gcmHEADER_ARG("SamplerName=%s PatchDirectivePtr=0x%x", Sampler->name,
                                                          PatchDirectivePtr);
@@ -32695,7 +32964,7 @@ gcCreateYFlippedTextureDirective(
                             (gctPOINTER *)&pointer);
     if (gcmIS_ERROR(status)) {
         /* Error. */
-        gcmFATAL("gcCreateYFlippedTextureDirective: gcoOS_Allocate failed status=%d(%s)",
+        gcmFATAL("gcCreateyFlippedTextureDirective: gcoOS_Allocate failed status=%d(%s)",
                  status, gcoOS_DebugStatus2Name(status));
         gcmFOOTER();
         return status;
@@ -32708,16 +32977,16 @@ gcCreateYFlippedTextureDirective(
     *PatchDirectivePtr = pointer;
 
     status = gcoOS_Allocate(gcvNULL,
-                            gcmSIZEOF(gcsPatchYFilppedTexture),
+                            gcmSIZEOF(gcsPatchyFlippedTexture),
                             (gctPOINTER *)&fc);
     if (gcmIS_ERROR(status)) {
         /* Error. */
-        gcmFATAL("gcCreateYFlippedTextureDirective: gcoOS_Allocate failed status=%d(%s)",
+        gcmFATAL("gcCreateyFlippedTextureDirective: gcoOS_Allocate failed status=%d(%s)",
                  status, gcoOS_DebugStatus2Name(status));
         gcmFOOTER();
         return status;
     }
-    pointer->patchValue.yFilppedTexture = fc;
+    pointer->patchValue.yFlippedTexture = fc;
     fc->yFlippedTexture = Sampler;
     gcmFOOTER();
     return status;
@@ -32781,7 +33050,7 @@ gcCreateYFlippedShaderDirective(
 {
     gceSTATUS          status = gcvSTATUS_OK;
     gcPatchDirective * pointer;
-    gcsPatchYFilppedShader *fc;
+    gcsPatchYFlippedShader *fc;
 
     gcmHEADER();
     gcmASSERT(PatchDirectivePtr != gcvNULL);
@@ -32804,16 +33073,16 @@ gcCreateYFlippedShaderDirective(
     *PatchDirectivePtr = pointer;
 
     status = gcoOS_Allocate(gcvNULL,
-                            gcmSIZEOF(gcsPatchYFilppedShader),
+                            gcmSIZEOF(gcsPatchYFlippedShader),
                             (gctPOINTER *)&fc);
     if (gcmIS_ERROR(status)) {
         /* Error. */
-        gcmFATAL("gcCreateYFlippedTextureDirective: gcoOS_Allocate failed status=%d(%s)",
+        gcmFATAL("gcCreateyFlippedTextureDirective: gcoOS_Allocate failed status=%d(%s)",
                  status, gcoOS_DebugStatus2Name(status));
         gcmFOOTER();
         return status;
     }
-    pointer->patchValue.yFilppedShader = fc;
+    pointer->patchValue.yFlippedShader = fc;
     fc->rtHeight         = gcvNULL;
 
     gcmFOOTER();
@@ -33026,6 +33295,60 @@ gcCreateColorKillDirective(
 }
 
 gceSTATUS
+gcCreateAlphaBlendDirective(
+IN  gctINT                 OutputLocation,
+OUT gcPatchDirective  **   PatchDirectivePtr
+)
+{
+    gceSTATUS           status = gcvSTATUS_OK;
+    gcPatchDirective *  pointer;
+    gcsPatchAlphaBlend * fc;
+
+    if (PatchDirectivePtr == gcvNULL)
+    {
+        gcmASSERT(gcvFALSE);
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    status = gcoOS_Allocate(gcvNULL,
+        gcmSIZEOF(gcPatchDirective),
+        (gctPOINTER *)&pointer);
+    if (gcmIS_ERROR(status)) {
+        /* Error. */
+        gcmFATAL("gcCreateColorKillDirective: gcoOS_Allocate failed status=%d(%s)",
+            status, gcoOS_DebugStatus2Name(status));
+        return status;
+    }
+
+    /* link the new directive to existing directive */
+    pointer->next = *PatchDirectivePtr;
+    pointer->kind = gceRK_PATCH_ALPHA_BLEND;
+
+    *PatchDirectivePtr = pointer;
+
+    status = gcoOS_Allocate(gcvNULL,
+        gcmSIZEOF(gcsPatchAlphaBlend),
+        (gctPOINTER *)&fc);
+    if (gcmIS_ERROR(status)) {
+        /* Error. */
+        gcmFATAL("gcCreateColorKill: gcoOS_Allocate failed status=%d(%s)",
+            status, gcoOS_DebugStatus2Name(status));
+        gcmFOOTER();
+        return status;
+    }
+    pointer->patchValue.alphaBlend = fc;
+    fc->outputLocation = OutputLocation;
+    fc->outputs[0] = fc->outputs[1] = fc->outputs[2] = fc->outputs[3] = gcvNULL;
+    fc->alphaBlendEquation = gcvNULL;
+    fc->rtWidthHeight = gcvNULL;
+    fc->blendConstColor = gcvNULL;
+    fc->rtSampler = gcvNULL;
+
+    return status;
+}
+
+
+gceSTATUS
 gcDestroyPatchDirective(
     IN OUT gcPatchDirective **   PatchDirectivePtr
     )
@@ -33084,7 +33407,7 @@ gcDestroyPatchDirective(
             break;
         case gceRK_PATCH_Y_FLIPPED_TEXTURE:
            gcmONERROR(gcoOS_Free(gcvNULL,
-                           curDirective->patchValue.yFilppedTexture));
+                           curDirective->patchValue.yFlippedTexture));
             break;
         case gceRK_PATCH_REMOVE_ASSIGNMENT_FOR_ALPHA:
            gcmONERROR(gcoOS_Free(gcvNULL,
@@ -33093,7 +33416,7 @@ gcDestroyPatchDirective(
 
         case gceRK_PATCH_Y_FLIPPED_SHADER:
             gcmONERROR(gcoOS_Free(gcvNULL,
-                            curDirective->patchValue.yFilppedShader));
+                            curDirective->patchValue.yFlippedShader));
             break;
         case gceRK_PATCH_SAMPLE_MASK:
              gcmONERROR(gcoOS_Free(gcvNULL,
@@ -33111,6 +33434,9 @@ gcDestroyPatchDirective(
              gcmONERROR(gcoOS_Free(gcvNULL,
                             curDirective->patchValue.longULong));
             break;
+         case gceRK_PATCH_ALPHA_BLEND:
+            gcmONERROR(gcoOS_Free(gcvNULL,
+                curDirective->patchValue.alphaBlend));
         default:
             gcmASSERT(gcvFALSE);  /* not implemented yet */
             break;

@@ -88,7 +88,7 @@ GLvoid __glComputeArrayPrimBegin(__GLcontext *gc, GLenum mode, GLsizei count, __
     __GLvertexArrayState *pV = &gc->clientState.vertexArray;
     __GLPrimBegin *prevPrimBegin;
     GLuint copyPrevPrimBegin;
-    GLint i, offset, size;
+    GLint i, offset, size = 0;
     GLuint mask;
 
     /* We can copy primBegin from prevPrimBegin if vertex format is not changed */

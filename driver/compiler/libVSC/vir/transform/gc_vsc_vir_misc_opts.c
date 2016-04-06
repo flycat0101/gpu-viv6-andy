@@ -144,6 +144,8 @@ VSC_ErrCode vscVIR_PutImmValueToUniform(VIR_Shader* pShader, VSC_HW_CONFIG* pHwC
             numChange = 0;
             dstElemType = VIR_TYPE_VOID;
 
+            gcmASSERT(VIR_Inst_GetSrcNum(inst) <= VIR_MAX_SRC_NUM);
+
             for (i = 0; i < VIR_Inst_GetSrcNum(inst); ++i)
             {
                 needChange[i] = gcvFALSE;
@@ -2132,6 +2134,38 @@ static gctBOOL _vscVIR_ConvertIntegerSymbolToFloat(
 
                         VIR_Symbol_SetType(symbol, newType);
                         changed = gcvTRUE;
+
+                        if(symKind == VIR_SYM_UNIFORM && isSymUniformCompiletimeInitialized(symbol))
+                        {
+                            VIR_Uniform* uniform = VIR_Symbol_GetUniform(symbol);
+                            VIR_ConstId constId = VIR_Uniform_GetInitializer(uniform);
+                            VIR_Const* constVal = VIR_Shader_GetConstFromId(pShader, constId);
+                            VIR_TypeId constTypeId = constVal->type;
+                            gctUINT constTypeComponents = VIR_GetTypeComponents(constTypeId);
+                            VIR_TypeId newConstTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_FLOAT32, constTypeComponents, 1);
+                            VIR_ConstVal newConstVal;
+                            gctUINT i;
+                            VIR_ConstId newConstId;
+
+                            if(VIR_GetTypeFlag(constTypeId) & VIR_TYFLAG_IS_UNSIGNED_INT ||
+                               VIR_GetTypeFlag(constTypeId) & VIR_TYFLAG_IS_BOOLEAN)
+                            {
+                                for(i = 0; i < constTypeComponents; i++)
+                                {
+                                    newConstVal.vecVal.f32Value[i] = (gctFLOAT)constVal->value.vecVal.u32Value[i];
+                                }
+                            }
+                            else if(VIR_GetTypeFlag(constTypeId) & VIR_TYFLAG_IS_SIGNED_INT)
+                            {
+                                for(i = 0; i < constTypeComponents; i++)
+                                {
+                                    newConstVal.vecVal.f32Value[i] = (gctFLOAT)constVal->value.vecVal.i32Value[i];
+                                }
+
+                            }
+                            VIR_Shader_AddConstant(pShader, newConstTypeId, &newConstVal, &newConstId);
+                            VIR_Uniform_SetInitializer(uniform, newConstId);
+                        }
                     }
                     break;
                 }
@@ -2225,6 +2259,33 @@ static gctBOOL _vscVIR_ConvertIntegerOperandToFloat(
         }
         case VIR_OPND_CONST:
         {
+            VIR_ConstId constId = VIR_Operand_GetConstId(operand);
+            VIR_Const* constVal = VIR_Shader_GetConstFromId(pShader, constId);
+            VIR_TypeId constTypeId = constVal->type;
+            gctUINT constTypeComponents = VIR_GetTypeComponents(constTypeId);
+            VIR_TypeId newConstTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_FLOAT32, constTypeComponents, 1);
+            VIR_ConstVal newConstVal;
+            gctUINT i;
+            VIR_ConstId newConstId;
+
+            if(VIR_GetTypeFlag(constTypeId) & VIR_TYFLAG_IS_UNSIGNED_INT ||
+               VIR_GetTypeFlag(constTypeId) & VIR_TYFLAG_IS_BOOLEAN)
+            {
+                for(i = 0; i < constTypeComponents; i++)
+                {
+                    newConstVal.vecVal.f32Value[i] = (gctFLOAT)constVal->value.vecVal.u32Value[i];
+                }
+            }
+            else if(VIR_GetTypeFlag(constTypeId) & VIR_TYFLAG_IS_SIGNED_INT)
+            {
+                for(i = 0; i < constTypeComponents; i++)
+                {
+                    newConstVal.vecVal.f32Value[i] = (gctFLOAT)constVal->value.vecVal.i32Value[i];
+                }
+
+            }
+            VIR_Shader_AddConstant(pShader, newConstTypeId, &newConstVal, &newConstId);
+            VIR_Operand_SetConst(operand, newConstTypeId, newConstId);
             break;
         }
         default:
@@ -2303,7 +2364,7 @@ static void _vscVIR_ConvertIntegerInstructionToFloat(
         ConvertedSource[i] = _vscVIR_ConvertIntegerOperandToFloat(pShader, source);
     }
 
-    if(VIR_OPCODE_hasDest(opcode) && toBeConvertedDest)
+    if(VIR_OPCODE_hasDest(opcode) && !VIR_OPCODE_WriteMem(opcode) && toBeConvertedDest)
     {
         VIR_Operand* dest = VIR_Inst_GetDest(inst);
 
@@ -2317,7 +2378,7 @@ static void _vscVIR_ConvertIntegerInstructionToFloat(
             VIR_Operand* dest = VIR_Inst_GetDest(inst);
             VIR_Operand* src = VIR_Inst_GetSource(inst, 0);
 
-            if(VIR_Operand_GetType(dest) == VIR_Operand_GetType(src))
+            if(VIR_GetTypeComponentType(VIR_Operand_GetType(dest)) == VIR_GetTypeComponentType(VIR_Operand_GetType(src)))
             {
                 if(ConvertedDest && !ConvertedSource[0])
                 {

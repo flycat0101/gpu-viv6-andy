@@ -95,6 +95,8 @@ struct _cloCOMPILER
         gctUINT          unnamedCount;
         gctBOOL          hasInt64;
         gctBOOL          hasImageQuery;
+        gctUINT          imageArrayMaxLevel;
+        gctBOOL          basicTypePacked;
     } context;
     cloPREPROCESSOR      preprocessor;
     cloCODE_EMITTER      codeEmitter;
@@ -223,6 +225,8 @@ cloCOMPILER_Construct(
         compiler->context.hasLocalMemoryKernelArg = gcvFALSE;
         compiler->context.hasInt64 = gcvFALSE;
         compiler->context.hasImageQuery = gcvFALSE;
+        compiler->context.basicTypePacked = gcvFALSE;
+        compiler->context.imageArrayMaxLevel = cldVxImageArrayMaxLevelDefault;
         compiler->context.constantMemorySize = 0;
         compiler->context.privateMemorySize = 0;
         compiler->context.maxKernelFunctionArgs = 0;
@@ -1130,6 +1134,11 @@ cloCOMPILER_Compile(
            gcShaderSetHasImageQuery(Compiler->binary);
         }
 
+        gcShaderClrHasVivVxExtension(Compiler->binary);
+        if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+           gcShaderSetHasVivVxExtension(Compiler->binary);
+        }
+
         /* Pack the binary */
         gcmONERROR(gcSHADER_Pack(Compiler->binary));
 
@@ -1634,6 +1643,29 @@ IN gctBOOL Enable
     else {
         Compiler->context.extensions &= ~Extension;
     }
+    return gcvSTATUS_OK;
+}
+
+gctBOOL
+cloCOMPILER_IsBasicTypePacked(
+IN cloCOMPILER Compiler
+)
+{
+    /* Verify the arguments. */
+    clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
+    return Compiler->context.basicTypePacked;
+}
+
+/* Set the packed attribute for basic type */
+gceSTATUS
+cloCOMPILER_SetBasicTypePacked(
+IN cloCOMPILER Compiler
+)
+{
+    /* Verify the arguments. */
+    clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
+
+    Compiler->context.basicTypePacked = gcvTRUE;
     return gcvSTATUS_OK;
 }
 
@@ -2394,98 +2426,97 @@ _clGetOrConstructElement(
     gcmVERIFY_ARGUMENT(CompoundDecl);
     gcmVERIFY_ARGUMENT(Decl);
 
-    do
-    {
-    clsBUILTIN_DATATYPE_INFO *typeInfo;
-    gctINT componentType;
-    clsARRAY *array;
-    clsARRAY arrayBuffer[1];
-    slsSLINK_LIST *ptrDscr;
+    do {
+        clsBUILTIN_DATATYPE_INFO *typeInfo;
+        gctINT componentType;
+        clsARRAY *array;
+        clsARRAY arrayBuffer[1];
+        slsSLINK_LIST *ptrDscr;
 
-    slmSLINK_LIST_Initialize(ptrDscr);
-    array = &CompoundDecl->array;
-    if (clmDECL_IsMat(CompoundDecl)) {
-       gctUINT8 componentCount;
-       componentCount = clmDATA_TYPE_matrixRowCount_GET(CompoundDecl->dataType);
-       componentType = clGetVectorTerminalToken(CompoundDecl->dataType->elementType,
-                               componentCount);
-       typeInfo = clGetBuiltinDataTypeInfo(componentType);
-    }
-    else {
-       componentType = CompoundDecl->dataType->type;
-       if(!slmSLINK_LIST_IsEmpty(CompoundDecl->ptrDscr)) {
-          status = cloCOMPILER_ClonePtrDscr(Compiler,
+        slmSLINK_LIST_Initialize(ptrDscr);
+        array = &CompoundDecl->array;
+        if (clmDECL_IsMat(CompoundDecl)) {
+           gctUINT8 componentCount;
+           componentCount = clmDATA_TYPE_matrixRowCount_GET(CompoundDecl->dataType);
+           componentType = clGetVectorTerminalToken(CompoundDecl->dataType->elementType,
+                                   componentCount);
+           typeInfo = clGetBuiltinDataTypeInfo(componentType);
+        }
+        else {
+           componentType = CompoundDecl->dataType->type;
+           if(!slmSLINK_LIST_IsEmpty(CompoundDecl->ptrDscr)) {
+              status = cloCOMPILER_ClonePtrDscr(Compiler,
                                                 CompoundDecl->ptrDscr,
                                                 &ptrDscr);
-          if (gcmIS_ERROR(status)) break;
-       }
-
-       typeInfo = clGetBuiltinDataTypeInfo(componentType);
-       if(typeInfo == gcvNULL) {
-           if (clmDECL_IsUnderlyingArray(CompoundDecl)) {
-              array = _DecrementArrayDim(&CompoundDecl->array, arrayBuffer);
+              if (gcmIS_ERROR(status)) break;
            }
-               else if(ptrDscr) {
-              clParseRemoveIndirectionOneLevel(Compiler, &ptrDscr);
+
+           typeInfo = clGetBuiltinDataTypeInfo(componentType);
+           if(typeInfo == gcvNULL) {
+               if (clmDECL_IsUnderlyingArray(CompoundDecl)) {
+                  array = _DecrementArrayDim(&CompoundDecl->array, arrayBuffer);
                }
-           else {
+               else if(ptrDscr) {
+                  clParseRemoveIndirectionOneLevel(Compiler, &ptrDscr);
+               }
+               else {
                    gcmASSERT(0);
                    status = gcvSTATUS_INVALID_ARGUMENT;
-               break;
-           }
-       }
-       else {
-           if (clmDECL_IsUnderlyingArray(CompoundDecl)) {
-              array = _DecrementArrayDim(&CompoundDecl->array, arrayBuffer);
-           }
-               else if(ptrDscr) {
-               clParseRemoveIndirectionOneLevel(Compiler, &ptrDscr);
+                   break;
                }
+           }
            else {
-               if(typeInfo->type == typeInfo->componentType) {
-                      status = gcvSTATUS_INVALID_ARGUMENT;
-                  break;
+               if (clmDECL_IsUnderlyingArray(CompoundDecl)) {
+                   array = _DecrementArrayDim(&CompoundDecl->array, arrayBuffer);
                }
+               else if(ptrDscr) {
+                   clParseRemoveIndirectionOneLevel(Compiler, &ptrDscr);
+               }
+               else {
+                   if(typeInfo->type == typeInfo->componentType) {
+                       status = gcvSTATUS_INVALID_ARGUMENT;
+                       break;
+                   }
                    componentType = typeInfo->componentType;
-               typeInfo = clGetBuiltinDataTypeInfo(componentType);
+                   typeInfo = clGetBuiltinDataTypeInfo(componentType);
+               }
            }
-       }
-    }
-    if(typeInfo != gcvNULL) {
-      dataType = typeInfo->typePtr[CompoundDecl->dataType->accessQualifier]
-                          [CompoundDecl->dataType->addrSpaceQualifier];
-    }
-    else dataType = gcvNULL;
+        }
+        if(typeInfo != gcvNULL) {
+           dataType = typeInfo->typePtr[CompoundDecl->dataType->accessQualifier]
+                              [CompoundDecl->dataType->addrSpaceQualifier];
+        }
+        else dataType = gcvNULL;
 
-    if(dataType == gcvNULL) {
-        gctPOINTER pointer;
-        gcmONERROR(cloCOMPILER_Allocate(Compiler,
-                                            (gctSIZE_T)sizeof(clsDATA_TYPE),
-                                            &pointer));
-        dataType = pointer;
+        if(dataType == gcvNULL) {
+            gctPOINTER pointer;
+            gcmONERROR(cloCOMPILER_Allocate(Compiler,
+                                                (gctSIZE_T)sizeof(clsDATA_TYPE),
+                                                &pointer));
+            dataType = pointer;
 
             dataType->type  = componentType;
             dataType->accessQualifier  = CompoundDecl->dataType->accessQualifier;
             dataType->addrSpaceQualifier  = CompoundDecl->dataType->addrSpaceQualifier;
             dataType->u.generic = CompoundDecl->dataType->u.generic;
 
-        if(typeInfo != gcvNULL) {
-          dataType->elementType = typeInfo->dataType.elementType;
-          dataType->matrixSize = typeInfo->dataType.matrixSize;
-          gcmONERROR(cloCOMPILER_DetachFromMemoryPool(Compiler,
-                                      dataType));
-          typeInfo->typePtr[CompoundDecl->dataType->accessQualifier]
-                               [CompoundDecl->dataType->addrSpaceQualifier] = dataType;
-        }
-        else {
-              dataType->elementType = CompoundDecl->dataType->elementType;
-          dataType->matrixSize = CompoundDecl->dataType->matrixSize;
-              slsDLINK_LIST_InsertLast(&Compiler->context.dataTypes, &dataType->node);
-        }
+            if(typeInfo != gcvNULL) {
+                dataType->elementType = typeInfo->dataType.elementType;
+                dataType->matrixSize = typeInfo->dataType.matrixSize;
+                gcmONERROR(cloCOMPILER_DetachFromMemoryPool(Compiler,
+                                          dataType));
+                typeInfo->typePtr[CompoundDecl->dataType->accessQualifier]
+                                   [CompoundDecl->dataType->addrSpaceQualifier] = dataType;
+            }
+            else {
+                dataType->elementType = CompoundDecl->dataType->elementType;
+                dataType->matrixSize = CompoundDecl->dataType->matrixSize;
+                slsDLINK_LIST_InsertLast(&Compiler->context.dataTypes, &dataType->node);
+            }
         }
 
         clmDECL_Initialize(Decl, dataType, array, ptrDscr,
-               array->numDim ? CompoundDecl->ptrDominant : gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
+        array->numDim ? CompoundDecl->ptrDominant : gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
         gcmFOOTER_ARG("Decl=0x%x", Decl);
         return gcvSTATUS_OK;
     }
@@ -3120,6 +3151,37 @@ IN gctUINT TempIndex
 }
 
 gceSTATUS
+cloCOMPILER_SetImageArrayMaxLevel(
+    IN cloCOMPILER Compiler,
+    IN gctSTRING MaxLevel
+)
+{
+   gceSTATUS status = gcvSTATUS_OK;
+   gctINT level = 1;
+
+   gcmHEADER_ARG("Compiler=0x%x MaxLevel=%s",
+                 Compiler, MaxLevel);
+
+   if (gcmIS_SUCCESS(gcoOS_StrToInt(MaxLevel, &level)) &&
+       level > 0) {
+      Compiler->context.imageArrayMaxLevel = level;
+   }
+   else {
+      status = gcvSTATUS_INVALID_DATA;
+   }
+   gcmFOOTER();
+   return status;
+}
+
+gctUINT32
+cloCOMPILER_GetImageArrayMaxLevel(
+    IN cloCOMPILER Compiler
+)
+{
+  return Compiler ? Compiler->context.imageArrayMaxLevel : cldVxImageArrayMaxLevelDefault;
+}
+
+gceSTATUS
 cloCOMPILER_SetLanguageVersion(
     IN cloCOMPILER Compiler,
     IN gctSTRING LangVersion
@@ -3555,7 +3617,6 @@ IN cloCOMPILER Compiler
 )
 {
    return Compiler->context.currentSpace;
-
 }
 
 clsNAME_SPACE *
@@ -3564,7 +3625,6 @@ IN cloCOMPILER Compiler
 )
 {
    return Compiler->context.globalSpace;
-
 }
 
 clsNAME_SPACE *

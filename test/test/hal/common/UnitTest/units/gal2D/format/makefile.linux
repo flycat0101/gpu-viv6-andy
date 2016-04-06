@@ -26,6 +26,7 @@
 ##############################################################################
 
 
+
 ######################################################
 # Include global difinitions.
 
@@ -42,7 +43,8 @@ CASELIST := A8 \
             Gamma \
             Compressed2D \
             CompressedTPC \
-            CompressedDEC
+            CompressedDEC \
+            10Bit
 
 
 

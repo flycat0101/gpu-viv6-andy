@@ -226,6 +226,8 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
 
     VIR_HwRegId                 samplePosRegister;
 
+    gctUINT                     maxReg[VIR_RA_HWREG_TYPE_COUNT];
+
 } VIR_RA_LS;
 
 #define VIR_RA_LS_GetShader(ra)          ((ra)->pShader)

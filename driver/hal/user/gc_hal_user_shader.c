@@ -348,6 +348,10 @@ gcCreateInstVidMem(
     *PhysicalAddr = physical;
 
 OnError:
+    if (gcmIS_ERROR(status) && node != gcvNULL)
+    {
+        gcoOS_Free(gcvNULL, node);
+    }
     gcmFOOTER();
     return status;
 }
@@ -435,6 +439,10 @@ gcCreateSpillVidMem(
     *PhysicalAddr = physical;
 
 OnError:
+    if (gcmIS_ERROR(status) && node != gcvNULL)
+    {
+        gcoOS_Free(gcvNULL, node);
+    }
     gcmFOOTER();
     return status;
 }

@@ -774,6 +774,12 @@ _Set(
                 if (rect.right  > Display->res.right)  { rect.right  = Display->res.right;  }
                 if (rect.bottom > Display->res.bottom) { rect.bottom = Display->res.bottom; }
 
+                if ((rect.left >= rect.right) || (rect.top >= rect.bottom))
+                {
+                    /* Skip invalid rectangle. */
+                    continue;
+                }
+
                 _SplitArea(Display,
                            Display->compositionArea,
                            &rect,
@@ -1137,7 +1143,7 @@ _Set(
     /***************************************************************************
     ** Swap Rectangle Optimization.
     */
-
+    if (Display->hasG2D)
     {
         /* Get short cuts. */
         hwcBuffer * buffer           = Display->target;

@@ -920,6 +920,14 @@ clReleaseEvent(
 
     if (oldReference == 1)
     {
+#if cldSYNC_MEMORY
+        if (Event->queue != gcvNULL)
+        {
+            clReleaseCommandQueue(Event->queue);
+            Event->queue = gcvNULL;
+        }
+#endif
+
         /* Free signals. */
         gcmVERIFY_OK(gcoCL_DestroySignal(Event->finishSignal));
         Event->finishSignal = gcvNULL;

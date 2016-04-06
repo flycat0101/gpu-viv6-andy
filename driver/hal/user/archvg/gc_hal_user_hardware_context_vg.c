@@ -579,7 +579,7 @@ gcoVGHARDWARE_OpenContext(
         /* Allocate the context buffer. */
         gcmERR_BREAK(gcoVGHARDWARE_AllocateLinearVideoMemory(
             Hardware,
-            bufferSize, 1,
+            bufferSize, 64,
             gcvPOOL_DEFAULT,
             gcvALLOC_FLAG_CONTIGUOUS,
             &node, &headerAddress,

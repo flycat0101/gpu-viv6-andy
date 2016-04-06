@@ -26,6 +26,7 @@
 *****************************************************************************/
 
 
+
 /*
  *  Feature:    Filter Blit - kernel size
  *  API:        gco2D_FilterBlit
@@ -335,7 +336,6 @@ static void CDECL Destroy(Test2D *t2d)
 
 const gceFEATURE FeatureList[]=
 {
-    gcvFEATURE_SCALER,
     gcvFEATURE_2D_YUV_SEPARATE_STRIDE,
 };
 

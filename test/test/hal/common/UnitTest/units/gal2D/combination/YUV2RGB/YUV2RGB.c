@@ -201,12 +201,20 @@ static void CDECL Destroy(Test2D *t2d)
     free(t2d);
 }
 
+const gceFEATURE FeatureList[]=
+{
+    gcvFEATURE_SCALER,
+};
+
 static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 {
 	gceSTATUS status = gcvSTATUS_OK;
-    t2d->runtime = runtime;
+    gctUINT32 k, listLen = sizeof(FeatureList)/sizeof(gctINT);
+    gctBOOL featureStatus;
+    char featureName[FEATURE_NAME_LEN], featureMsg[FEATURE_MSG_LEN];
 
-    runtime->wholeDescription = (char*)malloc(strlen(s_CaseDescription) + 1);
+    t2d->runtime = runtime;
+    runtime->wholeDescription = (char*)malloc(FEATURE_NAME_LEN * listLen + strlen(s_CaseDescription) + 1);
 
     if (runtime->wholeDescription == gcvNULL)
     {
@@ -214,6 +222,20 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     }
 
     memcpy(runtime->wholeDescription, s_CaseDescription, strlen(s_CaseDescription) + 1);
+
+    for(k = 0; k < listLen; k++)
+    {
+        gcmONERROR(GalQueryFeatureStr(FeatureList[k], featureName, featureMsg, &featureStatus));
+        if (gcoHAL_IsFeatureAvailable(runtime->hal, FeatureList[k]) == featureStatus)
+        {
+            GalOutput(GalOutputType_Result | GalOutputType_Console, "%s is not supported.\n", featureMsg);
+            runtime->notSupport = gcvTRUE;
+        }
+        strncat(runtime->wholeDescription, featureName, k==listLen-1 ? strlen(featureName)+1:strlen(featureName));
+    }
+
+    if (runtime->notSupport)
+        return gcvFALSE;
 
 	t2d->dstSurf    = runtime->target;
 	t2d->dstFormat = runtime->format;

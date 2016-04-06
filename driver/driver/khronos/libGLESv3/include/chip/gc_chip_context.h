@@ -176,7 +176,8 @@ typedef struct __GLchipDirtyRec
             unsigned int tesReload       : 1;
             unsigned int gsReload        : 1;
             unsigned int activeUniform   : 1;
-            unsigned int reserved        : 14;
+            unsigned int pgInsChanged    : 1;
+            unsigned int reserved        : 13;
         } sDefer;
         unsigned int deferDirty;
     } uDefer;
@@ -329,6 +330,7 @@ struct __GLchipContextRec
     /* Record attrib index, actually means hw attribute register usage. */
     GLint                       attribMask;
     GLint                       positionIndex;
+    GLint                       directPositionIndex;
     gcoVERTEXARRAY              vertexArray;
 
     /* Translated primitive type seen in PA */

@@ -493,7 +493,8 @@ static VSC_ErrCode _CompileShaderAtMCLevel(VSC_PASS_MANAGER* pPassMnger)
         }
     }
 
-    if (ENABLE_FULL_NEW_LINKER)
+    if (ENABLE_FULL_NEW_LINKER &&
+        !(pPassMnger->passWorker.pCompilerParam->cfg.optFlags & VSC_COMPILER_OPT_MIN_COMP_TIME))
     {
         errCode = vscVIR_PerformSpecialHwPatches(pShader);
         ON_ERROR(errCode, "Perform special HW patch");
