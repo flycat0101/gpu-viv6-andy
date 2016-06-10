@@ -757,7 +757,8 @@ _FillFlatMapping(
 
     /************************ Setup flat mapping in dynamic range. ****************/
 
-    if (area->dynamicMappingStart != gcvINVALID_ADDRESS && mtlb >= area->dynamicMappingStart && mtlb < area->dynamicMappingEnd)
+    if (area->dynamicMappingStart != gcvINVALID_ADDRESS && mtlb >= area->dynamicMappingStart &&
+	_MtlbOffset(PhysBase + Size - 1) < area->dynamicMappingEnd)
     {
         gctUINT32_PTR stlbEntry;
         gctUINT i;
