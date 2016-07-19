@@ -59,100 +59,100 @@ typedef struct Test2D {
     GalTest     base;
     GalRuntime  *runtime;
 
-	// destination surface
-    gcoSURF			dstSurf;
-	gceSURF_FORMAT	dstFormat;
-	gctUINT			dstWidth;
-	gctUINT			dstHeight;
-	gctINT			dstStride;
-	gctUINT32		dstPhyAddr;
-	gctPOINTER		dstLgcAddr;
+    // destination surface
+    gcoSURF            dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT            dstWidth;
+    gctUINT            dstHeight;
+    gctINT            dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
 
-	//source surface
-    gcoSURF			srcSurf;
-	gceSURF_FORMAT	srcFormat;
-	gctUINT			srcWidth;
-	gctUINT			srcHeight;
-	gctINT			srcStride;
-	gctUINT32		srcPhyAddr;
-	gctPOINTER		srcLgcAddr;
+    //source surface
+    gcoSURF            srcSurf;
+    gceSURF_FORMAT    srcFormat;
+    gctUINT            srcWidth;
+    gctUINT            srcHeight;
+    gctINT            srcStride;
+    gctUINT32        srcPhyAddr;
+    gctPOINTER        srcLgcAddr;
 
-	//mask
-	gceSURF_MONOPACK maskType;
-	gctPOINTER maskData;
-	gctUINT32 maskWidth;
-	gctUINT32 maskHeight;
+    //mask
+    gceSURF_MONOPACK maskType;
+    gctPOINTER maskData;
+    gctUINT32 maskWidth;
+    gctUINT32 maskHeight;
 } Test2D;
 
 
 static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 {
-	gceSTATUS status = gcvSTATUS_OK;
-	gctUINT8_PTR maskData = gcvNULL;
-	gceSURF_MONOPACK maskType;
-	gcsRECT srcRect;
-	gcsRECT DstRect;
-	DstRect.left = DstRect.top = 0;
-	DstRect.right = t2d->dstWidth < t2d->maskWidth ? t2d->dstWidth : t2d->maskWidth;
-	DstRect.bottom = t2d->dstHeight < t2d->maskHeight ? t2d->dstHeight : t2d->maskHeight;
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT8_PTR maskData = gcvNULL;
+    gceSURF_MONOPACK maskType;
+    gcsRECT srcRect;
+    gcsRECT DstRect;
+    DstRect.left = DstRect.top = 0;
+    DstRect.right = t2d->dstWidth < t2d->maskWidth ? t2d->dstWidth : t2d->maskWidth;
+    DstRect.bottom = t2d->dstHeight < t2d->maskHeight ? t2d->dstHeight : t2d->maskHeight;
 
-	// select pack type
-	switch (frameNo)
-	{
-	case 0:
-		maskType = gcvSURF_UNPACKED;
-		break;
+    // select pack type
+    switch (frameNo)
+    {
+    case 0:
+        maskType = gcvSURF_UNPACKED;
+        break;
 
-	case 1:
-		maskType = gcvSURF_PACKED32;
-		break;
+    case 1:
+        maskType = gcvSURF_PACKED32;
+        break;
 
-	case 2:
-		maskType = gcvSURF_PACKED16;
-		break;
+    case 2:
+        maskType = gcvSURF_PACKED16;
+        break;
 
-	case 3:
-		maskType = gcvSURF_PACKED8;
-		break;
+    case 3:
+        maskType = gcvSURF_PACKED8;
+        break;
 
-	default:
-		return gcvFALSE;
-	}
+    default:
+        return gcvFALSE;
+    }
 
-	if (maskType != gcvSURF_UNPACKED)
-	{
-		gcmONERROR(GalPackStream(t2d->maskData, t2d->maskWidth, t2d->maskHeight, maskType, &maskData));
-	}
+    if (maskType != gcvSURF_UNPACKED)
+    {
+        gcmONERROR(GalPackStream(t2d->maskData, t2d->maskWidth, t2d->maskHeight, maskType, &maskData));
+    }
 
-	srcRect.left = frameNo * 20;
-	srcRect.top = frameNo * 10;
+    srcRect.left = frameNo * 20;
+    srcRect.top = frameNo * 10;
 
-	if (t2d->dstWidth > t2d->maskWidth)
-	{
-		DstRect.right -= srcRect.left * 2;
-	}
-	if (t2d->dstHeight > t2d->maskHeight)
-	{
-		DstRect.bottom -= srcRect.top * 2;
-	}
+    if (t2d->dstWidth > t2d->maskWidth)
+    {
+        DstRect.right -= srcRect.left * 2;
+    }
+    if (t2d->dstHeight > t2d->maskHeight)
+    {
+        DstRect.bottom -= srcRect.top * 2;
+    }
 
-	gcoSURF_SetClipping(t2d->dstSurf);
-	gcmONERROR(gcoSURF_Blit(t2d->srcSurf, t2d->dstSurf,
-							  1, &srcRect, &DstRect,
-							  gcvNULL,
-							  0xAA, 0xCC,
-							  gcvSURF_SOURCE_MASK,
-							  0,
-							  (maskData ? maskData : t2d->maskData),
-							  maskType
-							  ));
+    gcoSURF_SetClipping(t2d->dstSurf);
+    gcmONERROR(gcoSURF_Blit(t2d->srcSurf, t2d->dstSurf,
+                              1, &srcRect, &DstRect,
+                              gcvNULL,
+                              0xAA, 0xCC,
+                              gcvSURF_SOURCE_MASK,
+                              0,
+                              (maskData ? maskData : t2d->maskData),
+                              maskType
+                              ));
 
-	if (maskData)
-		free(maskData);
+    if (maskData)
+        free(maskData);
 
     gcmONERROR(gco2D_Flush(t2d->runtime->engine2d));
 
-	gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
+    gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
 
     return gcvTRUE;
 
@@ -166,37 +166,37 @@ OnError:
 
 static void CDECL Destroy(Test2D *t2d)
 {
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
     if ((t2d->dstSurf != gcvNULL) && (t2d->dstLgcAddr != gcvNULL))
     {
-		if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
-		}
-		t2d->dstLgcAddr = gcvNULL;
+        if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
+        }
+        t2d->dstLgcAddr = gcvNULL;
     }
 
-	// destroy source surface
-	if (t2d->srcSurf != gcvNULL)
+    // destroy source surface
+    if (t2d->srcSurf != gcvNULL)
     {
-		if (t2d->srcLgcAddr)
-		{
-			if (gcmIS_ERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcLgcAddr)))
-			{
-				GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock srcSurf failed:%s\n", GalStatusString(status));
-			}
-			t2d->srcLgcAddr = 0;
-		}
+        if (t2d->srcLgcAddr)
+        {
+            if (gcmIS_ERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcLgcAddr)))
+            {
+                GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock srcSurf failed:%s\n", GalStatusString(status));
+            }
+            t2d->srcLgcAddr = 0;
+        }
 
         if (gcmIS_ERROR(gcoSURF_Destroy(t2d->srcSurf)))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
-		}
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
+        }
     }
 
-	// destroy mask
-	if (t2d->maskData)
-		free(t2d->maskData);
+    // destroy mask
+    if (t2d->maskData)
+        free(t2d->maskData);
 
     free(t2d);
 }
@@ -208,10 +208,10 @@ const gceFEATURE FeatureList[]=
 
 static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 {
-	gceSTATUS status = gcvSTATUS_OK;
-	BMPINFO *pInfo;
-	gctPOINTER sourcefile = "resource/VV_Background.bmp";
-	gctPOINTER maskfile = "resource/Font.bmp";
+    gceSTATUS status = gcvSTATUS_OK;
+    BMPINFO *pInfo;
+    gctPOINTER sourcefile = "resource/VV_Background.bmp";
+    gctPOINTER maskfile = "resource/Font.bmp";
 
     gctUINT32 k, listLen = sizeof(FeatureList)/sizeof(gctINT);
     gctBOOL featureStatus;
@@ -248,100 +248,100 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 
     t2d->runtime = runtime;
 
-	t2d->dstSurf    = runtime->target;
-	t2d->dstFormat = runtime->format;
-	t2d->dstWidth = 0;
-	t2d->dstHeight = 0;
-	t2d->dstStride = 0;
-	t2d->dstPhyAddr = 0;
-	t2d->dstLgcAddr = 0;
+    t2d->dstSurf    = runtime->target;
+    t2d->dstFormat = runtime->format;
+    t2d->dstWidth = 0;
+    t2d->dstHeight = 0;
+    t2d->dstStride = 0;
+    t2d->dstPhyAddr = 0;
+    t2d->dstLgcAddr = 0;
 
-	// create source surface
+    // create source surface
     t2d->srcSurf = GalLoadDIB2Surface(t2d->runtime->hal, sourcefile);
-	if (t2d->srcSurf == NULL)
-	{
-		GalOutput(GalOutputType_Error, "can not load %s\n", sourcefile);
-		gcmONERROR(gcvSTATUS_NOT_FOUND);
-	}
+    if (t2d->srcSurf == NULL)
+    {
+        GalOutput(GalOutputType_Error, "can not load %s\n", sourcefile);
+        gcmONERROR(gcvSTATUS_NOT_FOUND);
+    }
 
-	gcmONERROR(gcoSURF_GetAlignedSize(t2d->srcSurf,
-										gcvNULL,
-										gcvNULL,
-										&t2d->srcStride));
+    gcmONERROR(gcoSURF_GetAlignedSize(t2d->srcSurf,
+                                        gcvNULL,
+                                        gcvNULL,
+                                        &t2d->srcStride));
 
-	gcmONERROR(gcoSURF_GetSize(t2d->srcSurf,
-								&t2d->srcWidth,
-								&t2d->srcHeight,
-								gcvNULL));
+    gcmONERROR(gcoSURF_GetSize(t2d->srcSurf,
+                                &t2d->srcWidth,
+                                &t2d->srcHeight,
+                                gcvNULL));
 
-	gcmONERROR(gcoSURF_GetFormat(t2d->srcSurf, gcvNULL, &t2d->srcFormat));
+    gcmONERROR(gcoSURF_GetFormat(t2d->srcSurf, gcvNULL, &t2d->srcFormat));
 
-	gcmONERROR(gcoSURF_Lock(t2d->srcSurf, &t2d->srcPhyAddr, &t2d->srcLgcAddr));
+    gcmONERROR(gcoSURF_Lock(t2d->srcSurf, &t2d->srcPhyAddr, &t2d->srcLgcAddr));
 
-	// create mask surface
- 	t2d->maskData = GalLoadDIBitmap(maskfile, &pInfo);
-	if (t2d->maskData == gcvNULL)
-	{
-		// destroy source surface
-		if (t2d->srcSurf != gcvNULL)
-	    {
-			if (t2d->srcLgcAddr)
-			{
-				gcmONERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcLgcAddr));
-				t2d->srcLgcAddr = 0;
-			}
+    // create mask surface
+     t2d->maskData = GalLoadDIBitmap(maskfile, &pInfo);
+    if (t2d->maskData == gcvNULL)
+    {
+        // destroy source surface
+        if (t2d->srcSurf != gcvNULL)
+        {
+            if (t2d->srcLgcAddr)
+            {
+                gcmONERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcLgcAddr));
+                t2d->srcLgcAddr = 0;
+            }
 
-	        if (gcmIS_ERROR(gcoSURF_Destroy(t2d->srcSurf)))
-			{
-				GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
-			}
-	    }
-		GalOutput(GalOutputType_Error, "can not open %s\n", maskfile);
-		return gcvFALSE;
-	}
+            if (gcmIS_ERROR(gcoSURF_Destroy(t2d->srcSurf)))
+            {
+                GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
+            }
+        }
+        GalOutput(GalOutputType_Error, "can not open %s\n", maskfile);
+        return gcvFALSE;
+    }
 
-	t2d->maskWidth = pInfo->bmiHeader.biWidth;
-	t2d->maskType = gcvSURF_UNPACKED;
-	if (pInfo->bmiHeader.biHeight > 0)
-	{
-		gctINT i;
-		gctINT32 Stride
-			= pInfo->bmiHeader.biWidth
-			* pInfo->bmiHeader.biBitCount
-			/ 8;
-		gctPOINTER temp;
-		gctSTRING bits = t2d->maskData;
+    t2d->maskWidth = pInfo->bmiHeader.biWidth;
+    t2d->maskType = gcvSURF_UNPACKED;
+    if (pInfo->bmiHeader.biHeight > 0)
+    {
+        gctINT i;
+        gctINT32 Stride
+            = pInfo->bmiHeader.biWidth
+            * pInfo->bmiHeader.biBitCount
+            / 8;
+        gctPOINTER temp;
+        gctSTRING bits = t2d->maskData;
 
-		Stride = gcmALIGN(Stride, 4);
-		temp = malloc(Stride);
-		t2d->maskHeight = pInfo->bmiHeader.biHeight;
-		for (i = 0; i < pInfo->bmiHeader.biHeight/2; i++)
-		{
-			memcpy(temp, bits + i * Stride, Stride);
-			memcpy(bits + i * Stride, bits + (pInfo->bmiHeader.biHeight - 1 - i) * Stride, Stride);
-			memcpy(bits + (pInfo->bmiHeader.biHeight - 1 - i) * Stride, temp, Stride);
-		}
-		free(temp);
-	}
-	else
-	{
-		t2d->maskHeight = -pInfo->bmiHeader.biHeight;
-	}
+        Stride = gcmALIGN(Stride, 4);
+        temp = malloc(Stride);
+        t2d->maskHeight = pInfo->bmiHeader.biHeight;
+        for (i = 0; i < pInfo->bmiHeader.biHeight/2; i++)
+        {
+            memcpy(temp, bits + i * Stride, Stride);
+            memcpy(bits + i * Stride, bits + (pInfo->bmiHeader.biHeight - 1 - i) * Stride, Stride);
+            memcpy(bits + (pInfo->bmiHeader.biHeight - 1 - i) * Stride, temp, Stride);
+        }
+        free(temp);
+    }
+    else
+    {
+        t2d->maskHeight = -pInfo->bmiHeader.biHeight;
+    }
 
-	free(pInfo);
+    free(pInfo);
 
-	// dst with dst surf
-	gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
-										&t2d->dstWidth,
-										&t2d->dstHeight,
-										&t2d->dstStride));
+    // dst with dst surf
+    gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
+                                        &t2d->dstWidth,
+                                        &t2d->dstHeight,
+                                        &t2d->dstStride));
 
-	gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
+    gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
 
     t2d->base.render     = (PGalRender)Render;
     t2d->base.destroy    = (PGalDestroy)Destroy;
     t2d->base.frameCount = 4;
-	t2d->base.description = s_CaseDescription;
+    t2d->base.description = s_CaseDescription;
 
     return gcvTRUE;
 

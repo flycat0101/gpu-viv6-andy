@@ -29,8 +29,17 @@ ifeq ($(VIVANTE_ENABLE_VG), 1)
 EXTRA_INCVPATH += $(driver_root)/hal/inc
 EXTRA_INCVPATH += $(driver_root)/hal/user
 EXTRA_INCVPATH += $(driver_root)/hal/os/qnx/user
-EXTRA_INCVPATH += $(driver_root)/compiler/libVSC/include
 EXTRA_INCVPATH += $(driver_root)/arch/GC350/cmodel/inc
+
+ifeq ($(VIVANTE_ENABLE_3D), 1)
+EXTRA_INCVPATH += $(driver_root)/compiler/libVSC/include
+endif
+ifeq ($(VIVANTE_ENABLE_2D), 1)
+EXTRA_INCVPATH += $(driver_root)/hal/user/arch/thirdparty_special
+endif
+ifeq ($(VIVANTE_ENABLE_VG), 1)
+EXTRA_INCVPATH += $(driver_root)/hal/user/archvg
+endif
 
 SOURCE_OBJECTS += $(driver_root)/hal/user/archvg/gc_hal_user_hardware_context_vg.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/archvg/gc_hal_user_hardware_vg.o

@@ -61,7 +61,7 @@ VX_PRIVATE_API vx_status vxInitializeTarget(
     }
 
     /* ToDo : Add more specific return status check */
-	if (gcoVX_Initialize(&target->base.context->evisNoInst) != gcvSTATUS_OK)
+    if (gcoVX_Initialize(&target->base.context->evisNoInst) != gcvSTATUS_OK)
     {
         return VX_FAILURE;
     }

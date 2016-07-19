@@ -1858,6 +1858,21 @@ _VSC_CPF_EvaluateConst(
             resultVal->value = constVal[0].value ^ constVal[1].value;
             break;
         }
+        case VIR_OP_MOD:
+        {
+            if (_VSC_CPF_isTypeFloat(dstType))
+            {
+                gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
+                gctFLOAT f1 = *(gctFLOAT*) &(constVal[1].value);
+
+                resultVal->value = gcoMATH_FloatAsUInt(f0 - f1 * gcoMATH_Floor(f0 / f1));
+            }
+            else
+            {
+                resultVal->value = constVal[0].value % constVal[1].value;
+            }
+            break;
+        }
         case VIR_OP_SUB:
         {
             if(srcLattice[0] == VSC_CPF_CONSTANT)
@@ -2096,6 +2111,7 @@ _VSC_CPF_isAssignmentOpcode(
         opcode == VIR_OP_AND_BITWISE ||
         opcode == VIR_OP_OR_BITWISE ||
         opcode == VIR_OP_XOR_BITWISE ||
+        opcode == VIR_OP_MOD ||
         opcode == VIR_OP_SUB ||
         opcode == VIR_OP_MUL ||
         opcode == VIR_OP_MULHI ||

@@ -48,19 +48,19 @@ radix(
     int N
     )
 {
-	int i=0, j=0;
+    int i = 0, j = 0;
     for (; i <= 31; i++)
     {
-		if ((N & (1 << i)) == 0)
+        if ((N & (1 << i)) == 0)
         {
-			j++;
+            j++;
         }
-		else
+        else
         {
-			break;
-	}
+            break;
+        }
     }
-	return (0 == (j%2)) ? 4 : 2;
+    return (0 == (j%2)) ? 4 : 2;
 }
 
 static unsigned int
@@ -74,7 +74,7 @@ log2NFFT(
     {
         log2n++;
     }
-	return log2n;
+    return log2n;
 }
 
 #define RADIX2_FFT_KERNEL "fft_radix2"
@@ -90,10 +90,10 @@ FFTGpu(
         return;
     }
 
-	// figure out if we can use a radix-4 FFT : otherwise radix-2
+    // figure out if we can use a radix-4 FFT : otherwise radix-2
     int rad = radix(len);
-	if (4==rad && ((16==len) || (256==len) || (4096==len) || (65536==len)))
-		rad = 2;
+    if (4==rad && ((16==len) || (256==len) || (4096==len) || (65536==len)))
+        rad = 2;
 
     // log2(n) is the # of kernels that will be invoked (for a radix-2 FFT)
     unsigned int log2n = log2NFFT(len);
@@ -107,18 +107,18 @@ FFTGpu(
     {
         for (unsigned kk = 0; kk < log2n; kk++)
         {
-			printf("Creating kernel %s %d (p=%d)...\n", RADIX2_FFT_KERNEL, kk, p[kk]);
-			createFFTKernel(RADIX2_FFT_KERNEL, kk);
-		}
+            printf("Creating kernel %s %d (p=%d)...\n", RADIX2_FFT_KERNEL, kk, p[kk]);
+            createFFTKernel(RADIX2_FFT_KERNEL, kk);
+        }
     }
     else
     { // radix-4
         for (unsigned kk = 0; kk < log2n; kk+=2)
         {
-			printf("Creating kernel %s %d...\n", RADIX4_FFT_KERNEL, kk>>1);
-			createFFTKernel(RADIX4_FFT_KERNEL, kk>>1);
-		}
-	}
+            printf("Creating kernel %s %d...\n", RADIX4_FFT_KERNEL, kk>>1);
+            createFFTKernel(RADIX4_FFT_KERNEL, kk>>1);
+        }
+    }
 
     workSize = len;
 
@@ -126,40 +126,40 @@ FFTGpu(
 
     if (2 == rad)
     {
-		// FFT kernel invoked for p=1, p=2, ..., p=n/2
-		// input and output swapped each time
+        // FFT kernel invoked for p=1, p=2, ..., p=n/2
+        // input and output swapped each time
         for (unsigned kk = 0; kk < log2n; kk++)
         {
-			void *in = (0 == (kk&1)) ? &d_intime : &d_outfft;
-			void *out = (0 == (kk&1)) ? &d_outfft : &d_intime;
-			printf("Setting kernel args for kernel %d (p=%d)...\n", kk, p[kk]);
-			clSetKernelArg(kernels[kk], 0, sizeof(cl_mem), in);
-			clSetKernelArg(kernels[kk], 1, sizeof(cl_mem), out);
-			clSetKernelArg(kernels[kk], 2, sizeof(unsigned), &p[kk]);
-			clSetKernelArg(kernels[kk], 3, sizeof(unsigned), &pminus1[kk]);
-			clSetKernelArg(kernels[kk], 4, sizeof(cl_float), &minusPIoverp[kk]);
-		} // end (for 1,2,4,8,...N/2)
+            void *in = (0 == (kk&1)) ? &d_intime : &d_outfft;
+            void *out = (0 == (kk&1)) ? &d_outfft : &d_intime;
+            printf("Setting kernel args for kernel %d (p=%d)...\n", kk, p[kk]);
+            clSetKernelArg(kernels[kk], 0, sizeof(cl_mem), in);
+            clSetKernelArg(kernels[kk], 1, sizeof(cl_mem), out);
+            clSetKernelArg(kernels[kk], 2, sizeof(unsigned), &p[kk]);
+            clSetKernelArg(kernels[kk], 3, sizeof(unsigned), &pminus1[kk]);
+            clSetKernelArg(kernels[kk], 4, sizeof(cl_float), &minusPIoverp[kk]);
+        } // end (for 1,2,4,8,...N/2)
     }
     else
     {
         // radix-4, FFT kernel invoked for p=1, p=4, ..., p=n/4
         for (unsigned kk = 0; kk < log2n; kk+=2)
         {
-			int idx = kk>>1;
-			void *in = (0 == (idx&1)) ? &d_intime : &d_outfft;
-			void *out = (0 == (idx&1)) ? &d_outfft : &d_intime;
-			printf("Setting kernel args for kernel %d (p=%d)...\n", idx, p[kk]);
-			clSetKernelArg(kernels[idx], 0, sizeof(cl_mem), in);
-			clSetKernelArg(kernels[idx], 1, sizeof(cl_mem), out);
-			clSetKernelArg(kernels[idx], 2, sizeof(unsigned), &p[kk]);
-			clSetKernelArg(kernels[idx], 3, sizeof(unsigned), &pminus1[kk]);
-			clSetKernelArg(kernels[idx], 4, sizeof(unsigned), &twop[kk]);
-			clSetKernelArg(kernels[idx], 5, sizeof(unsigned), &threep[kk]);
-			clSetKernelArg(kernels[idx], 6, sizeof(cl_float), &minusPIover2p[kk]);
-			clSetKernelArg(kernels[idx], 7, sizeof(cl_float), &minusPIover2p_2x[kk]);
-			clSetKernelArg(kernels[idx], 8, sizeof(cl_float), &minusPIover2p_3x[kk]);
-		} // end (for 1,4,16,...,N/4)
-	} // end (if radix-2 or radix-4)
+            int idx   = kk>>1;
+            void *in  = (0 == (idx&1)) ? &d_intime : &d_outfft;
+            void *out = (0 == (idx&1)) ? &d_outfft : &d_intime;
+            printf("Setting kernel args for kernel %d (p=%d)...\n", idx, p[kk]);
+            clSetKernelArg(kernels[idx], 0, sizeof(cl_mem), in);
+            clSetKernelArg(kernels[idx], 1, sizeof(cl_mem), out);
+            clSetKernelArg(kernels[idx], 2, sizeof(unsigned), &p[kk]);
+            clSetKernelArg(kernels[idx], 3, sizeof(unsigned), &pminus1[kk]);
+            clSetKernelArg(kernels[idx], 4, sizeof(unsigned), &twop[kk]);
+            clSetKernelArg(kernels[idx], 5, sizeof(unsigned), &threep[kk]);
+            clSetKernelArg(kernels[idx], 6, sizeof(cl_float), &minusPIover2p[kk]);
+            clSetKernelArg(kernels[idx], 7, sizeof(cl_float), &minusPIover2p_2x[kk]);
+            clSetKernelArg(kernels[idx], 8, sizeof(cl_float), &minusPIover2p_3x[kk]);
+        } // end (for 1,4,16,...,N/4)
+    } // end (if radix-2 or radix-4)
 
     size_t globalWorkSize[] = { (2==rad) ? (1<<(log2n-1)) : (len>>2) };
     size_t localWorkSize[] = { (blockSize <= globalWorkSize[0]) ? blockSize : globalWorkSize[0] };
@@ -171,22 +171,22 @@ FFTGpu(
         for (unsigned kk = 0; kk < log2n; kk++)
         {
             // note to self: up to 8 it works, beyond that it does not
-			printf("running kernel %d (p=%d)...\n", kk, p[kk]);
-			runKernelFFT(localWorkSize, globalWorkSize, kk);
-			d_result = (0 == (kk&1)) ? d_outfft : d_intime;
-		}
+            printf("running kernel %d (p=%d)...\n", kk, p[kk]);
+            runKernelFFT(localWorkSize, globalWorkSize, kk);
+            d_result = (0 == (kk&1)) ? d_outfft : d_intime;
+        }
     }
     else
     {
         // radix-4
         for (unsigned kk = 0; kk < log2n; kk+=2)
         {
-			int idx = kk>>1;
-			printf("running kernel %d (p=%d)...\n", idx, p[kk]);
-			runKernelFFT(localWorkSize, globalWorkSize, idx);
-			d_result = (0 == (kk&1)) ? d_outfft : d_intime;
-		}
-	}
+            int idx = kk>>1;
+            printf("running kernel %d (p=%d)...\n", idx, p[kk]);
+            runKernelFFT(localWorkSize, globalWorkSize, idx);
+            d_result = (0 == (kk&1)) ? d_outfft : d_intime;
+        }
+    }
 
     copyFromDevice(d_result, h_outfft + workOffset,  2*workSize);
 

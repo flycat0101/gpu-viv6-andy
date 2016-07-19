@@ -35,42 +35,42 @@
 
 Test3DUShort8::Test3DUShort8(const size_t sizeX, const size_t sizeY, const size_t sizeZ):
 MultiDimensionalArraysTest3D("ushort8", sizeX, sizeY, sizeZ) {
-	inputAHost = new cl_ushort8[size];
-	inputBHost = new cl_ushort8[size];
-	resultHost = new cl_ushort8[size];
-	inputA = inputAHost;
-	inputB = inputBHost;
-	result = resultHost;
+    inputAHost = new cl_ushort8[size];
+    inputBHost = new cl_ushort8[size];
+    resultHost = new cl_ushort8[size];
+    inputA = inputAHost;
+    inputB = inputBHost;
+    result = resultHost;
 }
 
 Test3DUShort8::~Test3DUShort8() {
-	delete[] inputAHost;
-	delete[] inputBHost;
-	delete[] resultHost;
+    delete[] inputAHost;
+    delete[] inputBHost;
+    delete[] resultHost;
 }
 
 const int Test3DUShort8::getMemSize() const {
-	return sizeof(cl_ushort8)*size;
+    return sizeof(cl_ushort8)*size;
 }
 
 void Test3DUShort8::generateInput(const unsigned int &kernelIndex) {
-	for (unsigned int i=0; i<VECTOR_SIZE; i++) {
-		for (unsigned int k=0; k<size; k++) {
-			inputAHost[k].s[i] = randUShort();
-			if (getKernelInputArgNum(kernelIndex) == 2)
-				inputBHost[k].s[i] = randUShort();
-		}
-	}
+    for (unsigned int i=0; i<VECTOR_SIZE; i++) {
+        for (unsigned int k=0; k<size; k++) {
+            inputAHost[k].s[i] = randUShort();
+            if (getKernelInputArgNum(kernelIndex) == 2)
+                inputBHost[k].s[i] = randUShort();
+        }
+    }
 }
 
 void* Test3DUShort8::getInputAElement(const unsigned int &index) const {
-	return inputAHost[index].s;
+    return inputAHost[index].s;
 }
 
 void* Test3DUShort8::getInputBElement(const unsigned int &index) const {
-	return &inputBHost[index].s;
+    return &inputBHost[index].s;
 }
 
 void* Test3DUShort8::getResultElement(const unsigned int &index) const {
-	return &resultHost[index].s;
+    return &resultHost[index].s;
 }

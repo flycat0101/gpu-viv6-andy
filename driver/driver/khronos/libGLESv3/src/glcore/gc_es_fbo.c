@@ -67,6 +67,20 @@ GLboolean __glDeleteRenderbufferObject(__GLcontext *gc, __GLrenderbufferObject *
 #define _GC_OBJ_ZONE __GLES3_ZONE_CORE
 
 
+__GL_INLINE GLvoid __glFramebufferResetAttachPoint(__GLcontext *gc, __GLfboAttachPoint *attachPoint)
+{
+    attachPoint->objType    = GL_NONE;
+    attachPoint->objName    = 0;
+    attachPoint->object     = gcvNULL;
+    attachPoint->level      = 0;
+    attachPoint->face       = 0;
+    attachPoint->layer      = 0;
+    attachPoint->slice      = 0;
+    attachPoint->layered    = GL_FALSE;
+    attachPoint->cube       = GL_FALSE;
+    attachPoint->isExtMode  = GL_FALSE;
+}
+
 __GL_INLINE GLvoid __glRemoveFramebufferAsImageUser(__GLcontext *gc, __GLframebufferObject *framebuffer, __GLfboAttachPoint* attachPoint)
 {
     if (!attachPoint || attachPoint->objType == GL_NONE || attachPoint->objName == 0)
@@ -92,6 +106,7 @@ __GL_INLINE GLvoid __glRemoveFramebufferAsImageUser(__GLcontext *gc, __GLframebu
                 if (!rbo->bindCount && !rbo->fboList && (rbo->flag & __GL_OBJECT_IS_DELETED))
                 {
                     __glDeleteRenderbufferObject(gc, rbo);
+                    __glFramebufferResetAttachPoint(gc, attachPoint);
                 }
             }
         }
@@ -113,6 +128,7 @@ __GL_INLINE GLvoid __glRemoveFramebufferAsImageUser(__GLcontext *gc, __GLframebu
                 if (!tex->bindCount && !tex->fboList && !tex->imageList && (tex->flag & __GL_OBJECT_IS_DELETED))
                 {
                     __glDeleteTextureObject(gc, tex);
+                    __glFramebufferResetAttachPoint(gc, attachPoint);
                 }
             }
         }
@@ -121,25 +137,12 @@ __GL_INLINE GLvoid __glRemoveFramebufferAsImageUser(__GLcontext *gc, __GLframebu
     }
 }
 
-GLvoid __glFramebufferResetAttachpoint(__GLcontext *gc,
+GLvoid __glFramebufferResetAttachIndex(__GLcontext *gc,
                                        __GLframebufferObject *fbo,
                                        GLint attachIndex,
                                        GLboolean drawFbo)
 {
-    /* Set all state of "attachment" point to default state. */
-
-    __GLfboAttachPoint *attachState = &fbo->attachPoint[attachIndex];
-
-    attachState->objType    = GL_NONE;
-    attachState->objName    = 0;
-    attachState->object     = gcvNULL;
-    attachState->level      = 0;
-    attachState->face       = 0;
-    attachState->layer      = 0;
-    attachState->slice      = 0;
-    attachState->layered    = GL_FALSE;
-    attachState->cube       = GL_FALSE;
-    attachState->isExtMode  = GL_FALSE;
+    __glFramebufferResetAttachPoint(gc, &fbo->attachPoint[attachIndex]);
 }
 
 GLvoid __glInitRenderbufferObject(__GLcontext *gc, __GLrenderbufferObject *renderbuffer, GLuint name)
@@ -319,7 +322,7 @@ GLboolean __glDeleteFramebufferObject(__GLcontext *gc, __GLframebufferObject *fr
         }
 
         __glRemoveFramebufferAsImageUser(gc, framebuffer, attachPoint);
-        __glFramebufferResetAttachpoint(gc, framebuffer, i, GL_TRUE);
+        __glFramebufferResetAttachIndex(gc, framebuffer, i, GL_TRUE);
     }
 
     (*gc->imports.free)(gc, framebuffer);
@@ -777,7 +780,7 @@ GLvoid __glFramebufferTexture(__GLcontext *gc,
                               GLboolean isExtMode)
 {
     __GLfboAttachPoint *attachPoint;
-
+    __GLfboAttachPoint preAttach;
     __GL_HEADER();
 
     /* Check parameters */
@@ -807,6 +810,7 @@ GLvoid __glFramebufferTexture(__GLcontext *gc,
 
     /* If there is previously attached obj, remove fbo from it's owner list. */
     __glRemoveFramebufferAsImageUser(gc, framebufferObj, attachPoint);
+     __GL_MEMCOPY(&preAttach, attachPoint, gcmSIZEOF(preAttach));
 
     if (texObj)
     {
@@ -829,7 +833,7 @@ GLvoid __glFramebufferTexture(__GLcontext *gc,
     else
     {
         /* Detach image */
-        __glFramebufferResetAttachpoint(gc, framebufferObj, attachIndex, GL_TRUE);
+        __glFramebufferResetAttachIndex(gc, framebufferObj, attachIndex, GL_TRUE);
     }
 
     if (!gc->dp.frameBufferTexture(gc,
@@ -840,7 +844,8 @@ GLvoid __glFramebufferTexture(__GLcontext *gc,
                                    face,
                                    samples,
                                    layer,
-                                   layered))
+                                   layered,
+                                   &preAttach))
     {
         __GL_ERROR((*gc->dp.getError)(gc));
     }
@@ -874,7 +879,7 @@ GLvoid __glFramebufferRenderbuffer(__GLcontext *gc,
                                    __GLrenderbufferObject *renderbufferObj)
 {
     __GLfboAttachPoint* attachPoint;
-
+    __GLfboAttachPoint preAttach;
     __GL_HEADER();
 
     GL_ASSERT(attachIndex >= 0 && attachIndex < __GL_MAX_ATTACHMENTS);
@@ -898,6 +903,7 @@ GLvoid __glFramebufferRenderbuffer(__GLcontext *gc,
 
     /* If there is previously attached obj, remove fbo from it's owner list. */
     __glRemoveFramebufferAsImageUser(gc, framebufferObj, attachPoint);
+    __GL_MEMCOPY(&preAttach, attachPoint, gcmSIZEOF(preAttach));
 
     if (renderbufferObj != gcvNULL)
     {
@@ -913,10 +919,10 @@ GLvoid __glFramebufferRenderbuffer(__GLcontext *gc,
     else
     {
         /* Detach image */
-        __glFramebufferResetAttachpoint(gc, framebufferObj, attachIndex, GL_TRUE);
+        __glFramebufferResetAttachIndex(gc, framebufferObj, attachIndex, GL_TRUE);
     }
 
-    gc->dp.framebufferRenderbuffer(gc, framebufferObj, attachIndex, renderbufferObj);
+    gc->dp.framebufferRenderbuffer(gc, framebufferObj, attachIndex, renderbufferObj, &preAttach);
 
     /* Dirty this framebuffer object */
     __GL_FRAMEBUFFER_COMPLETE_DIRTY(framebufferObj);

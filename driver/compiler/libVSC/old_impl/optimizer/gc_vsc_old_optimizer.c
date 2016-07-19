@@ -4039,7 +4039,7 @@ _ExpandOneFunctionCall(
        all parameters
      */
     /* Don't do this optimization for CTS30, it would use a lot of memory. */
-    if (Function->shaderFunction && Function->shaderFunction->name &&
+    if (Function->shaderFunction &&
         gcoOS_StrNCmp(Function->shaderFunction->name, "compare_", 8) == 0 &&
         Optimizer->shader->storageBlockCount == 0 &&
         (patchID == gcvPATCH_GTFES30 || patchID == gcvPATCH_DEQP))
@@ -4137,13 +4137,17 @@ _GetInlineBudget(
     gcePATCH_ID patchID = Optimizer->patchID;
 
     if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SHADER_HAS_INSTRUCTION_CACHE) &&
-        (patchID == gcvPATCH_GTFES30 || patchID == gcvPATCH_DEQP))
+        /* WAR for some APPs. */
+        (patchID != gcvPATCH_YOUILABS_SHADERTEST && !gcdPROC_IS_WEBGL(patchID)))
     {
-        return 0x7FFFFFFF;
-    }
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SHADER_HAS_INSTRUCTION_CACHE))
-    {
-        instMax = 512*gcmOPT_INLINELEVEL();
+        if (patchID == gcvPATCH_GTFES30 || patchID == gcvPATCH_DEQP)
+        {
+            return 0x7FFFFFFF;
+        }
+        else
+        {
+            instMax = 512 * gcmOPT_INLINELEVEL();
+        }
     }
     else
     {
@@ -4192,7 +4196,7 @@ _isFunctionInlinable(
 
     /* do not inline intrinsic functions,
      * it will be lowered later */
-    if (Function->shaderFunction && Function->shaderFunction->name &&
+    if (Function->shaderFunction &&
         (gcoOS_StrNCmp(Function->shaderFunction->name, "viv_intrinsic_", 14) == 0 ))
     {
         return gcvFALSE;
@@ -4345,7 +4349,7 @@ _InlineSinglelFunction(
     gctBOOL inlineAllFunctionForCTS = gcvFALSE;
     gctBOOL updateTempArray = gcvFALSE;
 
-    if (function->shaderFunction && function->shaderFunction->name &&
+    if (function->shaderFunction &&
         gcoOS_StrNCmp(function->shaderFunction->name, "compare_", 8) == 0 &&
         Optimizer->shader->storageBlockCount == 0 &&
         (patchID == gcvPATCH_GTFES30 || patchID == gcvPATCH_DEQP))

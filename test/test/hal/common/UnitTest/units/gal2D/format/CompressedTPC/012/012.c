@@ -310,15 +310,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
     gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvFALSE, gcvFALSE));
 
-#if 0
-    {
-        char name[200];
-
-        gcmONERROR(gcoHAL_Commit(gcvNULL, gcvTRUE));
-        sprintf(name, "gal2DFormatCompressedTPC012_intermediate_%03d.bmp", frameNo);
-        GalSaveTSurfToDIB(compressedTarget, name);
-    }
-#endif
 
     /* compressed => non compressed */
     gcmONERROR(gco2D_SetGenericSource(

@@ -159,7 +159,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     gcmONERROR(gco2D_SetClipping(egn2D, &rect));
 
     gcmONERROR(gco2D_Blit(egn2D, 1, &rect, 0xCC, 0xCC, surf[0]->format));
-#if 1
     if (!t2d->runtime->noSaveTargetNew)
     {
         char name[200];
@@ -168,7 +167,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         sprintf(name, "gal2DFormatCompressedDEC005_intermediate0_%03d.bmp", frameNo);
         GalSaveTSurfToDIB(surf[0], name);
     }
-#endif
     /* StretchBlit surf0 to surf1. */
     srect.left = 160;
     srect.right = src->width - 160;
@@ -246,7 +244,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
         gcmONERROR(gco2D_StretchBlit(egn2D, 1, &rect, 0xCC, 0xCC, surf[1]->format));
     }
-#if 1
     if (!t2d->runtime->noSaveTargetNew)
     {
         char name[200];
@@ -255,7 +252,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         sprintf(name, "gal2DFormatCompressedDEC005_intermediate1_%03d.bmp", frameNo);
         GalSaveTSurfToDIB(surf[1], name);
     }
-#endif
     /* Uncompress surf[1] to result. */
     rect.left = rect.top = 0;
     rect.right = surf[1]->width;
@@ -373,7 +369,7 @@ static void CDECL Destroy(Test2D *t2d)
 
 const gceFEATURE FeatureList[]=
 {
-    gcvFEATURE_DEC_COMPRESSION,
+    gcvFEATURE_DEC300_COMPRESSION,
 };
 
 static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)

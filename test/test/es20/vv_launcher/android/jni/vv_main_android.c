@@ -41,23 +41,23 @@
 #include <glutils/log.h>
 #include "LauncherApp.h"
 
-int  appWidth	= 640;
-int  appHeight	= 480;
-int  flipY		= 0;
+int  appWidth    = 640;
+int  appHeight    = 480;
+int  flipY        = 0;
 
 
 int
 Run(
-	char const * Command
-	)
+    char const * Command
+    )
 {
-	/* TODO: Current do not know how to start a external application. */
-	return 0;
+    /* TODO: Current do not know how to start a external application. */
+    return 0;
 }
 
 
-#	define RETURN_SUCCESS   0
-#	define RETURN_ERROR 1
+#    define RETURN_SUCCESS   0
+#    define RETURN_ERROR 1
 
 static int finished;
 static volatile int key;
@@ -67,166 +67,166 @@ static unsigned int lastTime;
 JNIEXPORT void JNICALL Java_com_vivantecorp_graphics_Native_init
   (JNIEnv * Env, jobject jo, jint id, jint w, jint h)
 {
-	key = 0;
-	appWidth  = w;
-	appHeight = h;
+    key = 0;
+    appWidth  = w;
+    appHeight = h;
 
-	// Create the application class.
-	app = LauncherAppConstruct(appWidth, appHeight);
-	flipVertical(app, flipY);
+    // Create the application class.
+    app = LauncherAppConstruct(appWidth, appHeight);
+    flipVertical(app, flipY);
 
-	// Get the current time.
-	{
-	struct timeval tv;
+    // Get the current time.
+    {
+    struct timeval tv;
 
-	/* Return the time of day in milliseconds. */
-	gettimeofday(&tv, 0);
-	lastTime = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
-	}
+    /* Return the time of day in milliseconds. */
+    gettimeofday(&tv, 0);
+    lastTime = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+    }
 
-	// Main loop.
-	finished = 0;
+    // Main loop.
+    finished = 0;
 }
 
 
 JNIEXPORT void JNICALL Java_com_vivantecorp_graphics_Native_fini
   (JNIEnv * Env, jobject jo)
 {
-	// Delete the application.
-	LauncherAppDestroy(app);
-	app = NULL;
+    // Delete the application.
+    LauncherAppDestroy(app);
+    app = NULL;
 }
 
 
 enum
 {
-	KEYCODE_BACK = 0x04,
-	KEYCODE_0 = 0x07,
-	KEYCODE_1,
-	KEYCODE_2,
-	KEYCODE_3,
-	KEYCODE_4,
-	KEYCODE_5,
-	KEYCODE_6,
-	KEYCODE_7,
-	KEYCODE_8,
-	KEYCODE_9,
-	KEYCODE_Q = 0x2d
+    KEYCODE_BACK = 0x04,
+    KEYCODE_0 = 0x07,
+    KEYCODE_1,
+    KEYCODE_2,
+    KEYCODE_3,
+    KEYCODE_4,
+    KEYCODE_5,
+    KEYCODE_6,
+    KEYCODE_7,
+    KEYCODE_8,
+    KEYCODE_9,
+    KEYCODE_Q = 0x2d
 };
 
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_Native_repaint
   (JNIEnv * Env, jobject jo)
 {
-	if (!finished)
-	{
-		// Test for events.
-		if (key != 0)
-		{
-			// Test for keyboard event.
-			// Check the scancode.
-			switch (key)
-			{
-			case KEYCODE_BACK:
-				// Exit program.
-				finished = 1;
-				break;
+    if (!finished)
+    {
+        // Test for events.
+        if (key != 0)
+        {
+            // Test for keyboard event.
+            // Check the scancode.
+            switch (key)
+            {
+            case KEYCODE_BACK:
+                // Exit program.
+                finished = 1;
+                break;
 
-			case KEYCODE_0:
-			case KEYCODE_1:
-			case KEYCODE_2:
-			case KEYCODE_3:
-			case KEYCODE_4:
-			case KEYCODE_5:
-			case KEYCODE_6:
-			case KEYCODE_7:
-			case KEYCODE_8:
-			case KEYCODE_9:
-				{
-					// Numeric key selects a menu entry.
-					int k = key - KEYCODE_0;
-					LauncherAppSelect(app, k - 1);
-				}
-				break;
+            case KEYCODE_0:
+            case KEYCODE_1:
+            case KEYCODE_2:
+            case KEYCODE_3:
+            case KEYCODE_4:
+            case KEYCODE_5:
+            case KEYCODE_6:
+            case KEYCODE_7:
+            case KEYCODE_8:
+            case KEYCODE_9:
+                {
+                    // Numeric key selects a menu entry.
+                    int k = key - KEYCODE_0;
+                    LauncherAppSelect(app, k - 1);
+                }
+                break;
 
-			case KEYCODE_Q:
-				finished = 1;
+            case KEYCODE_Q:
+                finished = 1;
 
-			default:
-				break;
-			}
+            default:
+                break;
+            }
 
-			key = 0;
-		}
-		else
-		{
-			// Compute the time delta in seconds.
-			char const * command;
-			unsigned int now;
-			float delta;
-			struct timeval tv;
+            key = 0;
+        }
+        else
+        {
+            // Compute the time delta in seconds.
+            char const * command;
+            unsigned int now;
+            float delta;
+            struct timeval tv;
 
-			/* Return the time of day in milliseconds. */
-			gettimeofday(&tv, 0);
-			now = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+            /* Return the time of day in milliseconds. */
+            gettimeofday(&tv, 0);
+            now = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
 
-			delta = (float)(now - lastTime) / 1000.0f;
+            delta = (float)(now - lastTime) / 1000.0f;
 
-			// Clamp delta to 1/20th of a second.
-			if (delta > 1.0f / 20.0f) delta = 1.0f / 20.0f;
-			lastTime = now;
+            // Clamp delta to 1/20th of a second.
+            if (delta > 1.0f / 20.0f) delta = 1.0f / 20.0f;
+            lastTime = now;
 
-			// Move the application to the next tick.
-			command = LauncherAppTick(app, delta);
+            // Move the application to the next tick.
+            command = LauncherAppTick(app, delta);
 
-			// Do we need to launch an application?
-			if (command != NULL)
-			{
-				// Launch the application.
-				if (!Run(command))
-				{
-					LogError("Command %s could not be executed\n", command);
-				}
-				// Unselect current menu item.
-				// TODO: Enable this after launch implemented.
-				// LauncherAppSelect(app, -1);
-			}
+            // Do we need to launch an application?
+            if (command != NULL)
+            {
+                // Launch the application.
+                if (!Run(command))
+                {
+                    LogError("Command %s could not be executed\n", command);
+                }
+                // Unselect current menu item.
+                // TODO: Enable this after launch implemented.
+                // LauncherAppSelect(app, -1);
+            }
 
-			// Render one frame.
-			LauncherAppDraw(app, appWidth, appHeight);
-		}
+            // Render one frame.
+            LauncherAppDraw(app, appWidth, appHeight);
+        }
 
-		return JNI_FALSE;
-	}
+        return JNI_FALSE;
+    }
 
-	return JNI_TRUE;
+    return JNI_TRUE;
 }
 
 JNIEXPORT void JNICALL Java_com_vivantecorp_graphics_Native_key
   (JNIEnv * Env, jobject jo, jint k, jboolean down)
 {
-	if (down != 0)
-	{
-		key = k;
-	}
+    if (down != 0)
+    {
+        key = k;
+    }
 }
 
 JNIEXPORT void JNICALL Java_com_vivantecorp_graphics_Native_touch
   (JNIEnv * Env, jobject jo, jint x, jint y, jboolean down)
 {
-	if (down == 1)
-	{
-		/*
-		Let me simulate a key.
-		Area:
-			1 2 3
-			4 5 6
-			7 8 9
-		*/
+    if (down == 1)
+    {
+        /*
+        Let me simulate a key.
+        Area:
+            1 2 3
+            4 5 6
+            7 8 9
+        */
 
-		int hori = x / (appWidth  / 3);
-		int vert = y / (appHeight / 3);
+        int hori = x / (appWidth  / 3);
+        int vert = y / (appHeight / 3);
 
-		key = KEYCODE_1 + vert * 3 + hori;
-	}
+        key = KEYCODE_1 + vert * 3 + hori;
+    }
 }
 

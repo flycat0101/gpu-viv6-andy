@@ -39,11 +39,11 @@
 
 struct _gcsEVENT
 {
-	pthread_mutex_t mutex;
-	pthread_cond_t condition;
+    pthread_mutex_t mutex;
+    pthread_cond_t condition;
 
-	gctBOOL manualReset;
-	gctBOOL state;
+    gctBOOL manualReset;
+    gctBOOL state;
 };
 
 typedef struct _gcsEVENT * gcsEVENT_PTR;
@@ -55,19 +55,19 @@ typedef struct _gcsEVENT * gcsEVENT_PTR;
 
 static gctPOINTER
 _ThreadStarter(
-	gctPOINTER Argument
-	)
+    gctPOINTER Argument
+    )
 {
-	/* Copy information. */
-	gctTHREADROUTINE routine = ((gcsTHREADINFO_PTR) Argument)->routine;
-	gctPOINTER argument = ((gcsTHREADINFO_PTR) Argument)->argument;
+    /* Copy information. */
+    gctTHREADROUTINE routine = ((gcsTHREADINFO_PTR) Argument)->routine;
+    gctPOINTER argument = ((gcsTHREADINFO_PTR) Argument)->argument;
 
-	/* Free the info structure. */
-	free(Argument);
+    /* Free the info structure. */
+    free(Argument);
 
-	/* Call the thread. */
-	(*routine) (argument);
-	return gcvNULL;
+    /* Call the thread. */
+    (*routine) (argument);
+    return gcvNULL;
 }
 
 
@@ -77,592 +77,592 @@ _ThreadStarter(
 
 /*******************************************************************************
 **
-**	vdkSleep
+**    vdkSleep
 **
-**	Sleep for specified number of milliseconds.
+**    Sleep for specified number of milliseconds.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctUINT Milliseconds
-**			Number of milliseconds to sleep for.
+**        gctUINT Milliseconds
+**            Number of milliseconds to sleep for.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkSleep(
-	gctUINT Milliseconds
-	)
+    gctUINT Milliseconds
+    )
 {
-	struct timespec milliseconds;
+    struct timespec milliseconds;
 
-	/* Init the wait structure. */
-	milliseconds.tv_sec  = 0;
-	milliseconds.tv_nsec = Milliseconds * 1000;
+    /* Init the wait structure. */
+    milliseconds.tv_sec  = 0;
+    milliseconds.tv_nsec = Milliseconds * 1000;
 
-	/* Sleep for 1 millisecond. */
-	nanosleep(&milliseconds, NULL);
+    /* Sleep for 1 millisecond. */
+    nanosleep(&milliseconds, NULL);
 }
 
 /*******************************************************************************
 **
-**	vdkCreateThread
+**    vdkCreateThread
 **
-**	Create and start a new thread.
+**    Create and start a new thread.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctTHREADROUTINE ThreadRoutine
-**			Pointer to the thread routine.
+**        gctTHREADROUTINE ThreadRoutine
+**            Pointer to the thread routine.
 **
-**		gctPOINTER Argument
-**			Argument to be passed to the thread routine.
+**        gctPOINTER Argument
+**            Argument to be passed to the thread routine.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		gctHANDLE
-**			Handle of the new thread.
+**        gctHANDLE
+**            Handle of the new thread.
 */
 
 gctHANDLE
 vdkCreateThread(
-	gctTHREADROUTINE ThreadRoutine,
-	gctPOINTER Argument
-	)
+    gctTHREADROUTINE ThreadRoutine,
+    gctPOINTER Argument
+    )
 {
-	int result;
-	pthread_t thread;
-	gcsTHREADINFO_PTR info;
+    int result;
+    pthread_t thread;
+    gcsTHREADINFO_PTR info;
 
-	/* Allocate thread info structure. */
-	info = (gcsTHREADINFO_PTR) malloc(sizeof(struct _gcsTHREADINFO));
-	if (info == gcvNULL)
-	{
-		return gcvNULL;
-	}
+    /* Allocate thread info structure. */
+    info = (gcsTHREADINFO_PTR) malloc(sizeof(struct _gcsTHREADINFO));
+    if (info == gcvNULL)
+    {
+        return gcvNULL;
+    }
 
-	/* Set the info. */
-	info->routine = ThreadRoutine;
-	info->argument = Argument;
+    /* Set the info. */
+    info->routine = ThreadRoutine;
+    info->argument = Argument;
 
-	/* Start the thread. */
-	result = pthread_create(
-		&thread,
-		NULL,				/* Use default attributes. */
-		_ThreadStarter,
-		info
-		);
+    /* Start the thread. */
+    result = pthread_create(
+        &thread,
+        NULL,                /* Use default attributes. */
+        _ThreadStarter,
+        info
+        );
 
-	/* Return result. */
-	if (result == 0)
-	{
-		return (gctHANDLE) thread;
-	}
-	else
-	{
-		/* Cleanup. */
-		free(info);
+    /* Return result. */
+    if (result == 0)
+    {
+        return (gctHANDLE) thread;
+    }
+    else
+    {
+        /* Cleanup. */
+        free(info);
 
-		/* Failed. */
-		return gcvNULL;
-	}
+        /* Failed. */
+        return gcvNULL;
+    }
 }
 
 /*******************************************************************************
 **
-**	vdkCloseThread
+**    vdkCloseThread
 **
-**	Close existing thread.
+**    Close existing thread.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctHANDLE ThreadHandle
-**			Handle of the existing thread to be closed.
+**        gctHANDLE ThreadHandle
+**            Handle of the existing thread to be closed.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkCloseThread(
-	gctHANDLE ThreadHandle
-	)
+    gctHANDLE ThreadHandle
+    )
 {
-	/* Wait until the thread terminates. */
-	pthread_join(
-		(pthread_t) ThreadHandle,
-		gcvNULL				/* Ignore return value. */
-		);
+    /* Wait until the thread terminates. */
+    pthread_join(
+        (pthread_t) ThreadHandle,
+        gcvNULL                /* Ignore return value. */
+        );
 }
 
 /*******************************************************************************
 **
-**	vdkCreateEvent
+**    vdkCreateEvent
 **
-**	Create an event.
+**    Create an event.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctBOOL ManualReset
-**			If gcvTRUE, a manual reset is needed to reset the event to
-**			non-signaled state.
+**        gctBOOL ManualReset
+**            If gcvTRUE, a manual reset is needed to reset the event to
+**            non-signaled state.
 **
-**		gctBOOL InitialState
-**			Initial state of the event.
+**        gctBOOL InitialState
+**            Initial state of the event.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		gctHANDLE
-**			Handle to the new event.
+**        gctHANDLE
+**            Handle to the new event.
 */
 
 gctHANDLE
 vdkCreateEvent(
-	gctBOOL ManualReset,
-	gctBOOL InitialState
-	)
+    gctBOOL ManualReset,
+    gctBOOL InitialState
+    )
 {
-	gcsEVENT_PTR info;
+    gcsEVENT_PTR info;
 
-	/* Allocate event structure. */
-	info = (gcsEVENT_PTR) malloc(sizeof(struct _gcsEVENT));
-	if (info == gcvNULL)
-	{
-		return gcvNULL;
-	}
+    /* Allocate event structure. */
+    info = (gcsEVENT_PTR) malloc(sizeof(struct _gcsEVENT));
+    if (info == gcvNULL)
+    {
+        return gcvNULL;
+    }
 
-	/* Initialize the event. */
-	pthread_mutex_init(&info->mutex, NULL);		/* Default attributes. */
-	pthread_cond_init(&info->condition, NULL);	/* Default attributes. */
+    /* Initialize the event. */
+    pthread_mutex_init(&info->mutex, NULL);        /* Default attributes. */
+    pthread_cond_init(&info->condition, NULL);    /* Default attributes. */
 
-	info->manualReset = ManualReset;
-	info->state = InitialState;
+    info->manualReset = ManualReset;
+    info->state = InitialState;
 
-	/* Return the handle. */
-	return (gctHANDLE) info;
+    /* Return the handle. */
+    return (gctHANDLE) info;
 }
 
 /*******************************************************************************
 **
-**	vdkCloseEvent
+**    vdkCloseEvent
 **
-**	Destroy an event.
+**    Destroy an event.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctHANDLE EventHandle
-**			Handle of the event.
+**        gctHANDLE EventHandle
+**            Handle of the event.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkCloseEvent(
-	gctHANDLE EventHandle
-	)
+    gctHANDLE EventHandle
+    )
 {
-	gcsEVENT_PTR info;
+    gcsEVENT_PTR info;
 
-	/* Cast to the structure. */
-	info = (gcsEVENT_PTR) EventHandle;
+    /* Cast to the structure. */
+    info = (gcsEVENT_PTR) EventHandle;
 
-	/* Acquire the mutex. */
-	if (pthread_mutex_lock(&info->mutex) != 0)
-	{
-		return;
-	}
+    /* Acquire the mutex. */
+    if (pthread_mutex_lock(&info->mutex) != 0)
+    {
+        return;
+    }
 
-	/* Signal the condition before destroying it in case other threads
-	   are waiting for it. */
-	pthread_cond_signal(&info->condition);
-	pthread_cond_destroy(&info->condition);
+    /* Signal the condition before destroying it in case other threads
+       are waiting for it. */
+    pthread_cond_signal(&info->condition);
+    pthread_cond_destroy(&info->condition);
 
-	/* Release and destroy the mutex. */
-	pthread_mutex_unlock(&info->mutex);
-	pthread_mutex_destroy(&info->mutex);
+    /* Release and destroy the mutex. */
+    pthread_mutex_unlock(&info->mutex);
+    pthread_mutex_destroy(&info->mutex);
 
-	/* Free the structure. */
-	free(info);
+    /* Free the structure. */
+    free(info);
 }
 
 /*******************************************************************************
 **
-**	vdkSetEvent
+**    vdkSetEvent
 **
-**	Set event to signaled state.
+**    Set event to signaled state.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctHANDLE EventHandle
-**			Handle of the event.
+**        gctHANDLE EventHandle
+**            Handle of the event.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkSetEvent(
-	gctHANDLE EventHandle
-	)
+    gctHANDLE EventHandle
+    )
 {
-	gcsEVENT_PTR info;
+    gcsEVENT_PTR info;
 
-	/* Cast to the structure. */
-	info = (gcsEVENT_PTR) EventHandle;
+    /* Cast to the structure. */
+    info = (gcsEVENT_PTR) EventHandle;
 
-	/* Acquire the mutex. */
-	if (pthread_mutex_lock(&info->mutex) == 0)
-	{
-		/* Set the event. */
-		info->state = gcvTRUE;
+    /* Acquire the mutex. */
+    if (pthread_mutex_lock(&info->mutex) == 0)
+    {
+        /* Set the event. */
+        info->state = gcvTRUE;
 
-		/* Signal the condition. */
-		pthread_cond_signal(&info->condition);
+        /* Signal the condition. */
+        pthread_cond_signal(&info->condition);
 
-		/* Release the mutex. */
-		pthread_mutex_unlock(&info->mutex);
-	}
+        /* Release the mutex. */
+        pthread_mutex_unlock(&info->mutex);
+    }
 }
 
 /*******************************************************************************
 **
-**	vdkResetEvent
+**    vdkResetEvent
 **
-**	Set event to non-signaled state.
+**    Set event to non-signaled state.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctHANDLE EventHandle
-**			Handle of the event.
+**        gctHANDLE EventHandle
+**            Handle of the event.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkResetEvent(
-	gctHANDLE EventHandle
-	)
+    gctHANDLE EventHandle
+    )
 {
-	gcsEVENT_PTR info;
+    gcsEVENT_PTR info;
 
-	/* Cast to the structure. */
-	info = (gcsEVENT_PTR) EventHandle;
+    /* Cast to the structure. */
+    info = (gcsEVENT_PTR) EventHandle;
 
-	/* Acquire the mutex. */
-	if (pthread_mutex_lock(&info->mutex) == 0)
-	{
-		/* Set the event. */
-		info->state = gcvFALSE;
+    /* Acquire the mutex. */
+    if (pthread_mutex_lock(&info->mutex) == 0)
+    {
+        /* Set the event. */
+        info->state = gcvFALSE;
 
-		/* Release the mutex. */
-		pthread_mutex_unlock(&info->mutex);
-	}
+        /* Release the mutex. */
+        pthread_mutex_unlock(&info->mutex);
+    }
 }
 
 /*******************************************************************************
 **
-**	vdkWaitForEvent
+**    vdkWaitForEvent
 **
-**	Wait for the event to become signaled.
+**    Wait for the event to become signaled.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctHANDLE EventHandle
-**			Handle of the event.
+**        gctHANDLE EventHandle
+**            Handle of the event.
 **
-**		gctINT Timeout
-**			Timeout in milliseconds.
+**        gctINT Timeout
+**            Timeout in milliseconds.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkWaitForEvent(
-	gctHANDLE EventHandle,
-	gctUINT Timeout
-	)
+    gctHANDLE EventHandle,
+    gctUINT Timeout
+    )
 {
-	gcsEVENT_PTR info;
+    gcsEVENT_PTR info;
 
-	/* Cast to the structure. */
-	info = (gcsEVENT_PTR) EventHandle;
+    /* Cast to the structure. */
+    info = (gcsEVENT_PTR) EventHandle;
 
-	/* Acquire the mutex. Functions pthread_cond_wait and pthread_cond_timedwait
-	   atomically unlock the mutex when called and automatically lock it back
-	   before returning. */
-	pthread_mutex_lock(&info->mutex);
+    /* Acquire the mutex. Functions pthread_cond_wait and pthread_cond_timedwait
+       atomically unlock the mutex when called and automatically lock it back
+       before returning. */
+    pthread_mutex_lock(&info->mutex);
 
-	do
-	{
-		/* Already signaled? */
-		if (info->state)
-		{
-			break;
-		}
+    do
+    {
+        /* Already signaled? */
+        if (info->state)
+        {
+            break;
+        }
 
-		/* Infinite wait? */
-		if (Timeout == gcvINFINITE)
-		{
-			pthread_cond_wait(&info->condition, &info->mutex);
-			break;
-		}
+        /* Infinite wait? */
+        if (Timeout == gcvINFINITE)
+        {
+            pthread_cond_wait(&info->condition, &info->mutex);
+            break;
+        }
 
-		/* Timed wait. */
-		{
-			struct timeval tv;
-			struct timespec ts;
+        /* Timed wait. */
+        {
+            struct timeval tv;
+            struct timespec ts;
 
-			gctUINT32 nowMicroseconds;
-			gctUINT32 stopMicroseconds;
+            gctUINT32 nowMicroseconds;
+            gctUINT32 stopMicroseconds;
 
-			/* Get current time. */
-			gettimeofday(&tv, NULL);
+            /* Get current time. */
+            gettimeofday(&tv, NULL);
 
-			/* Compute the current time in microseconds. */
-			nowMicroseconds
-				= tv.tv_sec * 1000 * 1000
-				+ tv.tv_usec;
+            /* Compute the current time in microseconds. */
+            nowMicroseconds
+                = tv.tv_sec * 1000 * 1000
+                + tv.tv_usec;
 
-			/* Compute the stop time in microseconds. */
-			stopMicroseconds
-				= nowMicroseconds
-				+ Timeout * 1000;
+            /* Compute the stop time in microseconds. */
+            stopMicroseconds
+                = nowMicroseconds
+                + Timeout * 1000;
 
-			/* Split in seconds and nanoseconds. */
-			ts.tv_sec  = stopMicroseconds / (1000 * 1000);
-			ts.tv_nsec = stopMicroseconds % (1000 * 1000);
+            /* Split in seconds and nanoseconds. */
+            ts.tv_sec  = stopMicroseconds / (1000 * 1000);
+            ts.tv_nsec = stopMicroseconds % (1000 * 1000);
 
-			/* Wait for the event to happen. */
-			pthread_cond_timedwait(&info->condition, &info->mutex, &ts);
-		}
-	}
-	while (gcvFALSE);
+            /* Wait for the event to happen. */
+            pthread_cond_timedwait(&info->condition, &info->mutex, &ts);
+        }
+    }
+    while (gcvFALSE);
 
-	/* Reset the state to nonsignaled if needed. */
-	if (!info->manualReset)
-	{
-		info->state = gcvFALSE;
-	}
+    /* Reset the state to nonsignaled if needed. */
+    if (!info->manualReset)
+    {
+        info->state = gcvFALSE;
+    }
 
-	/* Release the mutex. */
-	pthread_mutex_unlock(&info->mutex);
+    /* Release the mutex. */
+    pthread_mutex_unlock(&info->mutex);
 }
 
 /*******************************************************************************
 **
-**	vdkCreateMutex
+**    vdkCreateMutex
 **
-**	Create a mutex.
+**    Create a mutex.
 **
-**	INPUT:
+**    INPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		gctHANDLE
-**			Handle to the new mutex.
+**        gctHANDLE
+**            Handle to the new mutex.
 */
 
 gctHANDLE
 vdkCreateMutex(
-	void
-	)
+    void
+    )
 {
-	pthread_mutex_t* mutex;
+    pthread_mutex_t* mutex;
 
-	/* Allocate mutex structure. */
-	mutex = (pthread_mutex_t*) malloc(sizeof(pthread_mutex_t));
-	if (mutex == gcvNULL)
-	{
-		return gcvNULL;
-	}
+    /* Allocate mutex structure. */
+    mutex = (pthread_mutex_t*) malloc(sizeof(pthread_mutex_t));
+    if (mutex == gcvNULL)
+    {
+        return gcvNULL;
+    }
 
-	/* Initialize the mutex. */
-	pthread_mutex_init(mutex, NULL);	/* Default attributes. */
+    /* Initialize the mutex. */
+    pthread_mutex_init(mutex, NULL);    /* Default attributes. */
 
-	/* Return the handle. */
-	return (gctHANDLE) mutex;
+    /* Return the handle. */
+    return (gctHANDLE) mutex;
 }
 
 /*******************************************************************************
 **
-**	vdkCloseMutex
+**    vdkCloseMutex
 **
-**	Destroy a mutex.
+**    Destroy a mutex.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctHANDLE MutexHandle
-**			Handle of the mutex.
+**        gctHANDLE MutexHandle
+**            Handle of the mutex.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkCloseMutex(
-	gctHANDLE MutexHandle
-	)
+    gctHANDLE MutexHandle
+    )
 {
-	pthread_mutex_t* mutex;
+    pthread_mutex_t* mutex;
 
-	/* Cast to mutex. */
-	mutex = (pthread_mutex_t*) MutexHandle;
+    /* Cast to mutex. */
+    mutex = (pthread_mutex_t*) MutexHandle;
 
-	/* Release and destroy the mutex. */
-	pthread_mutex_unlock(mutex);
-	pthread_mutex_destroy(mutex);
+    /* Release and destroy the mutex. */
+    pthread_mutex_unlock(mutex);
+    pthread_mutex_destroy(mutex);
 
-	/* Free the mutex structure. */
-	free(mutex);
+    /* Free the mutex structure. */
+    free(mutex);
 }
 
 /*******************************************************************************
 **
-**	vdkAcquireMutex
+**    vdkAcquireMutex
 **
-**	Acquire a mutex.
+**    Acquire a mutex.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctHANDLE MutexHandle
-**			Handle of the event.
+**        gctHANDLE MutexHandle
+**            Handle of the event.
 **
-**		gctINT Timeout
-**			Timeout in milliseconds.
+**        gctINT Timeout
+**            Timeout in milliseconds.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkAcquireMutex(
-	gctHANDLE MutexHandle,
-	gctUINT Timeout
-	)
+    gctHANDLE MutexHandle,
+    gctUINT Timeout
+    )
 {
-	pthread_mutex_t* mutex;
+    pthread_mutex_t* mutex;
 
-	/* Cast to mutex. */
-	mutex = (pthread_mutex_t*) MutexHandle;
+    /* Cast to mutex. */
+    mutex = (pthread_mutex_t*) MutexHandle;
 
-	do
-	{
-		/* Infinite wait? */
-		if (Timeout == gcvINFINITE)
-		{
-			pthread_mutex_lock(mutex);
-			break;
-		}
+    do
+    {
+        /* Infinite wait? */
+        if (Timeout == gcvINFINITE)
+        {
+            pthread_mutex_lock(mutex);
+            break;
+        }
 
-		/* Timed wait. */
-		while (gcvTRUE)
-		{
-			/* Successfully locked? */
-			if (pthread_mutex_trylock(mutex) == 0)
-			{
-				break;
-			}
+        /* Timed wait. */
+        while (gcvTRUE)
+        {
+            /* Successfully locked? */
+            if (pthread_mutex_trylock(mutex) == 0)
+            {
+                break;
+            }
 
-			/* Timed out? */
-			if (Timeout == 0)
-			{
-				break;
-			}
+            /* Timed out? */
+            if (Timeout == 0)
+            {
+                break;
+            }
 
-			/* Decrement the wait value. */
-			Timeout--;
+            /* Decrement the wait value. */
+            Timeout--;
 
-			/* Sleep for 1 millisecond. */
-			vdkSleep(1);
-		}
-	}
-	while (gcvFALSE);
+            /* Sleep for 1 millisecond. */
+            vdkSleep(1);
+        }
+    }
+    while (gcvFALSE);
 }
 
 /*******************************************************************************
 **
-**	vdkReleaseMutex
+**    vdkReleaseMutex
 **
-**	Release a mutex.
+**    Release a mutex.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctHANDLE MutexHandle
-**			Handle of the mutex.
+**        gctHANDLE MutexHandle
+**            Handle of the mutex.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkReleaseMutex(
-	gctHANDLE MutexHandle
-	)
+    gctHANDLE MutexHandle
+    )
 {
-	pthread_mutex_unlock((pthread_mutex_t*) MutexHandle);
+    pthread_mutex_unlock((pthread_mutex_t*) MutexHandle);
 }
 
 /* if defined(LINUX) */

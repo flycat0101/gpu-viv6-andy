@@ -33,40 +33,40 @@
 
 Test3DShort::Test3DShort(const size_t sizeX, const size_t sizeY, const size_t sizeZ):
 MultiDimensionalArraysTest3D("short", sizeX, sizeY, sizeZ) {
-	inputAHost = new cl_short[size];
-	inputBHost = new cl_short[size];
-	resultHost = new cl_short[size];
-	inputA = inputAHost;
-	inputB = inputBHost;
-	result = resultHost;
+    inputAHost = new cl_short[size];
+    inputBHost = new cl_short[size];
+    resultHost = new cl_short[size];
+    inputA = inputAHost;
+    inputB = inputBHost;
+    result = resultHost;
 }
 
 Test3DShort::~Test3DShort() {
-	delete[] inputAHost;
-	delete[] inputBHost;
-	delete[] resultHost;
+    delete[] inputAHost;
+    delete[] inputBHost;
+    delete[] resultHost;
 }
 
 const int Test3DShort::getMemSize() const {
-	return sizeof(cl_short)*size;
+    return sizeof(cl_short)*size;
 }
 
 void Test3DShort::generateInput(const unsigned int &kernelIndex) {
-	for (unsigned int k=0; k<size; k++) {
-		inputAHost[k] = randShort();
-		if (getKernelInputArgNum(kernelIndex) == 2)
-			inputBHost[k] = randShort();
-	}
+    for (unsigned int k=0; k<size; k++) {
+        inputAHost[k] = randShort();
+        if (getKernelInputArgNum(kernelIndex) == 2)
+            inputBHost[k] = randShort();
+    }
 }
 
 void* Test3DShort::getInputAElement(const unsigned int &index) const {
-	return &inputAHost[index];
+    return &inputAHost[index];
 }
 
 void* Test3DShort::getInputBElement(const unsigned int &index) const {
-	return &inputBHost[index];
+    return &inputBHost[index];
 }
 
 void* Test3DShort::getResultElement(const unsigned int &index) const {
-	return &resultHost[index];
+    return &resultHost[index];
 }

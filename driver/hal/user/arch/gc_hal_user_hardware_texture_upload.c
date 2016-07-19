@@ -13649,7 +13649,7 @@ gcoHARDWARE_UploadCompressedTexture(
             gcmVERIFY_NODE_LOCK(&TexSurf->node);
 
             if ((TexSurf->format == gcvSURF_RGB8_PUNCHTHROUGH_ALPHA1_ETC2)
-             || (TexSurf->format == gcvSURF_RGB8_PUNCHTHROUGH_ALPHA1_ETC2))
+             || (TexSurf->format == gcvSURF_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2))
             {
                 punchThrough = gcvTRUE;
             }

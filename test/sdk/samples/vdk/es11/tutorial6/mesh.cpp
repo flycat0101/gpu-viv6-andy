@@ -35,15 +35,15 @@
 
 static void fread_bit32(void * buf, size_t size, FILE * file)
 {
-	unsigned char cdata[4];
-	size_t i;
+    unsigned char cdata[4];
+    size_t i;
 
-	for (i = 0; i < size / sizeof(unsigned int); i++)
-	{
-		fread(&cdata, sizeof(unsigned int), 1, file);
-		((unsigned int *)buf)[i] = (cdata[3] << 24) + (cdata[2] << 16)
-				+ (cdata[1] << 8) + cdata[0];
-	}
+    for (i = 0; i < size / sizeof(unsigned int); i++)
+    {
+        fread(&cdata, sizeof(unsigned int), 1, file);
+        ((unsigned int *)buf)[i] = (cdata[3] << 24) + (cdata[2] << 16)
+                + (cdata[1] << 8) + cdata[0];
+    }
 }
 
 Mesh::Mesh(const char *filename)
@@ -54,13 +54,13 @@ Mesh::Mesh(const char *filename)
 #ifdef UNDER_CE
   if (meshFile == NULL)
   {
-	wchar_t moduleName[MAX_PATH];
-	char path[MAX_PATH], * p;
-	GetModuleFileName(NULL, moduleName, MAX_PATH);
-	wcstombs(path, moduleName, MAX_PATH);
-	p = strrchr(path, '\\');
-	strcpy(p + 1, filename);
-	meshFile = fopen(path, "rb");
+    wchar_t moduleName[MAX_PATH];
+    char path[MAX_PATH], * p;
+    GetModuleFileName(NULL, moduleName, MAX_PATH);
+    wcstombs(path, moduleName, MAX_PATH);
+    p = strrchr(path, '\\');
+    strcpy(p + 1, filename);
+    meshFile = fopen(path, "rb");
   }
 #endif
   if(!meshFile)
@@ -156,9 +156,9 @@ void Mesh::Draw()
 
   glDrawElements(GL_TRIANGLES,m_mesh.indexCounter,GL_UNSIGNED_SHORT,m_mesh.Indices);
 
-  glDisableClientState(GL_VERTEX_ARRAY);
+  glDisableClientState(GL_VERTEX_ARRAY);   
   glDisableClientState(GL_NORMAL_ARRAY);
-  glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+  glDisableClientState(GL_TEXTURE_COORD_ARRAY);   
 }
 
 

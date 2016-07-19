@@ -219,6 +219,10 @@ typedef struct __GLformatInfoRec
     /* For compressed formats, it's bitsPerBlock */
     GLint       bitsPerPixel;
 
+    /* Compression block size, non-conpressed size is 1 */
+    GLint       blockWidth;
+    GLint       blockHeight;
+
     GLint       redSize;
     GLint       greenSize;
     GLint       blueSize;

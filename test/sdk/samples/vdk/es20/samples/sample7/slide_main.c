@@ -43,116 +43,116 @@ int VDKS_Val_WindowsHeight = 0;
 char* VDKS_ARG0 = NULL;
 
 /*
-*	Save Screen.
+*    Save Screen.
 */
 #endif
 int SaveResult = 0;
 
 VDKS_BOOL Init()
 {
-	return SlideInit();
+    return SlideInit();
 }
 
 void Run ()
 {
-	SlideRun();
+    SlideRun();
 
-	if (SaveResult)
-	{
-		char szBMPFile[MAX_PATH + 1];
+    if (SaveResult)
+    {
+        char szBMPFile[MAX_PATH + 1];
 #ifndef ANDROID
-		VDKS_Func_GetCurrentDir(szBMPFile);
+        VDKS_Func_GetCurrentDir(szBMPFile);
 #else
-		strcpy(szBMPFile, "/sdcard/sample/sample7/");
+        strcpy(szBMPFile, "/sdcard/sample/sample7/");
 #endif
-		strcat(szBMPFile, "vdksample7_es20_result.bmp");
-		VDKS_Func_SaveScreen(szBMPFile);
-	}
+        strcat(szBMPFile, "vdksample7_es20_result.bmp");
+        VDKS_Func_SaveScreen(szBMPFile);
+    }
 #ifndef ANDROID
-	vdkSwapEGL(&VdkEgl);
+    vdkSwapEGL(&VdkEgl);
 #endif
 }
 
 int main(int argc, char * argv[])
 {
-	int i = 0;
-	int count = 1;
+    int i = 0;
+    int count = 1;
 #ifndef ANDROID
-	vdkEvent vdk_event;
+    vdkEvent vdk_event;
 #endif
-	/*
-	 * Miscellaneous
-	*/
-	if (argc == 2)
-	{
-		count = atoi(argv[1]);
-	}
-	else if(argc == 4)
-	{
-		count = atoi(argv[1]);
-		VDKS_Val_WindowsWidth = atoi(argv[2]);
-		VDKS_Val_WindowsHeight = atoi(argv[3]);
-	}
-	else if(argc == 5)
-	{
-		count = atoi(argv[1]);
-		VDKS_Val_WindowsWidth = atoi(argv[2]);
-		VDKS_Val_WindowsHeight = atoi(argv[3]);
-		SaveResult = atoi(argv[4]);;
-	}
+    /*
+     * Miscellaneous
+    */
+    if (argc == 2)
+    {
+        count = atoi(argv[1]);
+    }
+    else if(argc == 4)
+    {
+        count = atoi(argv[1]);
+        VDKS_Val_WindowsWidth = atoi(argv[2]);
+        VDKS_Val_WindowsHeight = atoi(argv[3]);
+    }
+    else if(argc == 5)
+    {
+        count = atoi(argv[1]);
+        VDKS_Val_WindowsWidth = atoi(argv[2]);
+        VDKS_Val_WindowsHeight = atoi(argv[3]);
+        SaveResult = atoi(argv[4]);;
+    }
 #ifndef ANDROID
-	/*
-	 * VDKS
-	*/
-	VDKS_ARG0 = argv[0];
+    /*
+     * VDKS
+    */
+    VDKS_ARG0 = argv[0];
 
-	memset(&VdkEgl, 0, sizeof(vdkEGL));
+    memset(&VdkEgl, 0, sizeof(vdkEGL));
 
-	VDKS_Init(&VdkEgl);
+    VDKS_Init(&VdkEgl);
 
-	vdkShowWindow(VdkEgl.window);
+    vdkShowWindow(VdkEgl.window);
 #endif
-	/*
-	* App Data
-	*/
+    /*
+    * App Data
+    */
 
-	if (VDKS_TRUE != Init())
-	{
-		printf("main : Failed to init case.");
-		return 1;
-	}
+    if (VDKS_TRUE != Init())
+    {
+        printf("main : Failed to init case.");
+        return 1;
+    }
 
-	if(count)
-	{
-		for(i = 0; i < count; i++)
-		{
-			Run();
-		}
-	}
-	else
-	{
-		int done = 0;
-		while(!done)
-		{
+    if(count)
+    {
+        for(i = 0; i < count; i++)
+        {
+            Run();
+        }
+    }
+    else
+    {
+        int done = 0;
+        while(!done)
+        {
 #ifndef ANDROID
-			if(0 != vdkGetEvent(VdkEgl.window, &vdk_event))
-			{
-				if(vdk_event.type == VDK_CLOSE)
-				{
-					done = 1;
-				}
-			}
-			else
-			{
-				Run();
-			}
+            if(0 != vdkGetEvent(VdkEgl.window, &vdk_event))
+            {
+                if(vdk_event.type == VDK_CLOSE)
+                {
+                    done = 1;
+                }
+            }
+            else
+            {
+                Run();
+            }
 #endif
-		}
-	}
+        }
+    }
 #ifndef ANDROID
-	vdkFinishEGL(&VdkEgl);
+    vdkFinishEGL(&VdkEgl);
 #endif
-	return 0;
+    return 0;
 }
 
 

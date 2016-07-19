@@ -16,7 +16,6 @@
 
 #include "gc_hal_types.h"
 #include "gc_hal_base.h"
-#include "gc_hal_eglplatform_type.h"
 #include "gc_hal_user_math.h"
 #include "gc_hal_options.h"
 

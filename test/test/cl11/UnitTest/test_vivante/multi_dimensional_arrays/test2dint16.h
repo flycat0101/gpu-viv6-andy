@@ -33,19 +33,19 @@
 
 class Test2DInt16: public MultiDimensionalArraysTest2D {
 public:
-	Test2DInt16(const size_t sizeX, const size_t sizeY);
-	~Test2DInt16();
+    Test2DInt16(const size_t sizeX, const size_t sizeY);
+    ~Test2DInt16();
 
 protected:
-	cl_int16* inputAHost;
-	cl_int16* inputBHost;
-	cl_int16* resultHost;
+    cl_int16* inputAHost;
+    cl_int16* inputBHost;
+    cl_int16* resultHost;
 
-	const int getMemSize() const;
-	void generateInput(const unsigned int &kernelIndex);
-	void* getInputAElement(const unsigned int &index) const;
-	void* getInputBElement(const unsigned int &index) const;
-	void* getResultElement(const unsigned int &index) const;
+    const int getMemSize() const;
+    void generateInput(const unsigned int &kernelIndex);
+    void* getInputAElement(const unsigned int &index) const;
+    void* getInputBElement(const unsigned int &index) const;
+    void* getResultElement(const unsigned int &index) const;
 };
 
 #endif /*_test2dint16_h*/

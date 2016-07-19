@@ -144,6 +144,12 @@ _Set(
         /* Get private handle. */
         handle = gc_native_handle_get(Handle);
 
+        if (handle->surface == 0)
+        {
+            ALOGE("Invalid handle.");
+            return;
+        }
+
         /* Get surface wrapper. */
         gcoSURF surface = (gcoSURF) intptr_t(handle->surface);
 
@@ -2612,8 +2618,11 @@ hwc_set(
             /* Get surface wrapper. */
             gcoSURF surface = (gcoSURF) intptr_t(handle->surface);
 
-            /* Unlock the target. */
-            gcmVERIFY_OK(gcoSURF_Unlock(surface, gcvNULL));
+            if (handle->surface != 0)
+            {
+                /* Unlock the target. */
+                gcmVERIFY_OK(gcoSURF_Unlock(surface, gcvNULL));
+            }
 
             for (gctUINT i = 0; i < dpy->layerCount; i++)
             {

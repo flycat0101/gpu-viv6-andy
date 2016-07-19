@@ -101,13 +101,13 @@ extern PFNGLMULTIDRAWELEMENTSEXTPROC _glMultiDrawElementsEXT;
 
 bool InitGLES()
 {
-	FILE* file;
-	void * bits;
-	GLenum  format, target = 0;
-	GLsizei width;
-	GLsizei height;
-	GLsizei bytes;
-	int temp;
+    FILE* file;
+    void * bits;
+    GLenum  format, target = 0;
+    GLsizei width;
+    GLsizei height;
+    GLsizei bytes;
+    int temp;
 
     glClearColorx(FixedFromFloat(0.5f),
                   FixedFromFloat(0.5f),
@@ -120,32 +120,32 @@ bool InitGLES()
 
     SetPerspective();
 
-	glGenTextures(1, &texture1);
-	glBindTexture(GL_TEXTURE_2D, texture1);
+    glGenTextures(1, &texture1);
+    glBindTexture(GL_TEXTURE_2D, texture1);
 
-	file = fopen("/sdcard/es11/tutorial3/door.tga", "rb");
-	bits = LoadTGA(file, &format, &width, &height);
+    file = fopen("/sdcard/es11/tutorial3/door.tga", "rb");
+    bits = LoadTGA(file, &format, &width, &height);
     glTexParameteri( GL_TEXTURE_2D,GL_GENERATE_MIPMAP,GL_TRUE);
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-	if (bits != NULL)
-		glTexImage2D(GL_TEXTURE_2D,0,format,width,height,0,format,GL_UNSIGNED_BYTE,bits);
-	else
-		return false;
+    if (bits != NULL)
+        glTexImage2D(GL_TEXTURE_2D,0,format,width,height,0,format,GL_UNSIGNED_BYTE,bits);
+    else
+        return false;
 
-	fclose(file);
+    fclose(file);
 
     glGenTextures(1, &texture2);
     glBindTexture(target = GL_TEXTURE_2D, texture2);
-	file = fopen("/sdcard/es11/tutorial3/fire.tga", "rb");
-	bits = LoadTGA(file, &format, &width, &height);
+    file = fopen("/sdcard/es11/tutorial3/fire.tga", "rb");
+    bits = LoadTGA(file, &format, &width, &height);
 
     glTexParameteri( GL_TEXTURE_2D,GL_GENERATE_MIPMAP,GL_TRUE);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-	if (bits != NULL)
-		glTexImage2D(GL_TEXTURE_2D,0,format,width,height,0,format,GL_UNSIGNED_BYTE,bits);
-	else
-		return false;
+    if (bits != NULL)
+        glTexImage2D(GL_TEXTURE_2D,0,format,width,height,0,format,GL_UNSIGNED_BYTE,bits);
+    else
+        return false;
 
     {
         char* extensions = (char *)glGetString(GL_EXTENSIONS);
@@ -160,7 +160,7 @@ bool InitGLES()
         }
     }
 
-	fclose(file);
+    fclose(file);
     return true;
 }
 
@@ -168,34 +168,34 @@ extern "C" {
     JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial3_GL11JNILib_init(JNIEnv * env, jobject obj,  jint w, jint h);
     JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial3_GL11JNILib_repaint(JNIEnv * env, jobject obj);
     JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial3_GL11JNILib_changeBackground(JNIEnv * env, jobject obj);
-	JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial3_GL11JNILib_key(JNIEnv * env, jobject obj, jint k, jboolean d);
+    JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial3_GL11JNILib_key(JNIEnv * env, jobject obj, jint k, jboolean d);
 };
 
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial3_GL11JNILib_init(JNIEnv * env, jobject obj,  jint w, jint h)
 {
-	width  = w;
-	height = h;
-	LOGI("w=%d, h=%d",w,h);
-//	glViewport(0, 0, width, height);
+    width  = w;
+    height = h;
+    LOGI("w=%d, h=%d",w,h);
+//    glViewport(0, 0, width, height);
 
-	if(!InitGLES())
-	{
-		LOGI("Init GLES failed!");
-		return false;
-	}
+    if(!InitGLES())
+    {
+        LOGI("Init GLES failed!");
+        return false;
+    }
 
-	gettimeofday(&tm, NULL);
+    gettimeofday(&tm, NULL);
     start = tm.tv_sec * 1000 + tm.tv_usec / 1000;
 
-	LOGI("init end");
-	return true;
+    LOGI("init end");
+    return true;
 }
 static bool done = false;
 static bool paused = false;
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial3_GL11JNILib_repaint(JNIEnv * env, jobject obj)
 {
-//	LOGI("start repaint");
-//	InitGLES();
+//    LOGI("start repaint");
+//    InitGLES();
     if(!done)
     {
          if(key!=0)
@@ -210,16 +210,16 @@ JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial3_GL11JNILi
                      done = true;
                      LOGI("BACK pressed, case stopping!");
                      break;
-				  case KEYCODE_DPAD_LEFT :
+                  case KEYCODE_DPAD_LEFT :
 
-					 //paused =false;
-					break;
+                     //paused =false;
+                    break;
                   case KEYCODE_DPAD_RIGHT :
                      break;
                   default:
                      break;
               }
-			key = 0;
+            key = 0;
           }
           if (!paused)
           {
@@ -232,7 +232,7 @@ JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial3_GL11JNILi
     end = tm.tv_sec * 1000 + tm.tv_usec / 1000;
     float fps = frameCount / ((end - start) / 1000.0f);
 
-	if((end-start)>1000 && !paused)
+    if((end-start)>1000 && !paused)
     {
             LOGI("%d frames in %d ticks -> %.3f fps\n", frameCount, end - start, fps);
             start = end;
@@ -246,15 +246,15 @@ JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial3_GL11JNILi
 
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial3_GL11JNILib_changeBackground(JNIEnv * env, jobject obj)
 {
-	return true;
+    return true;
 }
 
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial3_GL11JNILib_key(JNIEnv * env, jobject obj, jint k, jboolean d)
 {
-	LOGI("Key Event : %d, d:%d",k,d);
+    LOGI("Key Event : %d, d:%d",k,d);
     if (d)
     {
         key = k;
     }
-	return true;
+    return true;
 }

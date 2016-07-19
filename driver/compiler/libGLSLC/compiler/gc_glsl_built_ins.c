@@ -5707,7 +5707,7 @@ _GenTexelFetchCode(
     ** If HW can support INTEGER coord, we don't need to convert it to FLOAT.
     ** And we generate TEXLD_U instead of TEXLD.
     */
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE_V2))
+    if (0  && gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE_V2))
     {
         textureParameters[0] = OperandsParameters[0];
         textureParameters[1] = OperandsParameters[1];
@@ -5879,7 +5879,7 @@ _GenTexelFetchOffsetCode(
     ** If HW can support INTEGER coord, we don't need to convert it to FLOAT.
     ** And we generate TEXLD_U instead of TEXLD.
     */
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE_V2))
+    if (0  && gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE_V2))
     {
         /* Slice coords if needed. */
         if (numCoordComponents != numOffsetComponents)

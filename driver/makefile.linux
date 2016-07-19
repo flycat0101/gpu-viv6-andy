@@ -36,10 +36,6 @@ include $(AQROOT)/makefile.linux.def
 #
 LIB_GAL             := $(GAL_DIR)
 
-ifeq ($(EGL_API_WL), 1)
-LIB_WLSERVER       := $(WLSERVER_DIR)
-endif
-
 ifneq ($(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_VG),0_0)
   LIB_EGL           := $(EGL_DIR)
 endif
@@ -104,6 +100,13 @@ ifeq ($(VIVANTE_ENABLE_3D), 1)
 endif
 
 
+ifeq ($(EGL_API_GBM),1)
+  ifeq ($(shell $(PKG_CONFIG) --libs gbm 2>/dev/null),)
+    LIB_GBM_VIV      := $(AQROOT)/driver/gbm/backends/viv
+    LIB_GBM          := $(AQROOT)/driver/gbm/main
+  endif
+endif
+
 # galcore
   GAL_CORE          := ./
 
@@ -115,10 +118,6 @@ else
 endif
 
 LIB_LIST            := $(LIB_GAL)
-
-ifeq ($(EGL_API_WL), 1)
-LIB_LIST       += $(LIB_WLSERVER)
-endif
 
 ifneq ($(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_VG),0_0)
   LIB_LIST          += $(LIB_EGL)
@@ -171,6 +170,10 @@ endif
 
 ifeq ($(VIVANTE_ENABLE_3D), 1)
   LIB_LIST          += $(LIB_VIVANTE)
+endif
+
+ifeq ($(EGL_API_GBM),1)
+  LIB_LIST          += $(LIB_GBM) $(LIB_GBM_VIV)
 endif
 
 ################################################################################
@@ -247,10 +250,6 @@ ifeq ($(VIVANTE_ENABLE_2D),1)
   $(LIB_EXA):       $(LIB_GAL)
 endif
 
-ifeq ($(EGL_API_WL), 1)
-$(LIB_WLSERVER): $(LIB_GAL) $(LIB_EGL)
-endif
-
 ifeq ($(VIVANTE_ENABLE_3D)_$(EGL_API_DRI),1_1)
   $(LIB_GL21):      $(LIB_GAL) $(LIB_VSC)
 endif
@@ -277,6 +276,16 @@ endif
 
 ifeq ($(VIVANTE_ENABLE_3D), 1)
   $(LIB_VIVANTE):   $(REG_HEAD)
+endif
+
+ifeq ($(EGL_API_GBM),1)
+  ifneq ($(LIB_GBM),)
+    $(LIB_GBM_VIV): $(LIB_GAL)
+    $(LIB_GBM):     $(LIB_GBM_VIV)
+
+    $(LIB_EGL):     $(LIB_GBM)
+    $(LIB_VIVANTE): $(LIB_GBM)
+  endif
 endif
 
 ################################################################################

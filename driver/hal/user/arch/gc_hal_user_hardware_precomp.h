@@ -16,7 +16,7 @@
 
 #include "gc_hal_user.h"
 #include "gc_hal_user_hardware.h"
-#if gcdENABLE_THIRD_PARTY_OPERATION
+#if gcdENABLE_2D
 #include "gc_hal_user_hardware_thirdparty.h"
 #endif
 

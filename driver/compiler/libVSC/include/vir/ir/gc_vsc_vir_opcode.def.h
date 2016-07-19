@@ -299,12 +299,14 @@
             PRE_DIV tmp.xy, src0.x, src1.x
             MUL     dest.x, tmp.x, tmp.y
      */
-    VIR_OPINFO(DIV, 2, HasDest|Componentwise|Expr|EPFromHighest, 1, AL),
+    VIR_OPINFO(DIV, 2, HasDest|Transcendental|Componentwise|Expr|EPFromHighest, 1, AL),
 
     /* pre division: float32 scalar only */
     VIR_OPINFO(PRE_DIV, 2, HasDest|Transcendental|Componentwise|Expr|EPFromHighest, 1, LM),
     /* modulus: MOD dest, src0, src1 */
-    VIR_OPINFO(MOD, 2, HasDest|Componentwise|Expr|EPFromHighest, 1, AL),
+    VIR_OPINFO(MOD, 2, HasDest|Componentwise|Expr|EPFromHighest, 1, NM),
+    /* modulus: IMOD dest, src0, src1 */
+    VIR_OPINFO(AQ_IMOD, 2, HasDest|Transcendental|Componentwise|Expr|EPFromHighest, 1, MC),
     /* maximum: MAX dest, src0, src1 */
     VIR_OPINFO(MAX, 2, HasDest|Componentwise|Expr|EPFromHighest, 1, AL),
     /* minimum: MIN dest, src0, src1 */

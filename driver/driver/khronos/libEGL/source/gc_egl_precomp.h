@@ -30,7 +30,7 @@
 #include <EGL/eglext.h>
 #include <gc_egl_os.h>
 #include "gc_egl.h"
-#include "gc_egl_graphics.h"
+#include "gc_egl_platform.h"
 #include "gc_hal_user_math.h"
 #include "gc_hal_user_os_memory.h"
 #include "gc_hal_statistics.h"

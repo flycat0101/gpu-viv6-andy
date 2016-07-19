@@ -350,13 +350,6 @@ static gceSTATUS RenderSubFrame(Test2D *t2d, gctUINT frameNo, gctUINT subFrameIn
 
     gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
 
-#if 0
-    {
-        char buff[128];
-        sprintf(buff, "%03d.bmp", subFrameIndex);
-        GalSaveTSurfToDIB(result, buff);
-    }
-#endif
 
 OnError:
     if (compressedTarget)
@@ -480,7 +473,7 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     runtime->cleanTarget = gcvFALSE;
 
     // create source surface
-	for (i = 0; i < gcmCOUNTOF(t2d->surf); ++i)
+    for (i = 0; i < gcmCOUNTOF(t2d->surf); ++i)
     {
         gcmONERROR(GalLoadFileToTSurf(sourcefile[i], &t2d->surf[i]));
     }

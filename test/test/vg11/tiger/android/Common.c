@@ -67,21 +67,21 @@ void ConfigSetup(void)
 
 long runCases()
 {
-	int i = 0;
-	int specify = 0;
+    int i = 0;
+    int specify = 0;
 
-	for(i = 0; cases[i].casefunc != NULL; i++)
+    for(i = 0; cases[i].casefunc != NULL; i++)
     {
-		if (gRunCaseName == NULL || (specify = (strcmp(cases[i].casename, gRunCaseName) == 0)))
+        if (gRunCaseName == NULL || (specify = (strcmp(cases[i].casename, gRunCaseName) == 0)))
         {
 
-          (	*(cases[i].casefunc))();
-		}
-		if(specify)
-			break;
-	}
+          (    *(cases[i].casefunc))();
+        }
+        if(specify)
+            break;
+    }
 
-	return 1;
+    return 1;
 }
 
 

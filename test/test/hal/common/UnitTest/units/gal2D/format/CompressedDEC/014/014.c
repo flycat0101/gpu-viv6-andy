@@ -437,7 +437,7 @@ static void CDECL Destroy(Test2D *t2d)
 
 const gceFEATURE FeatureList[]=
 {
-    gcvFEATURE_DEC_COMPRESSION,
+    gcvFEATURE_DEC300_COMPRESSION,
     gcvFEATURE_DEC_TPC_COMPRESSION,
 };
 

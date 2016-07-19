@@ -41,5 +41,5 @@ INCLUDES=$(INCLUDES); \
 	$(AQROOT)\test\es20\vv_launcher\lib\math; \
 	$(AQROOT)\test\es20\vv_launcher\lib; \
 	$(_SYSGENSDKROOT)\inc; \
-	$(VIVANTE_SDK_INC);$(VIVANTE_SDK_INC)/HAL;$(AQROOT)/sdk/inc; \
+	$(VIVANTE_SDK_INC); \
 

@@ -27,6 +27,7 @@
 
 
 #include "gc_vdk.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,164 +36,587 @@
 #include <fcntl.h>
 #include <stdint.h>
 #include <sys/types.h>
-#include <sys/mman.h>
 #include <sys/time.h>
 
 #include <binder/IServiceManager.h>
 
 #include <cutils/properties.h>
 
-#include <utils/misc.h>
-#include <utils/threads.h>
-#include <utils/Atomic.h>
 #include <utils/Log.h>
 #include <ui/PixelFormat.h>
-#include <ui/Rect.h>
 #include <ui/DisplayInfo.h>
 #include <ui/FramebufferNativeWindow.h>
 
 #if ANDROID_SDK_VERSION <= 7
-#   include <surfaceflinger/SurfaceComposerClient.h>
-#   include <ui/ISurfaceFlingerClient.h>
+# include <surfaceflinger/SurfaceComposerClient.h>
+# include <ui/ISurfaceFlingerClient.h>
 
 #elif ANDROID_SDK_VERSION == 8
-#   include <surfaceflinger/SurfaceComposerClient.h>
-#   include <surfaceflinger/ISurfaceFlingerClient.h>
+# include <surfaceflinger/SurfaceComposerClient.h>
+# include <surfaceflinger/ISurfaceFlingerClient.h>
 
 #elif ANDROID_SDK_VERSION < 16
-#   include <surfaceflinger/SurfaceComposerClient.h>
-#   include <surfaceflinger/ISurfaceComposerClient.h>
+# include <surfaceflinger/SurfaceComposerClient.h>
+# include <surfaceflinger/ISurfaceComposerClient.h>
 
 #elif ANDROID_SDK_VERSION == 16
-#   include <gui/SurfaceComposerClient.h>
-#   include <gui/ISurfaceComposerClient.h>
+# include <gui/SurfaceComposerClient.h>
+# include <gui/ISurfaceComposerClient.h>
 
 #elif ANDROID_SDK_VERSION == 17
-#   include <gui/ISurfaceComposer.h>
-#   include <gui/Surface.h>
-#   include <gui/SurfaceComposerClient.h>
+# include <gui/ISurfaceComposer.h>
+# include <gui/Surface.h>
+# include <gui/SurfaceComposerClient.h>
 
 #elif ANDROID_SDK_VERSION == 18
-#   include <gui/ISurfaceComposer.h>
-#   include <gui/Surface.h>
-#   include <gui/SurfaceComposerClient.h>
-
-#elif ANDROID_SDK_VERSION <= 23
-#   include <gui/ISurfaceComposer.h>
-#   include <gui/Surface.h>
-#   include <gui/SurfaceComposerClient.h>
+# include <gui/ISurfaceComposer.h>
+# include <gui/Surface.h>
+# include <gui/SurfaceComposerClient.h>
 
 #else
-#   error "Not ready for ANDROID_SDK_VERSION > 23"
+# include <gui/ISurfaceComposer.h>
+# include <gui/Surface.h>
+# include <gui/SurfaceComposerClient.h>
+
 #endif
 
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
+#if ANDROID_SDK_VERSION > 23
+# warning "Not verified for ANDROID_SDK_VERSION > 23"
+#endif
 
 using namespace android;
 
-/*******************************************************************************
-** VDK private data structure. *************************************************
-*/
-struct _vdkPrivate
+class DisplayContainer
 {
-    /* 0 for composition mode(android mode).
-     * 1 for framebuffer mode(linux mode). */
-    int                       mode;
-    sp<SurfaceComposerClient> session;
-    sp<FramebufferNativeWindow> framebuffer;
-    void *                    egl;
-    /* Display (vdk only support one display) . */
-    struct _Display
-    {
-        unsigned long      physical;
-        void *             memory;
-        int                width;
-        int                height;
-        int                format;
-        int                bpp;
-        int                size;
-        int                stride;
-        int                alpha_length;
-        int                alpha_offset;
-        int                red_length;
-        int                red_offset;
-        int                green_length;
-        int                green_offset;
-        int                blue_length;
-        int                blue_offset;
+public:
+    DisplayContainer(int index,
+        void * displayId, int width, int height, int format);
 
-        void *             display_id;
-    }
-    * display;
-    /* Window list. */
-    struct _Window
-    {
-        int                x, y;
-        int                width;
-        int                height;
-        int                bpp;
+    ~DisplayContainer() {}
 
-        sp<SurfaceControl> control;
-        sp<Surface>        surface;
-        struct _Window *   next;
-    }
-    * window_list;
-    /* Pixmap list. */
-    struct _Pixmap
+    /* Check if is container of specified native display type. */
+    bool isContainerOf(void * displayId)
     {
-        egl_native_pixmap_t * pixmap;
-        struct _Pixmap *      next;
+        return (mDisplayId == displayId);
     }
-    * pixmap_list;
+
+    /* Get display info. */
+    bool getDisplayInfo(int * width, int * height, int * format);
+
+private:
+    int             mIndex;
+    int             mWidth;
+    int             mHeight;
+    int             mStride;
+    int             mFormat;
+    void *          mDisplayId;
 };
+
+DisplayContainer::DisplayContainer(int index,
+        void * displayId, int width, int height, int format):
+        mIndex(index), mWidth(width), mHeight(height), mFormat(format),
+        mDisplayId(displayId)
+{
+}
+
+bool DisplayContainer::getDisplayInfo(int *width, int *height, int *format)
+{
+    if (width)
+        *width = mWidth;
+
+    if (height)
+        *height = mHeight;
+
+    if (format)
+        *format = mFormat;
+
+    return true;
+}
+
+
+class WindowContainer
+{
+public:
+    WindowContainer(sp<SurfaceControl> control, sp<Surface> surface,
+            int x, int y, int width, int height, int format);
+    ~WindowContainer();
+
+    /* Check if is container of specified native display type. */
+    bool isContainerOf(ANativeWindow *win)
+    {
+        return (static_cast<ANativeWindow *>(mSurface.get()) == win);
+    }
+
+    /* Window Info. */
+    void getWindowInfo(int * x, int * y, int * width, int * height, int * format);
+
+private:
+    int                mX, mY;
+    int                mWidth;
+    int                mHeight;
+    int                mFormat;
+    sp<SurfaceControl> mControl;
+    sp<Surface>        mSurface;
+};
+
+/* Window */
+WindowContainer::WindowContainer(sp<SurfaceControl> control, sp<Surface> surface,
+            int x, int y, int width, int height, int format):
+    mX(x), mY(y), mWidth(width), mHeight(height), mFormat(format),
+    mControl(control), mSurface(surface)
+{
+}
+
+WindowContainer::~WindowContainer()
+{
+    mControl = 0;
+    mSurface = 0;
+}
+
+void WindowContainer::getWindowInfo(int * x, int * y, int * width, int * height, int * format)
+{
+    if (x)
+        *x = mX;
+
+    if (y)
+        *y = mY;
+
+    if (width)
+        *width = mWidth;
+
+    if (height)
+        *height = mHeight;
+
+    if (format)
+        *format = mFormat;
+}
+
+
+class PixmapContainer
+{
+public:
+    PixmapContainer() {}
+    ~PixmapContainer() {}
+
+private:
+    egl_native_pixmap_t * mPixmap;
+};
+
+
+class Manager
+{
+public:
+    static Manager * getInstance();
+    static void freeInstance();
+
+    /* Display */
+    void * getDisplay(int id);
+    void destroyDisplay(void * displayId);
+
+    bool getDisplayInfo(void * displayId,
+            int * width, int * height, int * format);
+
+    /* Window */
+    ANativeWindow * createWindow(const char * name, int x, int y,
+            int width, int height, int format);
+
+    void destroyWindow(ANativeWindow * win);
+
+    bool getWindowInfo(ANativeWindow * win, int * x, int * y,
+            int * width, int * height, int * format);
+
+    /* Pixmap */
+    egl_native_pixmap_t * createPixmap(int width, int height, int format);
+    void destroyPixmap(egl_native_pixmap_t * pixmap);
+
+private:
+    Manager();
+    ~Manager();
+
+    /* Containers. */
+    Vector<DisplayContainer *>  mDisplayList;
+    Vector<WindowContainer *>   mWindowList;
+    Vector<PixmapContainer *>   mPixmapList;
+    Mutex                       mMutex;
+
+    /* false for framebuffer mode(linux mode). */
+    /* true for composition mode(android mode). */
+    bool                        mCompositionMode;
+    sp<SurfaceComposerClient>   mSession;
+    sp<FramebufferNativeWindow> mFramebuffer;
+
+    static Manager *            mSelf;
+};
+
+Manager * Manager::mSelf(NULL);
+
+Manager* Manager::getInstance()
+{
+    if (!mSelf)
+    {
+        mSelf = new Manager();
+    }
+
+    return mSelf;
+}
+
+void Manager::freeInstance()
+{
+    if (mSelf)
+    {
+        delete mSelf;
+        mSelf = NULL;
+    }
+}
+
+Manager::Manager()
+{
+    char value[PROPERTY_VALUE_MAX];
+    status_t err = NO_ERROR;
+
+    /* Initialize the private data structure. */
+    property_get("vdk.window_mode", value, "0");
+
+    do
+    {
+        /* Safe mode is framebuffer mode. */
+        mCompositionMode = false;
+
+        if (value[0] != '0')
+        {
+            /* Set framebuffer mode. */
+            break;
+        }
+
+        /* Try composition mode. */
+        sp<IBinder> binder;
+        sp<IServiceManager> sm = defaultServiceManager();
+
+        /* 1. Find surfaceflinger service. */
+        binder = sm->checkService(String16("SurfaceFlinger"));
+        if (binder == 0)
+        {
+            /* Fail back to framebuffer mode. */
+            break;
+        }
+
+        /* 2. Create session. */
+        mSession = new SurfaceComposerClient();
+
+        /* Init check. */
+        err = mSession->initCheck();
+
+        if (err == NO_INIT)
+        {
+            /* Composition not started. */
+            mSession->dispose();
+            mSession = NULL;
+
+
+            printf("Try \'Composition\' mode failed: "
+                   "Composition not started.\n");
+
+            /* Fail back to framebuffer mode. */
+            break;
+        }
+
+        /* Set composition mode success. */
+        mCompositionMode = true;
+    }
+    while (0);
+
+    if (mCompositionMode)
+    {
+        printf("Running in \'Composition\' mode\n");
+        printf("Composition is enabled for this native window\n");
+    }
+    else
+    {
+        printf("Running in \'FramebufferNativeWindow\' mode\n");
+        printf("Directly to framebuffer, bypass composition\n");
+
+        /* Get display surface immediately if using mode 1. */
+        mFramebuffer = static_cast<FramebufferNativeWindow *>(android_createDisplaySurface());
+    }
+}
+
+Manager::~Manager()
+{
+    /* Window. */
+    for (size_t i = 0; i < mWindowList.size(); i++)
+    {
+        WindowContainer *w = mWindowList[i];
+        delete w;
+        mWindowList.replaceAt(NULL, i);
+    }
+    mWindowList.clear();
+
+    /* Pixmap. */
+    for (size_t i = 0; i < mPixmapList.size(); i++)
+    {
+        PixmapContainer *p = mPixmapList[i];
+        delete p;
+        mPixmapList.replaceAt(NULL, i);
+    }
+    mPixmapList.clear();
+
+    /* Display. */
+    for (size_t i = 0; i < mDisplayList.size(); i++)
+    {
+        DisplayContainer *d = mDisplayList[i];
+        delete d;
+        mDisplayList.replaceAt(NULL, i);
+    }
+    mDisplayList.clear();
+
+    if (mCompositionMode)
+    {
+        /* Composition mode. */
+        mSession->dispose();
+        mSession = 0;
+    }
+    else
+    {
+        /* Framebuffer mode. */
+        mFramebuffer = 0;
+    }
+}
+
+void * Manager::getDisplay(int index)
+{
+    DisplayContainer *d;
+    (void) index;
+    void * displayId = /* EGL_DEFAULT_DISPLAY */ (void *) 0;
+
+    int width  = 1;
+    int height = 1;
+    int format = HAL_PIXEL_FORMAT_RGBX_8888;
+
+    for (size_t i = 0; i < mDisplayList.size(); i++)
+    {
+        d = mDisplayList[i];
+
+        if (d->isContainerOf(displayId))
+        {
+            return displayId;
+        }
+    }
+
+    if (mCompositionMode)
+    {
+        /* Composition mode. */
+        DisplayInfo info;
+        status_t status;
+
+#if (ANDROID_SDK_VERSION >= 17)
+        sp<IBinder> token(SurfaceComposerClient::getBuiltInDisplay(
+            ISurfaceComposer::eDisplayIdMain));
+        status = SurfaceComposerClient::getDisplayInfo(token, &info);
+#else
+        status = mSession->getDisplayInfo(0, &info);
+#endif
+        if (status != NO_ERROR)
+        {
+            return NULL;
+        }
+
+        width    = info.w;
+        height   = info.h;
+#if (ANDROID_SDK_VERSION < 19)
+        format   = info.pixelFormatInfo.format;
+#else
+        format   = HAL_PIXEL_FORMAT_RGBX_8888;
+#endif
+    }
+    else
+    {
+        /* Framebuffer mode. */
+        ANativeWindow * fb =
+            static_cast<ANativeWindow *>(mFramebuffer.get());
+
+        fb->query(fb, NATIVE_WINDOW_WIDTH,  &width);
+        fb->query(fb, NATIVE_WINDOW_HEIGHT, &height);
+        fb->query(fb, NATIVE_WINDOW_FORMAT, &format);
+    }
+
+    {
+        Mutex::Autolock lock(mMutex);
+        d = new DisplayContainer(index, displayId, width, height, format);
+        mDisplayList.add(d);
+    }
+
+    return displayId;
+}
+
+void Manager::destroyDisplay(void * displayId)
+{
+    for (size_t i = 0; i < mDisplayList.size(); i++)
+    {
+        DisplayContainer * d = mDisplayList[i];
+
+        if (d->isContainerOf(displayId))
+        {
+            Mutex::Autolock lock(mMutex);
+            mDisplayList.removeAt(i);
+            delete d;
+            break;
+        }
+    }
+}
+
+bool Manager::getDisplayInfo(void * displayId, int *width, int *height, int *format)
+{
+    for (size_t i = 0; i < mDisplayList.size(); i++)
+    {
+        DisplayContainer * d = mDisplayList[i];
+
+        if (d->isContainerOf(displayId))
+        {
+            return d->getDisplayInfo(width, height, format);
+        }
+    }
+
+    /* Display not found. */
+    return false;
+}
+
+ANativeWindow * Manager::createWindow(const char *name, int x, int y, int width, int height, int format)
+{
+    WindowContainer *w;
+    sp<SurfaceControl> control;
+    sp<Surface> surface;
+
+    if (mCompositionMode)
+    {
+        /* Create surface control. */
+#if ANDROID_SDK_VERSION < 14
+        control = mSession->createSurface(
+                getpid(), 0, width, height, format);
+#elif ANDROID_SDK_VERSION <= 16
+        control = mSession->createSurface(
+                0, width, height, format);
+#else
+        control = mSession->createSurface(
+                String8(name), width, height, format, 0);
+#endif
+
+        /* Set Z order and position. */
+#if ANDROID_SDK_VERSION < 14
+        mSession->openTransaction();
+#else
+        SurfaceComposerClient::openGlobalTransaction();
+#endif
+
+        control->setLayer(0x40000000);
+        control->setPosition(x, y);
+
+#if ANDROID_SDK_VERSION < 14
+        mSession->closeTransaction();
+#else
+        SurfaceComposerClient::closeGlobalTransaction();
+#endif
+        /* Get surface. */
+        surface = control->getSurface();
+
+        {
+            Mutex::Autolock lock(mMutex);
+            w = new WindowContainer(control, surface, x, y, width, height, format);
+            mWindowList.add(w);
+        }
+
+        return static_cast<ANativeWindow *>(surface.get());
+    }
+    else
+    {
+        control = NULL;
+        surface = NULL;
+
+        ANativeWindow *win = static_cast<ANativeWindow *>(mFramebuffer.get());
+
+        win->query(win, NATIVE_WINDOW_WIDTH,  &width);
+        win->query(win, NATIVE_WINDOW_HEIGHT, &height);
+        win->query(win, NATIVE_WINDOW_FORMAT, &format);
+
+        Mutex::Autolock lock(mMutex);
+        w = new WindowContainer(control, surface, 0, 0, width, height, format);
+        mWindowList.add(w);
+
+        return static_cast<ANativeWindow *>(mFramebuffer.get());
+    }
+}
+
+void Manager::destroyWindow(ANativeWindow *win)
+{
+    Mutex::Autolock lock(mMutex);
+
+    for (size_t i = 0; i < mWindowList.size(); i++)
+    {
+        WindowContainer *w = mWindowList[i];
+
+        if (w->isContainerOf(win))
+        {
+            mWindowList.removeAt(i);
+            delete w;
+            break;
+        }
+    }
+}
+
+bool Manager::getWindowInfo(ANativeWindow *win,
+        int *x, int *y, int *width, int *height, int *format)
+{
+    WindowContainer * w = NULL;
+    for (size_t i = 0; i < mWindowList.size(); i++)
+    {
+        if (mWindowList[i]->isContainerOf(win))
+        {
+            w = mWindowList[i];
+            break;
+        }
+    }
+
+    if (!w)
+        return false;
+
+    w->getWindowInfo(x, y, width, height, format);
+    return true;
+}
+
+
+
+class ManagerFinalizer
+{
+    public:
+    ManagerFinalizer() {}
+    ~ManagerFinalizer() { Manager::freeInstance(); }
+};
+
+/* dtor will be automatically called when exit. */
+static ManagerFinalizer __managerFinalizer;
+
+
+
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
 
 /*******************************************************************************
 ** Default keyboard map. *******************************************************
 */
 
-static vdkPrivate _vdk        = NULL;
+static void *_egl;
 
 static __attribute__((destructor)) void
 _onexit(
     void
     )
 {
-    vdkPrivate vdk = _vdk;
-    _vdk = NULL;
-
-    if (vdk == NULL)
+    if (_egl)
     {
-        return;
+        dlclose(_egl);
+        _egl = NULL;
     }
 
-    /* Composition mode. */
-    if (vdk->mode == 0)
-    {
-        while (vdk->window_list != NULL)
-        {
-            struct _vdkPrivate::_Window * window = vdk->window_list;
-            vdk->window_list = window->next;
-
-            window->control.clear();
-            window->surface.clear();
-
-            free(window);
-        }
-
-        vdk->session->dispose();
-    }
-    else
-    /* Framebuffer mode. */
-    {
-        if (vdk->window_list != NULL)
-        {
-            free(vdk->window_list);
-            vdk->window_list = NULL;
-        }
-    }
-
-    free(vdk);
+    Manager::freeInstance();
 }
 
 /*******************************************************************************
@@ -204,107 +628,14 @@ vdkInitialize(
     void
     )
 {
-    vdkPrivate vdk = NULL;
-
-    /* Return if already initialized. */
-    if (_vdk != NULL)
+    if (_egl == NULL)
     {
-        return _vdk;
+        _egl = dlopen("libEGL.so", RTLD_NOW);
     }
 
-    do
-    {
-        char value[PROPERTY_VALUE_MAX];
-        status_t err = NO_ERROR;
+    atexit(_onexit);
 
-        /* Allocate the private data structure. */
-        vdk = (vdkPrivate) malloc(sizeof(struct _vdkPrivate));
-
-        if (vdk == NULL)
-        {
-            /* Break if we are out of memory. */
-            break;
-        }
-
-        memset(vdk, 0, sizeof (struct _vdkPrivate));
-
-        /* Initialize the private data structure. */
-        property_get("vdk.window_mode", value, "0");
-
-        do
-        {
-            /* Safe mode is framebuffer mode. */
-            vdk->mode = 1;
-
-            if (value[0] != '0')
-            {
-                /* Set framebuffer mode. */
-                break;
-            }
-
-            /* Try composition mode. */
-            sp<IBinder> binder;
-            sp<IServiceManager> sm = defaultServiceManager();
-
-            /* 1. Find surfaceflinger service. */
-            binder = sm->checkService(String16("SurfaceFlinger"));
-            if (binder == 0)
-            {
-                /* Fail back to framebuffer mode. */
-                break;
-            }
-
-            /* 2. Create session. */
-            vdk->session = new SurfaceComposerClient();
-
-            /* Init check. */
-            err = vdk->session->initCheck();
-
-            if (err == NO_INIT)
-            {
-                /* Composition not started. */
-                vdk->session->dispose();
-                vdk->session = NULL;
-
-
-                printf("Try \'Composition\' mode failed: "
-                       "Composition not started.\n");
-
-                /* Fail back to framebuffer mode. */
-                break;
-            }
-
-            /* Set composition mode success. */
-            vdk->mode = 0;
-        }
-        while (0);
-
-        printf("Running in \'%s\' mode\n",
-            (vdk->mode == 0 ? "Composition" : "FramebufferNativeWindow"));
-
-        if (vdk->mode == 1)
-        {
-            /* Get display surface immediately if using mode 1. */
-            vdk->framebuffer = static_cast<FramebufferNativeWindow *>(android_createDisplaySurface());
-        }
-
-        /* Get libEGL handle. */
-        vdk->egl = dlopen("libEGL.so", RTLD_NOW);
-
-        /* Do not need lock. */
-        _vdk = vdk;
-        atexit(_onexit);
-
-        return vdk;
-    }
-    while (0);
-
-    if (vdk != NULL)
-    {
-        free(vdk);
-    }
-
-    return NULL;
+    return (vdkPrivate) Manager::getInstance();
 }
 
 VDKAPI void VDKLANG
@@ -312,47 +643,13 @@ vdkExit(
     vdkPrivate Private
     )
 {
-    if (Private != 0)
+    if (_egl)
     {
-        /* Composition mode. */
-        if (Private->mode == 0)
-        {
-            while (Private->window_list != NULL)
-            {
-                struct _vdkPrivate::_Window * window = Private->window_list;
-                Private->window_list = window->next;
-
-                window->control.clear();
-                window->surface.clear();
-
-                free(window);
-            }
-
-            Private->session->dispose();
-        }
-        else
-        /* Framebuffer mode. */
-        {
-            if (Private->window_list != NULL)
-            {
-                free(Private->window_list);
-                Private->window_list = NULL;
-            }
-
-            Private->framebuffer.clear();
-        }
-        if (_vdk == Private)
-        {
-            _vdk = 0;
-        }
-
-        if (Private->egl != 0)
-        {
-            dlclose(Private->egl);
-        }
-
-        free(Private);
+        dlclose(_egl);
+        _egl = NULL;
     }
+
+    Manager::freeInstance();
 }
 
 /*******************************************************************************
@@ -364,143 +661,8 @@ vdkGetDisplay(
     vdkPrivate Private
     )
 {
-    struct _vdkPrivate::_Display * display;
-
-    if (Private == NULL || Private != _vdk)
-    {
-        /* Because EGL_DEFAULT_DISPLAY is actually 0. */
-        return (vdkDisplay) -1;
-    }
-
-    if (Private->display != NULL)
-    {
-        return (vdkDisplay) Private->display->display_id;
-    }
-
-    display = (struct _vdkPrivate::_Display *) malloc(
-            sizeof (struct _vdkPrivate::_Display));
-
-    /* Andriod only support one display: 0.*/
-    display->display_id = EGL_DEFAULT_DISPLAY;
-
-    /* Composition mode. */
-    if (_vdk->mode == 0)
-    {
-        DisplayInfo info;
-        status_t status;
-
-#if (ANDROID_SDK_VERSION >= 17)
-        sp<IBinder> token(SurfaceComposerClient::getBuiltInDisplay(
-            ISurfaceComposer::eDisplayIdMain));
-        status = SurfaceComposerClient::getDisplayInfo(token, &info);
-#else
-        status = _vdk->session->getDisplayInfo(0, &info);
-#endif
-        if (status != NO_ERROR)
-        {
-            return NULL;
-        }
-
-        display->physical = ~0UL; /* Can not get physical. */
-        display->memory   = NULL; /* Can not get logical. */
-        display->width    = info.w;
-        display->height   = info.h;
-#if (ANDROID_SDK_VERSION < 19)
-        display->format   = info.pixelFormatInfo.format;
-#endif
-    }
-    else
-    /* Framebuffer mode. */
-    {
-        android_native_window_t * fb =
-            (android_native_window_t *) _vdk->framebuffer.get();
-
-        display->physical = ~0UL; /* Can not get physical. */
-        display->memory   = NULL; /* Can not get logical. */
-        fb->query(fb, NATIVE_WINDOW_WIDTH,  &display->width);
-        fb->query(fb, NATIVE_WINDOW_HEIGHT, &display->height);
-        fb->query(fb, NATIVE_WINDOW_FORMAT, &display->format);
-    }
-
-    /* Obtain format information. */
-    switch (display->format)
-    {
-    case PIXEL_FORMAT_RGBA_8888:
-        display->bpp          = 32;
-        display->size         = display->width * display->height * 4;
-        display->stride       = display->width * 4;
-        display->alpha_length = 8;
-        display->alpha_offset = 24;
-        display->red_length   = 8;
-        display->red_offset   = 0;
-        display->green_length = 8;
-        display->green_offset = 8;
-        display->blue_length  = 8;
-        display->blue_offset  = 16;
-        break;
-
-    case PIXEL_FORMAT_RGBX_8888:
-        display->bpp          = 32;
-        display->size         = display->width * display->height * 4;
-        display->stride       = display->width * 4;
-        display->alpha_length = 0;
-        display->alpha_offset = 24;
-        display->red_length   = 8;
-        display->red_offset   = 0;
-        display->green_length = 8;
-        display->green_offset = 8;
-        display->blue_length  = 8;
-        display->blue_offset  = 16;
-        break;
-
-    case PIXEL_FORMAT_RGB_888:
-        display->bpp          = 24;
-        display->size         = display->width * display->height * 3;
-        display->stride       = display->width * 3;
-        display->alpha_length = 0;
-        display->alpha_offset = 0;
-        display->red_length   = 8;
-        display->red_offset   = 0;
-        display->green_length = 8;
-        display->green_offset = 8;
-        display->blue_length  = 8;
-        display->blue_offset  = 16;
-        break;
-
-    case PIXEL_FORMAT_BGRA_8888:
-        display->bpp          = 32;
-        display->size         = display->width * display->height * 4;
-        display->stride       = display->width * 4;
-        display->alpha_length = 8;
-        display->alpha_offset = 24;
-        display->red_length   = 8;
-        display->red_offset   = 16;
-        display->green_length = 8;
-        display->green_offset = 8;
-        display->blue_length  = 8;
-        display->blue_offset  = 0;
-        break;
-
-    case PIXEL_FORMAT_RGB_565:
-    default:
-        display->bpp          = 16;
-        display->size         = display->width * display->height * 2;
-        display->stride       = display->width * 2;
-        display->alpha_length = 0;
-        display->alpha_offset = 0;
-        display->red_length   = 5;
-        display->red_offset   = 11;
-        display->green_length = 6;
-        display->green_offset = 5;
-        display->blue_length  = 5;
-        display->blue_offset  = 0;
-        break;
-    }
-
-    /* Save display to vdkPrivate. */
-    _vdk->display = display;
-
-    return (vdkDisplay) display->display_id;
+    Manager * manager = Manager::getInstance();
+    return (vdkDisplay) manager->getDisplay(0);
 }
 
 VDKAPI int VDKLANG
@@ -513,153 +675,69 @@ vdkGetDisplayInfo(
     int * BitsPerPixel
     )
 {
-    struct _vdkPrivate::_Display * display;
+    int width;
+    int height;
+    int format;
+    int bpp;
+    bool ret;
 
-    if ((Display != EGL_DEFAULT_DISPLAY)
-    ||  (_vdk == NULL)
-    ||  (_vdk->display == NULL)
-    )
+    Manager * manager = Manager::getInstance();
+
+    ret = manager->getDisplayInfo((void *) Display, &width, &height, &format);
+
+    if (!ret)
     {
         return 0;
     }
 
-    display = _vdk->display;
+    /* Obtain format information. */
+    switch (format)
+    {
+    case PIXEL_FORMAT_RGBA_8888:
+    case PIXEL_FORMAT_RGBX_8888:
+    case PIXEL_FORMAT_BGRA_8888:
+        bpp = 32;
+        break;
+
+    case PIXEL_FORMAT_RGB_888:
+        bpp = 24;
+        break;
+
+    case PIXEL_FORMAT_RGB_565:
+        bpp = 16;
+        break;
+
+    default:
+        return 0;
+    }
 
     if (Width != NULL)
     {
-        *Width  = display->width;
+        *Width = width;
     }
 
     if (Height != NULL)
     {
-        *Height = display->height;
+        *Height = height;
     }
 
     if (Physical != NULL)
     {
-        *Physical = display->physical;
+        *Physical = ~0U;
     }
 
     if (Stride != NULL)
     {
-        *Stride = display->stride;
+        *Stride = width * bpp / 8;
     }
 
     if (BitsPerPixel != NULL)
     {
-        *BitsPerPixel = display->bpp;
+        *BitsPerPixel = bpp;
     }
-
-    return 1;
-}
-
-VDKAPI int VDKLANG
-vdkGetDisplayInfoEx(
-    vdkDisplay Display,
-    unsigned int DisplayInfoSize,
-    vdkDISPLAY_INFO * DisplayInfo
-    )
-{
-    /* Valid display? */
-    struct _vdkPrivate::_Display * display;
-
-    if ((Display != EGL_DEFAULT_DISPLAY)
-    ||  (_vdk == NULL)
-    ||  (_vdk->display == NULL)
-    )
-    {
-        return 0;
-    }
-
-    /* Valid structure size? */
-    if (DisplayInfoSize != sizeof(vdkDISPLAY_INFO))
-    {
-        /* Invalid structure size. */
-        return 0;
-    }
-
-    display = _vdk->display;
-
-    /* Return the size of the display. */
-    DisplayInfo->width  = display->width;
-    DisplayInfo->height = display->height;
-
-    /* Return the stride of the display. */
-    DisplayInfo->stride = display->stride;
-
-    /* Return the color depth of the display. */
-    DisplayInfo->bitsPerPixel = display->bpp;
-
-    /* Return the logical pointer to the display. */
-    DisplayInfo->logical = display->memory;
-
-    /* Return the physical address of the display. */
-    DisplayInfo->physical = display->physical;
-
-    /* Return the color info. */
-    DisplayInfo->alphaLength = display->alpha_length;
-    DisplayInfo->alphaOffset = display->alpha_offset;
-    DisplayInfo->redLength   = display->red_length;
-    DisplayInfo->redOffset   = display->red_offset;
-    DisplayInfo->greenLength = display->green_length;
-    DisplayInfo->greenOffset = display->green_offset;
-    DisplayInfo->blueLength  = display->blue_length;
-    DisplayInfo->blueOffset  = display->blue_offset;
-
-    /* In Android we always flip. */
-    DisplayInfo->flip = 1;
 
     /* Success. */
     return 1;
-}
-
-VDKAPI int VDKLANG
-vdkGetDisplayVirtual(
-    vdkDisplay Display,
-    int * Width,
-    int * Height
-    )
-{
-    (void) Display;
-    (void) Width;
-    (void) Height;
-
-    /* Not supported. */
-    return 0;
-}
-
-VDKAPI int VDKLANG
-vdkGetDisplayBackbuffer(
-    vdkDisplay Display,
-    unsigned int * Offset,
-    int * X,
-    int * Y
-    )
-{
-    (void) Display;
-    (void) Offset;
-    (void) X;
-    (void) Y;
-
-    /* Not supported. */
-    return 0;
-}
-
-VDKAPI int VDKLANG
-vdkSetDisplayVirtual(
-    vdkDisplay Display,
-    unsigned int Offset,
-    int X,
-    int Y
-    )
-{
-    (void) Display;
-    (void) Offset;
-    (void) X;
-    (void) Y;
-
-    /* Not supported. */
-    return 0;
 }
 
 VDKAPI void VDKLANG
@@ -667,16 +745,8 @@ vdkDestroyDisplay(
     vdkDisplay Display
     )
 {
-    if ((Display != EGL_DEFAULT_DISPLAY)
-    ||  (_vdk == NULL)
-    ||  (_vdk->display == NULL)
-    )
-    {
-        return;
-    }
-
-    free(_vdk->display);
-    _vdk->display = NULL;
+    Manager * manager = Manager::getInstance();
+    manager->destroyDisplay((void *) Display);
 }
 
 /*******************************************************************************
@@ -692,175 +762,60 @@ vdkCreateWindow(
     int Height
     )
 {
-    struct _vdkPrivate::_Display * display = NULL;
-    struct _vdkPrivate::_Window  * window  = NULL;
+    int xres, yres;
+    int format;
+    int ret;
+    char name[64] = "vdk window";
+    int fd;
 
-    /* Check display. */
-    if ((Display != EGL_DEFAULT_DISPLAY)
-    ||  (_vdk == NULL)
-    ||  (_vdk->display == NULL)
-    )
+    Manager * manager = Manager::getInstance();
+
+    ret = manager->getDisplayInfo((void *) 0, &xres, &yres, &format);
+
+    if (!ret)
     {
         return NULL;
     }
 
-    display = _vdk->display;
-
     if (Width == 0)
     {
-        Width = display->width;
+        Width = xres;
     }
 
     if (Height == 0)
     {
-        Height = display->height;
+        Height = yres;
     }
 
     if (X == -1)
     {
-        X = ((display->width - Width) / 2) & ~7;
+        X = ((xres - Width) / 2) & ~7;
     }
 
     if (Y == -1)
     {
-        Y = ((display->height - Height) / 2) & ~7;
+        Y = ((yres - Height) / 2) & ~7;
     }
 
     if (X < 0) X = 0;
     if (Y < 0) Y = 0;
-    if (X + Width  > display->width)  Width  = display->width  - X;
-    if (Y + Height > display->height) Height = display->height - Y;
+    if (X + Width  > xres)  Width  = xres - X;
+    if (Y + Height > yres)  Height = yres - Y;
 
-    do
+    fd = open("/proc/self/cmdline", O_RDONLY);
+    if (fd > 0)
     {
-        window = (struct _vdkPrivate::_Window *) malloc(
-                sizeof (struct _vdkPrivate::_Window));
+        ssize_t len = read(fd, name, 64);
 
-        if (window == NULL)
+        if (len > 0)
         {
-            break;
+            name[len] = '\0';
         }
 
-        memset(window, 0, sizeof (struct _vdkPrivate::_Window));
-
-        /* Composition mode. */
-        if (_vdk->mode == 0)
-        {
-            /* Create surface control. */
-#if ANDROID_SDK_VERSION < 14
-            window->control = _vdk->session->createSurface(
-                    getpid(), 0, Width, Height, display->format);
-#elif ANDROID_SDK_VERSION <= 16
-            window->control = _vdk->session->createSurface(
-                    0, Width, Height, display->format);
-#else
-            window->control = _vdk->session->createSurface(
-                    String8("vdk Surface"), Width, Height, display->format, 0);
-#endif
-
-            /* Set Z order and position. */
-#if ANDROID_SDK_VERSION < 14
-            _vdk->session->openTransaction();
-#else
-            SurfaceComposerClient::openGlobalTransaction();
-#endif
-            window->control->setLayer(0x40000000);
-            window->control->setPosition(X, Y);
-
-#if ANDROID_SDK_VERSION < 14
-            _vdk->session->closeTransaction();
-#else
-            SurfaceComposerClient::closeGlobalTransaction();
-#endif
-            /* Get surface. */
-            window->surface = window->control->getSurface();
-
-            /* Save parameters. */
-            window->x      = X;
-            window->y      = Y;
-
-#if ANDROID_SDK_VERSION >= 18
-            int format;
-            ANativeWindow * anw;
-
-            anw = static_cast<ANativeWindow *>(window->surface.get());
-            anw->query(anw, NATIVE_WINDOW_DEFAULT_WIDTH,  &window->width);
-            anw->query(anw, NATIVE_WINDOW_DEFAULT_HEIGHT, &window->height);
-            anw->query(anw, NATIVE_WINDOW_FORMAT, &format);
-
-            switch (format)
-            {
-            case HAL_PIXEL_FORMAT_RGBA_8888:
-            case HAL_PIXEL_FORMAT_RGBX_8888:
-            case HAL_PIXEL_FORMAT_BGRA_8888:
-                window->bpp = 32;
-                break;
-
-            case HAL_PIXEL_FORMAT_RGB_888:
-                window->bpp = 24;
-                break;
-
-#if (ANDROID_SDK_VERSION < 19)
-            case HAL_PIXEL_FORMAT_RGBA_5551:
-            case HAL_PIXEL_FORMAT_RGBA_4444:
-#endif
-            case HAL_PIXEL_FORMAT_RGB_565:
-                window->bpp = 16;
-                break;
-
-            default:
-                window->bpp = 0;
-                break;
-            }
-#else
-            Surface::SurfaceInfo info;
-
-            window->surface->lock(&info);
-            window->surface->unlockAndPost();
-
-            window->width  = info.w;
-            window->height = info.h;
-            window->bpp    = display->bpp;
-#endif
-
-            /* Add to window list. */
-            window->next      = _vdk->window_list;
-            _vdk->window_list = window;
-
-            return (vdkWindow) (android_native_window_t *) window->surface.get();
-        }
-        else
-        /* Framebuffer mode. */
-        {
-            if (_vdk->window_list != NULL)
-            {
-                /* Can only create one window instance in fb mode. */
-                break;
-            }
-
-            /* Save dummy window info. */
-            window->control = NULL;
-            window->surface = NULL;
-            window->x       = 0;
-            window->y       = 0;
-            window->width   = display->width;
-            window->height  = display->height;
-            window->bpp     = display->bpp;
-            window->next    = NULL;
-
-            _vdk->window_list = window;
-
-            return (vdkWindow) (android_native_window_t *) _vdk->framebuffer.get();
-        }
-    }
-    while (0);
-
-    if (window != NULL)
-    {
-        free(window);
+        close(fd);
     }
 
-    return NULL;
+    return manager->createWindow(name, X, Y, Width, Height, format);
 }
 
 VDKAPI int VDKLANG
@@ -874,69 +829,69 @@ vdkGetWindowInfo(
     unsigned int * Offset
     )
 {
-    struct _vdkPrivate::_Window * window = NULL;
+    int x, y;
+    int width, height;
+    int format;
+    int ret;
 
-    if ((Window == NULL)
-    ||  (_vdk == NULL)
-    ||  (_vdk->window_list == NULL)
-    )
-    {
+    Manager * manager = Manager::getInstance();
+
+    ret = manager->getWindowInfo((ANativeWindow *) Window, &x, &y, &width, &height, &format);
+
+    if (!ret)
         return 0;
-    }
 
-    window = _vdk->window_list;
-
-    if (_vdk->mode == 0)
+    if (X != NULL)
     {
-        /* Composition mode. */
-        while (window != NULL)
-        {
-            if (Window == (vdkWindow) (android_native_window_t *)
-                    window->surface.get())
-            {
-                break;
-            }
-
-            window = window->next;
-        }
+        *X = x;
     }
 
-    if (window != NULL)
+    if (Y != NULL)
     {
-        if (X != NULL)
-        {
-            *X = window->x;
-        }
-
-        if (Y != NULL)
-        {
-            *Y = window->y;
-        }
-
-        if (Width != NULL)
-        {
-            *Width = window->width;
-        }
-
-        if (Height != NULL)
-        {
-            *Height = window->height;
-        }
-
-        if (BitsPerPixel != NULL)
-        {
-            *BitsPerPixel = window->bpp;
-        }
-
-        if (Offset != NULL)
-        {
-            *Offset = 0;
-        }
-
-        return 1;
+        *Y = y;
     }
 
-    return 0;
+    if (Width != NULL)
+    {
+        *Width = width;
+    }
+
+    if (Height != NULL)
+    {
+        *Height = height;
+    }
+
+    if (BitsPerPixel != NULL)
+    {
+        switch (format)
+        {
+        case PIXEL_FORMAT_RGBA_8888:
+        case PIXEL_FORMAT_RGBX_8888:
+        case PIXEL_FORMAT_BGRA_8888:
+            *BitsPerPixel = 32;
+            break;
+
+        case PIXEL_FORMAT_RGB_888:
+            *BitsPerPixel = 24;
+            break;
+
+        case PIXEL_FORMAT_RGB_565:
+        case PIXEL_FORMAT_RGBA_5551:
+        case PIXEL_FORMAT_RGBA_4444:
+            *BitsPerPixel = 16;
+            break;
+
+        default:
+            return 0;
+        }
+    }
+
+    if (Offset != NULL)
+    {
+        *Offset = 0;
+    }
+
+    return 1;
 }
 
 VDKAPI void VDKLANG
@@ -944,64 +899,8 @@ vdkDestroyWindow(
     vdkWindow Window
     )
 {
-    struct _vdkPrivate::_Window * window = NULL;
-
-    if ((Window == NULL)
-    ||  (_vdk == NULL)
-    ||  (_vdk->window_list == NULL)
-    )
-    {
-        return;
-    }
-
-    window = _vdk->window_list;
-
-    /* Composition mode. */
-    if (_vdk->mode == 0)
-    {
-        while (window != NULL)
-        {
-            if (Window == (vdkWindow) (android_native_window_t *)
-                    window->surface.get())
-            {
-                break;
-            }
-
-            window = window->next;
-        }
-
-        if (window != NULL)
-        {
-            window->control.clear();
-            window->surface.clear();
-
-            if (window == _vdk->window_list)
-            {
-                _vdk->window_list = window->next;
-            }
-            else
-            {
-                struct _vdkPrivate::_Window * last = _vdk->window_list;
-
-                while (last->next != window)
-                {
-                    last = last->next;
-                }
-
-                /* Remove window from list. */
-                last->next = window->next;
-            }
-
-            free(window);
-        }
-    }
-    else
-    /* Framebuffer mode. */
-    {
-        /* Nothing to do. */
-        _vdk->window_list = NULL;
-        free(window);
-    }
+    Manager * manager = Manager::getInstance();
+    manager->destroyWindow((ANativeWindow *) Window);
 }
 
 VDKAPI int VDKLANG
@@ -1036,22 +935,6 @@ vdkSetWindowTitle(
     (void) Title;
 }
 
-VDKAPI int VDKLANG
-vdkDrawImage(
-    vdkWindow Window,
-    int Left,
-    int Top,
-    int Right,
-    int Bottom,
-    int Width,
-    int Height,
-    int BitsPerPixel,
-    void * Bits
-    )
-{
-    return 0;
-}
-
 VDKAPI void VDKLANG
 vdkCapturePointer(
     vdkWindow Window
@@ -1082,12 +965,12 @@ vdkGetAddress(
     const char * Function
     )
 {
-    if ((Private == NULL) || (Private->egl == NULL))
+    if (_egl == NULL)
     {
         return NULL;
     }
 
-    return (EGL_ADDRESS) dlsym(Private->egl, Function);
+    return (EGL_ADDRESS) dlsym(_egl, Function);
 }
 
 /*******************************************************************************
@@ -1157,34 +1040,10 @@ vdkDestroyPixmap(
     printf("Warning: Pixmap is not supported on android.\n");
 }
 
-VDKAPI int VDKLANG
-vdkDrawPixmap(
-    vdkPixmap Pixmap,
-    int Left,
-    int Top,
-    int Right,
-    int Bottom,
-    int Width,
-    int Height,
-    int BitsPerPixel,
-    void * Bits
-    )
-{
-    return 0;
-}
 
 /*******************************************************************************
 ** ClientBuffers. **************************************************************
 */
-
-/* GL_VIV_direct_texture */
-#ifndef GL_VIV_direct_texture
-#define GL_VIV_YV12                     0x8FC0
-#define GL_VIV_NV12                     0x8FC1
-#define GL_VIV_YUY2                     0x8FC2
-#define GL_VIV_UYVY                     0x8FC3
-#define GL_VIV_NV21                     0x8FC4
-#endif
 
 VDKAPI vdkClientBuffer VDKLANG
 vdkCreateClientBuffer(

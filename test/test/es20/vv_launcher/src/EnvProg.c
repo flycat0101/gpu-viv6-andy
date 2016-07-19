@@ -33,61 +33,61 @@
 
 EnvProg* EnvProgConstruct()
 {
-	EnvProg* ep = (EnvProg*)malloc(sizeof (EnvProg));
-	if (ep == NULL)
-	{
-		return NULL;
-	}
+    EnvProg* ep = (EnvProg*)malloc(sizeof (EnvProg));
+    if (ep == NULL)
+    {
+        return NULL;
+    }
 
-	ep->pos_attr = -1;
-	ep->proj_unif = -1;
-	ep->env_unif = -1;
-	ep->env_tex_unif = -1;
+    ep->pos_attr = -1;
+    ep->proj_unif = -1;
+    ep->env_unif = -1;
+    ep->env_tex_unif = -1;
 
-	ep->prog = LoadProgram("env.vert", "env.frag");
-	ShaderProgramUse(ep->prog);
+    ep->prog = LoadProgram("env.vert", "env.frag");
+    ShaderProgramUse(ep->prog);
 
-	if (ep->prog == NULL)
-	{
-		free(ep);
-		return NULL;
-	}
+    if (ep->prog == NULL)
+    {
+        free(ep);
+        return NULL;
+    }
 
-	ep->pos_attr = ShaderProgramGetAttribLoc(ep->prog, "pos_attr");
+    ep->pos_attr = ShaderProgramGetAttribLoc(ep->prog, "pos_attr");
 
-	ep->proj_unif = ShaderProgramGetUniformLoc(ep->prog, "proj_unif");
-	ep->env_unif = ShaderProgramGetUniformLoc(ep->prog, "env_unif");
+    ep->proj_unif = ShaderProgramGetUniformLoc(ep->prog, "proj_unif");
+    ep->env_unif = ShaderProgramGetUniformLoc(ep->prog, "env_unif");
 
-	ep->env_tex_unif = ShaderProgramGetUniformLoc(ep->prog, "env_tex_unif");
+    ep->env_tex_unif = ShaderProgramGetUniformLoc(ep->prog, "env_tex_unif");
 
-	return ep;
+    return ep;
 }
 
 
 void EnvProgDestroy(EnvProg* Env)
 {
-	assert(Env != NULL);
+    assert(Env != NULL);
 
-	ShaderProgramDestroy(Env->prog);
-	free(Env);
+    ShaderProgramDestroy(Env->prog);
+    free(Env);
 }
 
 
 void EnvProgUse(EnvProg* Env)
 {
-	ShaderProgramUse(Env->prog);
+    ShaderProgramUse(Env->prog);
 }
 
 
 
 void EnvProgSetProj(EnvProg* Env, const Matf* M)
 {
-	glUniformMatrix4fv(Env->proj_unif, 1, GL_FALSE, &M->m[0][0]);
+    glUniformMatrix4fv(Env->proj_unif, 1, GL_FALSE, &M->m[0][0]);
 }
 
 
 void EnvProgSetEnv(EnvProg* Env, const Matf* M)
 {
-	glUniformMatrix4fv(Env->env_unif, 1, GL_FALSE, &M->m[0][0]);
+    glUniformMatrix4fv(Env->env_unif, 1, GL_FALSE, &M->m[0][0]);
 }
 

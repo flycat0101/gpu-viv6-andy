@@ -48,10 +48,9 @@ CASELIST := AlphaBlending \
             source \
             AlphablendFilterblit \
             dither	\
-            cache	\
             benchmark	\
-			MultiSourceBlitRotation	\
-			AlphaBlendingYUV	\
+            MultiSourceBlitRotation	\
+            AlphaBlendingYUV	\
 
 
 ######################################################

@@ -342,7 +342,7 @@ gcoCL_AllocateMemory(
     gceSTATUS status;
     gctUINT bytes;
     gcsSURF_NODE_PTR node = gcvNULL;
-    gctUINT alignBytes = 64;
+    gctUINT alignBytes = 128;
 
     gcmHEADER_ARG("*Bytes=%lu", *Bytes);
 
@@ -368,7 +368,6 @@ gcoCL_AllocateMemory(
 
     node = pointer;
     /* for CL FP long16/ulong16 need 128 bytes alignment */
-    alignBytes = ((*Bytes)%128) == 0? 128: 64;
 
     gcmONERROR(gcsSURF_NODE_Construct(
         node,
@@ -1443,7 +1442,7 @@ gcoCL_QueryDeviceInfo(
 
 #if BUILD_OPENCL_FP
     gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
-    chipEnableFP = ((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008));
+    chipEnableFP = ((chipModel == gcv2500 && chipRevision == 0x5422) || (chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008));
     if(gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) && gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE)
         && (chipEnableFP == gcvTRUE))
     {

@@ -26,6 +26,8 @@
 *****************************************************************************/
 
 
+
+
 #include "PreComp.h"
 #include "font.h"
 #include "text.h"
@@ -36,130 +38,130 @@
 
 /*******************************************************************************
 **
-**	GetTextSize
+**    GetTextSize
 **
-**	Calculates the width and the height of the text.
+**    Calculates the width and the height of the text.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctUINT FontSelect
-**			Integer index in the font array.
+**        gctUINT FontSelect
+**            Integer index in the font array.
 **
-**		char * String
-**			A pointer to the text to draw.
+**        char * String
+**            A pointer to the text to draw.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		gctINT * TextWidth
-**		gctINT * TextHeight
-**			Points to the width and the height of the text in pixels.
+**        gctINT * TextWidth
+**        gctINT * TextHeight
+**            Points to the width and the height of the text in pixels.
 **
-**		gctINT * VerOffset
-**			Points to the vertical offset.
+**        gctINT * VerOffset
+**            Points to the vertical offset.
 */
 gceSTATUS GetTextSize(
-	IN gctUINT FontSelect,
-	IN char * String,
-	IN OUT gctINT * TextWidth,
-	IN OUT gctINT * TextHeight,
-	IN OUT gctINT * VerOffset
-	)
+    IN gctUINT FontSelect,
+    IN char * String,
+    IN OUT gctINT * TextWidth,
+    IN OUT gctINT * TextHeight,
+    IN OUT gctINT * VerOffset
+    )
 {
-	gcsFONTTABLE_PTR font;
-	gcsGLYPH_PTR curGlyph;
-	gctINT textWidth;
-	gctINT verOffset;
-	gctINT i;
+    gcsFONTTABLE_PTR font;
+    gcsGLYPH_PTR curGlyph;
+    gctINT textWidth;
+    gctINT verOffset;
+    gctINT i;
 
     gcmHEADER_ARG("FontSelect=%d String=0x%x TextWidth=0x%x TextHeight=0x%x VerOffset=0x%x",
                 FontSelect, String, TextWidth, TextHeight, VerOffset);
-	/* Verify the arguments. */
-	gcmVERIFY_ARGUMENT(String != gcvNULL);
-	gcmVERIFY_ARGUMENT(FontSelect < gcmCOUNTOF(fontTableIndex));
+    /* Verify the arguments. */
+    gcmVERIFY_ARGUMENT(String != gcvNULL);
+    gcmVERIFY_ARGUMENT(FontSelect < gcmCOUNTOF(fontTableIndex));
 
-	font = fontTableIndex[FontSelect];
+    font = fontTableIndex[FontSelect];
 
-	/* Compute combined width of the text. */
-	textWidth = 0;
-	verOffset = 0;
-	for (i = 0; String[i] != '\0'; i++)
-	{
-		curGlyph = &font->glyph[(gctUINT8) String[i]];
+    /* Compute combined width of the text. */
+    textWidth = 0;
+    verOffset = 0;
+    for (i = 0; String[i] != '\0'; i++)
+    {
+        curGlyph = &font->glyph[(gctUINT8) String[i]];
 
-		textWidth += curGlyph->cellIncX;
+        textWidth += curGlyph->cellIncX;
 
-		if (curGlyph->glyphOriginY > verOffset)
-		{
-			verOffset = curGlyph->glyphOriginY;
-		}
-	}
+        if (curGlyph->glyphOriginY > verOffset)
+        {
+            verOffset = curGlyph->glyphOriginY;
+        }
+    }
 
-	/* Set the result. */
-	if (TextWidth != gcvNULL)
-	{
-		*TextWidth = textWidth;
-	}
+    /* Set the result. */
+    if (TextWidth != gcvNULL)
+    {
+        *TextWidth = textWidth;
+    }
 
-	if (TextHeight != gcvNULL)
-	{
-		*TextHeight = font->height;
-	}
+    if (TextHeight != gcvNULL)
+    {
+        *TextHeight = font->height;
+    }
 
-	if (VerOffset != gcvNULL)
-	{
-		*VerOffset = verOffset;
-	}
+    if (VerOffset != gcvNULL)
+    {
+        *VerOffset = verOffset;
+    }
 
-	return gcvSTATUS_OK;
+    return gcvSTATUS_OK;
 }
 
 /*******************************************************************************
 **
-**	DrawString
+**    DrawString
 **
-**	Draws the specified text.
+**    Draws the specified text.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gco2D Engine
-**			Pointer to an gco2D object.
+**        gco2D Engine
+**            Pointer to an gco2D object.
 **
-**		gcoSURF DestSurface
-**			Pointer to the destination surface.
+**        gcoSURF DestSurface
+**            Pointer to the destination surface.
 **
-**		gcsRECT_PTR DestRect
-**			Destination rectangle.
+**        gcsRECT_PTR DestRect
+**            Destination rectangle.
 **
-**		gctUINT FontSelect
-**			Integer index in the font array.
+**        gctUINT FontSelect
+**            Integer index in the font array.
 **
-**		char * String
-**			A pointer to the text to draw.
+**        char * String
+**            A pointer to the text to draw.
 **
-**		TEXT_OPTIONS Options
-*			A combination of TEXT_OPTIONS flags.
+**        TEXT_OPTIONS Options
+*            A combination of TEXT_OPTIONS flags.
 **
-**		gctUINT32 FgColor
-**			Foreground color for the text.
+**        gctUINT32 FgColor
+**            Foreground color for the text.
 **
-**		gctUINT32 BgColor
-**			Background color for the text.
+**        gctUINT32 BgColor
+**            Background color for the text.
 **
-**		gcoBRUSH Brush
-**			Brush to use with the text.
+**        gcoBRUSH Brush
+**            Brush to use with the text.
 **
-**		gctUINT8 FgRop
-**			Foreground ROP.
+**        gctUINT8 FgRop
+**            Foreground ROP.
 **
-**		gctUINT8 BgRop
-**			Background ROP.
+**        gctUINT8 BgRop
+**            Background ROP.
 **
-**		gceSURF_TRANSPARENCY Transparency
-**			Text transparency.
+**        gceSURF_TRANSPARENCY Transparency
+**            Text transparency.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 */
 
 static gctUINT32 ReorderTo32(gctUINT8 *buf)
@@ -169,271 +171,271 @@ static gctUINT32 ReorderTo32(gctUINT8 *buf)
 }
 
 gceSTATUS DrawString(
-	IN gco2D Engine,
-	IN gcoSURF DestSurface,
-	IN gcsRECT_PTR DestRect,
-	IN gctUINT FontSelect,
-	IN char * String,
-	IN TEXT_OPTIONS Options,
-	IN gctUINT32 FgColor,
-	IN gctUINT32 BgColor,
-	IN gcoBRUSH Brush,
-	IN gctUINT8 FgRop,
-	IN gctUINT8 BgRop,
-	IN gceSURF_TRANSPARENCY Transparency
-	)
+    IN gco2D Engine,
+    IN gcoSURF DestSurface,
+    IN gcsRECT_PTR DestRect,
+    IN gctUINT FontSelect,
+    IN char * String,
+    IN TEXT_OPTIONS Options,
+    IN gctUINT32 FgColor,
+    IN gctUINT32 BgColor,
+    IN gcoBRUSH Brush,
+    IN gctUINT8 FgRop,
+    IN gctUINT8 BgRop,
+    IN gceSURF_TRANSPARENCY Transparency
+    )
 {
-	gceSTATUS status;
-	gcsFONTTABLE_PTR font;
-	gcsGLYPH_PTR curGlyph;
-	gcsRECT clipRect;
-	gcsRECT destRect;
-	gctUINT8 * glyphData;
-	gcsPOINT glyphSize;
-	gctINT textWidth, textHeight;
-	gctINT verOffset;
-	gctINT x, y;
-	gctINT i;
+    gceSTATUS status;
+    gcsFONTTABLE_PTR font;
+    gcsGLYPH_PTR curGlyph;
+    gcsRECT clipRect;
+    gcsRECT destRect;
+    gctUINT8 * glyphData;
+    gcsPOINT glyphSize;
+    gctINT textWidth, textHeight;
+    gctINT verOffset;
+    gctINT x, y;
+    gctINT i;
 
-	/* Verify the arguments. */
+    /* Verify the arguments. */
     gcmHEADER_ARG("String=0x%x, DestRect=0x%x", String, DestRect);
-	gcmVERIFY_ARGUMENT(String != gcvNULL);
-	gcmVERIFY_ARGUMENT(DestRect != gcvNULL);
-	gcmVERIFY_ARGUMENT(FontSelect < gcmCOUNTOF(fontTableIndex));
+    gcmVERIFY_ARGUMENT(String != gcvNULL);
+    gcmVERIFY_ARGUMENT(DestRect != gcvNULL);
+    gcmVERIFY_ARGUMENT(FontSelect < gcmCOUNTOF(fontTableIndex));
 
-	do
-	{
-		/* Get the size of the text. */
-		gcmERR_BREAK(GetTextSize(FontSelect, String,
-							  &textWidth, &textHeight, &verOffset));
+    do
+    {
+        /* Get the size of the text. */
+        gcmERR_BREAK(GetTextSize(FontSelect, String,
+                              &textWidth, &textHeight, &verOffset));
 
-		/* Shortcut to the font. */
-		font = fontTableIndex[FontSelect];
+        /* Shortcut to the font. */
+        font = fontTableIndex[FontSelect];
 
-		/* Determine horizontal position. */
-		switch (Options & HORIZONTAL_TEXT_ALIGNMENT)
-		{
-		case LEFT_TEXT:
-			x = DestRect->left;
-			break;
+        /* Determine horizontal position. */
+        switch (Options & HORIZONTAL_TEXT_ALIGNMENT)
+        {
+        case LEFT_TEXT:
+            x = DestRect->left;
+            break;
 
-		case HCENTER_TEXT:
-			x = DestRect->left
-			  + (DestRect->right - DestRect->left - textWidth) / 2;
-			break;
+        case HCENTER_TEXT:
+            x = DestRect->left
+              + (DestRect->right - DestRect->left - textWidth) / 2;
+            break;
 
-		case RIGHT_TEXT:
-			x = DestRect->right - textWidth;
-			break;
+        case RIGHT_TEXT:
+            x = DestRect->right - textWidth;
+            break;
 
-		default:
-			return gcvSTATUS_INVALID_ARGUMENT;
-		}
+        default:
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
 
-		/* Determine vertical position. */
-		switch (Options & VERTICAL_TEXT_ALIGNMENT)
-		{
-		case TOP_TEXT:
-			y = DestRect->top;
-			break;
+        /* Determine vertical position. */
+        switch (Options & VERTICAL_TEXT_ALIGNMENT)
+        {
+        case TOP_TEXT:
+            y = DestRect->top;
+            break;
 
-		case VCENTER_TEXT:
-			y = DestRect->top
-			  + (DestRect->bottom - DestRect->top - textHeight) / 2;
-			break;
+        case VCENTER_TEXT:
+            y = DestRect->top
+              + (DestRect->bottom - DestRect->top - textHeight) / 2;
+            break;
 
-		case BOTTOM_TEXT:
-			y = DestRect->bottom - textHeight;
-			break;
+        case BOTTOM_TEXT:
+            y = DestRect->bottom - textHeight;
+            break;
 
-		default:
-			return gcvSTATUS_INVALID_ARGUMENT;
-		}
+        default:
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
 
-		y += verOffset;
+        y += verOffset;
 
-		/* Set clipping rectangle to the destination. */
-		clipRect.left   = DestRect->left;
-		clipRect.top    = DestRect->top;
-		clipRect.right  = DestRect->right;
-		clipRect.bottom = DestRect->bottom;
+        /* Set clipping rectangle to the destination. */
+        clipRect.left   = DestRect->left;
+        clipRect.top    = DestRect->top;
+        clipRect.right  = DestRect->right;
+        clipRect.bottom = DestRect->bottom;
 
-		/* Adjust for shadows. */
-		if (Options & SHADOW_TEXT)
-		{
-			/* Adjust the origin.  */
-			x += SHADOW_OFFSET;
-			y += SHADOW_OFFSET;
+        /* Adjust for shadows. */
+        if (Options & SHADOW_TEXT)
+        {
+            /* Adjust the origin.  */
+            x += SHADOW_OFFSET;
+            y += SHADOW_OFFSET;
 
-			/* Adjust clipping. */
-			clipRect.left   += SHADOW_OFFSET;
-			clipRect.top    += SHADOW_OFFSET;
-			clipRect.right  += SHADOW_OFFSET;
-			clipRect.bottom += SHADOW_OFFSET;
-		}
+            /* Adjust clipping. */
+            clipRect.left   += SHADOW_OFFSET;
+            clipRect.top    += SHADOW_OFFSET;
+            clipRect.right  += SHADOW_OFFSET;
+            clipRect.bottom += SHADOW_OFFSET;
+        }
 
-		/* Set clipping. */
-		gcmERR_BREAK(gco2D_SetClipping(Engine, &clipRect));
+        /* Set clipping. */
+        gcmERR_BREAK(gco2D_SetClipping(Engine, &clipRect));
 
-		/* Assume success. */
-		status = gcvSTATUS_OK;
+        /* Assume success. */
+        status = gcvSTATUS_OK;
 
-		/* Go through the string character by character. */
-		for (i = 0; String[i] != '\0'; i++)
-		{
-			curGlyph = &font->glyph[(gctUINT8) String[i]];
+        /* Go through the string character by character. */
+        for (i = 0; String[i] != '\0'; i++)
+        {
+            curGlyph = &font->glyph[(gctUINT8) String[i]];
 
-			if (curGlyph->size)
-			{
-				gctUINT j;
-				gctUINT glyphDataSize = curGlyph->size;
+            if (curGlyph->size)
+            {
+                gctUINT j;
+                gctUINT glyphDataSize = curGlyph->size;
 
-				/* Compute the glyph location. */
-				glyphData = (gctUINT8 *)malloc(glyphDataSize);
-				memcpy(glyphData, font->data + curGlyph->offset, glyphDataSize);
+                /* Compute the glyph location. */
+                glyphData = (gctUINT8 *)malloc(glyphDataSize);
+                memcpy(glyphData, font->data + curGlyph->offset, glyphDataSize);
 
-        		for (j = 0; j < glyphDataSize / sizeof(gctUINT32); j++)
-        		{
-                		gctUINT32 *p = (gctUINT32 *)glyphData;
-                		p[j] = (gctUINT32)ReorderTo32((gctUINT8 *)&p[j]);
-        		}
+                for (j = 0; j < glyphDataSize / sizeof(gctUINT32); j++)
+                {
+                        gctUINT32 *p = (gctUINT32 *)glyphData;
+                        p[j] = (gctUINT32)ReorderTo32((gctUINT8 *)&p[j]);
+                }
 
 
 
-				/* Init destination rectangle. */
-				destRect.left   = x + curGlyph->glyphOriginX;
-				destRect.top    = y - curGlyph->glyphOriginY;
-				destRect.right  = destRect.left + curGlyph->blackBoxX;
-				destRect.bottom = destRect.top  + curGlyph->blackBoxY;
+                /* Init destination rectangle. */
+                destRect.left   = x + curGlyph->glyphOriginX;
+                destRect.top    = y - curGlyph->glyphOriginY;
+                destRect.right  = destRect.left + curGlyph->blackBoxX;
+                destRect.bottom = destRect.top  + curGlyph->blackBoxY;
 
-				/* Init the size of the glyph bitmap. */
-				glyphSize.x = curGlyph->blackBoxX;
-				glyphSize.y = curGlyph->blackBoxY;
+                /* Init the size of the glyph bitmap. */
+                glyphSize.x = curGlyph->blackBoxX;
+                glyphSize.y = curGlyph->blackBoxY;
 
-				/* Execute the blit. */
-				gcmERR_BREAK(gcoSURF_MonoBlit(
-					DestSurface,
-					glyphData,
-					gcvSURF_PACKED32,
-					&glyphSize,
-					gcvNULL,
-					&destRect,
-					Brush,
-					FgRop, BgRop,
-					gcvTRUE,
-					0, Transparency,
-					FgColor, BgColor
-					));
+                /* Execute the blit. */
+                gcmERR_BREAK(gcoSURF_MonoBlit(
+                    DestSurface,
+                    glyphData,
+                    gcvSURF_PACKED32,
+                    &glyphSize,
+                    gcvNULL,
+                    &destRect,
+                    Brush,
+                    FgRop, BgRop,
+                    gcvTRUE,
+                    0, Transparency,
+                    FgColor, BgColor
+                    ));
 
-				x += curGlyph->cellIncX;
-				y += curGlyph->cellIncY;
+                x += curGlyph->cellIncX;
+                y += curGlyph->cellIncY;
 
-				free(glyphData);
-			}
-			else
-			{
-				x += curGlyph->cellIncX;
-				y += curGlyph->cellIncY;
-			}
-		}
-	}
-	while (gcvFALSE);
+                free(glyphData);
+            }
+            else
+            {
+                x += curGlyph->cellIncX;
+                y += curGlyph->cellIncY;
+            }
+        }
+    }
+    while (gcvFALSE);
 
-	/* Return status. */
-	return status;
+    /* Return status. */
+    return status;
 }
 
 /*******************************************************************************
 **
-**	DrawShadowedString
+**    DrawShadowedString
 **
-**	Draws the specified text with a shadow.
+**    Draws the specified text with a shadow.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gco2D Engine
-**			Pointer to an gco2D object.
+**        gco2D Engine
+**            Pointer to an gco2D object.
 **
-**		gcoSURF DestSurface
-**			Pointer to the destination surface.
+**        gcoSURF DestSurface
+**            Pointer to the destination surface.
 **
-**		gcsRECT_PTR DestRect
-**			Destination rectangle.
+**        gcsRECT_PTR DestRect
+**            Destination rectangle.
 **
-**		gctUINT FontSelect
-**			Integer index in the font array.
+**        gctUINT FontSelect
+**            Integer index in the font array.
 **
-**		char * String
-**			A pointer to the text to draw.
+**        char * String
+**            A pointer to the text to draw.
 **
-**		TEXT_OPTIONS Options
-*			A combination of TEXT_OPTIONS flags.
+**        TEXT_OPTIONS Options
+*            A combination of TEXT_OPTIONS flags.
 **
-**		gctUINT32 TextColor
-**			Color of the text.
+**        gctUINT32 TextColor
+**            Color of the text.
 **
-**		gctUINT32 ShadowColor
-**			Shadow color of the text.
+**        gctUINT32 ShadowColor
+**            Shadow color of the text.
 **
-**		gcoBRUSH Brush
-**			Brush to use with the text.
+**        gcoBRUSH Brush
+**            Brush to use with the text.
 **
-**		gctUINT8 FgRop
-**			Foreground ROP.
+**        gctUINT8 FgRop
+**            Foreground ROP.
 **
-**		gctUINT8 BgRop
-**			Background ROP.
+**        gctUINT8 BgRop
+**            Background ROP.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 */
 gceSTATUS DrawShadowedString(
-	IN gco2D Engine,
-	IN gcoSURF DestSurface,
-	IN gcsRECT_PTR DestRect,
-	IN gctUINT FontSelect,
-	IN char * String,
-	IN TEXT_OPTIONS Options,
-	IN gctUINT32 TextColor,
-	IN gctUINT32 ShadowColor,
-	IN gcoBRUSH Brush,
-	IN gctUINT8 FgRop,
-	IN gctUINT8 BgRop
-	)
+    IN gco2D Engine,
+    IN gcoSURF DestSurface,
+    IN gcsRECT_PTR DestRect,
+    IN gctUINT FontSelect,
+    IN char * String,
+    IN TEXT_OPTIONS Options,
+    IN gctUINT32 TextColor,
+    IN gctUINT32 ShadowColor,
+    IN gcoBRUSH Brush,
+    IN gctUINT8 FgRop,
+    IN gctUINT8 BgRop
+    )
 {
-	gceSTATUS status;
+    gceSTATUS status;
 
-	do
-	{
-		/* Draw the shadow first. */
-		gcmERR_BREAK(DrawString(Engine,
-							 DestSurface,
-							 DestRect,
-							 FontSelect,
-							 String,
-							 Options | SHADOW_TEXT,
-							 ShadowColor,
-							 ~0,					/* Not using bg color. */
-							 gcvNULL,
-							 0xCC, 0xAA,
-							 gcvSURF_SOURCE_MATCH));
+    do
+    {
+        /* Draw the shadow first. */
+        gcmERR_BREAK(DrawString(Engine,
+                             DestSurface,
+                             DestRect,
+                             FontSelect,
+                             String,
+                             Options | SHADOW_TEXT,
+                             ShadowColor,
+                             ~0,                    /* Not using bg color. */
+                             gcvNULL,
+                             0xCC, 0xAA,
+                             gcvSURF_SOURCE_MATCH));
 
-		/* Now draw the text in foreground color. */
-		gcmERR_BREAK(DrawString(Engine,
-							 DestSurface,
-							 DestRect,
-							 FontSelect,
-							 String,
-							 Options & ~SHADOW_TEXT,
-							 TextColor,
-							 ~0,					/* Not using bg color. */
-							 Brush,
-							 FgRop, BgRop,
-							 gcvSURF_SOURCE_MATCH));
-	}
-	while (gcvFALSE);
+        /* Now draw the text in foreground color. */
+        gcmERR_BREAK(DrawString(Engine,
+                             DestSurface,
+                             DestRect,
+                             FontSelect,
+                             String,
+                             Options & ~SHADOW_TEXT,
+                             TextColor,
+                             ~0,                    /* Not using bg color. */
+                             Brush,
+                             FgRop, BgRop,
+                             gcvSURF_SOURCE_MATCH));
+    }
+    while (gcvFALSE);
 
-	/* Return status. */
-	return status;
+    /* Return status. */
+    return status;
 }

@@ -37,16 +37,16 @@
 
 const char *kernel_const_constant_enum =
 "#ifndef _TYPES2_H_                                                                                                                 \n"
-"#define _TYPES2_H_																												   \n"
-"																																   \n"
-"#ifdef __OPENCL_VERSION__																										   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
-"#else // __OPENCL_VERSION__																									   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType									   \n"
-"#endif // __OPENCL_VERSION__																									   \n"
-"																																   \n"
-"ALIGNED_STRUCT(enum, 32) InputA {																							       \n"
-"    volatile_e,_restrict_e,const_e																													   \n"
+"#define _TYPES2_H_                                                                                                                   \n"
+"                                                                                                                                   \n"
+"#ifdef __OPENCL_VERSION__                                                                                                           \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))                               \n"
+"#else // __OPENCL_VERSION__                                                                                                       \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType                                       \n"
+"#endif // __OPENCL_VERSION__                                                                                                       \n"
+"                                                                                                                                   \n"
+"ALIGNED_STRUCT(enum, 32) InputA {                                                                                                   \n"
+"    volatile_e,_restrict_e,const_e                                                                                                                       \n"
 "};                                                                                                                                \n"
 "                                                                                                                                  \n"
 "                                                                                                                                  \n"
@@ -55,7 +55,7 @@ const char *kernel_const_constant_enum =
 "};                                                                                                                                \n"
 "                                                                                                                                  \n"
 "#endif // _TYPES_H_                                                                                                               \n"
-"__constant int in1 = 2;										                                                           \n"
+"__constant int in1 = 2;                                                                                                   \n"
 "__kernel void sum(__constant const enum InputA* a,__global enum Result* c, int iNumElements)\n"
 "{                                                                                                                                 \n"
 "    // get index into global data array                                                                                           \n"
@@ -64,10 +64,10 @@ const char *kernel_const_constant_enum =
 "    // bound check (equivalent to the limit on a 'for' loop for standard/serial C code                                            \n"
 "                                                                                                                                \n"
 "    const float in2 = 2.5;                                                                                                                                \n"
-"																																   \n"
-"		                                                                                            \n"
+"                                                                                                                                   \n"
+"                                                                                                    \n"
 "       c[tid] = a[tid] + in1*in2;                                                                                                                           \n"
-"																															   \n"
+"                                                                                                                               \n"
 "}                                                                                                                                 \n";
 
 class TestCase {
@@ -117,8 +117,8 @@ public:
         _deviceResult = cl::Buffer(_context, CL_MEM_WRITE_ONLY, sizeof(Result) * _globalWorkSize);
 
         _kernel.setArg(0,sizeof (_deviceInputA), &_deviceInputA);
-		_kernel.setArg(1,sizeof (_deviceResult), &_deviceResult);
-		_kernel.setArg(2,sizeof (_numElements), &_numElements);
+        _kernel.setArg(1,sizeof (_deviceResult), &_deviceResult);
+        _kernel.setArg(2,sizeof (_numElements), &_numElements);
     }
 
     virtual bool Execute()
@@ -146,7 +146,7 @@ private:
     void _computeGoldStandard()
     {
         for (int i = 0; i < _numElements; i++) {
-			_goldStandard[i] = test3;
+            _goldStandard[i] = test3;
         }
     }
 
@@ -164,8 +164,8 @@ private:
     {
         for (int i = 0; i < _numElements; ++i) {
             if (_goldStandard[i] + 5 != _result[i]) {
-				//std::cout << "c:" << _goldStandard[i] << "ocl:" << _result[i] << std::endl;
-				return false;
+                //std::cout << "c:" << _goldStandard[i] << "ocl:" << _result[i] << std::endl;
+                return false;
             }
 
 
@@ -193,7 +193,7 @@ private:
 int const_constant_enum(void)
 {
     cl_int err = CL_SUCCESS;
-	int cnt = 1;
+    int cnt = 1;
 
     try {
         std::vector<cl::Platform> platforms;
@@ -209,7 +209,7 @@ int const_constant_enum(void)
 
         std::vector<cl::Device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
 
-
+        
         const char* clProgramSource = kernel_const_constant_enum;//oclLoadProgSource("multiply.cl", "", &szKernelLength);
         if (clProgramSource == 0) {
             std::cerr << "OpenCL program not found." << std::endl;
@@ -233,13 +233,13 @@ int const_constant_enum(void)
         std::cout << "Running test const_constant_enum..." << std::endl;
         TestCase_const_constant_enum const_constant_enum(10, program_, context, devices);
 
-		bool control = true;
+        bool control = true;
         const_constant_enum.SetUp();
         for (int i = 0; i < 10; ++i) {
-			if(!const_constant_enum.Execute()){
-				control = false;
-				cnt = 0;
-			}
+            if(!const_constant_enum.Execute()){
+                control = false;
+                cnt = 0;
+            }
             std::cout << "RUN " << i + 1<< ": " << (control ? "PASSED" : "FAILED!") << std::endl;
         }
         const_constant_enum.TearDown();

@@ -40,19 +40,19 @@ extern "C" {
 
 typedef struct _ChicletProg
 {
-	int pos_attr;
-	int norm_attr;
+    int pos_attr;
+    int norm_attr;
 
-	int light_unif;
-	int proj_unif;
-	int modelview_unif;
-	int env_unif;
+    int light_unif;
+    int proj_unif;
+    int modelview_unif;
+    int env_unif;
 
-	int env_tex_unif;
-	int content_tex_unif;
-	int glass_tex_unif;
+    int env_tex_unif;
+    int content_tex_unif;
+    int glass_tex_unif;
 
-	ShaderProgram* prog;
+    ShaderProgram* prog;
 
 } ChicletProg;
 

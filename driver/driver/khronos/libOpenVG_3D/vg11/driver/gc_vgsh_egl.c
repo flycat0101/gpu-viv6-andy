@@ -60,13 +60,13 @@ _AddSurface(
     )
 {
     gctUINT32 address;
-    gctPOINTER memory;
+    gctPOINTER memory[3];
     gctUINT width, height;
     gctINT stride;
     gceSURF_FORMAT format;
 
     /* Lock the surface. */
-    gcmVERIFY_OK(gcoSURF_Lock(Surface, &address, &memory));
+    gcmVERIFY_OK(gcoSURF_Lock(Surface, &address, memory));
 
     /* Get the size of the surface. */
     gcmVERIFY_OK(gcoSURF_GetAlignedSize(Surface, &width, &height, &stride));
@@ -82,7 +82,7 @@ _AddSurface(
                                     stride * height));
 
     /* Unlock the surface. */
-    gcmVERIFY_OK(gcoSURF_Unlock(Surface, memory));
+    gcmVERIFY_OK(gcoSURF_Unlock(Surface, memory[0]));
 }
 #endif
 
@@ -878,7 +878,7 @@ veglCreateImageParentImage(
         khImage->u.vgimage.format = (gctUINT)vgimage_obj->internalColorDesc.format;
         khImage->u.vgimage.allowedQuality = (gctUINT)vgimage_obj->allowedQuality;
         khImage->u.vgimage.dirty = vgimage_obj->dirty;
-        khImage->u.vgimage.dirtyPtr = vgimage_obj->dirtyPtr;
+        khImage->u.vgimage.dirtyPtr = (khronos_int32_t *)vgimage_obj->dirtyPtr;
         khImage->u.vgimage.rootOffsetX = vgimage_obj->rootOffsetX;
         khImage->u.vgimage.rootOffsetY = vgimage_obj->rootOffsetY;
         khImage->u.vgimage.rootWidth = vgimage_obj->rootWidth;

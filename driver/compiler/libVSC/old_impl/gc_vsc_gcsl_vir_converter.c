@@ -4477,7 +4477,8 @@ _ConvSource2VirOperand(
         if (varSym)
         {
             gcmASSERT(VIR_Symbol_GetPrecision(sym) == VIR_Symbol_GetPrecision(varSym) ||
-                      VIR_Symbol_GetPrecision(varSym) == VIR_PRECISION_ANY);
+                      VIR_Symbol_GetPrecision(varSym) == VIR_PRECISION_ANY ||
+                      !VIR_Shader_IsFS(VirShader));
         }
         VIR_Operand_SetPrecision(VirSrc, srcPrecision);
 
@@ -5485,7 +5486,7 @@ _CmpInstuction(
     if((Inst0->opcode & 0xffff)  != Inst1->_opcode)
         return gcvFALSE;
 
-    if((gctUINT)((VIR_OpCode)vscHTBL_DirectGet(((VIR_PatternGCSL2VirContext *)Context)->externOpcodeTable, Inst1))
+    if((gctUINT)((VIR_OpCode)(gctUINTPTR_T)vscHTBL_DirectGet(((VIR_PatternGCSL2VirContext *)Context)->externOpcodeTable, Inst1))
         != (gctUINT)((Inst0->opcode & 0xf0000) >> 16))
         return gcvFALSE;
 

@@ -24,6 +24,7 @@ include $(AQROOT)/makefile.linux.def
 ################################################################################
 # Supply additional include directories.
 
+INCLUDE +=	-I$(AQROOT)/sdk/inc
 INCLUDE +=	-I$(AQROOT)/hal/inc
 INCLUDE +=	-I$(AQROOT)/hal/user
 INCLUDE +=	-I$(AQROOT)/hal/os/linux/user

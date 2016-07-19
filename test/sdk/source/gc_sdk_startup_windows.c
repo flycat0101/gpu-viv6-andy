@@ -33,84 +33,84 @@
 
 /*******************************************************************************
 **
-**	ivdkGetApplication
+**    ivdkGetApplication
 **
-**	Query a pointer to the applcation object.
+**    Query a pointer to the applcation object.
 **
-**	INPUT:
+**    INPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		gcsAPPLICATION_PTR
-**			Pointer to the applcation object.
+**        gcsAPPLICATION_PTR
+**            Pointer to the applcation object.
 */
 
 gcsAPPLICATION_PTR
 ivdkGetApplication(
-	void
-	)
+    void
+    )
 {
-	/* Define the application object. */
-	static struct _gcsAPPLICATION app = {0};
+    /* Define the application object. */
+    static struct _gcsAPPLICATION app = {0};
 
-	/* Return a pointer to the object. */
-	return &app;
+    /* Return a pointer to the object. */
+    return &app;
 }
 
 
 /*******************************************************************************
 **
-**	WinMain
+**    WinMain
 **
-**	Application entry point.
+**    Application entry point.
 **
-**	INPUT:
+**    INPUT:
 **
-**		HINSTANCE Instance
-**			Handle to the current instance of the application.
+**        HINSTANCE Instance
+**            Handle to the current instance of the application.
 **
-**		HINSTANCE PrevInstance
-**			Handle to the previous instance of the application.
+**        HINSTANCE PrevInstance
+**            Handle to the previous instance of the application.
 **
-**		LPTSTR CommandLine
-**			Pointer to a null-terminated string specifying the command line
-**			for the application, excluding the program name.
+**        LPTSTR CommandLine
+**            Pointer to a null-terminated string specifying the command line
+**            for the application, excluding the program name.
 **
-**		int Show
-**			Specifies how the window is to be shown.
+**        int Show
+**            Specifies how the window is to be shown.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		int
-**			Exit value.
+**        int
+**            Exit value.
 */
 
 int WINAPI
 WinMain(
-	IN HINSTANCE Instance,
-	IN HINSTANCE PrevInstance,
-	IN LPTSTR CommandLine,
-	IN int Show
-	)
+    IN HINSTANCE Instance,
+    IN HINSTANCE PrevInstance,
+    IN LPTSTR CommandLine,
+    IN int Show
+    )
 {
-	/* Get a pointer to the application object. */
-	gcsAPPLICATION_PTR app = ivdkGetApplication();
+    /* Get a pointer to the application object. */
+    gcsAPPLICATION_PTR app = ivdkGetApplication();
 
-	/* Init the object. */
-	app->instance    = Instance;
-	app->commandLine = CommandLine;
-	app->windowShow  = Show;
+    /* Init the object. */
+    app->instance    = Instance;
+    app->commandLine = CommandLine;
+    app->windowShow  = Show;
 
-	/* Run the application */
-	return vdkAppEntry();
+    /* Run the application */
+    return vdkAppEntry();
 }

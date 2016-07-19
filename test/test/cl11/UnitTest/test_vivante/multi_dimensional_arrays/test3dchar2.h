@@ -33,19 +33,19 @@
 
 class Test3DChar2: public MultiDimensionalArraysTest3D {
 public:
-	Test3DChar2(const size_t sizeX, const size_t sizeY, const size_t sizeZ);
-	~Test3DChar2();
+    Test3DChar2(const size_t sizeX, const size_t sizeY, const size_t sizeZ);
+    ~Test3DChar2();
 
 protected:
-	cl_char2* inputAHost;
-	cl_char2* inputBHost;
-	cl_char2* resultHost;
+    cl_char2* inputAHost;
+    cl_char2* inputBHost;
+    cl_char2* resultHost;
 
-	const int getMemSize() const;
-	void generateInput(const unsigned int &kernelIndex);
-	void* getInputAElement(const unsigned int &index) const;
-	void* getInputBElement(const unsigned int &index) const;
-	void* getResultElement(const unsigned int &index) const;
+    const int getMemSize() const;
+    void generateInput(const unsigned int &kernelIndex);
+    void* getInputAElement(const unsigned int &index) const;
+    void* getInputBElement(const unsigned int &index) const;
+    void* getResultElement(const unsigned int &index) const;
 };
 
 #endif /*_test3dchar2_h*/

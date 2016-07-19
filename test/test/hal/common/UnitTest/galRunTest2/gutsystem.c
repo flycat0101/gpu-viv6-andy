@@ -65,30 +65,30 @@ void sysOutput(const char *format, ...)
 gctHANDLE sysLoadModule(const gctSTRING modName)
 {
 #ifndef UNDER_CE
-	return LoadLibraryA(modName);
+    return LoadLibraryA(modName);
 #else
-	TCHAR	temp[MAX_BUFFER_SIZE + 1];
+    TCHAR    temp[MAX_BUFFER_SIZE + 1];
 
-	mbstowcs(temp, modName, MAX_BUFFER_SIZE + 1);
-	return LoadLibrary(temp);
+    mbstowcs(temp, modName, MAX_BUFFER_SIZE + 1);
+    return LoadLibrary(temp);
 
 #endif
 }
 
 gctBOOL sysUnloadModule(const gctHANDLE mod)
 {
-	return FreeLibrary(mod);
+    return FreeLibrary(mod);
 }
 
 gctPOINTER sysGetProcAddress(const gctHANDLE mod, gctSTRING ProName)
 {
 #ifndef UNDER_CE
-	return GetProcAddress(mod, ProName);
+    return GetProcAddress(mod, ProName);
 #else
-	TCHAR	temp[MAX_BUFFER_SIZE + 1];
+    TCHAR    temp[MAX_BUFFER_SIZE + 1];
 
-	mbstowcs(temp, ProName, MAX_BUFFER_SIZE + 1);
-	return GetProcAddress(mod, temp);
+    mbstowcs(temp, ProName, MAX_BUFFER_SIZE + 1);
+    return GetProcAddress(mod, temp);
 
 #endif
 }
@@ -96,18 +96,18 @@ gctPOINTER sysGetProcAddress(const gctHANDLE mod, gctSTRING ProName)
 gctUINT32 sysGetModuleName(const gctHANDLE mod, gctSTRING str, gctUINT32 size)
 {
 #ifndef UNDER_CE
-	return GetModuleFileNameA(mod, str, size);
+    return GetModuleFileNameA(mod, str, size);
 #else
-	TCHAR	temp[MAX_BUFFER_SIZE + 1];
-	gctUINT len;
+    TCHAR    temp[MAX_BUFFER_SIZE + 1];
+    gctUINT len;
 
-	if (size > MAX_BUFFER_SIZE + 1)
-		return 0;
+    if (size > MAX_BUFFER_SIZE + 1)
+        return 0;
 
-	len = GetModuleFileName(mod, temp, size);
-	wcstombs(str, temp, len);
+    len = GetModuleFileName(mod, temp, size);
+    wcstombs(str, temp, len);
 
-	return len;
+    return len;
 #endif
 }
 
@@ -116,28 +116,28 @@ DLL_API char CurrentModulePath[MAX_BUFFER_SIZE];
 #endif
 gctBOOL sysSetupLog(const gctSTRING CaseName)
 {
-	char path[MAX_BUFFER_SIZE + 1];
-	char * pos;
+    char path[MAX_BUFFER_SIZE + 1];
+    char * pos;
 
-	memset(path, 0, sizeof(char) * (MAX_BUFFER_SIZE + 1));
-	// Get the module path.
-	if (g_caseDll)
-	    sysGetModuleName(g_caseDll, path, MAX_BUFFER_SIZE);
-	else
-		return gcvFALSE;
+    memset(path, 0, sizeof(char) * (MAX_BUFFER_SIZE + 1));
+    // Get the module path.
+    if (g_caseDll)
+        sysGetModuleName(g_caseDll, path, MAX_BUFFER_SIZE);
+    else
+        return gcvFALSE;
 
-	// Find the last path seperator.
-	pos = strrchr(path, '\\');
+    // Find the last path seperator.
+    pos = strrchr(path, '\\');
     *(pos + 1) = '\0';
 
-	// Concatenate the file name.
+    // Concatenate the file name.
     strcpy(g_errorPath, path);
-	strcpy(g_resultPath, path);
-	strcpy(g_logPath, path);
-	strcpy(g_perfPath, path);
-	strcpy(g_bmpPath, path);
+    strcpy(g_resultPath, path);
+    strcpy(g_logPath, path);
+    strcpy(g_perfPath, path);
+    strcpy(g_bmpPath, path);
 #ifdef UNDER_CE
-	strcpy(CurrentModulePath, path);
+    strcpy(CurrentModulePath, path);
 #endif
 
     if (strcmp(g_errorPath, "") != 0) strcat(g_errorPath, "\\");
@@ -162,51 +162,51 @@ gctBOOL sysSetupLog(const gctSTRING CaseName)
 
     if (strcmp(g_bmpPath, "") != 0) strcat(g_bmpPath, "\\");
 
-	return gcvTRUE;
+    return gcvTRUE;
 }
 #if defined(UNDER_CE) && (UNDER_CE < 600)
-#define MAX_NUM_OF_PARAMETERS	20
+#define MAX_NUM_OF_PARAMETERS    20
 int main(int argc, char *argv[]);
 int _tmain(int argc, TCHAR *argv[], TCHAR *envp[])
 {
-	char *mbargv[MAX_NUM_OF_PARAMETERS];
-	int i;
-	int result = -1;
+    char *mbargv[MAX_NUM_OF_PARAMETERS];
+    int i;
+    int result = -1;
 
-	if (argc > MAX_NUM_OF_PARAMETERS)
-	{
-		sysOutput("The parameters are too much!!!");
-		return result;
-	}
+    if (argc > MAX_NUM_OF_PARAMETERS)
+    {
+        sysOutput("The parameters are too much!!!");
+        return result;
+    }
 
-	// convert the string to mb
-	for (i = 0; i < argc; i++)
-	{
-		int len = wcslen(argv[i]);
+    // convert the string to mb
+    for (i = 0; i < argc; i++)
+    {
+        int len = wcslen(argv[i]);
 
-		mbargv[i] = (char*)malloc(len + 1);
-		if (!mbargv[i])
-		{
-			sysOutput("Out of memory!!!");
-			result = -2;
-			goto EXIT;
-		}
+        mbargv[i] = (char*)malloc(len + 1);
+        if (!mbargv[i])
+        {
+            sysOutput("Out of memory!!!");
+            result = -2;
+            goto EXIT;
+        }
 
-		wcstombs(mbargv[i], argv[i], len);
-		mbargv[i][len] = '\0';
-	}
+        wcstombs(mbargv[i], argv[i], len);
+        mbargv[i][len] = '\0';
+    }
 
-	result = main(argc, mbargv);
+    result = main(argc, mbargv);
 
 EXIT:
-	// free the mb string
-	for (i = 0; i < argc; i++)
-	{
-		if (mbargv[i])
-		{
-			free(mbargv[i]);
-		}
-	}
+    // free the mb string
+    for (i = 0; i < argc; i++)
+    {
+        if (mbargv[i])
+        {
+            free(mbargv[i]);
+        }
+    }
 
     return result;
 }
@@ -222,29 +222,29 @@ void sysOutput(const char *format, ...)
 {
     va_list args;
 
-	va_start(args, format);
+    va_start(args, format);
     vprintf(format, args);
-	va_end(args);
+    va_end(args);
 }
 
 gctHANDLE sysLoadModule(const gctSTRING modName)
 {
-	return dlopen(modName, RTLD_LAZY);
+    return dlopen(modName, RTLD_LAZY);
 }
 
 gctBOOL sysUnloadModule(const gctHANDLE mod)
 {
-	return dlclose(mod);
+    return dlclose(mod);
 }
 
 gctPOINTER sysGetProcAddress(const gctHANDLE mod, gctSTRING ProName)
 {
-	return dlsym(mod, ProName);
+    return dlsym(mod, ProName);
 }
 
 gctUINT32 sysGetModuleName(const gctHANDLE mod, gctSTRING str, gctUINT32 size)
 {
-	return 0;
+    return 0;
 }
 
 gctBOOL sysSetupLog(const gctSTRING CaseName)
@@ -282,7 +282,7 @@ gctBOOL sysSetupLog(const gctSTRING CaseName)
 
     if (strcmp(g_bmpPath, "") != 0) strcat(g_bmpPath, "/");
 
-	return gcvTRUE;
+    return gcvTRUE;
 }
 
 #else

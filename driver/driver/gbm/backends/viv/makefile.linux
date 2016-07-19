@@ -1,0 +1,77 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+################################################################################
+# Include common definitions.
+include $(AQROOT)/makefile.linux.def
+
+TARGET_NAME   := gbm_viv.so
+TARGET_SONAME := gbm_viv.so
+
+TARGET_MODULE := $(OBJ_DIR)/$(TARGET_NAME)
+
+################################################################################
+# Installation directory.
+
+INSTALL_DIR = $(SDK_DIR)/drivers
+
+################################################################################
+# Add extra flags for object files.
+
+CFLAGS += -fPIC -Werror
+
+CFLAGS += -I../../main \
+          -I$(AQROOT)/hal/inc \
+          -I$(AQROOT)/hal/user \
+          -I$(AQROOT)/hal/os/linux/user \
+          -I$(AQROOT)/compiler/libVSC/include \
+		  -I$(ROOTFS)/usr/include/libdrm
+
+################################################################################
+# Define flags for the linker.
+
+LDFLAGS := $(LFLAGS) -Wl,-z,defs
+
+################################################################################
+# Supply necessary libraries.
+
+LDLIBS := -L$(SDK_DIR)/drivers -L$(AQROOT)/hal/user/$(OBJ_DIR) -l GAL
+LDLIBS += -ldrm
+
+################################################################################
+# Describe object files.
+
+OBJECTS := $(OBJ_DIR)/gbm_viv.o
+
+################################################################################
+# Define targets.
+
+.PHONY: all clean install
+all: $(TARGET_MODULE)
+
+clean:
+	@rm -rf $(OBJ_DIR)
+
+install: all
+	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
+
+$(TARGET_MODULE): $(OBJECTS)
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,$(TARGET_SONAME) -o $@ $(OBJECTS) $(LDLIBS)
+
+$(OBJ_DIR)/%.o: %.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -MMD -o $@ $<
+
+# object dependencies.
+-include $(OBJECTS:.o=.d)
+

@@ -979,7 +979,7 @@ DoReLink:
     }
 
 #if BUILD_OPENCL_FP
-    if(((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008)) && (reLinkNeed == gcvFALSE))
+    if(((chipModel == gcv2500 && chipRevision == 0x5422) || (chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008)) && (reLinkNeed == gcvFALSE))
     {
         gcoOS_Allocate(gcvNULL,  numToUpdate * gcmSIZEOF(clsArgument), &orgArgs);
         gcoOS_MemCopy(orgArgs, *Args, numToUpdate * gcmSIZEOF(clsArgument));
@@ -1011,7 +1011,7 @@ DoReLink:
                           &hints);
 
 #if BUILD_OPENCL_FP
-    if((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008))
+    if((chipModel == gcv2500 && chipRevision == 0x5422) || (chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008))
     {
         if((status == gcvSTATUS_NOT_FOUND || status == gcvSTATUS_OUT_OF_RESOURCES) && gcmOPT_INLINELEVEL() != 4)
         {

@@ -445,7 +445,8 @@
 #define GL3_PROGRAM_FRAGMENT_SHADER 75
 #define GL3_PROGRAM_LINK_FUNCTION 76
 
-
+#define GL3_PROFILER_COMPUTE_BEGIN 80
+#define GL3_PROFILER_COMPUTE_END 81
 
 /* Profile information. */
 typedef struct _glsPROFILER

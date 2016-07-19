@@ -2083,7 +2083,7 @@ gceSTATUS GalSaveTSurfToVimg(
         gctUINT n;
         gctBOOL swap = gcvFALSE;
         gctUINT32 width[3] = {0}, height[3] = {0};
-        gctUINT32 bpp[3] = {0, 0, 0};
+        float bpp[3] = {0, 0, 0};
         gctUINT nPlane = 1;
 
         filehead.magic[0] = 'V';
@@ -2213,6 +2213,25 @@ gceSTATUS GalSaveTSurfToVimg(
                 bpp[1] = 2;
                 break;
 
+            case gcvSURF_NV12_10BIT:
+            case gcvSURF_NV21_10BIT:
+                width[1] = surf->width / 2;
+                height[1] = surf->height / 2;
+                nPlane = 2;
+                bpp[0] = 1.25;
+                bpp[1] = 2.5;
+                surf->vNode.size = surf->stride[0] * surf->height;
+                break;
+
+            case gcvSURF_NV16_10BIT:
+            case gcvSURF_NV61_10BIT:
+                width[1] = surf->width / 2;
+                height[1] = surf->height;
+                nPlane = 2;
+                bpp[0] = 1.25;
+                bpp[1] = 2.5;
+                break;
+
             default:
                 break;
             }
@@ -2297,7 +2316,7 @@ gceSTATUS GalSaveTSurfToVimg(
 
         if (nPlane > 1)
         {
-            gctUINT lineSize1 = width[1] * bpp[1];
+            gctUINT lineSize1 = (gctUINT)(width[1] * bpp[1]);
 
             if (surf->logical[1] == gcvNULL)
             {
@@ -2339,7 +2358,7 @@ gceSTATUS GalSaveTSurfToVimg(
                     gcmONERROR(gcvSTATUS_INVALID_DATA);
                 }
 
-                lineSize2 = width[2] * bpp[2];
+                lineSize2 = (gctUINT)(width[2] * bpp[2]);
                 for (n = 0; n < height[2]; n++)
                 {
                     gctUINT8_PTR p;
@@ -3395,6 +3414,10 @@ gceSTATUS GalQueryBpp(gceSURF_FORMAT Format, gctUINT *Bpp)
     case gcvSURF_NV12:
     case gcvSURF_NV61:
     case gcvSURF_NV21:
+    case gcvSURF_NV12_10BIT:
+    case gcvSURF_NV21_10BIT:
+    case gcvSURF_NV16_10BIT:
+    case gcvSURF_NV61_10BIT:
         *Bpp = 2;
         break;
 
@@ -3410,10 +3433,7 @@ gceSTATUS GalQueryBpp(gceSURF_FORMAT Format, gctUINT *Bpp)
     case gcvSURF_A2R10G10B10:
     case gcvSURF_R10G10B10A2:
     case gcvSURF_B10G10R10A2:
-    case gcvSURF_NV12_10BIT:
-    case gcvSURF_NV21_10BIT:
-    case gcvSURF_NV16_10BIT:
-    case gcvSURF_NV61_10BIT:
+    case gcvSURF_P010:
         *Bpp = 4;
         break;
 
@@ -3450,10 +3470,13 @@ gceSTATUS GalCreateTSurfWithPool(
 {
     gceSTATUS status;
     T2D_SURF_PTR surf = gcvNULL;
-    gctUINT32 bpp, offset = 0;
-    gctUINT alignedWidth, alignedHeight, alignedBase = 64, alignedTSBase = 64;
+    gctUINT32 bpp, offset = 0, aligned = 1;
+    gctUINT alignedWidth, alignedHeight, alignedStride, alignedBase = 64, alignedTSBase = 64;
 
     gcmONERROR(GalQueryBpp(Format, &bpp));
+
+    alignedWidth = Width;
+    alignedHeight = Height;
 
     /* Align width and height. */
     switch (Tiling)
@@ -3479,6 +3502,25 @@ gceSTATUS GalCreateTSurfWithPool(
         alignedHeight = gcmALIGN(Height, 128);
         break;
 
+    case gcvTILED_8X8_XMAJOR:
+    case gcvTILED_8X8_YMAJOR:
+    case gcvTILED_16X4:
+        alignedWidth = gcmALIGN(Width, 64);
+        break;
+
+    case gcvTILED_8X4:
+    case gcvTILED_4X8:
+        alignedWidth = gcmALIGN(Width, 32);
+        break;
+
+    case gcvTILED_32X4:
+        alignedWidth = gcmALIGN(Width, 128);
+        break;
+
+    case gcvTILED_64X4:
+        alignedWidth = gcmALIGN(Width, 256);
+        break;
+
     default:
         alignedWidth = gcmALIGN(Width, 8);
         alignedHeight = gcmALIGN(Height, 1);
@@ -3486,7 +3528,8 @@ gceSTATUS GalCreateTSurfWithPool(
     }
 
     if (TileStatusConfig == gcv2D_TSC_2D_COMPRESSED ||
-        (TileStatusConfig & gcv2D_TSC_DEC_COMPRESSED) ||
+        (gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC_COMPRESSION) &&
+         (TileStatusConfig & gcv2D_TSC_DEC_COMPRESSED)) ||
         (TileStatusConfig & gcv2D_TSC_V4_COMPRESSED))
     {
         if (TileStatusConfig == gcv2D_TSC_2D_COMPRESSED &&
@@ -3529,21 +3572,112 @@ gceSTATUS GalCreateTSurfWithPool(
         }
         alignedBase = 256;
     }
-    else if (TileStatusConfig == gcv2D_TSC_TPC_COMPRESSED)
+    else if (TileStatusConfig & gcv2D_TSC_TPC_COMPRESSED)
     {
         if ((Tiling != gcvLINEAR) && (Tiling != gcvTILED))
         {
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         }
 
-        alignedWidth = gcmALIGN(Width, 16);
-        alignedHeight = gcmALIGN(Height, 16);
-        alignedBase = 1024;
-        bpp = 4;
+        if (TileStatusConfig == gcv2D_TSC_TPC_COMPRESSED_V10)
+        {
+            alignedWidth = gcmALIGN(Width, 16);
+            alignedHeight = gcmALIGN(Height, 16);
+            alignedBase = 1024;
+            bpp = 4;
+        }
+        else if (TileStatusConfig == gcv2D_TSC_TPC_COMPRESSED_V11)
+        {
+            alignedBase = 32 * 8 * bpp;
+
+            alignedWidth = gcmALIGN(Width, 32);
+            alignedHeight = gcmALIGN(Height, 8);
+
+            if (Format == gcvSURF_NV12 ||
+                Format == gcvSURF_NV21)
+            {
+                alignedBase = 256;
+            }
+            else if (Format == gcvSURF_P010)
+            {
+                alignedBase = 512;
+            }
+        }
+    }
+    else if (gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_TPCV11_COMPRESSION))
+    {
+        if (Format == gcvSURF_NV12)
+        {
+            alignedWidth = gcmALIGN(Width, 256);
+            alignedBase = 256;
+        }
+        else if (Format == gcvSURF_NV12_10BIT || Format == gcvSURF_NV21_10BIT)
+        {
+            alignedWidth = gcmALIGN(Width, 256);
+            alignedBase = 320;
+        }
+        else if (Format == gcvSURF_P010)
+        {
+            alignedWidth = gcmALIGN(Width, 32);
+            alignedHeight = gcmALIGN(Height, 8);
+            alignedBase = 512;
+        }
     }
     else if (TileStatusConfig != gcv2D_TSC_DISABLE)
     {
         alignedBase = 256;
+    }
+
+    alignedStride = alignedWidth * bpp;
+
+    if (TileStatusConfig == gcv2D_TSC_TPC_COMPRESSED_V11)
+    {
+        switch (Format)
+        {
+            case gcvSURF_A8R8G8B8:
+            case gcvSURF_X8R8G8B8:
+            case gcvSURF_A2R10G10B10:
+                alignedStride = gcmALIGN(alignedStride, 128);
+                aligned = 1024;
+                break;
+
+            case gcvSURF_NV12:
+                alignedStride = gcmALIGN(alignedStride, 32);
+                aligned = 256;
+                break;
+
+            case gcvSURF_P010:
+                alignedStride = gcmALIGN(alignedStride, 64);
+                aligned = 512;
+                break;
+        }
+    }
+    else if (gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_TPCV11_COMPRESSION))
+    {
+        if (Format == gcvSURF_P010)
+        {
+            alignedStride = gcmALIGN(alignedStride, 64);
+            aligned = 512;
+        }
+        else if (Format == gcvSURF_NV12 || Format == gcvSURF_NV21)
+        {
+            alignedStride = gcmALIGN(alignedStride, 256);
+            aligned = 256;
+        }
+        else if (Format == gcvSURF_NV12_10BIT || Format == gcvSURF_NV21_10BIT)
+        {
+            alignedStride = gcmALIGN_NP2(alignedStride, 320);
+            aligned = 320;
+        }
+    }
+
+    if (Format == gcvSURF_NV12_10BIT ||
+        Format == gcvSURF_NV21_10BIT ||
+        Format == gcvSURF_NV16_10BIT ||
+        Format == gcvSURF_NV61_10BIT)
+    {
+        alignedStride = gcmALIGN_NP2(alignedStride, 80);
+        aligned = aligned < 80 ? 80 : aligned;
     }
 
     gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(T2D_SURF), &surf));
@@ -3551,8 +3685,9 @@ gceSTATUS GalCreateTSurfWithPool(
 
     if (TileStatusConfig == gcv2D_TSC_2D_COMPRESSED ||
         (TileStatusConfig & gcv2D_TSC_V4_COMPRESSED) ||
-        TileStatusConfig == gcv2D_TSC_TPC_COMPRESSED ||
-        TileStatusConfig & gcv2D_TSC_DEC_COMPRESSED ||
+        (TileStatusConfig & gcv2D_TSC_TPC_COMPRESSED) ||
+        (gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC_COMPRESSION) &&
+         (TileStatusConfig & gcv2D_TSC_DEC_COMPRESSED)) ||
         Tiling != gcvLINEAR)
     {
         if (TileStatusConfig & gcv2D_TSC_DEC_TPC)
@@ -3561,12 +3696,12 @@ gceSTATUS GalCreateTSurfWithPool(
         }
         else
         {
-            surf->vNode.size = alignedWidth * bpp * alignedHeight;
+            surf->vNode.size = alignedStride * alignedHeight;
         }
     }
     else
     {
-        surf->vNode.size = alignedWidth * bpp * alignedHeight + 128;
+        surf->vNode.size = alignedStride * alignedHeight + 128;
     }
     surf->vNode.pool = Pool;
 
@@ -3577,11 +3712,20 @@ gceSTATUS GalCreateTSurfWithPool(
         surf->vNode.size *= 4;
     }
 
-    if (TileStatusConfig == gcv2D_TSC_TPC_COMPRESSED)
+    if (TileStatusConfig & gcv2D_TSC_TPC_COMPRESSED)
     {
-        offset = gcmALIGN(alignedWidth * alignedHeight / 16, 1024);
+        if (TileStatusConfig == gcv2D_TSC_TPC_COMPRESSED_V10)
+        {
+            offset = gcmALIGN(alignedWidth * alignedHeight / 16, 1024);
+        }
+        else if (TileStatusConfig == gcv2D_TSC_TPC_COMPRESSED_V11)
+        {
+            offset = gcmALIGN(surf->vNode.size / 16, aligned);
+        }
         surf->vNode.size += offset;
     }
+
+    surf->vNode.size += aligned == 1 ? 0 : aligned;
 
     surf->vNode.allocatedSize = surf->vNode.size;
     gcmONERROR(AllocVideoNode(
@@ -3615,18 +3759,20 @@ gceSTATUS GalCreateTSurfWithPool(
     surf->height = Height;
     surf->aWidth = alignedWidth;
     surf->aHeight = alignedHeight;
-    surf->stride[0] = alignedWidth * bpp;
+    surf->stride[0] = alignedStride;
     surf->validStrideNum = 1;
     surf->address[0] = surf->vNode.address + offset;
-    surf->logical[0] = GAL_POINTER_OFFSET(surf->vNode.memory, offset);
+    surf->address[0] = (aligned & (aligned-1)) ? gcmALIGN_NP2(surf->address[0], aligned) : gcmALIGN(surf->address[0], aligned);
+    surf->logical[0] = GAL_POINTER_OFFSET(surf->vNode.memory, surf->address[0] - surf->vNode.address);
     surf->rotation = gcvSURF_0_DEGREE;
-    surf->tileStatusConfig = TileStatusConfig;
+    surf->tileStatusConfig = gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_DEC_COMPRESSION) ?
+                             TileStatusConfig : TileStatusConfig & ~gcv2D_TSC_DEC_COMPRESSED;
     surf->tileStatusFormat = Format;
     surf->superTileVersion = Tiling & gcvSUPERTILED ? gcv2D_SUPER_TILE_VERSION_V3 : -1;
 
-    if (TileStatusConfig == gcv2D_TSC_TPC_COMPRESSED)
+    if (TileStatusConfig & gcv2D_TSC_TPC_COMPRESSED)
     {
-        surf->tileStatusNode.size = alignedWidth * alignedHeight / 16;
+        surf->tileStatusNode.size = offset;
         surf->tileStatusNode.pool = surf->vNode.pool;
         surf->tileStatusNode.address = surf->vNode.address;
         surf->tileStatusNode.memory = surf->vNode.memory;
@@ -3721,20 +3867,22 @@ gceSTATUS GalCreateTSurfWithPool(
         case gcvSURF_I420:
         case gcvSURF_YV12:
             {
-                gctUINT32 size;
+                gctUINT32 size, delta;
 
                 surf->validAddressNum = surf->validStrideNum = 3;
 
-                surf->stride[0] = alignedWidth;
+                surf->stride[0] = gcmALIGN(alignedWidth, aligned);
                 size = surf->stride[0] * alignedHeight;
 
-                surf->address[1] = surf->address[0] + size + offset;
-                surf->logical[1] = GAL_POINTER_OFFSET(surf->logical[0], size + offset);
+                surf->address[1] = gcmALIGN(surf->address[0] + size, aligned);
+                delta = surf->address[1] - surf->address[0] - size;
+                surf->logical[1] = GAL_POINTER_OFFSET(surf->logical[0], size + delta);
                 surf->stride[1] = alignedWidth >> 1;
 
                 size >>= 2;
-                surf->address[2] = surf->address[1] + size + offset;
-                surf->logical[2] = GAL_POINTER_OFFSET(surf->logical[1], size + offset);
+                surf->address[2] = gcmALIGN(surf->address[1] + size, aligned);
+                delta = surf->address[2] - surf->address[1] - size;
+                surf->logical[2] = GAL_POINTER_OFFSET(surf->logical[1], size + delta);
                 surf->stride[2] = alignedWidth >> 1;
             }
             break;
@@ -3744,52 +3892,69 @@ gceSTATUS GalCreateTSurfWithPool(
         case gcvSURF_NV12:
         case gcvSURF_NV21:
             {
-                gctUINT32 size;
+                gctUINT32 size, delta;
 
                 surf->validAddressNum = surf->validStrideNum = 2;
 
                 if (TileStatusConfig & gcv2D_TSC_DEC_TPC)
                 {
                     surf->stride[0] = gcmALIGN(alignedWidth, 16);
-                    surf->stride[1]= gcmALIGN(alignedWidth, 16);
+                    surf->stride[1] = gcmALIGN(alignedWidth, 16);
                 }
                 else
                 {
-                    surf->stride[0] = alignedWidth;
-                    surf->stride[1] = alignedWidth;
+                    surf->stride[0] = gcmALIGN(alignedWidth, aligned);
+                    surf->stride[1] = gcmALIGN(alignedWidth, aligned);
                 }
 
                 size = surf->stride[0] * alignedHeight;
-                surf->address[1] = surf->address[0] + size + offset;
-                surf->logical[1] = GAL_POINTER_OFFSET(surf->logical[0], size + offset);
+                surf->address[1] = gcmALIGN(surf->address[0] + size, aligned);
+                delta = surf->address[1] - surf->address[0] - size;
+                surf->logical[1] = GAL_POINTER_OFFSET(surf->logical[0], size + delta);
             }
             break;
 
         case gcvSURF_NV12_10BIT:
         case gcvSURF_NV21_10BIT:
             {
-                gctUINT32 size;
+                gctUINT32 size, delta;
 
                 surf->validAddressNum = surf->validStrideNum = 2;
-                surf->stride[0] = surf->stride[1] = (gctUINT32)((float)alignedWidth * 1.25);
+                surf->stride[0] = surf->stride[1] = gcmALIGN_NP2((gctUINT32)((float)alignedWidth * 1.25), aligned);
 
                 size = surf->stride[0] * alignedHeight;
-                surf->address[1] = surf->address[0] + size + offset;
-                surf->logical[1] = GAL_POINTER_OFFSET(surf->logical[0], size + offset);
+                surf->address[1] = gcmALIGN_NP2(surf->address[0] + size, aligned);
+                delta = surf->address[1] - surf->address[0] - size;
+                surf->logical[1] = GAL_POINTER_OFFSET(surf->logical[0], size + delta);
             }
             break;
 
         case gcvSURF_NV16_10BIT:
         case gcvSURF_NV61_10BIT:
             {
-                gctUINT32 size;
+                gctUINT32 size, delta;
 
                 surf->validAddressNum = surf->validStrideNum = 2;
-                surf->stride[0] = surf->stride[1] = (gctUINT32)((float)alignedWidth * 1.25);
+                surf->stride[0] = surf->stride[1] = gcmALIGN_NP2((gctUINT32)((float)alignedWidth * 1.25), aligned);
 
                 size = surf->stride[0] * alignedHeight;
-                surf->address[1] = surf->address[0] + size + offset;
-                surf->logical[1] = GAL_POINTER_OFFSET(surf->logical[0], size + offset);
+                surf->address[1] = gcmALIGN_NP2(surf->address[0] + size, aligned);
+                delta = surf->address[1] - surf->address[0] - size;
+                surf->logical[1] = GAL_POINTER_OFFSET(surf->logical[0], size + delta);
+            }
+            break;
+
+        case gcvSURF_P010:
+            {
+                gctUINT32 size, delta;
+
+                surf->validAddressNum = surf->validStrideNum = 2;
+                surf->stride[0] = surf->stride[1] = gcmALIGN(alignedWidth * 2, aligned);
+
+                size = surf->stride[0] * alignedHeight;
+                surf->address[1] = gcmALIGN(surf->address[0] + size, aligned);
+                delta = surf->address[1] - surf->address[0] - size;
+                surf->logical[1] = GAL_POINTER_OFFSET(surf->logical[0], size + delta);
             }
             break;
 
@@ -4008,26 +4173,26 @@ gceSTATUS GalLoadVimgToTSurfWithPool(
             gcmONERROR(gcvSTATUS_INVALID_DATA);
         }
 
-	if (head.version == 1 || head.version == 2)
-	{
-	    vhead.v1.format = read_dword(file);
-	    vhead.v1.tiling = read_dword(file);
-	    vhead.v1.imageStride = read_dword(file);
-	    vhead.v1.imageWidth = read_dword(file);
-	    vhead.v1.imageHeight = read_dword(file);
-	    vhead.v1.bitsOffset = read_dword(file);
+    if (head.version == 1 || head.version == 2)
+    {
+        vhead.v1.format = read_dword(file);
+        vhead.v1.tiling = read_dword(file);
+        vhead.v1.imageStride = read_dword(file);
+        vhead.v1.imageWidth = read_dword(file);
+        vhead.v1.imageHeight = read_dword(file);
+        vhead.v1.bitsOffset = read_dword(file);
             v1 = &vhead.v1;
 
-	    if (head.version == 2)
-	    {
-	    	vhead.tileStatusConfig = read_dword(file);
-	    	vhead.tileStatusSize = read_dword(file);
-	    	vhead.compressedFormat = read_dword(file);
-	   	vhead.clearValue = read_dword(file);
-	    	vhead.tileStatusOffset = read_dword(file);
-            	v2 = &vhead;
-	    }
-	}
+        if (head.version == 2)
+        {
+            vhead.tileStatusConfig = read_dword(file);
+            vhead.tileStatusSize = read_dword(file);
+            vhead.compressedFormat = read_dword(file);
+           vhead.clearValue = read_dword(file);
+            vhead.tileStatusOffset = read_dword(file);
+                v2 = &vhead;
+        }
+    }
         else
         {
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
@@ -4071,85 +4236,85 @@ gceSTATUS GalLoadVimgToTSurfWithPool(
                 gcvFILE_SEEK_SET
                 ));
 
-	if (!GalIsBigEndian() || v2 != gcvNULL)
-	{
-	    gcmONERROR(gcoOS_Read(
-			gcvNULL,
-			file,
-			surf->vNode.size,
-			surf->vNode.memory,
-			gcvNULL
-			));
-	}
-	else
-	{
-	    switch (v1->imageStride / v1->imageWidth)
-	    {
-		case 1:
-		    gcmONERROR(gcoOS_Read(
-				gcvNULL,
-				file,
-				surf->vNode.size,
-				surf->vNode.memory,
-				gcvNULL
-			       ));
-		    break;
+    if (!GalIsBigEndian() || v2 != gcvNULL)
+    {
+        gcmONERROR(gcoOS_Read(
+            gcvNULL,
+            file,
+            surf->vNode.size,
+            surf->vNode.memory,
+            gcvNULL
+            ));
+    }
+    else
+    {
+        switch (v1->imageStride / v1->imageWidth)
+        {
+        case 1:
+            gcmONERROR(gcoOS_Read(
+                gcvNULL,
+                file,
+                surf->vNode.size,
+                surf->vNode.memory,
+                gcvNULL
+                   ));
+            break;
 
-		case 2:
-		    {
-			unsigned short* p = (unsigned short*) surf->vNode.memory;
-			int n = surf->vNode.size / 2;
-			while (n > 0)
-			{
-			    *p = read_word(file);
-			    p++;
-			    n--;
-			}
-		    }
-		    break;
+        case 2:
+            {
+            unsigned short* p = (unsigned short*) surf->vNode.memory;
+            int n = surf->vNode.size / 2;
+            while (n > 0)
+            {
+                *p = read_word(file);
+                p++;
+                n--;
+            }
+            }
+            break;
 
-		case 3:
-		    {
-			unsigned char* p = (unsigned char*) surf->vNode.memory;
-			int n = surf->vNode.size / 3;
-			while (n > 0)
-			{
-			    *(p + 2) = read_byte(file);
-			    *(p + 1) = read_byte(file);
-			    *(p)     = read_byte(file);
-			    p += 3;
-			    n--;
-			}
-		    }
-		    break;
+        case 3:
+            {
+            unsigned char* p = (unsigned char*) surf->vNode.memory;
+            int n = surf->vNode.size / 3;
+            while (n > 0)
+            {
+                *(p + 2) = read_byte(file);
+                *(p + 1) = read_byte(file);
+                *(p)     = read_byte(file);
+                p += 3;
+                n--;
+            }
+            }
+            break;
 
-		case 4:
-		    {
-			unsigned int* p = (unsigned int*) surf->vNode.memory;
-			int n = surf->vNode.size / 4;
-			while (n > 0)
-			{
-			    *p = read_dword(file);
-			    p++;
-			    n--;
-			}
-		    }
-		    break;
-	    }
-	}
+        case 4:
+            {
+            unsigned int* p = (unsigned int*) surf->vNode.memory;
+            int n = surf->vNode.size / 4;
+            while (n > 0)
+            {
+                *p = read_dword(file);
+                p++;
+                n--;
+            }
+            }
+            break;
+        }
+    }
 
-	if (surf->format == gcvSURF_YV12)
-	{
-		gctUINT32 phyT;
-		gctPOINTER logT;
-		phyT = surf->address[1];
-		surf->address[1] = surf->address[2];
-		surf->address[2] = phyT;
+    if (surf->format == gcvSURF_YV12)
+    {
+        gctUINT32 phyT;
+        gctPOINTER logT;
+        phyT = surf->address[1];
+        surf->address[1] = surf->address[2];
+        surf->address[2] = phyT;
 
-		logT = surf->logical[1];
-		surf->logical[1] = surf->logical[2];
-		surf->logical[2] = logT;
-	}
+        logT = surf->logical[1];
+        surf->logical[1] = surf->logical[2];
+        surf->logical[2] = logT;
+    }
 
         if (v2 != gcvNULL)
         {
@@ -4170,6 +4335,9 @@ gceSTATUS GalLoadVimgToTSurfWithPool(
 
             surf->tileStatusClear = v2->clearValue;
             surf->tileStatusConfig = v2->tileStatusConfig;
+            surf->tileStatusConfig = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC_COMPRESSION) ?
+                         v2->tileStatusConfig : v2->tileStatusConfig & ~gcv2D_TSC_DEC_COMPRESSED;
+
             surf->tileStatusFormat = v2->compressedFormat;
             if (surf->tileStatusFormat == gcvSURF_R8G8B8)
                 surf->tileStatusFormat = gcvSURF_X8R8G8B8;
@@ -4216,7 +4384,7 @@ gceSTATUS CDECL GalLoadVimgToSurface(
     do {
         VIMG_FILEHEADER fileHead;
         VIMG_V1 head;
-        gctUINT alignedWidth, alignedHeight;
+        gctUINT alignedWidth, alignedHeight, widthT;
         gctINT alignedStride;
         gctUINT32 lineSize, aStride;
         gctUINT32 address[3] = {0, 0, 0};
@@ -4281,6 +4449,8 @@ gceSTATUS CDECL GalLoadVimgToSurface(
         {
             gcmONERROR(gcvSTATUS_INVALID_DATA);
         }
+
+        widthT = head.imageWidth;
 
         /* Check the type. */
         switch (head.format)
@@ -4379,6 +4549,8 @@ gceSTATUS CDECL GalLoadVimgToSurface(
             width[1] = head.imageWidth / 2;
             height[1] = head.imageHeight / 2;
             bpp[1] = 2;
+            if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION))
+                widthT = gcmALIGN(head.imageWidth, 256);
             break;
 
         case gcvSURF_NV21:
@@ -4390,8 +4562,9 @@ gceSTATUS CDECL GalLoadVimgToSurface(
             width[1] = head.imageWidth / 2;
             height[1] = head.imageHeight / 2;
             bpp[1] = 2;
+            if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION))
+                widthT = gcmALIGN(head.imageWidth, 256);
             break;
-
 
         case gcvSURF_NV16_10BIT:
             format = gcvSURF_NV16_10BIT;
@@ -4405,7 +4578,7 @@ gceSTATUS CDECL GalLoadVimgToSurface(
             break;
 
         case gcvSURF_NV61_10BIT:
-            format = gcvSURF_NV16_10BIT;
+            format = gcvSURF_NV61_10BIT;
             nPlane = 2;
             width[0] = head.imageWidth;
             height[0] = head.imageHeight;
@@ -4422,8 +4595,10 @@ gceSTATUS CDECL GalLoadVimgToSurface(
             height[0] = head.imageHeight;
             bpp[0] = 1.25;
             width[1] = head.imageWidth / 2;
-            height[1] = head.imageHeight;
+            height[1] = head.imageHeight / 2;
             bpp[1] = 2.5;
+            if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION))
+                widthT = gcmALIGN(head.imageWidth, 256);
             break;
 
         case gcvSURF_NV21_10BIT:
@@ -4433,8 +4608,10 @@ gceSTATUS CDECL GalLoadVimgToSurface(
             height[0] = head.imageHeight;
             bpp[0] = 1.25;
             width[1] = head.imageWidth / 2;
-            height[1] = head.imageHeight;
+            height[1] = head.imageHeight / 2;
             bpp[1] = 2.5;
+            if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION))
+                widthT = gcmALIGN(head.imageWidth, 256);
             break;
 
         default:
@@ -4442,13 +4619,59 @@ gceSTATUS CDECL GalLoadVimgToSurface(
             break;
         }
 
-        gcmONERROR(gcoSURF_Construct(gcvNULL, head.imageWidth, head.imageHeight, 1,
+        gcmONERROR(gcoSURF_Construct(gcvNULL, widthT, head.imageHeight, 1,
             gcvSURF_BITMAP, format, gcvPOOL_DEFAULT, &surf));
 
         gcmONERROR(gcoSURF_GetAlignedSize(surf, &alignedWidth,
             &alignedHeight, &alignedStride));
 
         gcmONERROR(gcoSURF_Lock(surf, address, memory));
+
+        {
+            gctUINT32 addressT, aligned;
+
+            if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION))
+            {
+                memset(memory[0], 0, alignedStride * alignedHeight * 2);
+            }
+
+            switch (head.format)
+            {
+                case gcvSURF_NV16_10BIT:
+                case gcvSURF_NV61_10BIT:
+                    addressT = gcmALIGN_NP2(address[0], 80);
+
+                    memory[0] = GAL_POINTER_OFFSET(memory[0], addressT - address[0]);
+                    memory[1] = GAL_POINTER_OFFSET(memory[1], addressT - address[0]);
+
+                    address[1] += addressT - address[0];
+                    address[0] += addressT - address[0];
+                    break;
+
+                case gcvSURF_NV12_10BIT:
+                case gcvSURF_NV21_10BIT:
+                    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION))
+                    {
+                        aligned = 320;
+                    }
+                    else
+                    {
+                        aligned = 80;
+                    }
+
+                    addressT = gcmALIGN_NP2(address[0], aligned);
+
+                    memory[0] = GAL_POINTER_OFFSET(memory[0], addressT - address[0]);
+                    memory[1] = GAL_POINTER_OFFSET(memory[1], addressT - address[0]);
+
+                    address[1] += addressT - address[0];
+                    address[0] += addressT - address[0];
+                break;
+
+                default:
+                    break;
+            }
+        }
 
         if (memory[0] == gcvNULL)
         {
@@ -5420,7 +5643,7 @@ GalIsYUVFormat(IN gceSURF_FORMAT Format)
     case gcvSURF_NV61_10BIT:
     case gcvSURF_NV12_10BIT:
     case gcvSURF_NV21_10BIT:
-
+    case gcvSURF_P010:
         return gcvSTATUS_TRUE;
 
     default:
@@ -6160,6 +6383,38 @@ gceSTATUS CDECL GalLoadFileToTSurfWithPool(
                         && info->mask[2] == 0xFF000000)
                     {
                         format = gcvSURF_B8G8R8A8;
+                        surfDepth = 4;
+                        biDepth = 4;
+                    }
+                    else if (info->mask[0] == 0xFFC00000
+                        && info->mask[1] == 0x003FF000
+                        && info->mask[2] == 0x00000FFC)
+                    {
+                        format = gcvSURF_R10G10B10A2;
+                        surfDepth = 4;
+                        biDepth = 4;
+                    }
+                    else if (info->mask[0] == 0x00000FFC
+                        && info->mask[1] == 0x003FF000
+                        && info->mask[2] == 0xFFC00000)
+                    {
+                        format = gcvSURF_B10G10R10A2;
+                        surfDepth = 4;
+                        biDepth = 4;
+                    }
+                    else if (info->mask[0] == 0x3FF00000
+                        && info->mask[1] == 0x000FFC00
+                        && info->mask[2] == 0x000003FF)
+                    {
+                        format = gcvSURF_A2R10G10B10;
+                        surfDepth = 4;
+                        biDepth = 4;
+                    }
+                    else if (info->mask[0] == 0x000003FF
+                        && info->mask[1] == 0x000FFC00
+                        && info->mask[2] == 0x3FF00000)
+                    {
+                        format = gcvSURF_A2B10G10R10;
                         surfDepth = 4;
                         biDepth = 4;
                     }
@@ -7385,10 +7640,10 @@ const struct FeatureInfo
     {"gcvFEATURE_2D_A8_NO_ALPHA " , "A8 alphablend", gcvFEATURE_2D_A8_NO_ALPHA, gcvTRUE},
     {"gcvFEATURE_2D_FC_SOURCE " , "FC surface", gcvFEATURE_2D_FC_SOURCE, gcvFALSE},
     {"gcvFEATURE_TPC_COMPRESSION " , "TPC compression", gcvFEATURE_TPC_COMPRESSION, gcvFALSE},
-    {"gcvFEATURE_DEC_COMPRESSION " , "DEC compression", gcvFEATURE_DEC_COMPRESSION, gcvFALSE},
-    {"gcvFEATURE_DEC_TPC_COMPRESSION " , "DEC TPC compression", gcvFEATURE_DEC_TPC_COMPRESSION, gcvFALSE},
-    {"gcvFEATURE_DEC_COMPRESSION_TILE_NV12_8BIT " , "DEC TPC compression 8bit", gcvFEATURE_DEC_COMPRESSION_TILE_NV12_8BIT, gcvFALSE},
-    {"gcvFEATURE_DEC_COMPRESSION_TILE_NV12_10BIT " , "DEC TPC compression 10bit", gcvFEATURE_DEC_COMPRESSION_TILE_NV12_10BIT, gcvFALSE},
+    {"gcvFEATURE_DEC_COMPRESSION " , "DEC300 compression", gcvFEATURE_DEC_COMPRESSION, gcvFALSE},
+    {"gcvFEATURE_DEC_TPC_COMPRESSION " , "DEC300 TPC compression", gcvFEATURE_DEC_TPC_COMPRESSION, gcvFALSE},
+    {"gcvFEATURE_DEC_COMPRESSION_TILE_NV12_8BIT " , "DEC300 TPC compression 8bit", gcvFEATURE_DEC_COMPRESSION_TILE_NV12_8BIT, gcvFALSE},
+    {"gcvFEATURE_DEC_COMPRESSION_TILE_NV12_10BIT " , "DEC300 TPC compression 10bit", gcvFEATURE_DEC_COMPRESSION_TILE_NV12_10BIT, gcvFALSE},
     {"gcvFEATURE_FULL_DIRECTFB " , "DFB dest color key mode", gcvFEATURE_FULL_DIRECTFB, gcvFALSE},
     {"gcvFEATURE_2D_MIRROR_EXTENSION " , "2D mirror extension", gcvFEATURE_2D_MIRROR_EXTENSION, gcvFALSE},
     {"gcvFEATURE_2D_PIXEL_ALIGNMENT " , "Alignment improvement", gcvFEATURE_2D_PIXEL_ALIGNMENT, gcvFALSE},
@@ -7401,6 +7656,8 @@ const struct FeatureInfo
     {"gcvFEATURE_2D_VMSAA " , "2D VMSAA", gcvFEATURE_2D_VMSAA, gcvFALSE},
     {"gcvFEATURE_2D_10BIT_OUTPUT_LINEAR " , "2D 10bit output", gcvFEATURE_2D_10BIT_OUTPUT_LINEAR, gcvFALSE},
     {"gcvFEATURE_2D_YUV420_OUTPUT_LINEAR " , "2D YUV420 output", gcvFEATURE_2D_YUV420_OUTPUT_LINEAR, gcvFALSE},
+    {"gcvFEATURE_TPCV11_COMPRESSION " , "TPCv11 compression", gcvFEATURE_TPCV11_COMPRESSION, gcvFALSE},
+    {"gcvFEATURE_DEC400_COMPRESSION " , "DEC400 compression", gcvFEATURE_DEC400_COMPRESSION, gcvFALSE},
 };
 
 gceSTATUS GalQueryFeatureStr(
@@ -7409,7 +7666,7 @@ gceSTATUS GalQueryFeatureStr(
     char* message,
     gctBOOL* status)
 {
-    gctINT i;
+    gctUINT32 i;
     gctBOOL found = gcvFALSE;
 
     if (name == gcvNULL || message == gcvNULL || status == gcvNULL)

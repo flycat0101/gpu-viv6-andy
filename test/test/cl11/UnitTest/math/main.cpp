@@ -431,18 +431,18 @@ __kernel void math( \
 "\
 long viv_Add64(long x, long y) \
 { \
-	unsigned int lox, loy, hix, hiy; \
-	long a; \
-	lox = viv_getlonglo(x); \
-	loy = viv_getlonglo(y); \
-	hix = viv_getlonghi(x); \
-	hiy = viv_getlonghi(y); \
-	if(lox > ~loy) \
-		hix++; \
-	hix += hiy; \
-	lox += loy; \
-	viv_setlong(a, lox, hix); \
-	return a; \
+    unsigned int lox, loy, hix, hiy; \
+    long a; \
+    lox = viv_getlonglo(x); \
+    loy = viv_getlonglo(y); \
+    hix = viv_getlonghi(x); \
+    hiy = viv_getlonghi(y); \
+    if(lox > ~loy) \
+        hix++; \
+    hix += hiy; \
+    lox += loy; \
+    viv_setlong(a, lox, hix); \
+    return a; \
 } \
 \
 __kernel void math( \
@@ -458,23 +458,23 @@ __kernel void math( \
 "\
 long viv_Rshift64(long x, long y) \
 { \
-	unsigned int lox, loy, hix; \
-	long a; \
-	lox = viv_getlonglo(x); \
-	loy = viv_getlonglo(y); \
-	hix = viv_getlonghi(x); \
-	loy &= 0x3f; \
-	if(loy >= 32){ \
-		lox = hix >> (loy-32); \
-		hix = 0; \
-	} \
-	else if(loy){ \
-		lox = lox>>loy; \
-		lox |= hix <<(32 - loy); \
-		hix >>= loy; \
-	} \
-	viv_setlong(a, lox, hix); \
-	return  a; \
+    unsigned int lox, loy, hix; \
+    long a; \
+    lox = viv_getlonglo(x); \
+    loy = viv_getlonglo(y); \
+    hix = viv_getlonghi(x); \
+    loy &= 0x3f; \
+    if(loy >= 32){ \
+        lox = hix >> (loy-32); \
+        hix = 0; \
+    } \
+    else if(loy){ \
+        lox = lox>>loy; \
+        lox |= hix <<(32 - loy); \
+        hix >>= loy; \
+    } \
+    viv_setlong(a, lox, hix); \
+    return  a; \
 } \
 __kernel void math( \
     __global long *pdst, \
@@ -488,23 +488,23 @@ __kernel void math( \
 "\
 long viv_Rshift64Signed(long x, long y) \
 { \
-	int lox, loy, hix; \
-	long a; \
-	lox = viv_getlonglo(x); \
-	loy = viv_getlonglo(y); \
-	hix = viv_getlonghi(x); \
-	loy &= 0x3f; \
-	if(loy >= 32){ \
-		lox = hix >> (loy-32); \
-		hix >>= 31; \
-	} \
-	else if(loy){ \
-		lox = (unsigned int)lox>>loy; \
-		lox |= hix <<(32 - loy); \
-		hix >>= loy; \
-	} \
-	viv_setlong(a, (unsigned int)lox, (unsigned int)hix); \
-	return  a; \
+    int lox, loy, hix; \
+    long a; \
+    lox = viv_getlonglo(x); \
+    loy = viv_getlonglo(y); \
+    hix = viv_getlonghi(x); \
+    loy &= 0x3f; \
+    if(loy >= 32){ \
+        lox = hix >> (loy-32); \
+        hix >>= 31; \
+    } \
+    else if(loy){ \
+        lox = (unsigned int)lox>>loy; \
+        lox |= hix <<(32 - loy); \
+        hix >>= loy; \
+    } \
+    viv_setlong(a, (unsigned int)lox, (unsigned int)hix); \
+    return  a; \
 } \
 __kernel void math( \
     __global long *pdst, \
@@ -518,10 +518,10 @@ __kernel void math( \
 "\
  long  viv_Mul64_32RShift(  long  x1, int n32, int rshift) \
 { \
-	int lox1, hix1, mulhi, mulme, mulme2, mullo; \
-     long   a1; \
-	lox1 = viv_getlonglo(x1); \
-	hix1 = viv_getlonghi(x1); \
+    int lox1, hix1, mulhi, mulme, mulme2, mullo; \
+    long   a1; \
+    lox1 = viv_getlonglo(x1); \
+    hix1 = viv_getlonghi(x1); \
     mulhi = mul_hi((unsigned int)hix1, (unsigned int)n32); \
     mulme = mul_hi((unsigned int)lox1, (unsigned int)n32); \
     mulme2 = (unsigned int)hix1*(unsigned int)n32; \
@@ -533,29 +533,29 @@ __kernel void math( \
     if(rshift >= 64){ \
         viv_setlong(a1, (unsigned int)mulhi >> rshift, (unsigned int)0 ); \
     } \
-	else if(rshift >= 32){ \
-		mulme =(unsigned int)mulme >> (rshift - 32); \
+    else if(rshift >= 32){ \
+        mulme =(unsigned int)mulme >> (rshift - 32); \
         if(rshift > 32) \
             mulme |= (unsigned int)mulhi << ( 64 - rshift); \
         mulhi =(unsigned int)mulhi >> (rshift - 32); \
         viv_setlong(a1, (unsigned int)mulme, (unsigned int)mulhi); \
-	} \
-	else{ \
-		mullo =(unsigned int)mullo >> (rshift); \
+    } \
+    else{ \
+        mullo =(unsigned int)mullo >> (rshift); \
         if(rshift){ \
             mullo |= mulme << (32 - rshift); \
         } \
-		mulme =(unsigned int)mulme >> (rshift); \
-		if(rshift) \
-			mulme |= (unsigned int)mulhi <<(32 - rshift);\
-         viv_setlong(a1, (unsigned int)mullo, (unsigned int)mulme); \
-	} \
-	return a1; \
+        mulme =(unsigned int)mulme >> (rshift); \
+        if(rshift) \
+            mulme |= (unsigned int)mulhi <<(32 - rshift);\
+            viv_setlong(a1, (unsigned int)mullo, (unsigned int)mulme); \
+    } \
+    return a1; \
 } \
 \
  long   viv_Mul64HiLo_32RShift( int lox1, int hix1, int n32, int rshift) \
 { \
-	int  mulhi, mulme, mulme2, mullo; \
+    int  mulhi, mulme, mulme2, mullo; \
      long   a1; \
     mulhi = mul_hi((unsigned int)hix1, (unsigned int)n32); \
     mulme = mul_hi((unsigned int)lox1, (unsigned int)n32); \
@@ -568,93 +568,93 @@ __kernel void math( \
     if(rshift >= 64){ \
         viv_setlong(a1, (unsigned int)mulhi >> rshift, (unsigned int)0 ); \
     } \
-	else if(rshift >= 32){ \
-		mulme =(unsigned int)mulme >> (rshift - 32); \
+    else if(rshift >= 32){ \
+        mulme =(unsigned int)mulme >> (rshift - 32); \
         if(rshift > 32) \
             mulme |= (unsigned int)mulhi << ( 64 - rshift); \
         mulhi =(unsigned int)mulhi >> (rshift - 32); \
         viv_setlong(a1, (unsigned int)mulme, (unsigned int)mulhi); \
-	} \
-	else{ \
-		mullo =(unsigned int)mullo >> (rshift); \
+    } \
+    else{ \
+        mullo =(unsigned int)mullo >> (rshift); \
         if(mullo){ \
             mullo |= mulme << (32 - rshift); \
         } \
-		mulme =(unsigned int)mulme >> (rshift); \
-         viv_setlong(a1, (unsigned int)mullo, (unsigned int)mulme); \
-	} \
-	return a1; \
+        mulme =(unsigned int)mulme >> (rshift); \
+            viv_setlong(a1, (unsigned int)mullo, (unsigned int)mulme); \
+    } \
+    return a1; \
 } \
 \
  long   viv_Mul64ThenNeg(unsigned int lox2, unsigned int hix2,  long   y2) \
 { \
-	unsigned int loy2, hiy2,hiz2,loz2; \
-	 long   a2; \
-	loy2 = viv_getlonglo(y2); \
-	hiy2 = viv_getlonghi(y2); \
+    unsigned int loy2, hiy2,hiz2,loz2; \
+        long   a2; \
+    loy2 = viv_getlonglo(y2); \
+    hiy2 = viv_getlonghi(y2); \
     hiz2 = mul_hi(lox2, loy2); \
     hiz2 += lox2 * hiy2; \
     hiz2 += loy2 * hix2; \
     loz2 = loy2*lox2; \
-	loz2 = -loz2; \
+    loz2 = -loz2; \
     hiz2 = ~hiz2; \
     if(loz2 == 0) \
         hiz2 += 1; \
-	viv_setlong(a2, loz2, hiz2); \
-	return a2; \
+    viv_setlong(a2, loz2, hiz2); \
+    return a2; \
 } \
 \
 \
  long   viv_Add64( long  x3,  long   y3) \
 { \
-	unsigned int lox3, loy3, hix3, hiy3; \
-	 long   a3; \
-	lox3 = viv_getlonglo(x3); \
-	loy3 = viv_getlonglo(y3); \
-	hix3 = viv_getlonghi(x3); \
-	hiy3 = viv_getlonghi(y3); \
-	if(lox3 > ~loy3) \
-		hix3++; \
-	hix3 += hiy3; \
-	lox3 += loy3; \
-	viv_setlong(a3, lox3, hix3); \
-	return a3; \
+    unsigned int lox3, loy3, hix3, hiy3; \
+    long   a3; \
+    lox3 = viv_getlonglo(x3); \
+    loy3 = viv_getlonglo(y3); \
+    hix3 = viv_getlonghi(x3); \
+    hiy3 = viv_getlonghi(y3); \
+    if(lox3 > ~loy3) \
+        hix3++; \
+    hix3 += hiy3; \
+    lox3 += loy3; \
+    viv_setlong(a3, lox3, hix3); \
+    return a3; \
 } \
 \
  \
   long  viv_Unsigned64Div( long  x,  long  y) \
  { \
-	unsigned int lox, loy, hix, hiy,lor, hir, loq, hiq; \
+    unsigned int lox, loy, hix, hiy,lor, hir, loq, hiq; \
     int z, exp, mantissa; \
-	 long  a, zz, res, q, dq; \
+    long  a, zz, res, q, dq; \
     float fValue1, fValue0; \
-	lox = viv_getlonglo(x); \
-	loy = viv_getlonglo(y); \
-	hix = viv_getlonghi(x); \
-	hiy = viv_getlonghi(y); \
-	fValue1 = (float) loy + (float)hiy*4294967296.f; /*to float*/ \
-	exp = as_int(fValue1) >> 23; \
-	exp -= 0x7f; \
-	mantissa = as_int(fValue1) & 0x007fffff; /*Clean the exp*/ \
-	mantissa |= 0x30800000; /*2^(-30)*mantissaY*/ \
-	fValue0 = as_float(mantissa); \
-    fValue1 = 1.0f/fValue0;				/*Actually, should use our InstRcp*/ \
- \
-	mantissa = as_int(fValue1) - 3;  /*make should less than 1/y */  \
+    lox = viv_getlonglo(x); \
+    loy = viv_getlonglo(y); \
+    hix = viv_getlonghi(x); \
+    hiy = viv_getlonghi(y); \
+    fValue1 = (float) loy + (float)hiy*4294967296.f; /*to float*/ \
+    exp = as_int(fValue1) >> 23; \
+    exp -= 0x7f; \
+    mantissa = as_int(fValue1) & 0x007fffff; /*Clean the exp*/ \
+    mantissa |= 0x30800000; /*2^(-30)*mantissaY*/ \
     fValue0 = as_float(mantissa); \
-	z = (int)fValue0;		   /*2^(log2(y)+30)/y, back to integer*/ \
+    fValue1 = 1.0f/fValue0;             /*Actually, should use our InstRcp*/ \
  \
-	q =  viv_Mul64_32RShift(x, z, exp+30 ); /*Get estimation of x/y, may get 21 bit precision*/ \
+    mantissa = as_int(fValue1) - 3;  /*make should less than 1/y */  \
+    fValue0 = as_float(mantissa); \
+    z = (int)fValue0;          /*2^(log2(y)+30)/y, back to integer*/ \
+ \
+    q =  viv_Mul64_32RShift(x, z, exp+30 ); /*Get estimation of x/y, may get 21 bit precision*/ \
     zz = viv_Mul64ThenNeg(loy, hiy , q); \
     res =  viv_Add64(x, zz); \
  \
-	dq = viv_Mul64_32RShift( res, z, exp+30 );  \
-	q = viv_Add64(dq, q); \
+    dq = viv_Mul64_32RShift( res, z, exp+30 );  \
+    q = viv_Add64(dq, q); \
     zz = viv_Mul64ThenNeg(loy, hiy, q); \
     res =  viv_Add64(x, zz); \
  \
-	dq = viv_Mul64_32RShift( res, z, exp+30 );  \
-	q = viv_Add64(dq, q); \
+    dq = viv_Mul64_32RShift( res, z, exp+30 );  \
+    q = viv_Add64(dq, q); \
     zz = viv_Mul64ThenNeg(loy, hiy, q); \
     res =  viv_Add64(x, zz); \
  \
@@ -662,34 +662,34 @@ __kernel void math( \
     hir =  viv_getlonghi(res); \
 \
     if( (hir > hiy) || ( (hir == hiy) && (lor >= loy) )   ){ /*q = x/y - 1*/ \
-		/*res -= y; we don't need return res, if do %, we should have this step and return to res*/ \
-	    loq =  viv_getlonglo(q); \
+        /*res -= y; we don't need return res, if do %, we should have this step and return to res*/ \
+        loq =  viv_getlonglo(q); \
         hiq =  viv_getlonghi(q); \
         loq ++; \
         if(loq == 0) \
             hiq++; \
         viv_setlong(q, loq, hiq); \
-	} \
+    } \
     return q; \
 } \
  \
   long  viv_Signed64Div( long  x,  long  y) \
  { \
-	unsigned int lox, loy, hix, hiy,lor, hir, loq, hiq,signedXY = 0; \
+    unsigned int lox, loy, hix, hiy,lor, hir, loq, hiq,signedXY = 0; \
     int z, exp, mantissa; \
-	 long  a, zz, res, q, dq; \
+    long  a, zz, res, q, dq; \
     float fValue1, fValue0; \
-	lox = viv_getlonglo(x); \
-	loy = viv_getlonglo(y); \
-	hix = viv_getlonghi(x); \
-	hiy = viv_getlonghi(y); \
+    lox = viv_getlonglo(x); \
+    loy = viv_getlonglo(y); \
+    hix = viv_getlonghi(x); \
+    hiy = viv_getlonghi(y); \
     if(hix>>31){\
         lox = -lox;\
         hix = (~hix);\
         if(lox == 0)\
             hix++;\
         signedXY ^= 0xffffffff;\
-		viv_setlong(x, lox, hix);\
+        viv_setlong(x, lox, hix);\
     }\
     if(hiy>>31){\
         loy = -loy;\
@@ -698,29 +698,29 @@ __kernel void math( \
             hiy++;\
         signedXY ^= 0xffffffff;\
     }\
-	fValue1 = (float) loy + (float)hiy*4294967296.f; /*to float*/ \
-	exp = as_int(fValue1) >> 23; \
-	exp -= 0x7f; \
-	mantissa = as_int(fValue1) & 0x007fffff; /*Clean the exp*/ \
-	mantissa |= 0x30800000; /*2^(-30)*mantissaY*/ \
-	fValue0 = as_float(mantissa); \
-    fValue1 = 1.0f/fValue0;				/*Actually, should use our InstRcp*/ \
- \
-	mantissa = as_int(fValue1) - 3;  /*make should less than 1/y */  \
+    fValue1 = (float) loy + (float)hiy*4294967296.f; /*to float*/ \
+    exp = as_int(fValue1) >> 23; \
+    exp -= 0x7f; \
+    mantissa = as_int(fValue1) & 0x007fffff; /*Clean the exp*/ \
+    mantissa |= 0x30800000; /*2^(-30)*mantissaY*/ \
     fValue0 = as_float(mantissa); \
-	z = (int)fValue0;		   /*2^(log2(y)+30)/y, back to integer*/ \
+    fValue1 = 1.0f/fValue0;             /*Actually, should use our InstRcp*/ \
  \
-	q = viv_Mul64_32RShift(x, z, exp+30 ); /*Get estimation of x/y, may get 21 bit precision*/ \
+    mantissa = as_int(fValue1) - 3;  /*make should less than 1/y */  \
+    fValue0 = as_float(mantissa); \
+    z = (int)fValue0;          /*2^(log2(y)+30)/y, back to integer*/ \
+ \
+    q = viv_Mul64_32RShift(x, z, exp+30 ); /*Get estimation of x/y, may get 21 bit precision*/ \
     zz = viv_Mul64ThenNeg(loy, hiy , q); \
     res =  viv_Add64(x, zz); \
  \
-	dq = viv_Mul64_32RShift( res, z, exp+30 );  \
-	q = viv_Add64(dq, q); \
+    dq = viv_Mul64_32RShift( res, z, exp+30 );  \
+    q = viv_Add64(dq, q); \
     zz = viv_Mul64ThenNeg(loy, hiy, q); \
     res =  viv_Add64(x, zz); \
  \
-	dq = viv_Mul64_32RShift( res, z, exp+30 );  \
-	q = viv_Add64(dq, q); \
+    dq = viv_Mul64_32RShift( res, z, exp+30 );  \
+    q = viv_Add64(dq, q); \
     zz = viv_Mul64ThenNeg(loy, hiy, q); \
     res =  viv_Add64(x, zz); \
  \
@@ -728,17 +728,17 @@ __kernel void math( \
     hiq =  viv_getlonghi(res); \
 \
     if( (hiq > hiy) || ( (hiq == hiy) && (loq >= loy) )   ){ /*q = x/y - 1*/ \
-		/*res -= y; we don't need return res, if do %, we should have this step and return to res*/ \
-	    loq =  viv_getlonglo(q); \
+        /*res -= y; we don't need return res, if do %, we should have this step and return to res*/ \
+        loq =  viv_getlonglo(q); \
         hiq =  viv_getlonghi(q); \
         loq ++; \
         if(loq == 0) \
             hiq++; \
-	} \
-	else{\
-	    loq =  viv_getlonglo(q); \
+    } \
+    else{\
+        loq =  viv_getlonglo(q); \
         hiq =  viv_getlonghi(q); \
-	}\
+    }\
     if(signedXY){\
         loq = -loq;\
         hiq = (~hiq) + (loq == 0);\
@@ -760,35 +760,35 @@ __kernel void math( \
  float viv_ulong2float(long x) \
  { \
     float fValue1; \
-	int leadOne, leadOne31, leadOneP1;\
-	unsigned int lox, hix; \
-	lox = viv_getlonglo(x); \
-	hix = viv_getlonghi(x); \
-	fValue1 = (float)hix; \
-	if(fValue1 == 0){ \
-		fValue1 = (float) lox; \
-	}\
-	else if(fValue1 == 4294967296.f){ /*Full precision, may from 0xffffff80*/ \
-		fValue1 = 4294967296.f*4294967296.f; \
-	} \
-	else{ \
+    int leadOne, leadOne31, leadOneP1;\
+    unsigned int lox, hix; \
+    lox = viv_getlonglo(x); \
+    hix = viv_getlonghi(x); \
+    fValue1 = (float)hix; \
+    if(fValue1 == 0){ \
+        fValue1 = (float) lox; \
+    }\
+    else if(fValue1 == 4294967296.f){ /*Full precision, may from 0xffffff80*/ \
+        fValue1 = 4294967296.f*4294967296.f; \
+    } \
+    else{ \
         leadOne = as_int(fValue1); \
-		leadOne = ( leadOne >> 23 ) - 127; /*leading one position on hix*/ \
-		leadOne31 = (31 - leadOne); \
-		leadOneP1 = leadOne + 1; \
-		hix <<= leadOne31; \
+        leadOne = ( leadOne >> 23 ) - 127; /*leading one position on hix*/ \
+        leadOne31 = (31 - leadOne); \
+        leadOneP1 = leadOne + 1; \
+        hix <<= leadOne31; \
         if(leadOne31){ \
-		    hix |= lox >> (leadOneP1) ; \
-		    lox <<= leadOne31; \
+            hix |= lox >> (leadOneP1) ; \
+            lox <<= leadOne31; \
         } \
-		if( lox ) /*sticky bit*/ \
-			hix |= 1; \
-		fValue1 = (float) hix; \
-		leadOne = as_int(fValue1); \
+        if( lox ) /*sticky bit*/ \
+            hix |= 1; \
+        fValue1 = (float) hix; \
+        leadOne = as_int(fValue1); \
         leadOne += (leadOneP1)<<23; \
         fValue1 = as_float(leadOne); \
     } \
-	return fValue1; \
+    return fValue1; \
 } \
 __kernel void math( \
     __global float *pdst, \
@@ -804,10 +804,10 @@ __kernel void math( \
  float viv_signed_long2float(long x) \
  { \
     float fValue1; \
-	int leadOne, leadOne31, leadOneP1;\
-	unsigned int lox, hix, sign; \
-	lox = viv_getlonglo(x); \
-	hix = viv_getlonghi(x); \
+    int leadOne, leadOne31, leadOneP1;\
+    unsigned int lox, hix, sign; \
+    lox = viv_getlonglo(x); \
+    hix = viv_getlonghi(x); \
     sign = hix & 0x80000000; \
     if(sign){ \
         lox = -lox; \
@@ -815,30 +815,30 @@ __kernel void math( \
         if(lox == 0) \
             hix++; \
     } \
-	fValue1 = (float)hix; \
-	if(fValue1 == 0){ \
-		fValue1 = (float) lox; \
-	}\
-	else{ \
+    fValue1 = (float)hix; \
+    if(fValue1 == 0){ \
+        fValue1 = (float) lox; \
+    }\
+    else{ \
         leadOne = as_int(fValue1); \
-		leadOne = ( leadOne >> 23 ) - 127; /*leading one position on hix*/ \
-		leadOne31 = (31 - leadOne); \
-		leadOneP1 = leadOne + 1; \
-		hix <<= leadOne31; \
+        leadOne = ( leadOne >> 23 ) - 127; /*leading one position on hix*/ \
+        leadOne31 = (31 - leadOne); \
+        leadOneP1 = leadOne + 1; \
+        hix <<= leadOne31; \
         if(leadOne31){ \
-		    hix |= lox >> (leadOneP1) ; \
-		    lox <<= leadOne31; \
+            hix |= lox >> (leadOneP1) ; \
+            lox <<= leadOne31; \
         } \
-		if( lox ) /*sticky bit*/ \
-			hix |= 1; \
-		fValue1 = (float) hix; \
-		leadOne = as_int(fValue1); \
+        if( lox ) /*sticky bit*/ \
+            hix |= 1; \
+        fValue1 = (float) hix; \
+        leadOne = as_int(fValue1); \
         leadOne += (leadOneP1)<<23; \
         fValue1 = as_float(leadOne); \
     } \
     if(sign) \
         fValue1 = -fValue1; \
-	return fValue1; \
+    return fValue1; \
 } \
 __kernel void math( \
     __global float *pdst, \
@@ -852,35 +852,35 @@ __kernel void math( \
 "\
  long viv_float2ULong(float fValue1) \
  { \
-	unsigned int lox, hix; \
+    unsigned int lox, hix; \
     int  hexf, exp; \
-	long a; \
+    long a; \
     float absf = fabs(fValue1); \
-	if( fValue1 >=  4294967296.f*4294967296.f){ /*Overflow*/ \
-		lox = 0x0;       /*0x7ffff...; if _sat_ on*/ \
-		hix = 0x0; \
-	}\
-	else if(fValue1 < -4294967296.f*4294967296.f/2.0f){ \
-		lox = 0x0; \
-		hix = 0x80000000; \
-	}\
-	else if( absf < 65536.*65536. ){ /*fValue < 2^32*/ \
-		hix = 0; \
+    if( fValue1 >=  4294967296.f*4294967296.f){ /*Overflow*/ \
+        lox = 0x0;       /*0x7ffff...; if _sat_ on*/ \
+        hix = 0x0; \
+    }\
+    else if(fValue1 < -4294967296.f*4294967296.f/2.0f){ \
+        lox = 0x0; \
+        hix = 0x80000000; \
+    }\
+    else if( absf < 65536.*65536. ){ /*fValue < 2^32*/ \
+        hix = 0; \
         lox = (unsigned int)absf; \
-	} \
-	else{ \
+    } \
+    else{ \
         hexf = as_int(absf); \
-		exp = (hexf>> 23 ) - 127 - 23  ;\
-		lox = (hexf & 0x7fffff) | 0x800000; /*mantissa*/ \
-		if(exp >= 32){ \
-			hix = lox << (exp - 32); \
-			lox = 0; \
-		} \
-		else{ \
-			hix = lox >> (32 - exp); \
-			lox <<= exp; \
-		} \
-	} \
+        exp = (hexf>> 23 ) - 127 - 23  ;\
+        lox = (hexf & 0x7fffff) | 0x800000; /*mantissa*/ \
+        if(exp >= 32){ \
+            hix = lox << (exp - 32); \
+            lox = 0; \
+        } \
+        else{ \
+            hix = lox >> (32 - exp); \
+            lox <<= exp; \
+        } \
+    } \
     if(fValue1 < 0.0f){ \
         lox = -lox; \
         hix = ~hix; \
@@ -888,7 +888,7 @@ __kernel void math( \
             hix++; \
     } \
     viv_setlong(a, lox, hix); \
-	return a; \
+    return a; \
 } \
 \
 __kernel void math( \
@@ -903,32 +903,32 @@ __kernel void math( \
 "\
  long viv_float2SignedLong(float fValue1) \
  { \
-	unsigned int lox, hix; \
+    unsigned int lox, hix; \
     int  hexf, exp; \
-	long a; \
+    long a; \
     float absf = fabs(fValue1); \
-	if( fValue1 >=  4294967296.f*4294967296.f/2.0f || fValue1 < -4294967296.f*4294967296.f/2.0f){ /*Overflow*/ \
-		lox = 0;       /*0x7ffff...; if _sat_ on*/ \
-		hix = 0x80000000; \
-		fValue1 = 0; \
-	}\
-	else if( absf < 65536.*65536. ){ /*fValue < 2^32*/ \
-		hix = 0; \
+    if( fValue1 >=  4294967296.f*4294967296.f/2.0f || fValue1 < -4294967296.f*4294967296.f/2.0f){ /*Overflow*/ \
+        lox = 0;       /*0x7ffff...; if _sat_ on*/ \
+        hix = 0x80000000; \
+        fValue1 = 0; \
+    }\
+    else if( absf < 65536.*65536. ){ /*fValue < 2^32*/ \
+        hix = 0; \
         lox = (unsigned int)absf; \
-	} \
-	else{ \
+    } \
+    else{ \
         hexf = as_int(absf); \
-		exp = (hexf>> 23 ) - 127 - 23  ;\
-		lox = (hexf & 0x7fffff) | 0x800000; /*mantissa*/ \
-		if(exp >= 32){ \
-			hix = lox << (exp - 32); \
-			lox = 0; \
-		} \
-		else{ \
-			hix = lox >> (32 - exp); \
-			lox <<= exp; \
-		} \
-	} \
+        exp = (hexf>> 23 ) - 127 - 23  ;\
+        lox = (hexf & 0x7fffff) | 0x800000; /*mantissa*/ \
+        if(exp >= 32){ \
+            hix = lox << (exp - 32); \
+            lox = 0; \
+        } \
+        else{ \
+            hix = lox >> (32 - exp); \
+            lox <<= exp; \
+        } \
+    } \
     if(fValue1 < 0.0f){ \
         lox = -lox; \
         hix = ~hix; \
@@ -936,7 +936,7 @@ __kernel void math( \
             hix++; \
     } \
     viv_setlong(a, lox, hix); \
-	return a; \
+    return a; \
 } \
 __kernel void math( \
     __global long *pdst, \
@@ -950,13 +950,13 @@ __kernel void math( \
 "\
  long viv_mulHi_uLong(long x, long y) \
  { \
-	unsigned int lox, loy, hix, hiy,loz, hiz; \
+    unsigned int lox, loy, hix, hiy,loz, hiz; \
     unsigned int mulH1L0, mulH0L1, mulHighL0L1, mulH0L1L, mulH1L0L, notV;\
-	long a; \
-	lox = viv_getlonglo(x); \
-	loy = viv_getlonglo(y); \
-	hix = viv_getlonghi(x); \
-	hiy = viv_getlonghi(y); \
+    long a; \
+    lox = viv_getlonglo(x); \
+    loy = viv_getlonglo(y); \
+    hix = viv_getlonghi(x); \
+    hiy = viv_getlonghi(y); \
     hiz = mul_hi(hix, hiy); \
     loz = hix*hiy; \
     mulH0L1L = hix*loy; \
@@ -1001,13 +1001,13 @@ __kernel void math( \
 "\
  long viv_mulHi_Long(long x, long y) \
  { \
-	unsigned int lox, loy, hix, hiy,loz, hiz; \
+    unsigned int lox, loy, hix, hiy,loz, hiz; \
     unsigned int mulH1L0, mulH0L1, mulHighL0L1, mulH0L1L, mulH1L0L, notV;\
-	long a; \
-	lox = viv_getlonglo(x); \
-	loy = viv_getlonglo(y); \
-	hix = viv_getlonghi(x); \
-	hiy = viv_getlonghi(y); \
+    long a; \
+    lox = viv_getlonglo(x); \
+    loy = viv_getlonglo(y); \
+    hix = viv_getlonghi(x); \
+    hiy = viv_getlonghi(y); \
     hiz = mul_hi(hix, hiy); \
     loz = hix*hiy; \
     mulH0L1L = hix*loy; \
@@ -1065,13 +1065,13 @@ __kernel void math( \
 "\
  long viv_mulSat_uLong(long x, long y) \
  { \
-	unsigned int lox, loy, hix, hiy,loz, hiz; \
+    unsigned int lox, loy, hix, hiy,loz, hiz; \
     unsigned int mulH1L0, mulH0L1, mulHighL0L1, mulH0L1L, mulH1L0L, notV, overflow = 0;\
-	long a; \
-	lox = viv_getlonglo(x); \
-	loy = viv_getlonglo(y); \
-	hix = viv_getlonghi(x); \
-	hiy = viv_getlonghi(y); \
+    long a; \
+    lox = viv_getlonglo(x); \
+    loy = viv_getlonglo(y); \
+    hix = viv_getlonghi(x); \
+    hiy = viv_getlonghi(y); \
     hiz = mul_hi(hix, hiy); \
     loz = hix*hiy; \
     if(hiz || loz || mul_hi(lox, hiy) || mul_hi(hix, loy)){ \
@@ -1113,13 +1113,13 @@ __kernel void math( \
 "\
  long viv_mulSat_Long(long x, long y) \
  { \
-	unsigned int lox, loy, hix, hiy,loz, hiz; \
+    unsigned int lox, loy, hix, hiy,loz, hiz; \
     unsigned int mulH1L0, mulH0L1, mulHighL0L1, mulH0L1L, mulH1L0L, notV, resultSign = 0, overflow = 0, maxhi;\
-	long a; \
-	lox = viv_getlonglo(x); \
-	loy = viv_getlonglo(y); \
-	hix = viv_getlonghi(x); \
-	hiy = viv_getlonghi(y); \
+    long a; \
+    lox = viv_getlonglo(x); \
+    loy = viv_getlonglo(y); \
+    hix = viv_getlonghi(x); \
+    hiy = viv_getlonghi(y); \
     if(hix>>31){ \
         hix = ~hix;\
         lox = -lox;\
@@ -1159,11 +1159,11 @@ __kernel void math( \
         if(hiz > maxhi || (hiz == 0x80000000 && loz) ) \
             overflow = 0xffffffff;\
     }\
-	notV = ~overflow;\
+    notV = ~overflow;\
     if(resultSign){ \
         loz = (-loz) & notV; \
         hiz = ( (~hiz) + (loz == 0) )& notV; \
-		hiz += overflow & 0x80000000;\
+        hiz += overflow & 0x80000000;\
     }\
     else if(overflow){\
         loz = 0xffffffff;\
@@ -1184,13 +1184,13 @@ __kernel void math( \
 "\
  long  viv_mul_Long( long  x, long  y) \
  { \
-	unsigned int lox, loy, hix, hiy,loz, hiz; \
-	 long a; \
-	lox = viv_getlonglo(x); \
-	loy = viv_getlonglo(y); \
-	hix = viv_getlonghi(x); \
-	hiy = viv_getlonghi(y); \
-	loz = lox*loy; \
+    unsigned int lox, loy, hix, hiy,loz, hiz; \
+    long a; \
+    lox = viv_getlonglo(x); \
+    loy = viv_getlonglo(y); \
+    hix = viv_getlonghi(x); \
+    hiy = viv_getlonghi(y); \
+    loz = lox*loy; \
     hiz = mul_hi(lox, loy); \
     hiz += hix*loy; \
     hiz += lox*hiy; \
@@ -2735,32 +2735,32 @@ main(
 
 union Six4ToInt
 {
-	cl_ulong u64;
-	unsigned int n32[2];
+    cl_ulong u64;
+    unsigned int n32[2];
 };
 cl_ulong MultHigh64_cpu(cl_ulong u, cl_ulong v, int flagSigned)
 {
-	union Six4ToInt un[4];
-	cl_ulong temp;
+    union Six4ToInt un[4];
+    cl_ulong temp;
 
-	un[0].u64 = u;
-	un[1].u64 = v;
+    un[0].u64 = u;
+    un[1].u64 = v;
 
-	un[2].u64 = (cl_ulong)un[0].n32[1] * (cl_ulong)un[1].n32[1];
+    un[2].u64 = (cl_ulong)un[0].n32[1] * (cl_ulong)un[1].n32[1];
 
-	un[2].u64 += ((cl_ulong)un[0].n32[0] * (cl_ulong)un[1].n32[1]) >> (cl_ulong)32;
-	un[2].u64 += ((cl_ulong)un[1].n32[0] * (cl_ulong)un[0].n32[1]) >> (cl_ulong)32;
+    un[2].u64 += ((cl_ulong)un[0].n32[0] * (cl_ulong)un[1].n32[1]) >> (cl_ulong)32;
+    un[2].u64 += ((cl_ulong)un[1].n32[0] * (cl_ulong)un[0].n32[1]) >> (cl_ulong)32;
 
-	un[3].u64 = ((cl_ulong)un[0].n32[0] * (cl_ulong)un[1].n32[0]);
+    un[3].u64 = ((cl_ulong)un[0].n32[0] * (cl_ulong)un[1].n32[0]);
 
-	temp = ((cl_ulong)un[0].n32[0] * (cl_ulong)un[1].n32[1]) << (cl_ulong)32;
-	if(un[3].u64 > ~temp) //Carry bit happen in Low part
-		un[2].u64++;
-	un[3].u64 += temp;
+    temp = ((cl_ulong)un[0].n32[0] * (cl_ulong)un[1].n32[1]) << (cl_ulong)32;
+    if(un[3].u64 > ~temp) //Carry bit happen in Low part
+        un[2].u64++;
+    un[3].u64 += temp;
 
-	temp = ((cl_ulong)un[1].n32[0] * (cl_ulong)un[0].n32[1]) << (cl_ulong)32;
-	if(un[3].u64 > ~temp) //Carry bit happen in Low part
-		un[2].u64++;
+    temp = ((cl_ulong)un[1].n32[0] * (cl_ulong)un[0].n32[1]) << (cl_ulong)32;
+    if(un[3].u64 > ~temp) //Carry bit happen in Low part
+        un[2].u64++;
 
     if(flagSigned){
         if(un[0].n32[1] >>31){
@@ -2770,5 +2770,5 @@ cl_ulong MultHigh64_cpu(cl_ulong u, cl_ulong v, int flagSigned)
             un[2].u64 -= un[0].u64;
         }
     }
-	return un[2].u64;
+    return un[2].u64;
 }

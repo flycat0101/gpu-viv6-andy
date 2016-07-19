@@ -52,101 +52,101 @@ typedef struct Test2D {
     GalTest     base;
     GalRuntime  *runtime;
 
-	/* Dst surface. */
-    gcoSURF			dstSurf;
-	gceSURF_FORMAT	dstFormat;
-	gctUINT			dstWidth;
-	gctUINT			dstHeight;
-	gctINT			dstStride;
-	gctUINT32		dstPhyAddr;
-	gctPOINTER		dstLgcAddr;
+    /* Dst surface. */
+    gcoSURF            dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT            dstWidth;
+    gctUINT            dstHeight;
+    gctINT            dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
 
-	/* Line color. */
-	gcsRECT			lines[8];
-	gctUINT32		lineColor;
+    /* Line color. */
+    gcsRECT            lines[8];
+    gctUINT32        lineColor;
 } Test2D;
 
 
 static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 {
-	gcsRECT   dstRect = { 0, 0, t2d->dstWidth, t2d->dstHeight };
-	gco2D     egn2D   = t2d->runtime->engine2d;
-	gceSTATUS status;
+    gcsRECT   dstRect = { 0, 0, t2d->dstWidth, t2d->dstHeight };
+    gco2D     egn2D   = t2d->runtime->engine2d;
+    gceSTATUS status;
 
-	gcmONERROR(gco2D_SetClipping(egn2D, &dstRect));
+    gcmONERROR(gco2D_SetClipping(egn2D, &dstRect));
 
-	/* clear the dst surface. */
-	gcmONERROR(Gal2DCleanSurface(t2d->runtime->hal, t2d->dstSurf, COLOR_ARGB8(0, 0, 0, 0)));
+    /* clear the dst surface. */
+    gcmONERROR(Gal2DCleanSurface(t2d->runtime->hal, t2d->dstSurf, COLOR_ARGB8(0, 0, 0, 0)));
 
-	gcmONERROR(gco2D_SetTarget(egn2D, t2d->dstPhyAddr, t2d->dstStride, gcvSURF_0_DEGREE, t2d->dstWidth));
+    gcmONERROR(gco2D_SetTarget(egn2D, t2d->dstPhyAddr, t2d->dstStride, gcvSURF_0_DEGREE, t2d->dstWidth));
 
-	t2d->lines[0].left   = 0;
-	t2d->lines[0].top    = 0;
-	t2d->lines[0].right  = t2d->dstWidth;
-	t2d->lines[0].bottom = t2d->dstHeight;
+    t2d->lines[0].left   = 0;
+    t2d->lines[0].top    = 0;
+    t2d->lines[0].right  = t2d->dstWidth;
+    t2d->lines[0].bottom = t2d->dstHeight;
 
-	t2d->lines[1].left   = t2d->dstWidth;
-	t2d->lines[1].top    = 0;
-	t2d->lines[1].right  = 0;
-	t2d->lines[1].bottom = t2d->dstHeight;
+    t2d->lines[1].left   = t2d->dstWidth;
+    t2d->lines[1].top    = 0;
+    t2d->lines[1].right  = 0;
+    t2d->lines[1].bottom = t2d->dstHeight;
 
-	t2d->lines[2].left   = 0;
-	t2d->lines[2].top    = t2d->dstHeight/2;
-	t2d->lines[2].right  = t2d->dstWidth;
-	t2d->lines[2].bottom = t2d->dstHeight/2;
+    t2d->lines[2].left   = 0;
+    t2d->lines[2].top    = t2d->dstHeight/2;
+    t2d->lines[2].right  = t2d->dstWidth;
+    t2d->lines[2].bottom = t2d->dstHeight/2;
 
-	t2d->lines[3].left   = t2d->dstWidth/2;
-	t2d->lines[3].top    = 0;
-	t2d->lines[3].right  = t2d->dstWidth/2;
-	t2d->lines[3].bottom = t2d->dstHeight;
+    t2d->lines[3].left   = t2d->dstWidth/2;
+    t2d->lines[3].top    = 0;
+    t2d->lines[3].right  = t2d->dstWidth/2;
+    t2d->lines[3].bottom = t2d->dstHeight;
 
-	t2d->lines[4].left   = t2d->dstWidth/4;
-	t2d->lines[4].top    = 0;
-	t2d->lines[4].right  = t2d->dstWidth/4;
-	t2d->lines[4].bottom = t2d->dstHeight;
+    t2d->lines[4].left   = t2d->dstWidth/4;
+    t2d->lines[4].top    = 0;
+    t2d->lines[4].right  = t2d->dstWidth/4;
+    t2d->lines[4].bottom = t2d->dstHeight;
 
-	t2d->lines[5].left   = t2d->dstWidth*3/4;
-	t2d->lines[5].top    = 0;
-	t2d->lines[5].right  = t2d->dstWidth*3/4;
-	t2d->lines[5].bottom = t2d->dstHeight;
+    t2d->lines[5].left   = t2d->dstWidth*3/4;
+    t2d->lines[5].top    = 0;
+    t2d->lines[5].right  = t2d->dstWidth*3/4;
+    t2d->lines[5].bottom = t2d->dstHeight;
 
-	t2d->lines[6].left   = 0;
-	t2d->lines[6].top    = t2d->dstHeight/4;
-	t2d->lines[6].right  = t2d->dstWidth;
-	t2d->lines[6].bottom = t2d->dstHeight/4;
+    t2d->lines[6].left   = 0;
+    t2d->lines[6].top    = t2d->dstHeight/4;
+    t2d->lines[6].right  = t2d->dstWidth;
+    t2d->lines[6].bottom = t2d->dstHeight/4;
 
-	t2d->lines[7].left   = 0;
-	t2d->lines[7].top    = t2d->dstHeight*3/4;
-	t2d->lines[7].right  = t2d->dstWidth;
-	t2d->lines[7].bottom = t2d->dstHeight*3/4;
+    t2d->lines[7].left   = 0;
+    t2d->lines[7].top    = t2d->dstHeight*3/4;
+    t2d->lines[7].right  = t2d->dstWidth;
+    t2d->lines[7].bottom = t2d->dstHeight*3/4;
 
-	/* Set the line color (ARGB8888). */
-	t2d->lineColor = 0x00536170;
+    /* Set the line color (ARGB8888). */
+    t2d->lineColor = 0x00536170;
 
-	gcmONERROR(gco2D_ColorLine(egn2D, 8, t2d->lines, t2d->lineColor, 0xCC, 0xCC, t2d->dstFormat));
+    gcmONERROR(gco2D_ColorLine(egn2D, 8, t2d->lines, t2d->lineColor, 0xCC, 0xCC, t2d->dstFormat));
 
-	gcmONERROR(gco2D_Flush(egn2D));
+    gcmONERROR(gco2D_Flush(egn2D));
 
-	gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
+    gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
 
     return gcvTRUE;
 
 OnError:
     GalOutput(GalOutputType_Error | GalOutputType_Console,
         "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
-	return gcvFALSE;
+    return gcvFALSE;
 }
 
 static void CDECL Destroy(Test2D *t2d)
 {
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
     if ((t2d->dstSurf != gcvNULL) && (t2d->dstLgcAddr != gcvNULL))
     {
-		if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
-		}
-		t2d->dstLgcAddr = gcvNULL;
+        if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
+        }
+        t2d->dstLgcAddr = gcvNULL;
     }
 
     free(t2d);
@@ -159,7 +159,7 @@ const gceFEATURE FeatureList[]=
 
 static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 {
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
 
     gctUINT32 k, listLen = sizeof(FeatureList)/sizeof(gctINT);
     gctBOOL featureStatus;
@@ -190,32 +190,32 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 
     t2d->runtime    = runtime;
 
-	t2d->dstSurf    = runtime->target;
-	t2d->dstFormat  = runtime->format;
-	t2d->dstWidth   = 0;
-	t2d->dstHeight  = 0;
-	t2d->dstStride  = 0;
-	t2d->dstPhyAddr = 0;
-	t2d->dstLgcAddr = 0;
+    t2d->dstSurf    = runtime->target;
+    t2d->dstFormat  = runtime->format;
+    t2d->dstWidth   = 0;
+    t2d->dstHeight  = 0;
+    t2d->dstStride  = 0;
+    t2d->dstPhyAddr = 0;
+    t2d->dstLgcAddr = 0;
 
-	gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
-										&t2d->dstWidth,
-										&t2d->dstHeight,
-										&t2d->dstStride));
+    gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
+                                        &t2d->dstWidth,
+                                        &t2d->dstHeight,
+                                        &t2d->dstStride));
 
-	gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
+    gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
 
-	t2d->base.render      = (PGalRender)Render;
+    t2d->base.render      = (PGalRender)Render;
     t2d->base.destroy     = (PGalDestroy)Destroy;
     t2d->base.frameCount  = 1;
-	t2d->base.description = s_CaseDescription;
+    t2d->base.description = s_CaseDescription;
 
     return gcvTRUE;
 
 OnError:
     GalOutput(GalOutputType_Error | GalOutputType_Console,
         "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
-	return gcvFALSE;
+    return gcvFALSE;
 }
 
 GalTest * CDECL GalCreateTestObject(GalRuntime *runtime)

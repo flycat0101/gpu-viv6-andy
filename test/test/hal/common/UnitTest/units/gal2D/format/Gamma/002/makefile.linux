@@ -46,7 +46,7 @@ OBJECTS = $(OBJ_DIR)/002.o \
 # Define a shortcut for the main target.
 
 DYNAMIC := 1
-TARGET_NAME  = libgal2DGamma002.so
+TARGET_NAME  = libgal2DFormatGamma002.so
 
 ################################################################################
 # Installation directory.

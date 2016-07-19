@@ -62,9 +62,15 @@ BANK_CHANNEL_BIT             ?= 0
 DEBUG                        ?= 0
 
 # Build OpenCL
-USE_OPENCL ?= 0
+USE_OPENCL ?= 1
+ifeq ($(USE_OPENCL),1)
+BUILD_OPENCL_ICD             ?= 1
+BUILD_OPENCL_FP              ?= 1
+ENABLE_CL_GL                 ?= 0
+else
 BUILD_OPENCL_ICD             ?= 0
 ENABLE_CL_GL                 ?= 0
+endif
 
 USE_OPENVX                   ?= 0
 
@@ -198,12 +204,10 @@ ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 19),1)
 CFLAGS        += -DgcdANDROID_IMPLICIT_NATIVE_BUFFER_SYNC=0
 endif
 
-
-################################################################################
-# Platform specific configs.
-
-THIRDPARTY_CUSTOMER ?=
-THIRDPARTY_TYPE ?=
+# For clang.
+ifeq ($(USE_CLANG_PLATFORM_BUILD),true)
+CFLAGS        += -Wno-parentheses-equality -Wno-self-assign
+endif
 
 endif
 

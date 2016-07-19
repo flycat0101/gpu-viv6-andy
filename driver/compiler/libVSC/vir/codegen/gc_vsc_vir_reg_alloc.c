@@ -6555,7 +6555,7 @@ gctBOOL _VIR_RA_LS_FindBrandnewColor(
         regNoRange = pLR->regNoRange;
     }
 
-    if (pCP->colorMap[VIR_RA_HWREG_GR].maxAllocReg + regNoRange < (pCP->colorMap[VIR_RA_HWREG_GR].maxReg - reservedDataReg - 1))
+    if (pCP->colorMap[VIR_RA_HWREG_GR].maxAllocReg + regNoRange < _VIR_RA_LS_GetMaxReg(pRA, VIR_RA_HWREG_GR, reservedDataReg))
     {
         gctUINT regNo = pCP->colorMap[VIR_RA_HWREG_GR].maxAllocReg + 1;
         _VIR_RA_MakeColor(regNo, 0, color);
@@ -8131,7 +8131,7 @@ _VIR_RA_LS_SpillAddrComputation(
     /* TODO: HW can't support 32 bit mod/div, use 16 bit mod right now, need to refine. */
     /* index = mod(index, groupSize) */
     retErrCode = VIR_Function_AddInstructionAfter(pFunc,
-                                                  VIR_OP_MOD,
+                                                  VIR_OP_AQ_IMOD,
                                                   VIR_TYPE_UINT16,
                                                   atomicAddInst,
                                                   &modInst);
@@ -8706,7 +8706,7 @@ VSC_ErrCode _VIR_RA_LS_InsertMOD(
 
     /* MOD index, index, vertexCount */
     retValue = VIR_Function_AddInstructionBefore(pFunc,
-                VIR_OP_MOD,
+                VIR_OP_AQ_IMOD,
                 VIR_TYPE_INT16,
                 pInst,
                 newInst);

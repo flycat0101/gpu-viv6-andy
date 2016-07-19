@@ -245,8 +245,8 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
     drect.left = 0;
     drect.top = 0;
-    drect.right = tempSurf->width;
-    drect.bottom = tempSurf->height;
+    drect.right = tempSurf->aWidth;
+    drect.bottom = tempSurf->aHeight;
 
     switch (frameNo % 4)
     {
@@ -269,6 +269,15 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
             break;
     }
 
+    if (tempSurf->format == gcvSURF_NV12_10BIT ||
+        tempSurf->format == gcvSURF_NV21_10BIT ||
+        tempSurf->format == gcvSURF_NV16_10BIT ||
+        tempSurf->format == gcvSURF_NV61_10BIT)
+    {
+        hMirror = vMirror = gcvFALSE;
+        rot = gcvSURF_0_DEGREE;
+    }
+
     gcmONERROR(gco2D_SetBitBlitMirror(egn2D, hMirror, vMirror));
 
     gcmONERROR(gco2D_SetClipping(egn2D, &drect));
@@ -287,14 +296,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         tempSurf->aWidth, tempSurf->aHeight,
         &drect, gcvNULL));
 
-    if (!t2d->runtime->noSaveTargetNew)
-    {
-        char name[200];
-
-        gcmONERROR(gcoHAL_Commit(gcvNULL, gcvTRUE));
-        sprintf(name, "gal2DFormat10Bit003_intermediate_%03d.bmp", frameNo);
-        GalSaveTSurfToDIB(tempSurf, name);
-    }
 
     srect.left = 0;
     srect.top = 0;

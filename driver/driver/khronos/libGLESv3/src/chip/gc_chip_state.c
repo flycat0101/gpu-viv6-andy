@@ -17,7 +17,7 @@
 #define _GC_OBJ_ZONE    __GLES3_ZONE_STATE
 
 #if gcdFRAMEINFO_STATISTIC
-extern GLboolean g_dbgDumpTexturePerDraw;
+extern GLint g_dbgDumpImagePerDraw;
 #endif
 
 /************************************************************************/
@@ -1704,7 +1704,8 @@ gcChipValidateProgramSamplersCB(
                 chipCtx->texture.halTexture[unit].magFilter = gcvTEXTURE_POINT;
         }
 
-        if (pgInstance->extraSamplerMap[sampler].subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_ADVANCED_BLEND_SAMPLER || pgInstance->extraSamplerMap[sampler].subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_SAMPLER )
+        if (pgInstance->extraSamplerMap[sampler].subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_ADVANCED_BLEND_SAMPLER
+         || pgInstance->extraSamplerMap[sampler].subUsage == __GL_CHIP_UNIFORM_SUB_USAGE_BLEND_SAMPLER )
         {
             gcsTEXTURE texParams;
             if (gcvNULL == chipCtx->rtTexture)
@@ -1786,8 +1787,8 @@ gcChipValidateProgramSamplersCB(
             {
                 gctUINT samplers[gcdMAX_SURF_LAYERS], layers = 1, samplerBaseOffset = 0;
                 gctBOOL swizzled = gcvFALSE;
-                gceTEXTURE_SWIZZLE backedSwizzle[gcvTEXTURE_COMPONENT_NUM];
-                const gceTEXTURE_SWIZZLE defaultSwizzle[gcvTEXTURE_COMPONENT_NUM] =
+                gceTEXTURE_SWIZZLE backedSwizzle[gcvTEXTURE_COMPONENT_NUM] = {gcvTEXTURE_SWIZZLE_INVALID};
+                static const gceTEXTURE_SWIZZLE defaultSwizzle[gcvTEXTURE_COMPONENT_NUM] =
                 {
                     gcvTEXTURE_SWIZZLE_R,
                     gcvTEXTURE_SWIZZLE_G,
@@ -1795,7 +1796,7 @@ gcChipValidateProgramSamplersCB(
                     gcvTEXTURE_SWIZZLE_A,
                 };
 
-                const gcePROGRAM_STAGE shaderKindToProgStage[] =
+                static const gcePROGRAM_STAGE shaderKindToProgStage[] =
                 {
                     gcvPROGRAM_STAGE_LAST,     /* gcSHADER_TYPE_UNKNOWN = 0 */
                     gcvPROGRAM_STAGE_VERTEX,   /* gcSHADER_TYPE_VERTEX */
@@ -1902,7 +1903,7 @@ gcChipValidateProgramSamplersCB(
             texObj->uObjStateDirty.objStateDirty = 0;
 
 #if gcdFRAMEINFO_STATISTIC
-            if (g_dbgDumpTexturePerDraw)
+            if (g_dbgDumpImagePerDraw & __GL_PERDRAW_DUMP_TEXTURE)
             {
                 gcmVERIFY_OK(gcChipUtilsDumpTexture(gc, texObj));
             }
@@ -2800,7 +2801,8 @@ gcChipRecompileShader(
     __GLchipProgramStateKey* pgStateKey =  pgInstance->pgStateKey;
     __GLchipProgramStateKeyMask* pgStateKeyMask = &pgInstance->pgStateKeyMask;
     __GLchipRecompileInfo *recompileInfo = &pgInstance->recompilePatchInfo;
-
+    gctBOOL recompileNoDirective = gcvFALSE;
+    gctUINT32 recompileOptions = 0;
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
     /* Currently, we have two methods of recompiling, one is full-time compile and the other is
@@ -3017,10 +3019,17 @@ gcChipRecompileShader(
         }
     }
 
-    if (recompileInfo->recompilePatchDirectivePtr)
+    /* 14, output highp conversion */
+    if (pgStateKeyMask->s.hasPSOutHighpConversion)
+    {
+        recompileNoDirective = gcvTRUE;
+        recompileOptions |= __GL_CHIP_RO_OUTPUT_HIGHP_CONVERSION;
+    }
+
+    if (recompileInfo->recompilePatchDirectivePtr || recompileNoDirective)
     {
         /* Do first kind of recompile */
-        gcmONERROR(gcChipDynamicPatchProgram(gc, progObj, recompileInfo->recompilePatchDirectivePtr));
+        gcmONERROR(gcChipDynamicPatchProgram(gc, progObj, recompileInfo->recompilePatchDirectivePtr, recompileOptions));
     }
 
 OnError:
@@ -3152,12 +3161,18 @@ gcChipNeedRecompile(
             pgStateKey->staticKey->ShaderPolygonOffset = GL_TRUE;
             pgStateKeyMask->s.hasPolygonOffset = 1;
         }
+
+        if (chipCtx->pgKeyState->staticKey->highpConversion)
+        {
+            pgStateKey->staticKey->highpConversion = GL_TRUE;
+            pgStateKeyMask->s.hasPSOutHighpConversion = 1;
+        }
     }
 
     if (program->stageBits & gcvPROGRAM_STAGE_TCS_BIT)
     {
         pgStateKey->staticKey->tcsPatchInVertices = masterInstance->tcsPatchInVertices;
-        if (pgKeyState->staticKey->tcsPatchInVertices != masterInstance->tcsPatchInVertices)
+        if (pgKeyState->staticKey->tcsPatchInVertices != masterInstance->tcsPatchInVertices )
         {
             pgStateKey->staticKey->tcsPatchInVertices = pgKeyState->staticKey->tcsPatchInVertices;
             pgStateKeyMask->s.hasTcsPatchInVertices = 1;
@@ -3632,6 +3647,7 @@ gcChipRecompileEvaluateKeyStates(
 
         if (chipDirty->uBuffer.sBuffer.rtSurfDirty || progSwitched)
         {
+            GLuint i;
             gctBOOL drawYInverted = program->masterPgInstance->programState.hints->yInvertAware &&
                                     chipCtx->drawYInverted;
 
@@ -3639,6 +3655,37 @@ gcChipRecompileEvaluateKeyStates(
             {
                 pgKeyState->staticKey->drawYInverted = drawYInverted;
                 pgKeyDirty = GL_TRUE;
+            }
+
+            if(!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PSIO_DUAL16_32bpc_FIX))
+            {
+                for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
+                {
+                    if (chipCtx->drawRtViews[i].surf && i < program->maxOutLoc && program->loc2Out[i])
+                    {
+                        gceSURF_FORMAT rtFormat = gcvSURF_UNKNOWN;
+
+                        gcmVERIFY_OK(gcoSURF_GetFormat(chipCtx->drawRtViews[i].surf, gcvNULL, &rtFormat));
+
+                        switch (rtFormat)
+                        {
+                        case gcvSURF_R32F:
+                        case gcvSURF_R32I:
+                        case gcvSURF_R32UI:
+                        case gcvSURF_G32R32F:
+                        case gcvSURF_G32R32I:
+                        case gcvSURF_G32R32UI:
+                        case gcvSURF_A32B32G32R32F_2_G32R32F:
+                        case gcvSURF_A32B32G32R32I_2_G32R32F:
+                        case gcvSURF_A32B32G32R32UI_2_G32R32F:
+                            pgKeyState->staticKey->highpConversion = gcvTRUE;
+                            pgKeyDirty = GL_TRUE;
+                            break;
+                        default:
+                            break;
+                        }
+                    }
+                }
             }
         }
 
@@ -3886,6 +3933,7 @@ gcChipValidateRecompileStateCB(
 
     if (status == gcvSTATUS_TRUE)
     {
+        GLint i;
         gcmONERROR(gcChipPgStateKeyAlloc(gc, &pgStateKey));
         /* Convert key states to state key to check whether we really need a recompile */
         if (gcChipNeedRecompile(gc, chipCtx, program, pgStateKey, &pgStateKeyMask))
@@ -3955,7 +4003,6 @@ gcChipValidateRecompileStateCB(
 
         if (pgInstanceChanged)
         {
-            GLint i;
             gcePROGRAM_STAGE halStage = gcvPROGRAM_STAGE_VERTEX;
             gcePROGRAM_STAGE_BIT stageBits = program->stageBits;
 
@@ -4039,6 +4086,23 @@ gcChipValidateRecompileStateCB(
             for (i = 0; i < newPgInstance->privateUniformCount; ++i)
             {
                 newPgInstance->privateUniforms[i].dirty = GL_TRUE;
+            }
+        }
+        if (newPgInstance->pgStateKeyMask.s.hasTexPatchFmt)
+        {
+            for (i = 0; i < (GLint)gc->constants.shaderCaps.maxTextureSamplers; i++)
+            {
+                __GLchipPgStateKeyTexPatchInfo *texPatchInfo = &newPgInstance->pgStateKey->texPatchInfo[i];
+                if (texPatchInfo->format != gcvSURF_UNKNOWN)
+                {
+                    gcsSURF_FORMAT_INFO_PTR formatInfo;
+                    gcoSURF_QueryFormat(texPatchInfo->format, &formatInfo);
+                    if (formatInfo->layers > 1)
+                    {
+                        __glBitmaskSet(&gc->shaderProgram.samplerMapDirty, i);
+
+                    }
+                }
             }
         }
     }
@@ -4215,7 +4279,7 @@ gcChipValidateProgramImagesCB(
                     break;
                 }
 
-                if (texObj && texObj->bufObj)
+                if (texObj->bufObj)
                 {
                     gcChipValidateProgramTexBufferUniform(gc, texObj, uniform, imageUnit);
                     valid = gcvTRUE;

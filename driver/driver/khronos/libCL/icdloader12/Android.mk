@@ -41,6 +41,11 @@ LOCAL_SHARED_LIBRARIES := \
 	liblog \
 	libdl
 
+ifeq ($(ENABLE_CL_GL), 1)
+CFLAGS += -DgcdENABLE_CL_GL=1
+else
+CFLAGS += -DgcdENABLE_CL_GL=0
+endif
 
 LOCAL_MODULE         := libOpenCL
 LOCAL_MODULE_TAGS    := optional

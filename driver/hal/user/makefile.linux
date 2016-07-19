@@ -46,41 +46,15 @@ INCLUDE := -I$(AQROOT)/hal/inc \
 
   INCLUDE += -I$(AQROOT)/hal/os/linux/user
 
-ifeq ($(EGL_API_WL), 1)
-  INCLUDE += -I$(WAYLAND_DIR)/include \
-             -I$(WAYLAND_DIR)/include/wayland-viv
-endif
-
-ifeq ($(EGL_API_DFB), 1)
-  INCLUDE += -I$(DFB_DIR)/usr/include \
-             -I$(DFB_DIR)/include \
-             -I$(DFB_DIR)/include/directfb-internal \
-             -I$(DFB_DIR)/include/directfb
-endif
-
-ifeq ($(EGL_API_DRI), 1)
-  INCLUDE += -I$(X11_ARM_DIR)/include
-endif
-
-ifeq ($(EGL_API_X), 1)
-  INCLUDE += -I$(X11_ARM_DIR)/include
-endif
-
 CFLAGS += $(INCLUDE)
 
 ################################################################################
 # Add extra flags for object files.
 
 ifneq ($(USE_ARMCC), 1)
-  ifeq ($(EGL_API_DFB), 1)
-    CFLAGS += -pipe -fPIC -DPIC
-  else
-    ifeq ($(EGL_API_WL), 1)
-      CFLAGS += -fPIC -Werror
-    else
-        CFLAGS += -fPIC -Werror -ansi
-    endif
-  endif
+  CFLAGS += -fPIC -Werror
+
+    CFLAGS += -Werror -ansi
 endif
 
 ifeq ($(BUILD_OPENCL_FP), 1)
@@ -121,27 +95,6 @@ LIBS += -L$(AQROOT)/hal/user/arch/$(OBJ_DIR)
 
 ifeq ($(VIVANTE_ENABLE_VG), 1)
   LIBS += -L$(AQROOT)/hal/user/archvg/$(OBJ_DIR)
-endif
-
-ifeq ($(EGL_API_DRI), 1)
-  LIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lX11
-endif
-
-ifeq ($(EGL_API_X), 1)
-  LIBS += -L$(X11_ARM_DIR)/lib -lX11 -lXext
-endif
-
-ifeq ($(EGL_API_WL), 1)
-  LIBS += -L$(WAYLAND_DIR)/lib -lwayland-client
-  LIBS += -L$(WAYLAND_DIR)/lib -lgc_wayland_protocol -lwayland-server
-endif
-
-ifeq ($(EGL_API_DFB), 1)
-  LIBS += -L$(DFB_DIR)/lib -ldirectfb -ldirect -lz
-endif
-
-ifeq ($(EGL_API_GBM), 1)
-  LIBS += $(shell $(PKG_CONFIG) --libs libdrm gbm)
 endif
 
 # Supply necessary libraries.
@@ -225,35 +178,14 @@ ifeq ($(VIVANTE_ENABLE_VG),1)
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_vg.h $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_engine_vg.h $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_driver_vg.h $(SDK_DIR)/include/HAL
-	@-cp -f $(AQROOT)/hal/inc/gc_hal_eglplatform.h $(SDK_DIR)/include/HAL
-	@-cp -f $(AQROOT)/hal/inc/gc_hal_eglplatform_type.h $(SDK_DIR)/include/HAL
 endif
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_driver.h $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_rename.h $(SDK_DIR)/include/HAL
 ifeq ($(VIVANTE_ENABLE_3D),1)
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_engine.h $(SDK_DIR)/include/HAL
-	@-cp -f $(AQROOT)/hal/inc/gc_hal_eglplatform.h $(SDK_DIR)/include/HAL
-	@-cp -f $(AQROOT)/hal/inc/gc_hal_eglplatform_type.h $(SDK_DIR)/include/HAL
 	@-cp -f $(AQROOT)/hal/inc/gc_hal_statistics.h $(SDK_DIR)/include/HAL
 endif
 	@-cd $(SDK_DIR)/include/HAL; echo "#include \"HAL/gc_hal.h\"" >aqHal.h; cd -
-ifeq ($(gcdSTATIC_LINK), 0)
-  ifeq ($(EGL_API_FB)_$(EGL_API_WL), 1_0)
-	@-cp -f $(TARGET_MODULE) $(INSTALL_DIR)/libGAL.fb.so
-  endif # EGL_API_FB
-  ifeq ($(EGL_API_FB)_$(EGL_API_WL), 1_1)
-	@-cp -f $(TARGET_MODULE) $(INSTALL_DIR)/libGAL.wl.so
-  endif # EGL_API_WL
-  ifeq ($(EGL_API_DRI), 1)
-	@-cp -f $(TARGET_MODULE) $(INSTALL_DIR)/libGAL.dri.so
-  endif # EGL_API_DRI
-  ifeq ($(EGL_API_X), 1)
-	@-cp -f $(TARGET_MODULE) $(INSTALL_DIR)/libGAL.x11.so
-  endif # EGL_API_X
-  ifeq ($(EGL_API_GBM), 1)
-	@-cp -f $(TARGET_MODULE) $(INSTALL_DIR)/libGAL.gbm.so
-  endif # EGL_API_GBM
-endif # gcdSTATIC_LINK
 
 ################################################################################
 # Module rules.

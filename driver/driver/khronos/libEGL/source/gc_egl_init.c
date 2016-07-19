@@ -12,7 +12,6 @@
 
 
 #include "gc_egl_precomp.h"
-#include <gc_hal_eglplatform.h>
 
 #define NO_STENCIL_VG   1
 #define _GC_OBJ_ZONE    gcdZONE_EGL_INIT
@@ -71,6 +70,10 @@ static const char extension[] =
 #if defined(LINUX)
     " "
     "EGL_EXT_image_dma_buf_import"
+    " "
+    "EGL_EXT_platform_base"
+    " "
+    "EGL_EXT_client_extensions"
 #endif
     " "
     "EGL_KHR_lock_surface"
@@ -106,28 +109,41 @@ static const char extension[] =
 #endif
     ;
 
+#undef __CLIENT_EXTENSION_STARTED
+
 /* See EGL SPEC 1.5 or EGL_EXT_client_extensions. */
 static const char clientExtension[] =
 #if defined(ANDROID)
     "EGL_KHR_platform_android"
-    /* Not ready.
+#  define __CLIENT_EXTENSION_STARTED
+#endif
+
+#if defined(WL_EGL_PLATFORM)
+#ifdef __CLIENT_EXTENSION_STARTED
     " "
-    "EGL_KHR_platform_gbm"
-     */
-#elif defined(X11)
-    "EGL_KHR_platform_x11"
-    /* Not ready.
-    " "
-    "EGL_KHR_platform_gbm"
-     */
-#elif defined(WL_EGL_PLATFORM)
-    /* Not ready.
-    " "
+#  endif
     "EGL_KHR_platform_wayland"
-     */
-#elif defined(__GBM__)
     " "
+    "EGL_EXT_platform_wayland"
+#  define __CLIENT_EXTENSION_STARTED
+#endif
+
+#if defined(__GBM__)
+#ifdef __CLIENT_EXTENSION_STARTED
+    " "
+#  endif
     "EGL_KHR_platform_gbm"
+#  define __CLIENT_EXTENSION_STARTED
+#endif
+
+#if defined(X11)
+#ifdef __CLIENT_EXTENSION_STARTED
+    " "
+#  endif
+    "EGL_KHR_platform_x11"
+    " "
+    "EGL_EXT_platform_x11"
+#  define __CLIENT_EXTENSION_STARTED
 #endif
     ""
     ;
@@ -213,7 +229,7 @@ _DestroyProcessData(
 
 static EGLBoolean
 _ValidateMode(
-    NativeDisplayType DeviceContext,
+    void * DeviceContext,
     VEGLConfigColor Color,
     VEGLConfigDepth Depth,
     EGLint * MaxSamples,
@@ -551,20 +567,33 @@ void veglSetEGLerror(VEGLThreadData thread, EGLint error)
     thread->error = error;
 }
 
+static gcmINLINE EGLAttrib
+_AttribValue(
+    const void *attrib_list,
+    EGLBoolean intAttrib,
+    EGLint index
+    )
+{
+    const EGLint * intList       = (const EGLint *) attrib_list;
+    const EGLAttrib * attribList = (const EGLAttrib *) attrib_list;
+
+    return intAttrib ? (EGLAttrib) intList[index]
+                     : attribList[index];
+}
+
 static EGLDisplay
 veglGetPlatformDisplay(
     EGLenum platform,
     void *native_display,
-    const EGLAttrib *attrib_list
+    const void *attrib_list,
+    EGLBoolean intAttrib
     )
 {
     VEGLThreadData thread;
     VEGLDisplay display = gcvNULL;
     gctBOOL releaseDpy = gcvFALSE;
     void * nativeScreen = gcvNULL;
-
-    /* Get shortcut. Only default platform display type supported for now. */
-    EGLNativeDisplayType display_id = (EGLNativeDisplayType) native_display;
+    VEGLPlatform eglPlatform = gcvNULL;
 
 #if gcdGC355_PROFILER
     gcoOS_GetTime(&AppstartTimeusec);
@@ -601,7 +630,7 @@ veglGetPlatformDisplay(
 #if defined(ANDROID)
     case EGL_PLATFORM_ANDROID_KHR:
         /* EGL_KHR_platform_android. */
-        if (display_id != EGL_DEFAULT_DISPLAY)
+        if (native_display != (void *) EGL_DEFAULT_DISPLAY)
         {
             /* Requires EGL_DEFAULT_DISPLAY for native_display. */
             veglSetEGLerror(thread, EGL_BAD_PARAMETER);
@@ -609,13 +638,16 @@ veglGetPlatformDisplay(
             return EGL_NO_DISPLAY;
         }
 
-        if ((attrib_list != gcvNULL) && (attrib_list[0] != EGL_NONE))
+        if ((attrib_list != gcvNULL) &&
+            (_AttribValue(attrib_list, intAttrib, 0) != EGL_NONE))
         {
             /* No attribute required. */
             veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
             gcoOS_UnLockPLS();
             return EGL_NO_DISPLAY;
         }
+
+        eglPlatform = veglGetAndroidPlatform(native_display);
         break;
 #endif
 
@@ -627,12 +659,12 @@ veglGetPlatformDisplay(
             /* Check attributes. */
             EGLint i;
 
-            for (i = 0; attrib_list[i] != EGL_NONE; i += 2)
+            for (i = 0; _AttribValue(attrib_list, intAttrib, i) != EGL_NONE; i += 2)
             {
-                switch (attrib_list[i])
+                switch (_AttribValue(attrib_list, intAttrib, i))
                 {
                 case EGL_PLATFORM_X11_SCREEN_KHR:
-                    nativeScreen = (void *) attrib_list[i+1];
+                    nativeScreen = (void *) _AttribValue(attrib_list, intAttrib, i+1);
                     break;
                 default:
                     veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
@@ -641,23 +673,50 @@ veglGetPlatformDisplay(
                 }
             }
         }
+
+        eglPlatform = veglGetX11Platform(native_display);
         break;
 #endif
 
 #if defined(__GBM__)
     case EGL_PLATFORM_GBM_KHR:
         /* EGL_KHR_platform_gbm. */
+        eglPlatform = veglGetGbmPlatform(native_display);
+        break;
+#endif
+
+#if defined(WL_EGL_PLATFORM)
+    case EGL_PLATFORM_WAYLAND_KHR:
+        eglPlatform = veglGetWaylandPlatform(native_display);
         break;
 #endif
 
     case 0:
         /*
          * Default platform called by eglGetDisplay.
-         * Don't pass '0' from eglGetPlatformDisplay API.
          */
+#if defined(WIN32) || defined(UNDER_CE)
+        eglPlatform = veglGetWin32Platform(native_display);
+#elif defined(ANDROID)
+        eglPlatform = veglGetAndroidPlatform(native_display);
+#elif defined(X11)
+        eglPlatform = veglGetX11Platform(native_display);
+#elif defined(WL_EGL_PLATFORM)
+        eglPlatform = veglGetWaylandPlatform(native_display);
+#elif defined(__GBM__)
+        eglPlatform = veglGetGbmPlatform(native_display);
+#elif defined(__QNXNTO__)
+        eglPlatform = veglGetQnxPlatform(native_display);
+#elif defined(EGL_API_DFB)
+        eglPlatform = veglGetDfbPlatform(native_display);
+#elif defined(EGL_API_FB)
+        eglPlatform = veglGetFbdevPlatform(native_display);
+#else
+        eglPlatform = veglGetNullwsPlatform(native_display);
+#endif
         break;
 
-    case EGL_PLATFORM_WAYLAND_KHR:
+
     default:
         /* Not supported, ie invalid. */
         veglSetEGLerror(thread, EGL_BAD_PARAMETER);
@@ -665,7 +724,7 @@ veglGetPlatformDisplay(
         return EGL_NO_DISPLAY;
     }
 
-    if (display_id == EGL_DEFAULT_DISPLAY)
+    if (native_display == (void *) EGL_DEFAULT_DISPLAY)
     {
         /* Try finding the default display inside the EGLDisplay stack. */
         for (display = (VEGLDisplay) gcoOS_GetPLSValue(gcePLS_VALUE_EGL_DISPLAY_INFO);
@@ -682,13 +741,21 @@ veglGetPlatformDisplay(
         if (display == gcvNULL)
         {
             /* Get default device context for desktop window. */
-            display_id = veglGetDefaultDisplay();
+            native_display = eglPlatform->getDefaultDisplay();
+
+            if (!native_display)
+            {
+                /* There no default display for this platform. */
+                gcoOS_UnLockPLS();
+                return EGL_NO_DISPLAY;
+            }
+
             releaseDpy = gcvTRUE;
         }
     }
     else
     {
-        if (!veglIsValidDisplay(display_id))
+        if (!eglPlatform->isValidDisplay(native_display))
         {
             gcoOS_UnLockPLS();
             return EGL_NO_DISPLAY;
@@ -702,12 +769,12 @@ veglGetPlatformDisplay(
              display != gcvNULL;
              display = display->next)
         {
-            if (display->hdc == display_id)
+            if (display->hdc == native_display)
             {
                 /* Release DC if necessary. */
                 if (releaseDpy)
                 {
-                    veglReleaseDefaultDisplay(display_id);
+                    eglPlatform->releaseDefaultDisplay(native_display);
                 }
 
                 /* Got it! */
@@ -737,10 +804,10 @@ veglGetPlatformDisplay(
         display = pointer;
 
         /* Initialize EGLDisplay. */
-        display->platform      = platform;
+        display->platform      = eglPlatform;
         display->nativeScreen  = nativeScreen;
-        display->nativeDisplay = (void *) display_id;
-        display->hdc           = display_id;
+        display->nativeDisplay = native_display;
+        display->hdc           = native_display;
         display->releaseDpy    = releaseDpy;
         display->initialized   = gcvFALSE;
         display->configCount   = 0;
@@ -802,10 +869,46 @@ eglGetPlatformDisplay(
     }
 
     /* Call internal function. */
-    dpy = veglGetPlatformDisplay(platform, native_display, attrib_list);
+    dpy = veglGetPlatformDisplay(platform, native_display, attrib_list, EGL_FALSE);
 
     VEGL_TRACE_API_POST(GetPlatformDisplay)(platform, native_display, attrib_list, dpy);
     gcmDUMP_API("${EGL eglGetPlatformDisplay 0x%08X 0x%08X 0x%08X := 0x%08X}",
+                platform, native_display, attrib_list, dpy);
+
+    gcmFOOTER_ARG("return=0x%x", dpy);
+    return dpy;
+}
+
+/* EGL_EXT_platform_base.  */
+EGLAPI EGLDisplay EGLAPIENTRY
+eglGetPlatformDisplayEXT(
+    EGLenum platform,
+    void *native_display,
+    const EGLint *attrib_list
+    )
+{
+    EGLDisplay dpy;
+
+    gcmHEADER_ARG("platform=0x%x native_display=0x%x attrib_list=0x%x",
+                  platform, native_display, attrib_list);
+
+    VEGL_TRACE_API_PRE(GetPlatformDisplayEXT)(platform, native_display, attrib_list);
+
+    if (platform == 0)
+    {
+        /*
+         * platform '0' is used as default platform in internal
+         * implementation, but it is error condition for this API.
+         * Set it to another invalid value.
+         */
+        platform = EGL_BAD_PARAMETER;
+    }
+
+    /* Call internal function. */
+    dpy = veglGetPlatformDisplay(platform, native_display, attrib_list, EGL_TRUE);
+
+    VEGL_TRACE_API_POST(GetPlatformDisplayEXT)(platform, native_display, attrib_list, dpy);
+    gcmDUMP_API("${EGL eglGetPlatformDisplayEXT 0x%08X 0x%08X 0x%08X := 0x%08X}",
                 platform, native_display, attrib_list, dpy);
 
     gcmFOOTER_ARG("return=0x%x", dpy);
@@ -823,7 +926,7 @@ eglGetDisplay(
     VEGL_TRACE_API_PRE(GetDisplay)(display_id);
 
     /* Call GetPlatformDisplay with default platform. */
-    dpy = veglGetPlatformDisplay(0, (void *) display_id, gcvNULL);
+    dpy = veglGetPlatformDisplay(0, (void *) display_id, gcvNULL, EGL_TRUE);
 
     VEGL_TRACE_API_POST(GetDisplay)(display_id, dpy);
     gcmDUMP_API("${EGL eglGetDisplay 0x%08X := 0x%08X}", display_id, dpy);
@@ -1032,6 +1135,8 @@ veglInitilizeDisplay(
     EGLint index;
     EGLint i;
     gceSTATUS status;
+    gctSTRING env = gcvNULL;
+    gctBOOL enableMSAAx2 = gcvFALSE;
 
     if (Display->initialized)
         return EGL_TRUE;
@@ -1039,6 +1144,14 @@ veglInitilizeDisplay(
     do
     {
         gctPOINTER pointer = gcvNULL;
+
+        if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_ENABLE_MSAAx2", &env)) && env)
+        {
+            if (gcmIS_SUCCESS(gcoOS_StrCmp(env, "1")))
+            {
+                enableMSAAx2 = gcvTRUE;
+            }
+        }
 
         /* Count the number of valid configurations. */
         gcmASSERT(Display->configCount == 0);
@@ -1075,16 +1188,14 @@ veglInitilizeDisplay(
                 {
                 case 4:
                     Display->configCount ++;
-
                     /* Fall through. */
-#if VEGL_ENABLE_2xAA_CONFIG
+
                 case 2:
-                    if (!fastMSAA)
+                    if (!fastMSAA && (enableMSAAx2 == gcvTRUE))
                     {
                         Display->configCount ++;
                     }
                     /* Fall through. */
-#endif
 
                 default:
                     Display->configCount ++;
@@ -1145,8 +1256,7 @@ veglInitilizeDisplay(
                 }
 #endif
 
-#if VEGL_ENABLE_2xAA_CONFIG
-                if (!fastMSAA && maxMultiSample >= 2)
+                if ((!fastMSAA) && (maxMultiSample >= 2) && (enableMSAAx2 == gcvTRUE))
                 {
                     _FillIn(
                         Display->config,
@@ -1155,7 +1265,6 @@ veglInitilizeDisplay(
                         &eglConfigDepth[depth],
                         2);
                 }
-#endif
 
                 if (maxMultiSample >= 4)
                 {
@@ -1309,7 +1418,7 @@ veglInitilizeDisplay(
         }
         while (gcvFALSE);
 
-        if (!veglInitLocalDisplayInfo(Display))
+        if (!Display->platform->initLocalDisplayInfo(Display))
         {
             /* Failed. */
             break;
@@ -1453,7 +1562,7 @@ veglTerminateDisplay(
         Display->configCount = 0;
     }
 
-    veglDeinitLocalDisplayInfo(Display);
+    Display->platform->deinitLocalDisplayInfo(Display);
 
     Display->initialized = gcvFALSE;
 
@@ -1513,7 +1622,7 @@ eglInitialize(
         if (dpy->hdc == EGL_DEFAULT_DISPLAY)
         {
             /* Get default device context for desktop window. */
-            dpy->hdc = veglGetDefaultDisplay();
+            dpy->hdc = dpy->platform->getDefaultDisplay();
             dpy->releaseDpy = gcvTRUE;
         }
 
@@ -1592,7 +1701,7 @@ eglTerminate(
     /* Release DC if necessary. */
     if (dpy->releaseDpy)
     {
-        veglReleaseDefaultDisplay(dpy->hdc);
+        dpy->platform->releaseDefaultDisplay(dpy->hdc);
 
         /* This display should never be found again.*/
         dpy->hdc = EGL_DEFAULT_DISPLAY;

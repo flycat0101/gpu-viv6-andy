@@ -28,7 +28,7 @@
  *
  *//**
  * \file
- * \brief	VG extensions
+ * \brief    VG extensions
  *//*-------------------------------------------------------------------*/
 
 #ifndef _VGEXT_H

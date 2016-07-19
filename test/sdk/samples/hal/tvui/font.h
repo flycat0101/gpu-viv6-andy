@@ -26,31 +26,33 @@
 *****************************************************************************/
 
 
-typedef struct _gcsGLYPH *		gcsGLYPH_PTR;
-typedef struct _gcsFONTTABLE *	gcsFONTTABLE_PTR;
+
+
+typedef struct _gcsGLYPH *        gcsGLYPH_PTR;
+typedef struct _gcsFONTTABLE *    gcsFONTTABLE_PTR;
 
 struct _gcsGLYPH
 {
-	gctUINT32			blackBoxX;
-	gctUINT32			blackBoxY;
-	gctINT32			glyphOriginX;
-	gctINT32			glyphOriginY;
-	gctINT16			cellIncX;
-	gctINT16			cellIncY;
-	gctUINT32			size;
-	gctUINT32			offset;
+    gctUINT32            blackBoxX;
+    gctUINT32            blackBoxY;
+    gctINT32            glyphOriginX;
+    gctINT32            glyphOriginY;
+    gctINT16            cellIncX;
+    gctINT16            cellIncY;
+    gctUINT32            size;
+    gctUINT32            offset;
 };
 
 struct _gcsFONTTABLE
 {
-	char  *				name;
-	gctUINT8 *			data;
-	gctINT32			size;
-	gctINT32			height;
-	gctBOOL				bold;
-	gctBOOL				italic;
-	gctBOOL				underline;
-	struct _gcsGLYPH	glyph[256];
+    char  *                name;
+    gctUINT8 *            data;
+    gctINT32            size;
+    gctINT32            height;
+    gctBOOL                bold;
+    gctBOOL                italic;
+    gctBOOL                underline;
+    struct _gcsGLYPH    glyph[256];
 };
 
 #include "fontArial11.h"
@@ -61,9 +63,9 @@ struct _gcsFONTTABLE
 
 gcsFONTTABLE_PTR fontTableIndex[] =
 {
-	&fontTable_Arial_11,
-	&fontTable_Arial_12,
-	&fontTable_Arial_14,
-	&fontTable_Arial_16,
-	&fontTable_Arial_18,
+    &fontTable_Arial_11,
+    &fontTable_Arial_12,
+    &fontTable_Arial_14,
+    &fontTable_Arial_16,
+    &fontTable_Arial_18,
 };

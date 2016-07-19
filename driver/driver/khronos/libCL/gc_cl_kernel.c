@@ -911,7 +911,7 @@ clfLoadKernelArgValues(
                 {
                     if (memAllocInfo->allocatedSize > privateBuf->allocatedSize)
                     {
-				        /* flush first */
+                        /* flush first */
                         gcoCL_Flush(gcvTRUE);
 
                         gcoCL_FreeMemory(privateBuf->physical,
@@ -1886,11 +1886,11 @@ clfExecuteCommandNDRangeKernel(
     {
         gcUNIFORM uniform = GetShaderUniform((gcSHADER)NDRangeKernel->kernel->states.binary, i);
         gctCONST_STRING tmpName=gcvNULL;
-		gctUINT8 uniformName[128]={0};
+        gctUINT8 uniformName[128]={0};
         if (uniform == gcvNULL) break;
 
         gcUNIFORM_GetName(uniform, gcvNULL, &tmpName);
-		gcoOS_StrCopySafe((gctSTRING)uniformName, gcmSIZEOF(uniformName), tmpName);
+        gcoOS_StrCopySafe((gctSTRING)uniformName, gcmSIZEOF(uniformName), tmpName);
 
         if (gcoOS_MemCmp(uniformName, "#global_size", 12) == gcvSTATUS_OK)
         {
@@ -1922,9 +1922,9 @@ clfExecuteCommandNDRangeKernel(
     while (userNotSetLocalGroup && noGroupRelateOP && i < GetShaderAttributeCount((gcSHADER)NDRangeKernel->kernel->states.binary)) {
         gctCONST_STRING attributeName=gcvNULL;
         gcATTRIBUTE attribute = GetShaderAttribute((gcSHADER)NDRangeKernel->kernel->states.binary, i);
-		if (attribute == gcvNULL) break;
+        if (attribute == gcvNULL) break;
         gcATTRIBUTE_GetName((gcSHADER)NDRangeKernel->kernel->states.binary,attribute, gcvFALSE, gcvNULL, &attributeName);
-		if (attributeName == gcvNULL) break;
+        if (attributeName == gcvNULL) break;
         if (gcoOS_StrCmp(attributeName, "#local_id") == 0)
         {
             noGroupRelateOP = gcvFALSE;
@@ -2917,7 +2917,7 @@ clCreateKernel(
     gcoHAL_GetPatchID(gcvNULL, &patchId);
 
 #if BUILD_OPENCL_FP
-    if((chipModel == gcv3000 && chipRevision == 0x5435) || (supportImageInst == gcvTRUE))
+    if((chipModel == gcv2500 && chipRevision == 0x5422) || (chipModel == gcv3000 && chipRevision == 0x5435) || (supportImageInst == gcvTRUE))
     {
         clmONERROR(gcSHADER_SaveEx(pgmBinary, gcvNULL, &tmpBinarySize), CL_INVALID_VALUE);
         clmONERROR(gcoOS_Allocate(gcvNULL, tmpBinarySize, &savedTmpBinary), CL_OUT_OF_HOST_MEMORY);
@@ -2932,7 +2932,7 @@ clCreateKernel(
                           &hints);
 
 #if BUILD_OPENCL_FP
-    if((chipModel == gcv3000 && chipRevision == 0x5435) || (supportImageInst == gcvTRUE))
+    if((chipModel == gcv2500 && chipRevision == 0x5422) || (chipModel == gcv3000 && chipRevision == 0x5435) || (supportImageInst == gcvTRUE))
     {
         if((kernel->patchNeeded == gcvFALSE) && (patchId == gcvPATCH_OCLCTS))
         {
@@ -3048,7 +3048,9 @@ clCreateKernel(
         clmRETURN_ERROR(CL_OUT_OF_RESOURCES);
     }
 
+#if BUILD_OPENCL_FP
 OnSkipOutOfSampler:
+#endif
     kernel->states.binary          = (gctUINT8_PTR) kernelBinary;
     kernel->states.stateBuffer     = buffer;
     kernel->states.stateBufferSize = bufferSize;
@@ -3078,7 +3080,7 @@ OnSkipOutOfSampler:
         {
             if(hasBarrier && hasImageWrite)
             {
-                 kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, kernel->states.hints->fsMaxTemp+3)) *
+                 kernel->maxWorkGroupSize = (gctUINT32)(109 / gcmMAX(2, kernel->states.hints->fsMaxTemp+3)) *
                     4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
             }
             else
@@ -3091,7 +3093,7 @@ OnSkipOutOfSampler:
         {
             if(hasBarrier && hasImageWrite)
             {
-                kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, kernel->states.hints->vsMaxTemp+3)) *
+                kernel->maxWorkGroupSize = (gctUINT32)(109 / gcmMAX(2, kernel->states.hints->vsMaxTemp+3)) *
                                        4 * kernel->program->devices[0]->deviceInfo.maxComputeUnits;
             }
             else
@@ -4114,16 +4116,8 @@ clGetKernelArgInfo(
         break;
 
     case CL_KERNEL_ARG_NAME:
-        if (argument->uniform->name != gcvNULL)
-        {
-            retParamSize = gcoOS_StrLen(argument->uniform->name, gcvNULL) + 1;
-            retParamPtr = argument->uniform->name;
-        }
-        else
-        {
-            retParamSize = 1;
-            retParamPtr = clgEmptyStr;
-        }
+        retParamSize = gcoOS_StrLen(argument->uniform->name, gcvNULL) + 1;
+        retParamPtr = argument->uniform->name;
         break;
 
     default:

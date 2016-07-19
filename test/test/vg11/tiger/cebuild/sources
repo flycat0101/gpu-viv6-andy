@@ -37,9 +37,8 @@ SOURCES= \
 INCLUDES= \
   $(INCLUDES); \
   $(VIVANTE_SDK_INC); \
-  $(VIVANTE_SDK_INC)\HAL; \
   $(AQROOT)\driver\openVG\vg11\driver; \
-  $(VIVANTE_SDK_INC);$(AQROOT)/sdk/inc; \
+  $(VIVANTE_SDK_INC); \
   $(AQROOT)\test\vg11\tiger; \
   $(AQROOT)\test\vg11\vgframe; \
 
@@ -52,6 +51,6 @@ TARGETLIBS= \
 WARNISERROR=0
 EXEENTRY=mainACRTStartup
 
-INSTALL_PATH=$(VIVANTE_SDK_DIR)\samples\tiger
+INSTALL_PATH=$(VIVANTE_SDK_DIR)\samples\vg\tiger
 
-!INCLUDE $(BUILDROOT)\wince_install.inc
+!INCLUDE $(AQROOT)\wince_install.inc

@@ -30,83 +30,83 @@
 
 void MatTranslatef(Matf* M, float x, float y, float z)
 {
-	M->m[0][0] = 1.0f;
-	M->m[0][1] = 0.0f;
-	M->m[0][2] = 0.0f;
-	M->m[0][3] = 0.0f;
+    M->m[0][0] = 1.0f;
+    M->m[0][1] = 0.0f;
+    M->m[0][2] = 0.0f;
+    M->m[0][3] = 0.0f;
 
-	M->m[1][0] = 0.0f;
-	M->m[1][1] = 1.0f;
-	M->m[1][2] = 0.0f;
-	M->m[1][3] = 0.0f;
+    M->m[1][0] = 0.0f;
+    M->m[1][1] = 1.0f;
+    M->m[1][2] = 0.0f;
+    M->m[1][3] = 0.0f;
 
-	M->m[2][0] = 0.0f;
-	M->m[2][1] = 0.0f;
-	M->m[2][2] = 1.0f;
-	M->m[2][3] = 0.0f;
+    M->m[2][0] = 0.0f;
+    M->m[2][1] = 0.0f;
+    M->m[2][2] = 1.0f;
+    M->m[2][3] = 0.0f;
 
-	M->m[3][0] = x;
-	M->m[3][1] = y;
-	M->m[3][2] = z;
-	M->m[3][3] = 1.0f;
+    M->m[3][0] = x;
+    M->m[3][1] = y;
+    M->m[3][2] = z;
+    M->m[3][3] = 1.0f;
 }
 
 
 void MatFrustumf(Matf* M, float l, float r, float b, float t, float n, float f)
 {
-	float m00 = n*2.0f/(r-l);
-	float m11 = n*2.0f/(t-b);
-	float m22 = -(f+n)/(f-n);
+    float m00 = n*2.0f/(r-l);
+    float m11 = n*2.0f/(t-b);
+    float m22 = -(f+n)/(f-n);
 
-	float m20 = (r+l)/(r-l);
-	float m21 = (t+b)/(t-b);
+    float m20 = (r+l)/(r-l);
+    float m21 = (t+b)/(t-b);
 
-	float m32 = -(2.0f*f*n)/(f-n);
-	float m23 = -1.0f;
+    float m32 = -(2.0f*f*n)/(f-n);
+    float m23 = -1.0f;
 
-	M->m[0][0] = m00;
-	M->m[0][1] = 0.0f;
-	M->m[0][2] = 0.0f;
-	M->m[0][3] = 0.0f;
+    M->m[0][0] = m00;
+    M->m[0][1] = 0.0f;
+    M->m[0][2] = 0.0f;
+    M->m[0][3] = 0.0f;
 
-	M->m[1][0] = 0.0f;
-	M->m[1][1] = m11;
-	M->m[1][2] = 0.0f;
-	M->m[1][3] = 0.0f;
+    M->m[1][0] = 0.0f;
+    M->m[1][1] = m11;
+    M->m[1][2] = 0.0f;
+    M->m[1][3] = 0.0f;
 
-	M->m[2][0] = m20;
-	M->m[2][1] = m21;
-	M->m[2][2] = m22;
-	M->m[2][3] = m23;
+    M->m[2][0] = m20;
+    M->m[2][1] = m21;
+    M->m[2][2] = m22;
+    M->m[2][3] = m23;
 
-	M->m[3][0] = 0.0f;
-	M->m[3][1] = 0.0f;
-	M->m[3][2] = m32;
-	M->m[3][3] = 0.0f;
+    M->m[3][0] = 0.0f;
+    M->m[3][1] = 0.0f;
+    M->m[3][2] = m32;
+    M->m[3][3] = 0.0f;
 }
 
 
 void MatScalef(Matf* M, float x, float y, float z)
 {
-	M->m[0][0] = x;
-	M->m[0][1] = 0.0f;
-	M->m[0][2] = 0.0f;
-	M->m[0][3] = 0.0f;
+    M->m[0][0] = x;
+    M->m[0][1] = 0.0f;
+    M->m[0][2] = 0.0f;
+    M->m[0][3] = 0.0f;
 
-	M->m[1][0] = 0.0f;
-	M->m[1][1] = y;
-	M->m[1][2] = 0.0f;
-	M->m[1][3] = 0.0f;
+    M->m[1][0] = 0.0f;
+    M->m[1][1] = y;
+    M->m[1][2] = 0.0f;
+    M->m[1][3] = 0.0f;
 
-	M->m[2][0] = 0.0f;
-	M->m[2][1] = 0.0f;
-	M->m[2][2] = z;
-	M->m[2][3] = 0.0f;
+    M->m[2][0] = 0.0f;
+    M->m[2][1] = 0.0f;
+    M->m[2][2] = z;
+    M->m[2][3] = 0.0f;
 
-	M->m[3][0] = 0.0f;
-	M->m[3][1] = 0.0f;
-	M->m[3][2] = 0.0f;
-	M->m[3][3] = 1.0f;
+    M->m[3][0] = 0.0f;
+    M->m[3][1] = 0.0f;
+    M->m[3][2] = 0.0f;
+    M->m[3][3] = 1.0f;
 }
 
 
@@ -136,81 +136,81 @@ void MatMulf(Matf* M1, Matf* M2)
 
 void RotXDegf(Matf* M, float degree)
 {
-	float s = (float)sin(degToRad(degree));
-	float c = (float)cos(degToRad(degree));
+    float s = (float)sin(degToRad(degree));
+    float c = (float)cos(degToRad(degree));
 
-	M->m[0][0] = 1.0f;
-	M->m[0][1] = 0.0f;
-	M->m[0][2] = 0.0f;
-	M->m[0][3] = 0.0f;
+    M->m[0][0] = 1.0f;
+    M->m[0][1] = 0.0f;
+    M->m[0][2] = 0.0f;
+    M->m[0][3] = 0.0f;
 
-	M->m[1][0] = 0.0f;
-	M->m[1][1] = c;
-	M->m[1][2] = s;
-	M->m[1][3] = 0.0f;
+    M->m[1][0] = 0.0f;
+    M->m[1][1] = c;
+    M->m[1][2] = s;
+    M->m[1][3] = 0.0f;
 
-	M->m[2][0] = 0.0f;
-	M->m[2][1] = -s;
-	M->m[2][2] = c;
-	M->m[2][3] = 0.0f;
+    M->m[2][0] = 0.0f;
+    M->m[2][1] = -s;
+    M->m[2][2] = c;
+    M->m[2][3] = 0.0f;
 
-	M->m[3][0] = 0.0f;
-	M->m[3][1] = 0.0f;
-	M->m[3][2] = 0.0f;
-	M->m[3][3] = 1.0f;
+    M->m[3][0] = 0.0f;
+    M->m[3][1] = 0.0f;
+    M->m[3][2] = 0.0f;
+    M->m[3][3] = 1.0f;
 }
 
 
 void RotYDegf(Matf* M, float degree)
 {
-	float s = (float)sin(degToRad(degree));
-	float c = (float)cos(degToRad(degree));
+    float s = (float)sin(degToRad(degree));
+    float c = (float)cos(degToRad(degree));
 
-	M->m[0][0] = c;
-	M->m[0][1] = 0.0f;
-	M->m[0][2] = -s;
-	M->m[0][3] = 0.0f;
+    M->m[0][0] = c;
+    M->m[0][1] = 0.0f;
+    M->m[0][2] = -s;
+    M->m[0][3] = 0.0f;
 
-	M->m[1][0] = 0.0f;
-	M->m[1][1] = 1.0f;
-	M->m[1][2] = 0.0f;
-	M->m[1][3] = 0.0f;
+    M->m[1][0] = 0.0f;
+    M->m[1][1] = 1.0f;
+    M->m[1][2] = 0.0f;
+    M->m[1][3] = 0.0f;
 
-	M->m[2][0] = s;
-	M->m[2][1] = 0.0f;
-	M->m[2][2] = c;
-	M->m[2][3] = 0.0f;
+    M->m[2][0] = s;
+    M->m[2][1] = 0.0f;
+    M->m[2][2] = c;
+    M->m[2][3] = 0.0f;
 
-	M->m[3][0] = 0.0f;
-	M->m[3][1] = 0.0f;
-	M->m[3][2] = 0.0f;
-	M->m[3][3] = 1.0f;
+    M->m[3][0] = 0.0f;
+    M->m[3][1] = 0.0f;
+    M->m[3][2] = 0.0f;
+    M->m[3][3] = 1.0f;
 }
 
 
 void RotZDegf(Matf* M, float degree)
 {
-	float s = (float)sin(degToRad(degree));
-	float c = (float)cos(degToRad(degree));
+    float s = (float)sin(degToRad(degree));
+    float c = (float)cos(degToRad(degree));
 
-	M->m[0][0] = c;
-	M->m[0][1] = s;
-	M->m[0][2] = 0.0f;
-	M->m[0][3] = 0.0f;
+    M->m[0][0] = c;
+    M->m[0][1] = s;
+    M->m[0][2] = 0.0f;
+    M->m[0][3] = 0.0f;
 
-	M->m[1][0] = -s;
-	M->m[1][1] = c;
-	M->m[1][2] = 0.0f;
-	M->m[1][3] = 0.0f;
+    M->m[1][0] = -s;
+    M->m[1][1] = c;
+    M->m[1][2] = 0.0f;
+    M->m[1][3] = 0.0f;
 
-	M->m[2][0] = 0.0f;
-	M->m[2][1] = 0.0f;
-	M->m[2][2] = 1.0f;
-	M->m[2][3] = 0.0f;
+    M->m[2][0] = 0.0f;
+    M->m[2][1] = 0.0f;
+    M->m[2][2] = 1.0f;
+    M->m[2][3] = 0.0f;
 
-	M->m[3][0] = 0.0f;
-	M->m[3][1] = 0.0f;
-	M->m[3][2] = 0.0f;
-	M->m[3][3] = 1.0f;
+    M->m[3][0] = 0.0f;
+    M->m[3][1] = 0.0f;
+    M->m[3][2] = 0.0f;
+    M->m[3][3] = 1.0f;
 }
 

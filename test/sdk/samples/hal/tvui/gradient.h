@@ -26,6 +26,8 @@
 *****************************************************************************/
 
 
+
+
 #ifndef __gradient_h_
 #define __gradient_h_
 
@@ -40,13 +42,13 @@ extern "C" {
 /* Draw a rectangle fill with gradient color. */
 gceSTATUS
 DrawGradientRect(
-	IN gco2D Engine,
-	IN gcoSURF DestSurface,
-	gcsRECT_PTR DestRect,
-	gctUINT32 color0,
-	gctUINT32 color1,
-	gctBOOL horizontal
-	);
+    IN gco2D Engine,
+    IN gcoSURF DestSurface,
+    gcsRECT_PTR DestRect,
+    gctUINT32 color0,
+    gctUINT32 color1,
+    gctBOOL horizontal
+    );
 
 #ifdef __cplusplus
 }

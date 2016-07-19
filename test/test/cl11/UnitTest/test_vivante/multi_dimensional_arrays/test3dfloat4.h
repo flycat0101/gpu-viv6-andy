@@ -33,19 +33,19 @@
 
 class Test3DFloat4: public MultiDimensionalArraysTest3D {
 public:
-	Test3DFloat4(const size_t sizeX, const size_t sizeY, const size_t sizeZ);
-	~Test3DFloat4();
+    Test3DFloat4(const size_t sizeX, const size_t sizeY, const size_t sizeZ);
+    ~Test3DFloat4();
 
 protected:
-	cl_float4* inputAHost;
-	cl_float4* inputBHost;
-	cl_float4* resultHost;
+    cl_float4* inputAHost;
+    cl_float4* inputBHost;
+    cl_float4* resultHost;
 
-	const int getMemSize() const;
-	void generateInput(const unsigned int &kernelIndex);
-	void* getInputAElement(const unsigned int &index) const;
-	void* getInputBElement(const unsigned int &index) const;
-	void* getResultElement(const unsigned int &index) const;
+    const int getMemSize() const;
+    void generateInput(const unsigned int &kernelIndex);
+    void* getInputAElement(const unsigned int &index) const;
+    void* getInputBElement(const unsigned int &index) const;
+    void* getResultElement(const unsigned int &index) const;
 };
 
 #endif /*_test3dfloat4_h*/

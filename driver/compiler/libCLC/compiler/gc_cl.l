@@ -213,6 +213,8 @@ file_name                                       {string_literal}|[^ \t\n]+
 
 "unsigned"{white_sp_nl}+{signed_integer_type}?	{ DUMP_SOURCE();
 						    return CL_SCAN_UNSIGNED_INTEGER_TYPE(); }
+"unsigned"                                      { DUMP_SOURCE();
+						    return CL_SCAN_UNSIGNED_INTEGER_TYPE(); }
 "float"{vec_elems}+x{nonzero_digit}+	        { DUMP_SOURCE(); return CL_SCAN_FLOAT_MATRIX_TYPE(); }
 "double"{vec_elems}+x{nonzero_digit}+           { DUMP_SOURCE(); return CL_SCAN_DOUBLE_MATRIX_TYPE(); }
 {builtin_data_type}{vec_elems}*		        { DUMP_SOURCE(); return CL_SCAN_BUILTIN_DATA_TYPE(); }

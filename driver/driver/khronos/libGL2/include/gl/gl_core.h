@@ -25,7 +25,7 @@
 ** If big endian, it should be not defined
 */
 #if defined(__arm__) || defined(i386) || defined(__i386__) || defined(__x86__) || defined(_M_IX86)\
- || defined(__x86_64__) || defined(_M_AMD64) || defined (_M_X64)
+ || defined(__x86_64__) || defined(_M_AMD64) || defined (_M_X64) || defined(__e2k__) || defined(_LITTLE_ENDIAN)
 #define USE_LENDIAN
 #endif
 

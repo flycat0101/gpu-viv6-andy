@@ -54,296 +54,296 @@ typedef struct Test2D {
     GalTest     base;
     GalRuntime  *runtime;
 
-	// dst
-    gcoSURF			dstSurf;
-	gceSURF_FORMAT	dstFormat;
-	gctUINT			dstWidth;
-	gctUINT			dstHeight;
-	gctINT			dstStride;
-	gctUINT32		dstPhyAddr;
-	gctPOINTER		dstLgcAddr;
+    // dst
+    gcoSURF            dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT            dstWidth;
+    gctUINT            dstHeight;
+    gctINT            dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
 
-	//brush
-	gctUINT8 brushColorFormat;
+    //brush
+    gctUINT8 brushColorFormat;
 } Test2D;
 
 
 static gctBOOL CDECL FillColor(Test2D *t2d, gctUINT32 *ColorBuf)
 {
-	int i, j;
-	gctUINT16 *colorBuf16 = (gctUINT16 *)ColorBuf;
+    int i, j;
+    gctUINT16 *colorBuf16 = (gctUINT16 *)ColorBuf;
 
-	switch (t2d->brushColorFormat)
-	{
-	case gcvSURF_A8R8G8B8:
-		for (i = 0; i < 8; ++i)
-		{
-			if (i < 4)
-			{
-				for (j = 0; j < 8; ++j)
-				{
-					if (j < 4)
-						ColorBuf[j*8+i] =
-						COLOR_ARGB8(0x00, 0xFF, 0x00, 0x00);
-					else
-						ColorBuf[j*8+i] =
-						COLOR_ARGB8(0x00, 0x00, 0xFF, 0x00);
-				}
-			}
-			else
-			{
-				for (j = 0; j < 8; ++j)
-				{
-					if (j < 4)
-						ColorBuf[j*8+i] =
-						COLOR_ARGB8(0x00, 0x00, 0x00, 0xFF);
-					else
-						ColorBuf[j*8+i] =
-						COLOR_ARGB8(0x00, 0x80, 0x80, 0x80);
-				}
-			}
-		}
-		break;
+    switch (t2d->brushColorFormat)
+    {
+    case gcvSURF_A8R8G8B8:
+        for (i = 0; i < 8; ++i)
+        {
+            if (i < 4)
+            {
+                for (j = 0; j < 8; ++j)
+                {
+                    if (j < 4)
+                        ColorBuf[j*8+i] =
+                        COLOR_ARGB8(0x00, 0xFF, 0x00, 0x00);
+                    else
+                        ColorBuf[j*8+i] =
+                        COLOR_ARGB8(0x00, 0x00, 0xFF, 0x00);
+                }
+            }
+            else
+            {
+                for (j = 0; j < 8; ++j)
+                {
+                    if (j < 4)
+                        ColorBuf[j*8+i] =
+                        COLOR_ARGB8(0x00, 0x00, 0x00, 0xFF);
+                    else
+                        ColorBuf[j*8+i] =
+                        COLOR_ARGB8(0x00, 0x80, 0x80, 0x80);
+                }
+            }
+        }
+        break;
 
-	case gcvSURF_X8R8G8B8:
-		for (i = 0; i < 8; ++i)
-		{
-			if (i < 4)
-			{
-				for (j = 0; j < 8; ++j)
-				{
-					if (j < 4)
-						ColorBuf[j*8+i] =
-						COLOR_XRGB8(0xFF, 0x00, 0x00);
-					else
-						ColorBuf[j*8+i] =
-						COLOR_XRGB8(0x00, 0xFF, 0x00);
-				}
-			}
-			else
-			{
-				for (j = 0; j < 8; ++j)
-				{
-					if (j < 4)
-						ColorBuf[j*8+i] =
-						COLOR_XRGB8(0x00, 0x00, 0xFF);
-					else
-						ColorBuf[j*8+i] =
-						COLOR_XRGB8(0x80, 0x80, 0x80);
-				}
-			}
-		}
-		break;
+    case gcvSURF_X8R8G8B8:
+        for (i = 0; i < 8; ++i)
+        {
+            if (i < 4)
+            {
+                for (j = 0; j < 8; ++j)
+                {
+                    if (j < 4)
+                        ColorBuf[j*8+i] =
+                        COLOR_XRGB8(0xFF, 0x00, 0x00);
+                    else
+                        ColorBuf[j*8+i] =
+                        COLOR_XRGB8(0x00, 0xFF, 0x00);
+                }
+            }
+            else
+            {
+                for (j = 0; j < 8; ++j)
+                {
+                    if (j < 4)
+                        ColorBuf[j*8+i] =
+                        COLOR_XRGB8(0x00, 0x00, 0xFF);
+                    else
+                        ColorBuf[j*8+i] =
+                        COLOR_XRGB8(0x80, 0x80, 0x80);
+                }
+            }
+        }
+        break;
 
-	case gcvSURF_R5G6B5:
-		for (i = 0; i < 8; ++i)
-		{
-			if (i < 4)
-			{
-				for (j = 0; j < 8; ++j)
-				{
-					if (j < 4)
-						colorBuf16[j*8+i] =
-						COLOR_R5G6B5(0xFF, 0x00, 0x00);
-					else
-						colorBuf16[j*8+i] =
-						COLOR_R5G6B5(0x00, 0xFF, 0x00);
-				}
-			}
-			else
-			{
-				for (j = 0; j < 8; ++j)
-				{
-					if (j < 4)
-						colorBuf16[j*8+i] =
-						COLOR_R5G6B5(0x00, 0x00, 0xFF);
-					else
-						colorBuf16[j*8+i] =
-						COLOR_R5G6B5(0x10, 0x20, 0x10);
-				}
-			}
-		}
-		break;
+    case gcvSURF_R5G6B5:
+        for (i = 0; i < 8; ++i)
+        {
+            if (i < 4)
+            {
+                for (j = 0; j < 8; ++j)
+                {
+                    if (j < 4)
+                        colorBuf16[j*8+i] =
+                        COLOR_R5G6B5(0xFF, 0x00, 0x00);
+                    else
+                        colorBuf16[j*8+i] =
+                        COLOR_R5G6B5(0x00, 0xFF, 0x00);
+                }
+            }
+            else
+            {
+                for (j = 0; j < 8; ++j)
+                {
+                    if (j < 4)
+                        colorBuf16[j*8+i] =
+                        COLOR_R5G6B5(0x00, 0x00, 0xFF);
+                    else
+                        colorBuf16[j*8+i] =
+                        COLOR_R5G6B5(0x10, 0x20, 0x10);
+                }
+            }
+        }
+        break;
 
-	case gcvSURF_A1R5G5B5:
-		for (i = 0; i < 8; ++i)
-		{
-			if (i < 4)
-			{
-				for (j = 0; j < 8; ++j)
-				{
-					if (j < 4)
-						colorBuf16[j*8+i] =
-						COLOR_A1R5G5B5(0x00, 0xFF, 0x00, 0x00);
-					else
-						colorBuf16[j*8+i] =
-						COLOR_A1R5G5B5(0x00, 0x00, 0xFF, 0x00);
-				}
-			}
-			else
-			{
-				for (j = 0; j < 8; ++j)
-				{
-					if (j < 4)
-						colorBuf16[j*8+i] =
-						COLOR_A1R5G5B5(0x00, 0x00, 0x00, 0xFF);
-					else
-						colorBuf16[j*8+i] =
-						COLOR_A1R5G5B5(0x00, 0x10, 0x10, 0x10);
-				}
-			}
-		}
-		break;
+    case gcvSURF_A1R5G5B5:
+        for (i = 0; i < 8; ++i)
+        {
+            if (i < 4)
+            {
+                for (j = 0; j < 8; ++j)
+                {
+                    if (j < 4)
+                        colorBuf16[j*8+i] =
+                        COLOR_A1R5G5B5(0x00, 0xFF, 0x00, 0x00);
+                    else
+                        colorBuf16[j*8+i] =
+                        COLOR_A1R5G5B5(0x00, 0x00, 0xFF, 0x00);
+                }
+            }
+            else
+            {
+                for (j = 0; j < 8; ++j)
+                {
+                    if (j < 4)
+                        colorBuf16[j*8+i] =
+                        COLOR_A1R5G5B5(0x00, 0x00, 0x00, 0xFF);
+                    else
+                        colorBuf16[j*8+i] =
+                        COLOR_A1R5G5B5(0x00, 0x10, 0x10, 0x10);
+                }
+            }
+        }
+        break;
 
-	case gcvSURF_X1R5G5B5:
-		for (i = 0; i < 8; ++i)
-		{
-			if (i < 4)
-			{
-				for (j = 0; j < 8; ++j)
-				{
-					if (j < 4)
-						colorBuf16[j*8+i] =
-						COLOR_X1R5G5B5(0xFF, 0x00, 0x00);
-					else
-						colorBuf16[j*8+i] =
-						COLOR_X1R5G5B5(0x00, 0xFF, 0x00);
-				}
-			}
-			else
-			{
-				for (j = 0; j < 8; ++j)
-				{
-					if (j < 4)
-						colorBuf16[j*8+i] =
-						COLOR_X1R5G5B5(0x00, 0x00, 0xFF);
-					else
-						colorBuf16[j*8+i] =
-						COLOR_X1R5G5B5(0x10, 0x10, 0x10);
-				}
-			}
-		}
-		break;
+    case gcvSURF_X1R5G5B5:
+        for (i = 0; i < 8; ++i)
+        {
+            if (i < 4)
+            {
+                for (j = 0; j < 8; ++j)
+                {
+                    if (j < 4)
+                        colorBuf16[j*8+i] =
+                        COLOR_X1R5G5B5(0xFF, 0x00, 0x00);
+                    else
+                        colorBuf16[j*8+i] =
+                        COLOR_X1R5G5B5(0x00, 0xFF, 0x00);
+                }
+            }
+            else
+            {
+                for (j = 0; j < 8; ++j)
+                {
+                    if (j < 4)
+                        colorBuf16[j*8+i] =
+                        COLOR_X1R5G5B5(0x00, 0x00, 0xFF);
+                    else
+                        colorBuf16[j*8+i] =
+                        COLOR_X1R5G5B5(0x10, 0x10, 0x10);
+                }
+            }
+        }
+        break;
 
-	case gcvSURF_A4R4G4B4:
-		for (i = 0; i < 8; ++i)
-		{
-			if (i < 4)
-			{
-				for (j = 0; j < 8; ++j)
-				{
-					if (j < 4)
-						colorBuf16[j*8+i] =
-						COLOR_ARGB4(0x00, 0xFF, 0x00, 0x00);
-					else
-						colorBuf16[j*8+i] =
-						COLOR_ARGB4(0x00, 0x00, 0xFF, 0x00);
-				}
-			}
-			else
-			{
-				for (j = 0; j < 8; ++j)
-				{
-					if (j < 4)
-						colorBuf16[j*8+i] =
-						COLOR_ARGB4(0x00, 0x00, 0x00, 0xFF);
-					else
-						colorBuf16[j*8+i] =
-						COLOR_ARGB4(0x00, 0x8, 0x8, 0x8);
-				}
-			}
-		}
-		break;
+    case gcvSURF_A4R4G4B4:
+        for (i = 0; i < 8; ++i)
+        {
+            if (i < 4)
+            {
+                for (j = 0; j < 8; ++j)
+                {
+                    if (j < 4)
+                        colorBuf16[j*8+i] =
+                        COLOR_ARGB4(0x00, 0xFF, 0x00, 0x00);
+                    else
+                        colorBuf16[j*8+i] =
+                        COLOR_ARGB4(0x00, 0x00, 0xFF, 0x00);
+                }
+            }
+            else
+            {
+                for (j = 0; j < 8; ++j)
+                {
+                    if (j < 4)
+                        colorBuf16[j*8+i] =
+                        COLOR_ARGB4(0x00, 0x00, 0x00, 0xFF);
+                    else
+                        colorBuf16[j*8+i] =
+                        COLOR_ARGB4(0x00, 0x8, 0x8, 0x8);
+                }
+            }
+        }
+        break;
 
-	case gcvSURF_X4R4G4B4:
-		for (i = 0; i < 8; ++i)
-		{
-			if (i < 4)
-			{
-				for (j = 0; j < 8; ++j)
-				{
-					if (j < 4)
-						colorBuf16[j*8+i] =
-						COLOR_XRGB4(0xFF, 0x00, 0x00);
-					else
-						colorBuf16[j*8+i] =
-						COLOR_XRGB4(0x00, 0xFF, 0x00);
-				}
-			}
-			else
-			{
-				for (j = 0; j < 8; ++j)
-				{
-					if (j < 4)
-						colorBuf16[j*8+i] =
-						COLOR_XRGB4(0x00, 0x00, 0xFF);
-					else
-						colorBuf16[j*8+i] =
-						COLOR_XRGB4(0x8, 0x8, 0x8);
-				}
-			}
-		}
-		break;
+    case gcvSURF_X4R4G4B4:
+        for (i = 0; i < 8; ++i)
+        {
+            if (i < 4)
+            {
+                for (j = 0; j < 8; ++j)
+                {
+                    if (j < 4)
+                        colorBuf16[j*8+i] =
+                        COLOR_XRGB4(0xFF, 0x00, 0x00);
+                    else
+                        colorBuf16[j*8+i] =
+                        COLOR_XRGB4(0x00, 0xFF, 0x00);
+                }
+            }
+            else
+            {
+                for (j = 0; j < 8; ++j)
+                {
+                    if (j < 4)
+                        colorBuf16[j*8+i] =
+                        COLOR_XRGB4(0x00, 0x00, 0xFF);
+                    else
+                        colorBuf16[j*8+i] =
+                        COLOR_XRGB4(0x8, 0x8, 0x8);
+                }
+            }
+        }
+        break;
 
-	default:
-		GalOutput(GalOutputType_Error, "Can not fill buffer with the color format:%x\n", t2d->brushColorFormat);
-		return gcvFALSE;
-	}
+    default:
+        GalOutput(GalOutputType_Error, "Can not fill buffer with the color format:%x\n", t2d->brushColorFormat);
+        return gcvFALSE;
+    }
 
-	return gcvTRUE;
+    return gcvTRUE;
 }
 
 static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 {
-	gcsRECT dstRect = {0, 0, t2d->dstWidth, t2d->dstHeight};
-	gco2D egn2D = t2d->runtime->engine2d;
-	gcoBRUSH brush;
-	gceSTATUS status;
-	gctUINT32 color[64];
+    gcsRECT dstRect = {0, 0, t2d->dstWidth, t2d->dstHeight};
+    gco2D egn2D = t2d->runtime->engine2d;
+    gcoBRUSH brush;
+    gceSTATUS status;
+    gctUINT32 color[64];
 
-	gcmONERROR(gco2D_SetClipping(egn2D, &dstRect));
+    gcmONERROR(gco2D_SetClipping(egn2D, &dstRect));
 
-	switch (frameNo)
-	{
-	case 0:
-		t2d->brushColorFormat = gcvSURF_X8R8G8B8; break;
+    switch (frameNo)
+    {
+    case 0:
+        t2d->brushColorFormat = gcvSURF_X8R8G8B8; break;
 
-	case 1:
-		t2d->brushColorFormat = gcvSURF_A8R8G8B8; break;
+    case 1:
+        t2d->brushColorFormat = gcvSURF_A8R8G8B8; break;
 
-	case 2:
-		t2d->brushColorFormat = gcvSURF_R5G6B5; break;
+    case 2:
+        t2d->brushColorFormat = gcvSURF_R5G6B5; break;
 
-	case 3:
-		t2d->brushColorFormat = gcvSURF_A1R5G5B5; break;
+    case 3:
+        t2d->brushColorFormat = gcvSURF_A1R5G5B5; break;
 
-	case 4:
-		t2d->brushColorFormat = gcvSURF_X1R5G5B5; break;
+    case 4:
+        t2d->brushColorFormat = gcvSURF_X1R5G5B5; break;
 
-	case 5:
-		t2d->brushColorFormat = gcvSURF_A4R4G4B4; break;
+    case 5:
+        t2d->brushColorFormat = gcvSURF_A4R4G4B4; break;
 
-	case 6:
-		t2d->brushColorFormat = gcvSURF_X4R4G4B4; break;
-	}
+    case 6:
+        t2d->brushColorFormat = gcvSURF_X4R4G4B4; break;
+    }
 
-	if (FillColor(t2d, color) == gcvFALSE)
-		return gcvFALSE;
+    if (FillColor(t2d, color) == gcvFALSE)
+        return gcvFALSE;
 
-	gcmONERROR(gco2D_ConstructColorBrush(egn2D, 0, 0,
-				color, t2d->brushColorFormat, 0, &brush));
+    gcmONERROR(gco2D_ConstructColorBrush(egn2D, 0, 0,
+                color, t2d->brushColorFormat, 0, &brush));
 
-	gcmONERROR(gco2D_FlushBrush(egn2D, brush, t2d->dstFormat));
+    gcmONERROR(gco2D_FlushBrush(egn2D, brush, t2d->dstFormat));
 
-	gcmONERROR(gco2D_SetTarget(egn2D, t2d->dstPhyAddr, t2d->dstStride, gcvSURF_0_DEGREE, t2d->dstWidth));
+    gcmONERROR(gco2D_SetTarget(egn2D, t2d->dstPhyAddr, t2d->dstStride, gcvSURF_0_DEGREE, t2d->dstWidth));
 
-	gcmONERROR(gco2D_Blit(egn2D, 1, &dstRect, 0xF0, 0xF0, t2d->dstFormat));
+    gcmONERROR(gco2D_Blit(egn2D, 1, &dstRect, 0xF0, 0xF0, t2d->dstFormat));
 
-	gcmONERROR(gco2D_Flush(egn2D));
+    gcmONERROR(gco2D_Flush(egn2D));
 
-	gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
+    gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
 
-	gcmONERROR(gcoBRUSH_Destroy(brush));
+    gcmONERROR(gcoBRUSH_Destroy(brush));
 
     return gcvTRUE;
 
@@ -357,14 +357,14 @@ OnError:
 
 static void CDECL Destroy(Test2D *t2d)
 {
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
     if ((t2d->dstSurf != gcvNULL) && (t2d->dstLgcAddr != gcvNULL))
     {
-		if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock dstSurf failed:%s\n", GalStatusString(status));
-		}
-		t2d->dstLgcAddr = gcvNULL;
+        if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock dstSurf failed:%s\n", GalStatusString(status));
+        }
+        t2d->dstLgcAddr = gcvNULL;
     }
 
     free(t2d);
@@ -377,7 +377,7 @@ const gceFEATURE FeatureList[]=
 
 static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 {
-	gceSTATUS status;
+    gceSTATUS status;
 
     gctUINT32 k, listLen = sizeof(FeatureList)/sizeof(gctINT);
     gctBOOL featureStatus;
@@ -408,27 +408,27 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 
     t2d->runtime = runtime;
 
-	t2d->dstSurf    = runtime->target;
-	t2d->dstFormat = runtime->format;
-	t2d->dstWidth = 0;
-	t2d->dstHeight = 0;
-	t2d->dstStride = 0;
-	t2d->dstPhyAddr = 0;
-	t2d->dstLgcAddr = 0;
+    t2d->dstSurf    = runtime->target;
+    t2d->dstFormat = runtime->format;
+    t2d->dstWidth = 0;
+    t2d->dstHeight = 0;
+    t2d->dstStride = 0;
+    t2d->dstPhyAddr = 0;
+    t2d->dstLgcAddr = 0;
 
-	t2d->brushColorFormat = gcvSURF_UNKNOWN;
+    t2d->brushColorFormat = gcvSURF_UNKNOWN;
 
-	gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
-										&t2d->dstWidth,
-										&t2d->dstHeight,
-										&t2d->dstStride));
+    gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
+                                        &t2d->dstWidth,
+                                        &t2d->dstHeight,
+                                        &t2d->dstStride));
 
-	gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
+    gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
 
-	t2d->base.render     = (PGalRender)Render;
+    t2d->base.render     = (PGalRender)Render;
     t2d->base.destroy    = (PGalDestroy)Destroy;
     t2d->base.frameCount = 7;
-	t2d->base.description = s_CaseDescription;
+    t2d->base.description = s_CaseDescription;
 
     return gcvTRUE;
 

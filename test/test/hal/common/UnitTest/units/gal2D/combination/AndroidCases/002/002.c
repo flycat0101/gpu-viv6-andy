@@ -753,23 +753,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         GalSplitArea(&ctx, pArea, &t2d->layer[i].dstRect, 1 << i);
     }
 
-#if 0
-    /* Dump all the areas. */
-    pAreaPool = ctx.areaPool;
-    while (pAreaPool != gcvNULL)
-    {
-        pArea = pAreaPool->areas;
-        while (pArea != gcvNULL)
-        {
-            printf("(%d, %d) --> (%d, %d). owners = 0x%x.\n",
-                pArea->rect.left, pArea->rect.top, pArea->rect.right,
-                pArea->rect.bottom, pArea->owners );
-            pArea = pArea->next;
-        }
-        printf("\n");
-        pAreaPool = pAreaPool->next;
-    }
-#endif
 
     /* Set the source surface. */
     for (i = 0; i < (gctINT)gcmCOUNTOF(t2d->surf); i++)

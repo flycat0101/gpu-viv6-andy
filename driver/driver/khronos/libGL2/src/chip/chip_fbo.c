@@ -33,6 +33,55 @@ extern gceSURF_FORMAT getHWFormat(GLuint devFmt);
 extern GLboolean __glIsIntegerInternalFormat(GLenum internalFormat);
 extern GLboolean __glIsFloatInternalFormat(GLenum internalFormat);
 extern GLvoid residentTextureLevel(__GLclientPixelState *ps, glsCHIPCONTEXT_PTR chipCtx, __GLtextureObject *texObj, GLint face, GLint level, const GLvoid* buf);
+
+gceSTATUS
+glSURF_Blit(
+    IN OPTIONAL gcoSURF SrcSurface,
+    IN gcoSURF DstSurface,
+    IN gctUINT32 RectCount,
+    IN OPTIONAL gcsRECT_PTR SrcRect,
+    IN gcsRECT_PTR DstRect,
+    IN OPTIONAL gcoBRUSH Brush,
+    IN gctUINT8 FgRop,
+    IN gctUINT8 BgRop,
+    IN OPTIONAL gceSURF_TRANSPARENCY Transparency,
+    IN OPTIONAL gctUINT32 TransparencyColor,
+    IN OPTIONAL gctPOINTER Mask,
+    IN OPTIONAL gceSURF_MONOPACK MaskPack
+    )
+{
+
+#if gcdENABLE_2D
+    return gcoSURF_Blit(SrcSurface, DstSurface, RectCount, SrcRect, DstRect, Brush, FgRop, BgRop, Transparency, TransparencyColor, Mask, MaskPack);
+#endif
+
+#if gcdENABLE_3D
+    {
+        gcsSURF_VIEW rtView = {gcvNULL, 0, 1};
+        gcsSURF_VIEW tgtView = {gcvNULL, 0, 1};
+        gcsSURF_RESOLVE_ARGS rlvArgs = {0};
+
+        rtView.surf = SrcSurface;
+        tgtView.surf = DstSurface;
+
+        rlvArgs.version = gcvHAL_ARG_VERSION_V2;
+        rlvArgs.uArgs.v2.yInverted = gcvTRUE;
+        rlvArgs.uArgs.v2.srcOrigin.x = SrcRect->left;
+        rlvArgs.uArgs.v2.srcOrigin.y = SrcRect->top;
+        rlvArgs.uArgs.v2.dstOrigin.x = DstRect->left;
+        rlvArgs.uArgs.v2.dstOrigin.y = DstRect->top;
+        rlvArgs.uArgs.v2.rectSize.x = SrcRect->right - SrcRect->left;
+        rlvArgs.uArgs.v2.rectSize.y = SrcRect->bottom- SrcRect->top;
+        rlvArgs.uArgs.v2.numSlices  = 1;
+        return gcoSURF_ResolveRect(&rtView, &tgtView, &rlvArgs);
+    }
+#endif
+
+/* make the compiler happy */
+    return gcvSTATUS_OK;
+
+}
+
 __GL_INLINE GLboolean IsAttachFormatRenderable(GLint attachpointIndex, GLenum internalformat)
 {
     GL_ASSERT((attachpointIndex>=0) && (attachpointIndex < __GL_MAX_ATTACHMENTS));
@@ -1215,7 +1264,7 @@ GLvoid __glChipBlitFrameBuffer(__GLcontext *gc,
                 }
 
                 /* Blt from read color buffer to draw color buffer */
-                gcoSURF_Blit(
+                glSURF_Blit(
                     chipCtx->readRT,
                     chipCtx->drawRT[i],
                     1,
@@ -1274,7 +1323,7 @@ GLvoid __glChipBlitFrameBuffer(__GLcontext *gc,
                /* Do we need to do resolve before BLT? */
             }
 
-            gcoSURF_Blit(
+            glSURF_Blit(
                 chipCtx->readDepth,
                 chipCtx->drawDepth,
                 1,
@@ -1328,7 +1377,7 @@ GLvoid __glChipBlitFrameBuffer(__GLcontext *gc,
                 dstrect.bottom   = min(dstHeight, dstY1);
             }
 
-            gcoSURF_Blit(
+            glSURF_Blit(
                 chipCtx->readStencil,
                 chipCtx->drawStencil,
                 1,

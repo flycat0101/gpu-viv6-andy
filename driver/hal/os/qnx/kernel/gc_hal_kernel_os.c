@@ -3276,7 +3276,8 @@ gckOS_MapPagesEx(
     IN gctSIZE_T PageCount,
     IN gctUINT32 Address,
     IN gctPOINTER PageTable,
-    IN gctBOOL Writable
+    IN gctBOOL Writable,
+    IN gceSURF_TYPE Type
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -6589,3 +6590,14 @@ OnError:
     gcmkFOOTER();
     return status;
 }
+gceSTATUS
+gckOS_GetPolicyID(
+    IN gckOS Os,
+    IN gceSURF_TYPE Type,
+    OUT gctUINT32_PTR PolicyID,
+    OUT gctUINT32_PTR AXIConfig
+    )
+{
+    return gcvSTATUS_NOT_SUPPORTED;
+}
+

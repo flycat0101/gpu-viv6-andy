@@ -26,6 +26,7 @@
 ##############################################################################
 
 
+
 DOSYSGEN=1
 
 SYNCHRONIZE_DRAIN=1
@@ -37,7 +38,7 @@ TARGETTYPE=PROGRAM
 SOURCES= \
   ../cover_flow.c \
 
-INCLUDES=$(INCLUDES);$(VIVANTE_SDK_INC);$(VIVANTE_SDK_INC)/HAL;;$(AQROOT)\sdk\samples\vdk\cover_flow
+INCLUDES=$(INCLUDES);$(VIVANTE_SDK_INC);$(AQROOT)\sdk\samples\vdk\cover_flow
 
 TARGETLIBS= \
   $(_SYSGENSDKROOT)\lib\$(_CPUINDPATH)\coredll.lib \

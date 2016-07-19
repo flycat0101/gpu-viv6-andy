@@ -9353,7 +9353,7 @@ static gctSTRING gcLibImageAtomicAdd_3D_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMADD, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9366,7 +9366,7 @@ static gctSTRING gcLibImageAtomicAdd_3D_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMADD, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9379,7 +9379,7 @@ static gctSTRING gcLibImageAtomicAdd_CUBE_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMADD, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9392,7 +9392,7 @@ static gctSTRING gcLibImageAtomicAdd_CUBE_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMADD, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9405,7 +9405,7 @@ static gctSTRING gcLibImageAtomicAdd_2DARRAY_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMADD, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9418,7 +9418,7 @@ static gctSTRING gcLibImageAtomicAdd_2DARRAY_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMADD, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9473,7 +9473,7 @@ static gctSTRING gcLibImageAtomicMin_3D_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMMIN, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9486,7 +9486,7 @@ static gctSTRING gcLibImageAtomicMin_3D_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMMIN, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9499,7 +9499,7 @@ static gctSTRING gcLibImageAtomicMin_CUBE_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMMIN, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9512,7 +9512,7 @@ static gctSTRING gcLibImageAtomicMin_CUBE_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMMIN, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9525,7 +9525,7 @@ static gctSTRING gcLibImageAtomicMin_2DARRAY_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMMIN, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9538,7 +9538,7 @@ static gctSTRING gcLibImageAtomicMin_2DARRAY_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMMIN, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9593,7 +9593,7 @@ static gctSTRING gcLibImageAtomicMax_3D_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMMAX, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9606,7 +9606,7 @@ static gctSTRING gcLibImageAtomicMax_3D_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMMAX, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9619,7 +9619,7 @@ static gctSTRING gcLibImageAtomicMax_CUBE_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMMAX, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9632,7 +9632,7 @@ static gctSTRING gcLibImageAtomicMax_CUBE_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMMAX, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9645,7 +9645,7 @@ static gctSTRING gcLibImageAtomicMax_2DARRAY_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMMAX, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9658,7 +9658,7 @@ static gctSTRING gcLibImageAtomicMax_2DARRAY_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMMAX, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9713,7 +9713,7 @@ static gctSTRING gcLibImageAtomicAnd_3D_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMAND, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9726,7 +9726,7 @@ static gctSTRING gcLibImageAtomicAnd_3D_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMAND, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9739,7 +9739,7 @@ static gctSTRING gcLibImageAtomicAnd_CUBE_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMAND, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9752,7 +9752,7 @@ static gctSTRING gcLibImageAtomicAnd_CUBE_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMAND, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9765,7 +9765,7 @@ static gctSTRING gcLibImageAtomicAnd_2DARRAY_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMAND, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9778,7 +9778,7 @@ static gctSTRING gcLibImageAtomicAnd_2DARRAY_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMAND, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9833,7 +9833,7 @@ static gctSTRING gcLibImageAtomicOr_3D_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMOR, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9846,7 +9846,7 @@ static gctSTRING gcLibImageAtomicOr_3D_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMOR, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9859,7 +9859,7 @@ static gctSTRING gcLibImageAtomicOr_CUBE_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMOR, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9872,7 +9872,7 @@ static gctSTRING gcLibImageAtomicOr_CUBE_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMOR, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9885,7 +9885,7 @@ static gctSTRING gcLibImageAtomicOr_2DARRAY_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMOR, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9898,7 +9898,7 @@ static gctSTRING gcLibImageAtomicOr_2DARRAY_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMOR, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9953,7 +9953,7 @@ static gctSTRING gcLibImageAtomicXor_3D_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMXOR, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9966,7 +9966,7 @@ static gctSTRING gcLibImageAtomicXor_3D_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMXOR, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9979,7 +9979,7 @@ static gctSTRING gcLibImageAtomicXor_CUBE_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMXOR, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -9992,7 +9992,7 @@ static gctSTRING gcLibImageAtomicXor_CUBE_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMXOR, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -10005,7 +10005,7 @@ static gctSTRING gcLibImageAtomicXor_2DARRAY_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMXOR, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -10018,7 +10018,7 @@ static gctSTRING gcLibImageAtomicXor_2DARRAY_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMXOR, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -10083,7 +10083,7 @@ static gctSTRING gcLibImageAtomicXchg_3D_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMXCHG, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -10096,7 +10096,7 @@ static gctSTRING gcLibImageAtomicXchg_3D_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMXCHG, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -10109,7 +10109,7 @@ static gctSTRING gcLibImageAtomicXchg_3D_float_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMXCHG, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -10122,7 +10122,7 @@ static gctSTRING gcLibImageAtomicXchg_CUBE_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMXCHG, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -10135,7 +10135,7 @@ static gctSTRING gcLibImageAtomicXchg_CUBE_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMXCHG, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -10148,7 +10148,7 @@ static gctSTRING gcLibImageAtomicXchg_CUBE_float_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMXCHG, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -10161,7 +10161,7 @@ static gctSTRING gcLibImageAtomicXchg_2DARRAY_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMXCHG, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -10174,7 +10174,7 @@ static gctSTRING gcLibImageAtomicXchg_2DARRAY_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMXCHG, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -10187,7 +10187,7 @@ static gctSTRING gcLibImageAtomicXchg_2DARRAY_float_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   _viv_asm(ATOMXCHG, result, address, data);\n"
 "   return result;\n"
 "}\n";
@@ -10260,7 +10260,7 @@ static gctSTRING gcLibImageAtomicCmpXchg_3D_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   temp.y = data0;"
 "   temp.x = data1;"
 "   _viv_asm(ATOMCMPXCHG, result, address, temp);\n"
@@ -10276,7 +10276,7 @@ static gctSTRING gcLibImageAtomicCmpXchg_3D_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   temp.y = data0;"
 "   temp.x = data1;"
 "   _viv_asm(ATOMCMPXCHG, result, address, temp);\n"
@@ -10292,7 +10292,7 @@ static gctSTRING gcLibImageAtomicCmpXchg_CUBE_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   temp.y = data0;"
 "   temp.x = data1;"
 "   _viv_asm(ATOMCMPXCHG, result, address, temp);\n"
@@ -10308,7 +10308,7 @@ static gctSTRING gcLibImageAtomicCmpXchg_CUBE_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   temp.y = data0;"
 "   temp.x = data1;"
 "   _viv_asm(ATOMCMPXCHG, result, address, temp);\n"
@@ -10324,7 +10324,7 @@ static gctSTRING gcLibImageAtomicCmpXchg_2DARRAY_int_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   temp.y = data0;"
 "   temp.x = data1;"
 "   _viv_asm(ATOMCMPXCHG, result, address, temp);\n"
@@ -10340,7 +10340,7 @@ static gctSTRING gcLibImageAtomicCmpXchg_2DARRAY_uint_hati4 =
 "   uvec4 is = _viv_image_size(img_desc);\n"
 "   ivec3 p1 = p;\n"
 "   p1.z = int(img_desc.x) + p.z * int(is.w) ;\n"
-"   _viv_asm(IMAGE_ADDR, address, img_desc, p1);\n"
+"   _viv_asm(IMAGE_ADDR_3D, address, img_desc, p1);\n"
 "   temp.y = data0;"
 "   temp.x = data1;"
 "   _viv_asm(ATOMCMPXCHG, result, address, temp);\n"

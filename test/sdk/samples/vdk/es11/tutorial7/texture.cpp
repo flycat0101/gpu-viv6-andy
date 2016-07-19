@@ -116,13 +116,13 @@ bool Texture::LoadRaw(const char *textureFileName,GLubyte **pixels,int width, in
 #ifdef UNDER_CE
   if (f == NULL)
   {
-	wchar_t moduleName[MAX_PATH];
-	char path[MAX_PATH], * p;
-	GetModuleFileName(NULL, moduleName, MAX_PATH);
-	wcstombs(path, moduleName, MAX_PATH);
-	p = strrchr(path, '\\');
-	strcpy(p + 1, textureFileName);
-	f = fopen(path, "rb");
+    wchar_t moduleName[MAX_PATH];
+    char path[MAX_PATH], * p;
+    GetModuleFileName(NULL, moduleName, MAX_PATH);
+    wcstombs(path, moduleName, MAX_PATH);
+    p = strrchr(path, '\\');
+    strcpy(p + 1, textureFileName);
+    f = fopen(path, "rb");
   }
 #endif
   if(!f) return false;
@@ -146,74 +146,74 @@ bool Texture::LoadTGA(const char *textureFileName, GLubyte **pixels)
 #ifdef UNDER_CE
   if (f == NULL)
   {
-	wchar_t moduleName[MAX_PATH];
-	char path[MAX_PATH], * p;
-	GetModuleFileName(NULL, moduleName, MAX_PATH);
-	wcstombs(path, moduleName, MAX_PATH);
-	p = strrchr(path, '\\');
-	strcpy(p + 1, textureFileName);
-	f = fopen(path, "rb");
+    wchar_t moduleName[MAX_PATH];
+    char path[MAX_PATH], * p;
+    GetModuleFileName(NULL, moduleName, MAX_PATH);
+    wcstombs(path, moduleName, MAX_PATH);
+    p = strrchr(path, '\\');
+    strcpy(p + 1, textureFileName);
+    f = fopen(path, "rb");
   }
 #endif
   if(!f) return false;
 
     unsigned short width, height;
-	unsigned char widthLow, widthHigh, heightLow, heightHigh;
-	unsigned char headerLength = 0;
-	unsigned char imageType = 0;
-	unsigned char bits = 0;
-	int format= 0;
-	int lineWidth = 0;
+    unsigned char widthLow, widthHigh, heightLow, heightHigh;
+    unsigned char headerLength = 0;
+    unsigned char imageType = 0;
+    unsigned char bits = 0;
+    int format= 0;
+    int lineWidth = 0;
 
-	fread(&headerLength, sizeof(unsigned char), 1, f);
-	fseek(f,1,SEEK_CUR);
-	fread(&imageType, sizeof(unsigned char), 1, f);
-	fseek(f, 9, SEEK_CUR);
-	fread(&widthLow,  sizeof(unsigned char), 1, f);
-	fread(&widthHigh,  sizeof(unsigned char), 1, f);
-	width = (widthHigh << 16) + widthLow;
-	fread(&heightLow, sizeof(unsigned char), 1, f);
-	fread(&heightHigh, sizeof(unsigned char), 1, f);
-	height = (heightHigh << 16) + heightLow;
-	fread(&bits,   sizeof(unsigned char), 1, f);
+    fread(&headerLength, sizeof(unsigned char), 1, f);
+    fseek(f,1,SEEK_CUR); 
+    fread(&imageType, sizeof(unsigned char), 1, f);
+    fseek(f, 9, SEEK_CUR);
+    fread(&widthLow,  sizeof(unsigned char), 1, f);
+    fread(&widthHigh,  sizeof(unsigned char), 1, f);
+    width = (widthHigh << 16) + widthLow;
+    fread(&heightLow, sizeof(unsigned char), 1, f);
+    fread(&heightHigh, sizeof(unsigned char), 1, f);
+    height = (heightHigh << 16) + heightLow;
+    fread(&bits,   sizeof(unsigned char), 1, f);
 
   m_width = width;
   m_height = height;
 
-	fseek(f, headerLength + 1, SEEK_CUR);
-	GLubyte *buffer = NULL;
-	if(imageType != 10)
-	{
-		if((bits == 24)||(bits == 32)) //added to support for LUMINANCE and RGBA textures
-		{
-			format = bits >> 3;
-			lineWidth = format * m_width;
-			buffer = new GLubyte[lineWidth * m_height];
+    fseek(f, headerLength + 1, SEEK_CUR);
+    GLubyte *buffer = NULL;
+    if(imageType != 10)
+    {
+        if((bits == 24)||(bits == 32)) //added to support for LUMINANCE and RGBA textures
+        {
+            format = bits >> 3;
+            lineWidth = format * m_width;
+            buffer = new GLubyte[lineWidth * m_height];
 
-			for(int y = 0; y < m_height; y++)
-			{
-	  		GLubyte *line = &buffer[lineWidth * y];
-				fread(line, lineWidth, 1, f);
+            for(int y = 0; y < m_height; y++)
+            {
+              GLubyte *line = &buffer[lineWidth * y];
+                fread(line, lineWidth, 1, f);
 
         if(format!= 1)
         {
-				  for(int i=0;i<lineWidth ; i+=format) //swap R and B because TGA are stored in BGR format
-				  {
-					  int temp  = line[i];
-					  line[i]   = line[i+2];
-					  line[i+2] = temp;
-				  }
+                  for(int i=0;i<lineWidth ; i+=format) //swap R and B because TGA are stored in BGR format
+                  {
+                      int temp  = line[i];
+                      line[i]   = line[i+2];
+                      line[i+2] = temp;
+                  }
         }
-			}
-		}
-		else
+            }
+        }
+        else
     {
       fclose(f);
       *pixels = buffer;
       return false;
     }
-	}
-	fclose(f);
+    }
+    fclose(f);
 
   *pixels = buffer;
   m_format = format; //bytes per pixel

@@ -57,7 +57,7 @@ gcoWL_CreateGhostBuffer(gcsWL_EGL_DISPLAY* wl_egl, gcsWL_EGL_BUFFER* buffer)
                                 buffer->info.stride,
                                 buffer->info.format,
                                 buffer->info.type,
-                                (int32_t) buffer->info.node,
+                                (uintptr_t)buffer->info.node,
                                 buffer->info.pool,
                                 buffer->info.bytes);
 }

@@ -15,6 +15,8 @@
 # Linux build file for libwayland-viv library.
 #
 
+$(warning Deprecated)
+
 ################################################################################
 # Include common definitions.
 include ../../makefile.linux.def
@@ -42,9 +44,6 @@ TARGET_OUTPUT = $(OBJ_DIR)/$(TARGET_NAME)
 
 ifneq ($(USE_ARMCC), 1)
   CFLAGS += -fPIC
-#  ifeq (,$(EGL_APPENDIX))
-#    LFLAGS += -Wl,--version-script=libEGL.map
-#  endif
 endif
 
 ################################################################################
@@ -68,8 +67,7 @@ endif
 ################################################################################
 # Describe object files.
 
-OBJECTS = $(OBJ_DIR)/gc_wayland_protocol.o \
-          $(OBJ_DIR)/wayland-viv-protocol.o
+OBJECTS = $(OBJ_DIR)/wayland-viv-protocol.o
 
 ################################################################################
 # Installation directory.

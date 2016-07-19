@@ -33,15 +33,15 @@
 
 class MultiDimensionalArraysTest3D: public MultiDimensionalArraysTest {
 public:
-	MultiDimensionalArraysTest3D(const char *typeName,
-		const size_t sizeX, const size_t sizeY, const size_t sizeZ);
+    MultiDimensionalArraysTest3D(const char *typeName,
+        const size_t sizeX, const size_t sizeY, const size_t sizeZ);
 protected:
-	const size_t sizeX;
-	const size_t sizeY;
-	const size_t sizeZ;
+    const size_t sizeX;
+    const size_t sizeY;
+    const size_t sizeZ;
 
-	cl_int enqueueKernel(cl_kernel kernel);
-	void generateSource(char *source, unsigned int *sourceSize);
+    cl_int enqueueKernel(cl_kernel kernel);
+    void generateSource(char *source, unsigned int *sourceSize);
 };
 
 #endif /*_multidimensionalarraystest3d_h*/

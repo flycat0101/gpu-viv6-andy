@@ -38,9 +38,9 @@ extern "C" {
 *************************** Intrernal Object Pointers. *************************
 \******************************************************************************/
 
-typedef struct _gcsAPPLICATION *	gcsAPPLICATION_PTR;
-typedef struct _gcsVISUAL *			gcsVISUAL_PTR;
-typedef struct _gcsCOMMONVISUAL *	gcsCOMMONVISUAL_PTR;
+typedef struct _gcsAPPLICATION *    gcsAPPLICATION_PTR;
+typedef struct _gcsVISUAL *            gcsVISUAL_PTR;
+typedef struct _gcsCOMMONVISUAL *    gcsCOMMONVISUAL_PTR;
 
 
 /******************************************************************************\
@@ -51,8 +51,8 @@ typedef struct _gcsTHREADINFO * gcsTHREADINFO_PTR;
 
 struct _gcsTHREADINFO
 {
-	gctTHREADROUTINE routine;
-	gctPOINTER argument;
+    gctTHREADROUTINE routine;
+    gctPOINTER argument;
 };
 
 
@@ -62,27 +62,27 @@ struct _gcsTHREADINFO
 
 struct _gcsCOMMONVISUAL
 {
-	/* Desktop size. */
-	gctUINT desktopWidth;
-	gctUINT desktopHeight;
+    /* Desktop size. */
+    gctUINT desktopWidth;
+    gctUINT desktopHeight;
 
-	/* Message handlers. */
-	gctPOINTER         eventArgument;
-	gctKEYBOARDEVENT   keyboardEvent;
-	gctMOUSEPRESSEVENT mousePressEvent;
-	gctMOUSEMOVEEVENT  mouseMoveEvent;
-	gctTIMERFUNC       timerEvent;
-	gctUINT            timerDelay;
+    /* Message handlers. */
+    gctPOINTER         eventArgument;
+    gctKEYBOARDEVENT   keyboardEvent;
+    gctMOUSEPRESSEVENT mousePressEvent;
+    gctMOUSEMOVEEVENT  mouseMoveEvent;
+    gctTIMERFUNC       timerEvent;
+    gctUINT            timerDelay;
 
-	/* Visual system mutex. */
-	gctHANDLE visualMutex;
+    /* Visual system mutex. */
+    gctHANDLE visualMutex;
 
-	/* Main window. */
-	gctUINT mainWindowDepth;
+    /* Main window. */
+    gctUINT mainWindowDepth;
 
-	/* Main window image. */
-	gctUINT mainWindowImageWidth;
-	gctUINT mainWindowImageHeight;
+    /* Main window image. */
+    gctUINT mainWindowImageWidth;
+    gctUINT mainWindowImageHeight;
 };
 
 
@@ -92,28 +92,28 @@ struct _gcsCOMMONVISUAL
 
 gcsAPPLICATION_PTR
 ivdkGetApplication(
-	void
-	);
+    void
+    );
 
 gcsVISUAL_PTR
 ivdkGetVisual(
-	void
-	);
+    void
+    );
 
 void
 ivdkLockVisual(
-	void
-	);
+    void
+    );
 
 void
 ivdkUnlockVisual(
-	void
-	);
+    void
+    );
 
 gctBOOL
 ivdkServeTimer(
-	void
-	);
+    void
+    );
 
 
 #ifdef __cplusplus

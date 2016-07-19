@@ -325,14 +325,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     gcmONERROR(gco2D_Flush(egn2D));
     gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
 
-#if 0
-    {
-        char name[200];
-
-        sprintf(name, "gal2DFormatCompressedTPC013_intermediate_%03d.bmp", frameNo);
-        GalSaveTSurfToDIB(surf, name);
-    }
-#endif
 
     /* Uncompress surf to result. */
     rect.left = rect.top = 0;

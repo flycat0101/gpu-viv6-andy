@@ -35,34 +35,34 @@
 
 /*******************************************************************************
 **
-**	ivdkGetApplication
+**    ivdkGetApplication
 **
-**	Query a pointer to the applcation object.
+**    Query a pointer to the applcation object.
 **
-**	INPUT:
+**    INPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		gcsAPPLICATION_PTR
-**			Pointer to the applcation object.
+**        gcsAPPLICATION_PTR
+**            Pointer to the applcation object.
 */
 
 gcsAPPLICATION_PTR
 ivdkGetApplication(
-	void
-	)
+    void
+    )
 {
-	/* Define the application object. */
-	static struct _gcsAPPLICATION app = {0};
+    /* Define the application object. */
+    static struct _gcsAPPLICATION app = {0};
 
-	/* Return a pointer to the object. */
-	return &app;
+    /* Return a pointer to the object. */
+    return &app;
 }
 
 
@@ -74,12 +74,12 @@ ivdkGetApplication(
 **
 **  INPUT:
 **
-**		int ArgCount
-**			Number of the passed arguments.
+**        int ArgCount
+**            Number of the passed arguments.
 **
-**		char* ArgPointer[]
-**			An array of null-terminated strings representing command-line
-**			arguments entered by the user of the program.
+**        char* ArgPointer[]
+**            An array of null-terminated strings representing command-line
+**            arguments entered by the user of the program.
 **
 **  OUTPUT:
 **
@@ -88,24 +88,24 @@ ivdkGetApplication(
 **  RETURN:
 **
 **      int
-**			Exit value.
+**            Exit value.
 */
 
 int
 main(
-	int ArgCount,
-	char* ArgPointer[]
-	)
+    int ArgCount,
+    char* ArgPointer[]
+    )
 {
-	/* Get a pointer to the application object. */
-	gcsAPPLICATION_PTR app = ivdkGetApplication();
+    /* Get a pointer to the application object. */
+    gcsAPPLICATION_PTR app = ivdkGetApplication();
 
-	/* Init the object. */
-	app->argCount   = ArgCount;
-	app->argPointer = ArgPointer;
+    /* Init the object. */
+    app->argCount   = ArgCount;
+    app->argPointer = ArgPointer;
 
-	/* Run the application */
-	return vdkAppEntry();
+    /* Run the application */
+    return vdkAppEntry();
 }
 
 /* if defined(LINUX) */

@@ -26,6 +26,8 @@
 *****************************************************************************/
 
 
+
+
 #ifndef __text_h_
 #define __text_h_
 
@@ -39,23 +41,23 @@ extern "C" {
 
 typedef enum _TEXT_OPTIONS
 {
-	LEFT_TEXT    = (0 << 0),
-	HCENTER_TEXT = (1 << 0),
-	RIGHT_TEXT   = (2 << 0),
-	HORIZONTAL_TEXT_ALIGNMENT = (3 << 0),
+    LEFT_TEXT    = (0 << 0),
+    HCENTER_TEXT = (1 << 0),
+    RIGHT_TEXT   = (2 << 0),
+    HORIZONTAL_TEXT_ALIGNMENT = (3 << 0),
 
-	TOP_TEXT     = (0 << 4),
-	VCENTER_TEXT = (1 << 4),
-	BOTTOM_TEXT  = (2 << 4),
-	VERTICAL_TEXT_ALIGNMENT = (3 << 4),
+    TOP_TEXT     = (0 << 4),
+    VCENTER_TEXT = (1 << 4),
+    BOTTOM_TEXT  = (2 << 4),
+    VERTICAL_TEXT_ALIGNMENT = (3 << 4),
 
-	SHADOW_TEXT  = (1 << 8),
+    SHADOW_TEXT  = (1 << 8),
 }
 TEXT_OPTIONS;
 
 typedef enum _TEXT_CONSTANTS
 {
-	SHADOW_OFFSET = 1
+    SHADOW_OFFSET = 1
 }
 TEXT_CONSTANTS;
 
@@ -67,45 +69,45 @@ TEXT_CONSTANTS;
 /* Calculates the width and the height of the text. */
 gceSTATUS
 GetTextSize(
-	IN gctUINT FontSelect,
-	IN char * String,
-	IN OUT gctINT * TextWidth,
-	IN OUT gctINT * TextHeight,
-	IN OUT gctINT * VerOffset
-	);
+    IN gctUINT FontSelect,
+    IN char * String,
+    IN OUT gctINT * TextWidth,
+    IN OUT gctINT * TextHeight,
+    IN OUT gctINT * VerOffset
+    );
 
 /* Draws the specified text. */
 gceSTATUS
 DrawString(
-	IN gco2D Engine,
-	IN gcoSURF DestSurface,
-	IN gcsRECT_PTR DestRect,
-	IN gctUINT FontSelect,
-	IN char * String,
-	IN TEXT_OPTIONS Options,
-	IN gctUINT32 FgColor,
-	IN gctUINT32 BgColor,
-	IN gcoBRUSH Brush,
-	IN gctUINT8 FgRop,
-	IN gctUINT8 BgRop,
-	IN gceSURF_TRANSPARENCY Transparency
-	);
+    IN gco2D Engine,
+    IN gcoSURF DestSurface,
+    IN gcsRECT_PTR DestRect,
+    IN gctUINT FontSelect,
+    IN char * String,
+    IN TEXT_OPTIONS Options,
+    IN gctUINT32 FgColor,
+    IN gctUINT32 BgColor,
+    IN gcoBRUSH Brush,
+    IN gctUINT8 FgRop,
+    IN gctUINT8 BgRop,
+    IN gceSURF_TRANSPARENCY Transparency
+    );
 
 /* Draws the specified text with a shadow. */
 gceSTATUS
 DrawShadowedString(
-	IN gco2D Engine,
-	IN gcoSURF DestSurface,
-	IN gcsRECT_PTR DestRect,
-	IN gctUINT FontSelect,
-	IN char * String,
-	IN TEXT_OPTIONS Options,
-	IN gctUINT32 TextColor,
-	IN gctUINT32 ShadowColor,
-	IN gcoBRUSH Brush,
-	IN gctUINT8 FgRop,
-	IN gctUINT8 BgRop
-	);
+    IN gco2D Engine,
+    IN gcoSURF DestSurface,
+    IN gcsRECT_PTR DestRect,
+    IN gctUINT FontSelect,
+    IN char * String,
+    IN TEXT_OPTIONS Options,
+    IN gctUINT32 TextColor,
+    IN gctUINT32 ShadowColor,
+    IN gcoBRUSH Brush,
+    IN gctUINT8 FgRop,
+    IN gctUINT8 BgRop
+    );
 
 #ifdef __cplusplus
 }

@@ -95,36 +95,6 @@ vdkGetDisplayInfo(
     );
 
 
-VDKAPI int VDKLANG
-vdkGetDisplayInfoEx(
-    vdkDisplay Display,
-    unsigned int DisplayInfoSize,
-    vdkDISPLAY_INFO * DisplayInfo
-    );
-
-VDKAPI int VDKLANG
-vdkGetDisplayVirtual(
-    vdkDisplay Display,
-    int * Width,
-    int * Height
-    );
-
-VDKAPI int VDKLANG
-vdkGetDisplayBackbuffer(
-    vdkDisplay Display,
-    unsigned int * Offset,
-    int * X,
-    int * Y
-    );
-
-VDKAPI int VDKLANG
-vdkSetDisplayVirtual(
-    vdkDisplay Display,
-    unsigned int Offset,
-    int X,
-    int Y
-    );
-
 VDKAPI void VDKLANG
 vdkDestroyDisplay(
     vdkDisplay Display
@@ -175,30 +145,6 @@ vdkHideWindow(
     vdkWindow Window
     );
 
-VDKAPI int VDKLANG
-vdkDrawImage(
-    vdkWindow Window,
-    int Left,
-    int Top,
-    int Right,
-    int Bottom,
-    int Width,
-    int Height,
-    int BitsPerPixel,
-    void * Bits
-    );
-
-VDKAPI int VDKLANG
-vdkGetImage(
-    vdkWindow Window,
-    int Left,
-    int Top,
-    int Right,
-    int Bottom,
-    int * BitsPerPixel,
-    void ** Bits
-    );
-
 VDKAPI void VDKLANG
 vdkCapturePointer(
     vdkWindow Window
@@ -224,19 +170,6 @@ vdkGetPixmapInfo(
     int * BitsPerPixel,
     int * Stride,
     void ** Bits
-    );
-
-VDKAPI int VDKLANG
-vdkDrawPixmap(
-    vdkPixmap Pixmap,
-    int Left,
-    int Top,
-    int Right,
-    int Bottom,
-    int Width,
-    int Height,
-    int BitsPerPixel,
-    void * Bits
     );
 
 VDKAPI void VDKLANG

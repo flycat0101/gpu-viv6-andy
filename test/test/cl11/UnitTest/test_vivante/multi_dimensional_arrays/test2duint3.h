@@ -33,19 +33,19 @@
 
 class Test2DUInt3: public MultiDimensionalArraysTest2D {
 public:
-	Test2DUInt3(const size_t sizeX, const size_t sizeY);
-	~Test2DUInt3();
+    Test2DUInt3(const size_t sizeX, const size_t sizeY);
+    ~Test2DUInt3();
 
 protected:
-	cl_uint3* inputAHost;
-	cl_uint3* inputBHost;
-	cl_uint3* resultHost;
+    cl_uint3* inputAHost;
+    cl_uint3* inputBHost;
+    cl_uint3* resultHost;
 
-	const int getMemSize() const;
-	void generateInput(const unsigned int &kernelIndex);
-	void* getInputAElement(const unsigned int &index) const;
-	void* getInputBElement(const unsigned int &index) const;
-	void* getResultElement(const unsigned int &index) const;
+    const int getMemSize() const;
+    void generateInput(const unsigned int &kernelIndex);
+    void* getInputAElement(const unsigned int &index) const;
+    void* getInputBElement(const unsigned int &index) const;
+    void* getResultElement(const unsigned int &index) const;
 };
 
 #endif /*_test2duint3_h*/

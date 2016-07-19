@@ -37,8 +37,8 @@ extern "C" {
 #endif
 
 /*
-	If there is an error, the checks log a message and returns
-	true. Otherwise it returns false.
+    If there is an error, the checks log a message and returns
+    true. Otherwise it returns false.
 */
 
 const char * GetGLMessage(GLenum);
@@ -54,18 +54,18 @@ const char * GetFramebufferMessage(GLenum);
 int CheckFramebufferStatus(const char * Message);
 
 /*
-	Checked versions of glGetAttribLocation and
-	glGetUniformLocation. Returns the attrib/uniform value and prints
-	out a message if value is less than zero.
+    Checked versions of glGetAttribLocation and
+    glGetUniformLocation. Returns the attrib/uniform value and prints
+    out a message if value is less than zero.
 */
 
 int CheckedGetAttribLoc(GLuint Prog,
-						const char * Attrib,
-						const char * Message);
+                        const char * Attrib,
+                        const char * Message);
 
 int CheckedGetUniformLoc(GLuint prog,
-						 const char * Uniform,
-						 const char * Message);
+                         const char * Uniform,
+                         const char * Message);
 
 #ifdef __cplusplus
 }

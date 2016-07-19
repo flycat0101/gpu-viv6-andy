@@ -1561,12 +1561,12 @@ gceSTATUS vgsPATHSTORAGE_Open(
             Storage->hal,
             Context->vg,
             Context->TreeDepth, Context->saveLayerTreeDepth, Context->varTreeDepth,
-            node
+            node, gcvTRUE
             ));
 #else
         gcmCHECK_STATUS(gcoHAL_FreeVideoMemory(
             Storage->hal,
-            node
+            node, gcvTRUE
             ));
 #endif
     }

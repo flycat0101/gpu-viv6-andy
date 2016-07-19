@@ -842,6 +842,12 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOV(
                         }
                     }
 
+                    if (VIR_Inst_GetThreadMode(defInst) == VIR_THREAD_D16_DUAL_32 &&
+                        VIR_Operand_GetPrecision(movSrc) == VIR_PRECISION_HIGH)
+                    {
+                        VIR_Inst_SetThreadMode(inst, VIR_THREAD_D16_DUAL_32);
+                    }
+
                     vscVIR_DeleteUsage(VSC_CPP_GetDUInfo(cpp),
                         VIR_ANY_DEF_INST,
                         inst,
@@ -1555,6 +1561,12 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
                     gcvNULL);
 
                 VIR_Operand_SetModifier(def_inst_dest, VIR_Operand_GetModifier(inst_src0));
+
+                if (VIR_Inst_GetThreadMode(inst) == VIR_THREAD_D16_DUAL_32 &&
+                    VIR_Operand_GetPrecision(inst_dest) == VIR_PRECISION_HIGH)
+                {
+                    VIR_Inst_SetThreadMode(def_inst, VIR_THREAD_D16_DUAL_32);
+                }
 
                 /* add the usage info between the def of work_inst and the src of inst_usage_inst */
                 {

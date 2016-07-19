@@ -1613,19 +1613,19 @@ _DumpTexture(
     )
 {
     gctUINT32 address;
-    gctPOINTER memory;
+    gctPOINTER memory[3];
     gctUINT width, height;
     gctINT stride;
 
     if (Surface != gcvNULL)
     {
-        gcmVERIFY_OK(gcoSURF_Lock(Surface, &address, &memory));
+        gcmVERIFY_OK(gcoSURF_Lock(Surface, &address, memory));
 
         gcmVERIFY_OK(gcoSURF_GetAlignedSize(Surface, &width, &height, &stride));
 
-        gcmDUMP_BUFFER(Os, "texture", address, memory, 0, height * stride);
+        gcmDUMP_BUFFER(Os, "texture", address, memory[0], 0, height * stride);
 
-        gcmVERIFY_OK(gcoSURF_Unlock(Surface, memory));
+        gcmVERIFY_OK(gcoSURF_Unlock(Surface, memory[0]));
     }
 
 }
@@ -3797,7 +3797,7 @@ vgCreateEGLImageTargetKHR(VGeglImageKHR inImage)
         image->allowedQuality   = kImage->u.vgimage.allowedQuality;
 
         image->dirty            = *kImage->u.vgimage.dirtyPtr;
-        image->dirtyPtr         = kImage->u.vgimage.dirtyPtr;
+        image->dirtyPtr         = (gctBOOL *)kImage->u.vgimage.dirtyPtr;
         image->rootOffsetX      = kImage->u.vgimage.rootOffsetX;
         image->rootOffsetY      = kImage->u.vgimage.rootOffsetY;
         image->rootWidth        = kImage->u.vgimage.rootWidth;

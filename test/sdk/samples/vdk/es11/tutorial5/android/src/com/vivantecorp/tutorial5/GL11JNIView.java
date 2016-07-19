@@ -31,6 +31,7 @@ package com.vivantecorp.graphics.gl11tutorial5;
  * limitations under the License.
  */
 
+
 import android.content.Context;
 import android.opengl.GLSurfaceView;
 import android.util.AttributeSet;

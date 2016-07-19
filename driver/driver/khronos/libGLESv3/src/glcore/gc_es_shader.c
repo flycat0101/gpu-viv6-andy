@@ -4344,9 +4344,9 @@ GLuint GL_APIENTRY __gles_CreateShaderProgramv(__GLcontext *gc, GLenum type, GLs
 
 OnError:
     /* Append shader infoLog to program infoLog */
-    if(shaderObj)
+    if (shaderObj && progObj)
     {
-        if (shaderObj->shaderInfo.compiledLog)
+        if (shaderObj->shaderInfo.compiledLog && progObj->programInfo.infoLog)
         {
             gcoOS_StrCatSafe(progObj->programInfo.infoLog, __GLSL_LOG_INFO_SIZE, shaderObj->shaderInfo.compiledLog);
         }

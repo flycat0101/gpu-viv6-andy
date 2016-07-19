@@ -101,25 +101,25 @@ extern "C" {
 
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_tutorial2_GL2JNILib_init(JNIEnv * env, jobject obj,  jint w, jint h)
 {
-	int width  = w;
-	int height = h;
+    int width  = w;
+    int height = h;
 
-	LoadShaders("/sdcard/tutorial/tutorial2/vs_es20t2.vert", "/sdcard/tutorial/tutorial2/ps_es20t2.frag");
+    LoadShaders("/sdcard/tutorial/tutorial2/vs_es20t2.vert", "/sdcard/tutorial/tutorial2/ps_es20t2.frag");
 
-	if(programHandle == 0)
-		return false;
+    if(programHandle == 0)
+        return false;
 
     gettimeofday(&tm, NULL);
     start = tm.tv_sec * 1000 + tm.tv_usec / 1000;
 
 
-	return true;
+    return true;
 }
 static bool done = false;
 static bool paused = false;
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_tutorial2_GL2JNILib_repaint(JNIEnv * env, jobject obj)
 {
-	RenderInit();
+    RenderInit();
     if(!done)
     {
          if(key!=0)
@@ -137,7 +137,7 @@ JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_tutorial2_GL2JNILib_rep
                   default:
                      break;
               }
-			key = 0;
+            key = 0;
           }
           if (!paused)
           {
@@ -168,6 +168,6 @@ JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_tutorial2_GL2JNILib_key
     {
         key = k;
     }
-	return true;
+    return true;
 }
 

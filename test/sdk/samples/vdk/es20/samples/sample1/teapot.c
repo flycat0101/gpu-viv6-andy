@@ -27,359 +27,359 @@
 
 
 /*
-*	History : 2009.02.02, Created by qizhuang.liu.
+*    History : 2009.02.02, Created by qizhuang.liu.
 */
 
 #include "teapot.h"
 
 /*
-*	Make program & set attributes' locations.
+*    Make program & set attributes' locations.
 */
 GLuint TeapotMakeProgramPresetLocation(
-	const char* VSFile,
-	const char* FGFile,
-	VDKS_Struct_AttributeInformation* AttributesInformation,
-	int AttributesInformationCount
-	)
+    const char* VSFile,
+    const char* FGFile,
+    VDKS_Struct_AttributeInformation* AttributesInformation,
+    int AttributesInformationCount
+    )
 {
-	GLuint Program = glCreateProgram();
-	char szCurDir[MAX_PATH + 1];
-	char szVSFile[MAX_PATH + 1], szFGFile[MAX_PATH + 1];
+    GLuint Program = glCreateProgram();
+    char szCurDir[MAX_PATH + 1];
+    char szVSFile[MAX_PATH + 1], szFGFile[MAX_PATH + 1];
 #ifndef ANDROID
-	VDKS_Func_GetCurrentDir(szCurDir);
+    VDKS_Func_GetCurrentDir(szCurDir);
 #else
-	strcpy(szCurDir, "/sdcard/sample/sample1/");
+    strcpy(szCurDir, "/sdcard/sample/sample1/");
 #endif
 
-	strcpy(szVSFile, szCurDir);
-	strcpy(szFGFile, szCurDir);
-	strcat(szVSFile, VSFile);
-	strcat(szFGFile, FGFile);
+    strcpy(szVSFile, szCurDir);
+    strcpy(szFGFile, szCurDir);
+    strcat(szVSFile, VSFile);
+    strcat(szFGFile, FGFile);
 
-	/*
-	*	Set assumed attribute location before glLinkProgram.
-	*/
+    /*
+    *    Set assumed attribute location before glLinkProgram.
+    */
 
-	VDKS_Func_Program_PresetAttributesLocations(
-		Program,
-		AttributesInformation,
-		AttributesInformationCount);
+    VDKS_Func_Program_PresetAttributesLocations(
+        Program,
+        AttributesInformation,
+        AttributesInformationCount);
 
-	Program = VDKS_Func_MakeShaderProgram2(szVSFile, szFGFile, Program);
-	if (Program == 0)
-	{
-		printf("Failed to create a new program.");
-	}
+    Program = VDKS_Func_MakeShaderProgram2(szVSFile, szFGFile, Program);
+    if (Program == 0)
+    {
+        printf("Failed to create a new program.");
+    }
 
-	return Program;
+    return Program;
 }
 
 void TeapotInitTextureUnit(GLuint Tex)
 {
-	glActiveTexture(GL_TEXTURE0 + Tex);
+    glActiveTexture(GL_TEXTURE0 + Tex);
 
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glActiveTexture(GL_TEXTURE0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glActiveTexture(GL_TEXTURE0);
 }
 
 /*
-*	Buffer Attributes Data in to buffer object, and alloc locations & set usage of the bufobj.
+*    Buffer Attributes Data in to buffer object, and alloc locations & set usage of the bufobj.
 */
 VDKS_BOOL TeapotInit()
 {
-	char szCurDir[MAX_PATH + 1];
-	char szTempFile[MAX_PATH + 1];
+    char szCurDir[MAX_PATH + 1];
+    char szTempFile[MAX_PATH + 1];
 #ifndef ANDROID
-	VDKS_Func_GetCurrentDir(szCurDir);
+    VDKS_Func_GetCurrentDir(szCurDir);
 #else
-	strcpy(szCurDir, "/sdcard/sample/sample1/");
+    strcpy(szCurDir, "/sdcard/sample/sample1/");
 #endif
-	/*
-	* Positon
-	*/
-	strcpy(szTempFile, szCurDir);
-	strcat(szTempFile, PositionFile);
-	if (VDKS_TRUE !=  VDKS_ReadFloats (szTempFile, &PositionFloats, (SIZE_T *)&PositionFloatsCount))
-	{
-		printf("Init : Failed to read position data file.");
-		return VDKS_FALSE;
-	}
-
-	glGenBuffers(1, &PositionGLBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, PositionGLBuffer);
-	glBufferData(GL_ARRAY_BUFFER, PositionFloatsCount * sizeof(float), PositionFloats, GL_STATIC_DRAW);
-
-	/*
-	*	TexCoords.
-	*/
-	strcpy(szTempFile, szCurDir);
-	strcat(szTempFile, TextureCoord_0_File);
-	if (VDKS_TRUE != VDKS_ReadFloats (szTempFile, &TextureCoord_0_Floats, (SIZE_T *)&TextureCoord_0_FloatsCount))
-	{
-		printf("Init : Failed to read position data file.");
-		return VDKS_FALSE;
-	}
-
-	glGenBuffers(1, &TextureCoord_0_GLBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, TextureCoord_0_GLBuffer);
-	glBufferData(GL_ARRAY_BUFFER, TextureCoord_0_FloatsCount * sizeof(float), TextureCoord_0_Floats, GL_STATIC_DRAW);
-
-	/*
-	 * Triangles
-	*/
+    /*
+    * Positon
+    */
     strcpy(szTempFile, szCurDir);
-	strcat(szTempFile, TriangleFile);
-	if (VDKS_TRUE != VDKS_ReadTriangle(szTempFile, &TriangleData, (SIZE_T *)&TriangleVertexCount))
-	{
-		printf("Init : Failed to read triangle data file.");
-		return VDKS_FALSE;
-	}
+    strcat(szTempFile, PositionFile);
+    if (VDKS_TRUE !=  VDKS_ReadFloats (szTempFile, &PositionFloats, (SIZE_T *)&PositionFloatsCount))
+    {
+        printf("Init : Failed to read position data file.");
+        return VDKS_FALSE;
+    }
 
-	glGenBuffers(1, &TriangleGLBuffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, TriangleGLBuffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, TriangleVertexCount * sizeof(unsigned short), TriangleData, GL_STATIC_DRAW);
+    glGenBuffers(1, &PositionGLBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, PositionGLBuffer);
+    glBufferData(GL_ARRAY_BUFFER, PositionFloatsCount * sizeof(float), PositionFloats, GL_STATIC_DRAW);
 
-	/*
-	 * Debug, Model Center & Radius
-	*/
+    /*
+    *    TexCoords.
+    */
+    strcpy(szTempFile, szCurDir);
+    strcat(szTempFile, TextureCoord_0_File);
+    if (VDKS_TRUE != VDKS_ReadFloats (szTempFile, &TextureCoord_0_Floats, (SIZE_T *)&TextureCoord_0_FloatsCount))
+    {
+        printf("Init : Failed to read position data file.");
+        return VDKS_FALSE;
+    }
 
-	VDKS_Func_ModelCenterRadius(PositionFloats, PositionFloatsCount, &CenterX, &CenterY, &CenterZ, &Radius);
+    glGenBuffers(1, &TextureCoord_0_GLBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, TextureCoord_0_GLBuffer);
+    glBufferData(GL_ARRAY_BUFFER, TextureCoord_0_FloatsCount * sizeof(float), TextureCoord_0_Floats, GL_STATIC_DRAW);
 
-	VDKS_Macro_AlertUser(0, "CenterX : %f, CenterY : %f, CenterZ : %f, Radius : %f\n",CenterX, CenterY, CenterZ, Radius);
+    /*
+     * Triangles
+    */
+    strcpy(szTempFile, szCurDir);
+    strcat(szTempFile, TriangleFile);
+    if (VDKS_TRUE != VDKS_ReadTriangle(szTempFile, &TriangleData, (SIZE_T *)&TriangleVertexCount))
+    {
+        printf("Init : Failed to read triangle data file.");
+        return VDKS_FALSE;
+    }
 
-	/*
-	 * Matrix
-	*/
-	do
-	{
-		float view [3] = {0.0, 0.0, 200};
-		float focus [3] = {0.0, 0.0, 0.0};
-		float up [3] = {0.0, 1.0, 0.0};
+    glGenBuffers(1, &TriangleGLBuffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, TriangleGLBuffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, TriangleVertexCount * sizeof(unsigned short), TriangleData, GL_STATIC_DRAW);
 
-		VDKS_Func_LoadIdentity(ModelView);
-		VDKS_Func_LoadIdentity(Projection);
-		VDKS_Func_LoadIdentity(MVP);
+    /*
+     * Debug, Model Center & Radius
+    */
 
-		VDKS_Func_Matrix_LookAt(view, focus, up, ModelView);
+    VDKS_Func_ModelCenterRadius(PositionFloats, PositionFloatsCount, &CenterX, &CenterY, &CenterZ, &Radius);
 
-		VDKS_Func_Matrix_Ortho(
-			-1.0f * Radius, Radius, /*left, right*/
-			-1.0f * Radius, Radius, /*bottom, up*/
-			1.0, 400.0, /*near, far*/
-			Projection);
+    VDKS_Macro_AlertUser(0, "CenterX : %f, CenterY : %f, CenterZ : %f, Radius : %f\n",CenterX, CenterY, CenterZ, Radius);
 
-		VDKS_Func_Matrix_Mul4by4(MVP, Projection, ModelView);
+    /*
+     * Matrix
+    */
+    do
+    {
+        float view [3] = {0.0, 0.0, 200};
+        float focus [3] = {0.0, 0.0, 0.0};
+        float up [3] = {0.0, 1.0, 0.0};
 
-		//VDKS_Func_Translate(ModelView, -1.0f * CenterX, -1.0f * CenterY, -1.0f * CenterZ);
-	}
-	while(0);
+        VDKS_Func_LoadIdentity(ModelView);
+        VDKS_Func_LoadIdentity(Projection);
+        VDKS_Func_LoadIdentity(MVP);
 
-	/*
-	*	Program(s)
-	*/
+        VDKS_Func_Matrix_LookAt(view, focus, up, ModelView);
 
-	VDKS_Func_LocationManagerInit();
+        VDKS_Func_Matrix_Ortho(
+            -1.0f * Radius, Radius, /*left, right*/
+            -1.0f * Radius, Radius, /*bottom, up*/
+            1.0, 400.0, /*near, far*/
+            Projection);
 
-	PositionVertexAttributeArrayIndex = VDKS_Func_LocationAcquire();
+        VDKS_Func_Matrix_Mul4by4(MVP, Projection, ModelView);
 
-	assert (PositionVertexAttributeArrayIndex);
+        //VDKS_Func_Translate(ModelView, -1.0f * CenterX, -1.0f * CenterY, -1.0f * CenterZ);
+    }
+    while(0);
 
-	TextureCoord_0_VertexAttributeArrayIndex = VDKS_Func_LocationAcquire();
+    /*
+    *    Program(s)
+    */
 
-	assert (TextureCoord_0_VertexAttributeArrayIndex);
+    VDKS_Func_LocationManagerInit();
 
-	/*
-	*	As we have set the location name, so we can set the approprate index and usage of the buffer object in the pre-final
-	*	vertex attribute array(s?) set.
-	*/
+    PositionVertexAttributeArrayIndex = VDKS_Func_LocationAcquire();
 
-	VDKS_Func_BufferObject_SetUsage(AttributesInformation, sizeof(AttributesInformation) / sizeof(AttributesInformation[0]));
+    assert (PositionVertexAttributeArrayIndex);
 
-	TeapotProgramFrontBack = TeapotMakeProgramPresetLocation(
-		FrontBackVSFile,
-		FrontBackFGFile,
-		AttributesInformation,
-		AttributesInformationCount
-		);
+    TextureCoord_0_VertexAttributeArrayIndex = VDKS_Func_LocationAcquire();
 
-	TeapotProgramBackFront = TeapotMakeProgramPresetLocation(
-		BackFrontVSFile,
-		BackFrontFGFile,
-		AttributesInformation,
-		AttributesInformationCount
-		);
+    assert (TextureCoord_0_VertexAttributeArrayIndex);
 
-	TeapotProgramFrontFront = TeapotMakeProgramPresetLocation(
-		FrontFrontVSFile,
-		FrontFrontFGFile,
-		AttributesInformation,
-		AttributesInformationCount
-		);
+    /*
+    *    As we have set the location name, so we can set the approprate index and usage of the buffer object in the pre-final
+    *    vertex attribute array(s?) set.
+    */
 
-	TeapotProgramBackBack = TeapotMakeProgramPresetLocation(
-		BackBackVSFile,
-		BackBackFGFile,
-		AttributesInformation,
-		AttributesInformationCount
-		);
+    VDKS_Func_BufferObject_SetUsage(AttributesInformation, sizeof(AttributesInformation) / sizeof(AttributesInformation[0]));
 
-	/*
-	*	Texture Unit
-	*/
-	TeapotInitTextureUnit(TeapotTexUnitBackground);
-	TeapotInitTextureUnit(TeapotTexUnitFrontFront);
-	TeapotInitTextureUnit(TeapotTexUnitFrontBack);
-	TeapotInitTextureUnit(TeapotTexUnitBackFront);
-	TeapotInitTextureUnit(TeapotTexUnitBackBack);
-	TeapotInitTextureUnit(TexUnitBase);
+    TeapotProgramFrontBack = TeapotMakeProgramPresetLocation(
+        FrontBackVSFile,
+        FrontBackFGFile,
+        AttributesInformation,
+        AttributesInformationCount
+        );
 
-	/*
-	*	Texture Object
-	*/
+    TeapotProgramBackFront = TeapotMakeProgramPresetLocation(
+        BackFrontVSFile,
+        BackFrontFGFile,
+        AttributesInformation,
+        AttributesInformationCount
+        );
 
-	glGenTextures(1, &TeapotTexObjBackground);
-	assert (TeapotTexObjBackground != 0);
+    TeapotProgramFrontFront = TeapotMakeProgramPresetLocation(
+        FrontFrontVSFile,
+        FrontFrontFGFile,
+        AttributesInformation,
+        AttributesInformationCount
+        );
 
-	glGenTextures(1, &TeapotTexObjFrontFront);
-	assert (TeapotTexObjFrontFront != 0);
+    TeapotProgramBackBack = TeapotMakeProgramPresetLocation(
+        BackBackVSFile,
+        BackBackFGFile,
+        AttributesInformation,
+        AttributesInformationCount
+        );
 
-	glGenTextures(1, &TeapotTexObjFrontBack);
-	assert (TeapotTexObjFrontBack != 0);
+    /*
+    *    Texture Unit
+    */
+    TeapotInitTextureUnit(TeapotTexUnitBackground);
+    TeapotInitTextureUnit(TeapotTexUnitFrontFront);
+    TeapotInitTextureUnit(TeapotTexUnitFrontBack);
+    TeapotInitTextureUnit(TeapotTexUnitBackFront);
+    TeapotInitTextureUnit(TeapotTexUnitBackBack);
+    TeapotInitTextureUnit(TexUnitBase);
 
-	glGenTextures(1, &TeapotTexObjBackFront);
-	assert (TeapotTexObjBackFront != 0);
+    /*
+    *    Texture Object
+    */
 
-	glGenTextures(1, &TeapotTexObjBackBack);
-	assert (TeapotTexObjBackBack != 0);
+    glGenTextures(1, &TeapotTexObjBackground);
+    assert (TeapotTexObjBackground != 0);
 
-	/*
-	*	Texture "base"
-	*/
-	strcpy(szTempFile, szCurDir);
-	strcat(szTempFile, TexImgBaseFile);
-	do
-	{
-		int w, h;
+    glGenTextures(1, &TeapotTexObjFrontFront);
+    assert (TeapotTexObjFrontFront != 0);
 
-		//int wi, hi;
+    glGenTextures(1, &TeapotTexObjFrontBack);
+    assert (TeapotTexObjFrontBack != 0);
 
-		unsigned char * img = NULL;
+    glGenTextures(1, &TeapotTexObjBackFront);
+    assert (TeapotTexObjBackFront != 0);
 
-		img = VDKS_Func_ReadBmp((char *)szTempFile/*TexImgBaseFile*/, &w, &h);
-		if (NULL == img)
-		{
-			return VDKS_FALSE;
-		}
+    glGenTextures(1, &TeapotTexObjBackBack);
+    assert (TeapotTexObjBackBack != 0);
 
-		//for (hi = 0; hi < h; hi++)
-		//{
-		//	for (wi = 0; wi < w; wi++)
-		//	{
-		//		img[hi * w * 4 + wi * 4 + 0] = img[hi * w * 4 + wi * 4 + 3];
-		//		img[hi * w * 4 + wi * 4 + 1] = img[hi * w * 4 + wi * 4 + 3];
-		//		img[hi * w * 4 + wi * 4 + 2] = img[hi * w * 4 + wi * 4 + 3];
-		//		img[hi * w * 4 + wi * 4 + 3] = img[hi * w * 4 + wi * 4 + 3];
-		//		//img[hi * w * 4 + wi * 4 + 3] = 255;
-		//	}
-		//}
+    /*
+    *    Texture "base"
+    */
+    strcpy(szTempFile, szCurDir);
+    strcat(szTempFile, TexImgBaseFile);
+    do
+    {
+        int w, h;
 
-		//VDKS_Func_SaveBmp("test.bmp",w, h, img);
+        //int wi, hi;
 
-		glGenTextures(1, &TexObjBase);
-		assert(TexObjBase);
+        unsigned char * img = NULL;
 
-		glActiveTexture(GL_TEXTURE0 + TexUnitBase);
+        img = VDKS_Func_ReadBmp((char *)szTempFile/*TexImgBaseFile*/, &w, &h);
+        if (NULL == img)
+        {
+            return VDKS_FALSE;
+        }
 
-		glBindTexture(GL_TEXTURE_2D, TexObjBase);
-	    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, img);
+        //for (hi = 0; hi < h; hi++)
+        //{
+        //    for (wi = 0; wi < w; wi++)
+        //    {
+        //        img[hi * w * 4 + wi * 4 + 0] = img[hi * w * 4 + wi * 4 + 3];
+        //        img[hi * w * 4 + wi * 4 + 1] = img[hi * w * 4 + wi * 4 + 3];
+        //        img[hi * w * 4 + wi * 4 + 2] = img[hi * w * 4 + wi * 4 + 3];
+        //        img[hi * w * 4 + wi * 4 + 3] = img[hi * w * 4 + wi * 4 + 3];
+        //        //img[hi * w * 4 + wi * 4 + 3] = 255;
+        //    }
+        //}
 
-		//glGenerateMipmap(GL_TEXTURE_2D);
+        //VDKS_Func_SaveBmp("test.bmp",w, h, img);
 
-		glActiveTexture(GL_TEXTURE0);
-	}
-	while(0);
+        glGenTextures(1, &TexObjBase);
+        assert(TexObjBase);
 
-	return VDKS_TRUE;
+        glActiveTexture(GL_TEXTURE0 + TexUnitBase);
+
+        glBindTexture(GL_TEXTURE_2D, TexObjBase);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, img);
+
+        //glGenerateMipmap(GL_TEXTURE_2D);
+
+        glActiveTexture(GL_TEXTURE0);
+    }
+    while(0);
+
+    return VDKS_TRUE;
 }
 
 void TeapotPassProgram ()
 {
-	/*
-	*	Get Active Attributes
-	*/
+    /*
+    *    Get Active Attributes
+    */
 
-	VDKS_Func_Program_QueryActiveAttributesCheckConsistent(
-		TeapotProgram,
-		AttributesInformation,
-		AttributesInformationCount
-		);
+    VDKS_Func_Program_QueryActiveAttributesCheckConsistent(
+        TeapotProgram,
+        AttributesInformation,
+        AttributesInformationCount
+        );
 
-	/*
-	*	Enable the vertex attribute array locations.
-	*/
+    /*
+    *    Enable the vertex attribute array locations.
+    */
 
-	VDKS_Func_ActiveAttribute_LocationEnable(
-		AttributesInformation,
-		AttributesInformationCount
-		);
+    VDKS_Func_ActiveAttribute_LocationEnable(
+        AttributesInformation,
+        AttributesInformationCount
+        );
 
-	/*
-	*	Get Active Uniforms.
-	*/
+    /*
+    *    Get Active Uniforms.
+    */
 
-	VDKS_Func_Program_ValidateUniformsGetLocations(
-		TeapotProgram,
-		UnifomsInfomation,
-		UnifomsInfomationCount
-		);
+    VDKS_Func_Program_ValidateUniformsGetLocations(
+        TeapotProgram,
+        UnifomsInfomation,
+        UnifomsInfomationCount
+        );
 
-	VDKS_Func_Program_SettingUniforms(
-		TeapotProgram,
-		UnifomsInfomation,
-		UnifomsInfomationCount
-		);
+    VDKS_Func_Program_SettingUniforms(
+        TeapotProgram,
+        UnifomsInfomation,
+        UnifomsInfomationCount
+        );
 }
 
 void TeapotPass ()
 {
-	GLint program_status = 0;
+    GLint program_status = 0;
 
-	TeapotPassProgram();
+    TeapotPassProgram();
 
-	glEnable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
 
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	assert(TeapotProgram);
+    assert(TeapotProgram);
 
-	glValidateProgram(TeapotProgram);
+    glValidateProgram(TeapotProgram);
 
-	glGetProgramiv(TeapotProgram, GL_VALIDATE_STATUS, &program_status);
+    glGetProgramiv(TeapotProgram, GL_VALIDATE_STATUS, &program_status);
 
-	if (program_status != GL_TRUE)
-	{
-		printf("The program is not valid now.");
-		return;
-	}
+    if (program_status != GL_TRUE)
+    {
+        printf("The program is not valid now.");
+        return;
+    }
 
-	glUseProgram(TeapotProgram);
+    glUseProgram(TeapotProgram);
 
-	/*
-	*	Other init routine may edit our GL_ELEMENT_ARRAY_BUFFER binding.
-	*/
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, TriangleGLBuffer);
+    /*
+    *    Other init routine may edit our GL_ELEMENT_ARRAY_BUFFER binding.
+    */
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, TriangleGLBuffer);
 
-	glDrawElements(GL_TRIANGLES, TriangleVertexCount, GL_UNSIGNED_SHORT, 0);
+    glDrawElements(GL_TRIANGLES, TriangleVertexCount, GL_UNSIGNED_SHORT, 0);
 
-	glFlush();
+    glFlush();
 
-	glUseProgram(0);
+    glUseProgram(0);
 }
 

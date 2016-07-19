@@ -36,17 +36,17 @@
 
 const char *kernel_multiply_union_vector8_5 =
 "#ifndef _TYPES7_H_                                                                                                                 \n"
-"#define _TYPES7_H_																												   \n"
-"																																   \n"
-"#ifdef __OPENCL_VERSION__																										   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
-"#else // __OPENCL_VERSION__																									   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType									   \n"
-"#endif // __OPENCL_VERSION__																									   \n"
-"																																   \n"
-"ALIGNED_STRUCT(union, 32) InputA {																							       \n"
-"    char8 a;																													   \n"
-"    float8 h;																												   \n"
+"#define _TYPES7_H_                                                                                                                   \n"
+"                                                                                                                                   \n"
+"#ifdef __OPENCL_VERSION__                                                                                                           \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))                               \n"
+"#else // __OPENCL_VERSION__                                                                                                       \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType                                       \n"
+"#endif // __OPENCL_VERSION__                                                                                                       \n"
+"                                                                                                                                   \n"
+"ALIGNED_STRUCT(union, 32) InputA {                                                                                                   \n"
+"    char8 a;                                                                                                                       \n"
+"    float8 h;                                                                                                                   \n"
 "};                                                                                                                                \n"
 "                                                                                                                                  \n"
 "ALIGNED_STRUCT(union, 32) InputB {                                                                                                \n"
@@ -67,8 +67,8 @@ const char *kernel_multiply_union_vector8_5 =
 "                                                                                                                                  \n"
 "    // bound check (equivalent to the limit on a 'for' loop for standard/serial C code                                            \n"
 "                                                                                                                                  \n"
-"																																   \n"
-"		c[tid].r = convert_float8(a[tid].a) * b[tid].b;                                                                                            \n"
+"                                                                                                                                   \n"
+"        c[tid].r = convert_float8(a[tid].a) * b[tid].b;                                                                                            \n"
 "                                                                                                                                  \n"
 "}                                                                                                                                 \n";
 
@@ -121,9 +121,9 @@ public:
         _deviceResult = cl::Buffer(_context, CL_MEM_WRITE_ONLY, sizeof(Result) * _globalWorkSize);
 
         _kernel.setArg(0,sizeof (_deviceInputA), &_deviceInputA);
-		_kernel.setArg(1,sizeof (_deviceInputB), &_deviceInputB);
-		_kernel.setArg(2,sizeof (_deviceResult), &_deviceResult);
-		_kernel.setArg(3,sizeof (_numElements), &_numElements);
+        _kernel.setArg(1,sizeof (_deviceInputB), &_deviceInputB);
+        _kernel.setArg(2,sizeof (_deviceResult), &_deviceResult);
+        _kernel.setArg(3,sizeof (_numElements), &_numElements);
     }
 
     virtual bool Execute()
@@ -145,11 +145,11 @@ private:
     void _fillData()
     {
         for (int i = 0; i < _numElements; ++i) {
-			_inputA[i].a.s[0] = rand();
+            _inputA[i].a.s[0] = rand();
             _inputA[i].h.s[0] = (float)rand();
             _inputB[i].k.s[0] = rand();
             _inputB[i].b.s[0] = (float)rand();
-			_inputA[i].a.s[1] = rand();
+            _inputA[i].a.s[1] = rand();
             _inputA[i].h.s[1] = (float)rand();
             _inputB[i].k.s[1] = rand();
             _inputB[i].b.s[1] = (float)rand();
@@ -157,16 +157,16 @@ private:
             _inputA[i].h.s[2] = (float)rand();
             _inputB[i].k.s[2] = rand();
             _inputB[i].b.s[2] = (float)rand();
-			_inputA[i].a.s[3] = rand();
+            _inputA[i].a.s[3] = rand();
             _inputA[i].h.s[3] = (float)rand();
             _inputB[i].k.s[3] = rand();
             _inputB[i].b.s[3] = (float)rand();
-			//////////////////////////////////
-			_inputA[i].a.s[4] = rand();
+            //////////////////////////////////
+            _inputA[i].a.s[4] = rand();
             _inputA[i].h.s[4] = (float)rand();
             _inputB[i].k.s[4] = rand();
             _inputB[i].b.s[4] = (float)rand();
-			_inputA[i].a.s[5] = rand();
+            _inputA[i].a.s[5] = rand();
             _inputA[i].h.s[5] = (float)rand();
             _inputB[i].k.s[5] = rand();
             _inputB[i].b.s[5] = (float)rand();
@@ -174,7 +174,7 @@ private:
             _inputA[i].h.s[6] = (float)rand();
             _inputB[i].k.s[6] = rand();
             _inputB[i].b.s[6] = (float)rand();
-			_inputA[i].a.s[7] = rand();
+            _inputA[i].a.s[7] = rand();
             _inputA[i].h.s[7] = (float)rand();
             _inputB[i].k.s[7] = rand();
             _inputB[i].b.s[7] = (float)rand();
@@ -184,15 +184,15 @@ private:
     void _computeGoldStandard()
     {
         for (int i = 0; i < _numElements; i++) {
-			_goldStandard[i].r.s[0] = _inputA[i].a.s[0] * (ISSUBNORM(_inputB[i].b.s[0]) ? 0 : _inputB[i].b.s[0]);
-			_goldStandard[i].r.s[1] = _inputA[i].a.s[1] * (ISSUBNORM(_inputB[i].b.s[1]) ? 0 : _inputB[i].b.s[1]);
-			_goldStandard[i].r.s[2] = _inputA[i].a.s[2] * (ISSUBNORM(_inputB[i].b.s[2]) ? 0 : _inputB[i].b.s[2]);
-			_goldStandard[i].r.s[3] = _inputA[i].a.s[3] * (ISSUBNORM(_inputB[i].b.s[3]) ? 0 : _inputB[i].b.s[3]);
-			///////////////////////////////////////////////////////////////
-			_goldStandard[i].r.s[4] = _inputA[i].a.s[4] * (ISSUBNORM(_inputB[i].b.s[4]) ? 0 : _inputB[i].b.s[4]);
-			_goldStandard[i].r.s[5] = _inputA[i].a.s[5] * (ISSUBNORM(_inputB[i].b.s[5]) ? 0 : _inputB[i].b.s[5]);
-			_goldStandard[i].r.s[6] = _inputA[i].a.s[6] * (ISSUBNORM(_inputB[i].b.s[6]) ? 0 : _inputB[i].b.s[6]);
-			_goldStandard[i].r.s[7] = _inputA[i].a.s[7] * (ISSUBNORM(_inputB[i].b.s[7]) ? 0 : _inputB[i].b.s[7]);
+            _goldStandard[i].r.s[0] = _inputA[i].a.s[0] * (ISSUBNORM(_inputB[i].b.s[0]) ? 0 : _inputB[i].b.s[0]);
+            _goldStandard[i].r.s[1] = _inputA[i].a.s[1] * (ISSUBNORM(_inputB[i].b.s[1]) ? 0 : _inputB[i].b.s[1]);
+            _goldStandard[i].r.s[2] = _inputA[i].a.s[2] * (ISSUBNORM(_inputB[i].b.s[2]) ? 0 : _inputB[i].b.s[2]);
+            _goldStandard[i].r.s[3] = _inputA[i].a.s[3] * (ISSUBNORM(_inputB[i].b.s[3]) ? 0 : _inputB[i].b.s[3]);
+            ///////////////////////////////////////////////////////////////
+            _goldStandard[i].r.s[4] = _inputA[i].a.s[4] * (ISSUBNORM(_inputB[i].b.s[4]) ? 0 : _inputB[i].b.s[4]);
+            _goldStandard[i].r.s[5] = _inputA[i].a.s[5] * (ISSUBNORM(_inputB[i].b.s[5]) ? 0 : _inputB[i].b.s[5]);
+            _goldStandard[i].r.s[6] = _inputA[i].a.s[6] * (ISSUBNORM(_inputB[i].b.s[6]) ? 0 : _inputB[i].b.s[6]);
+            _goldStandard[i].r.s[7] = _inputA[i].a.s[7] * (ISSUBNORM(_inputB[i].b.s[7]) ? 0 : _inputB[i].b.s[7]);
 
         }
     }
@@ -215,17 +215,17 @@ private:
         float checkResult3;
         float checkResult4;
 
-		for (int i = 0; i < _numElements; ++i) {
-			for (int j = 0; j < 8; ++j) {
+        for (int i = 0; i < _numElements; ++i) {
+            for (int j = 0; j < 8; ++j) {
                 checkResult1 = (*(unsigned int *)&(_goldStandard[i].r.s[j]) + 2);
                 checkResult2 = (*(unsigned int *)&(_goldStandard[i].r.s[j]) - 2);
                 checkResult3 = fabsf(*( float *) &checkResult1);
                 checkResult4 = fabsf(*( float *) &checkResult2);
                 if ((fabsf(_result[i].r.s[j]) > checkResult3 || fabsf(_result[i].r.s[j]) < checkResult4) && !isnan(_goldStandard[i].r.s[j]) && !isinf(_goldStandard[i].r.s[j])){
-					std::cout << "  c:" << _goldStandard[i].r.s[j] << " ocl:" << _result[i].r.s[j] << std::endl;
+                    std::cout << "  c:" << _goldStandard[i].r.s[j] << " ocl:" << _result[i].r.s[j] << std::endl;
                     return false;
                 }
-			}
+            }
         }
         return true;
     }
@@ -252,7 +252,7 @@ private:
 int multiply_union_vector8_5(void)
 {
     cl_int err = CL_SUCCESS;
-	int cnt = 1;
+    int cnt = 1;
 
     try {
         std::vector<cl::Platform> platforms;
@@ -268,7 +268,7 @@ int multiply_union_vector8_5(void)
 
         std::vector<cl::Device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
 
-
+        
         const char* clProgramSource = kernel_multiply_union_vector8_5;//oclLoadProgSource("multiply.cl", "", &szKernelLength);
         if (clProgramSource == 0) {
             std::cerr << "OpenCL program not found." << std::endl;
@@ -292,13 +292,13 @@ int multiply_union_vector8_5(void)
         std::cout << "Running test multiply_union_vector8_5..." << std::endl;
         TestCase_multiply_union_vector8_5 multiply_union_vector8_5(10, program_, context, devices);
 
-		bool control = true;
+        bool control = true;
         multiply_union_vector8_5.SetUp();
         for (int i = 0; i < 10; ++i) {
-			if(!multiply_union_vector8_5.Execute()){
-				control = false;
-				cnt = 0;
-			}
+            if(!multiply_union_vector8_5.Execute()){
+                control = false;
+                cnt = 0;
+            }
             std::cout << "RUN " << i + 1<< ": " << (control ? "PASSED" : "FAILED!") << std::endl;
         }
         multiply_union_vector8_5.TearDown();

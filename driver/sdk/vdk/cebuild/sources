@@ -47,8 +47,7 @@ CDEFINES= \
 SOURCES= \
     ../gc_vdk_gl.c \
     ../gc_vdk_egl.c \
-	../gc_vdk_hal.c \
-    ../gc_vdk.c \
+	../gc_vdk_win32.c \
 	../gc_vdk_ce.c \
 
 INCLUDES= \

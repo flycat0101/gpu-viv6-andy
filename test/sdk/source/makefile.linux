@@ -48,14 +48,14 @@ else
 CFLAGS += $(INCLUDE) -DFBDriver
 endif
 
-INCLUDE += -I$(VIVANTE_SDK_INC)
-INCLUDE += -I$(VIVANTE_SDK_INC)/HAL -I$(AQROOT)/sdk/inc
+INCLUDE += -I$(AQROOT) -I$(VIVANTE_SDK_INC)/HAL -I$(AQROOT)/sdk/inc
 
 ifeq ($(EGL_API_FB), 0)
 INCLUDE += -I$(X11_ARM_DIR)/include
 endif
 
 CFLAGS += $(INCLUDE)
+
 ################################################################################
 # Describe object files.
 

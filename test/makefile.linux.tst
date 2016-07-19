@@ -48,11 +48,11 @@ HAL_TEST        := $(HAL_TEST_DIR)
 HAL_UNIT_TEST   := $(AQROOT)/test/hal/common/UnitTest
 GFX_TEST        := $(GFX_TEST_DIR)
 VVLAUNCHER      := $(VVLAUNCHER_DIR)
-ifneq ($(VIVANTE_NO_VG), 1)
+ifneq ($(VIVANTE_NO_VG),1)
 TIGER           := $(AQROOT)/test/vg11/tiger
 endif
 
-ifeq ($(USE_VDK), 0)
+ifeq ($(USE_VDK),0)
 VDK_TEST        :=
 else
 VDK_TEST        += $(VDK_TEST_DIR)
@@ -61,16 +61,16 @@ CL11_TEST       := $(CL11_TEST_DIR)
 CL11_UNIT       := $(CL11_UNIT_DIR)
 
 
-ifeq ($(STATIC_LINK), 1)
+ifeq ($(STATIC_LINK),1)
 APP_HAL_LIST    := $(HAL_TEST)
-ifneq ($(VIVANTE_NO_VG), 1)
+ifneq ($(VIVANTE_NO_VG),1)
 APP_OVG11_LIST  := $(TIGER)
 endif
 APP_GFX_LIST    :=
 else
 APP_HAL_LIST    := $(HAL_TEST) $(HAL_UNIT_TEST)
 APP_GFX_LIST    := $(GFX_TEST)
-ifneq ($(VIVANTE_NO_VG), 1)
+ifneq ($(VIVANTE_NO_VG),1)
 APP_OVG11_LIST  := $(TIGER)
 endif
 endif
@@ -82,25 +82,25 @@ APP_LIST        :=
 
 ifeq ($(VIVANTE_ENABLE_2D),1)
 APP_LIST        += $(APP_HAL_LIST)
-ifneq ($(STATIC_LINK), 1)
+ifneq ($(STATIC_LINK),1)
 APP_LIST        += $(APP_GFX_LIST)
 endif
 endif
 
 ifeq ($(VIVANTE_ENABLE_3D),1)
-ifeq ($(USE_VDK), 1)
+ifeq ($(USE_VDK),1)
 APP_LIST        += $(APP_VDK_LIST)
 else
-ifneq ($(VIVANTE_NO_VG), 1)
+ifneq ($(VIVANTE_NO_VG),1)
 APP_LIST        += $(APP_OVG11_LIST)
 endif
 endif
-ifeq ($(USE_OPENCL), 1)
+ifeq ($(USE_OPENCL),1)
 APP_LIST        += $(APP_OCL11_LIST)
 endif
 endif
 
-ifeq ($(VIVANTE_ENABLE_VG,1)
+ifeq ($(VIVANTE_ENABLE_VG),1)
 ifneq ($(VIVANTE_NO_VG), 1)
 APP_LIST        += $(APP_OVG11_LIST)
 endif
@@ -109,7 +109,7 @@ endif
 ################################################################################
 # Define the macros used in the common makefile.
 
-MODULES     :=  $(APP_LIST)
+SUBDIRS     :=  $(APP_LIST)
 MAIN_MODULE :=  $(APP_LIST)
 
 OBJ_DIR     := $(SDK_DIR)

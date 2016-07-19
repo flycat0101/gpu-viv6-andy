@@ -235,15 +235,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     gcmONERROR(gco2D_SetClipping(egn2D, &rect));
 
     gcmONERROR(gco2D_Blit(egn2D, 1, &rect, 0xCC, 0xCC, surf[0]->format));
-#if 0
-    {
-        char name[200];
-
-        gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
-        sprintf(name, "gal2DFormatCompressed2D002_intermediate0_%03d.bmp", frameNo);
-        GalSaveTSurfToDIB(surf[0], name);
-    }
-#endif
     /* BitBlit surf0 to surf1. */
     rect.left = (src->width - len) / 2 ;
     rect.right = (src->width + len) / 2;
@@ -312,15 +303,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
         gcmONERROR(gco2D_Blit(egn2D, 1, &rect, 0xCC, 0xCC, surf[1]->format));
     }
-#if 0
-    {
-        char name[200];
-
-        gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
-        sprintf(name, "gal2DFormatCompressedTPC002_intermediate1_%03d.bmp", frameNo);
-        GalSaveTSurfToDIB(surf[1], name);
-    }
-#endif
     /* Uncompress surf[1] to result. */
     rect.left = rect.top = 0;
     rect.right = surf[1]->width;

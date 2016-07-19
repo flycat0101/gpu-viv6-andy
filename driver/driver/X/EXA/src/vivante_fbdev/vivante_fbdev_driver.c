@@ -603,7 +603,7 @@ static Bool InitExaLayer(ScreenPtr pScreen) {
         TRACE_EXIT(FALSE);
     }
 
-    if (!VIV2DGPUUserMemMap((char*) pExa->memoryBase, pScrn->memPhysBase, pExa->memorySize, &pViv->mFB.mMappingInfo, (unsigned int *)&pViv->mFB.memPhysBase)) {
+    if (!VIV2DGPUUserMemMap((char*) pExa->memoryBase, pScrn->memPhysBase, pExa->memorySize, &pViv->mFB.mMappingInfo, (unsigned int *)&pViv->mFB.memGpuBase)) {
         TRACE_ERROR("ERROR ON MAPPING FB\n");
         TRACE_EXIT(FALSE);
     }
@@ -658,7 +658,7 @@ static Bool DestroyExaLayer(ScreenPtr pScreen) {
     xf86DrvMsg(pScreen->myNum, X_INFO, "Shutdown EXA\n");
 
     ExaDriverPtr pExa = pViv->mFakeExa.mExaDriver;
-    if (!VIV2DGPUUserMemUnMap((char*) pExa->memoryBase, pExa->memorySize, pViv->mFB.mMappingInfo, pViv->mFB.memPhysBase)) {
+    if (!VIV2DGPUUserMemUnMap((char*) pExa->memoryBase, pExa->memorySize, pViv->mFB.mMappingInfo, pViv->mFB.memGpuBase)) {
         TRACE_ERROR("Unmapping User memory Failed\n");
     }
 

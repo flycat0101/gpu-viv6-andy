@@ -348,15 +348,25 @@ _hasHalti4(
 }
 
 static gctBOOL
-_hasHalti4_orPerf(
+_isQuality(
     IN gcLINKTREE Tree,
     IN gcsCODE_GENERATOR_PTR CodeGen,
     IN gcSL_INSTRUCTION Instruction,
     IN OUT gctUINT32_PTR States
     )
 {
-    return CodeGen->hasHalti4 ||
-        !(Tree->patchID == gcvPATCH_DEQP || Tree->patchID == gcvPATCH_OESCTS);
+    return (Tree->patchID == gcvPATCH_DEQP || Tree->patchID == gcvPATCH_OESCTS || Tree->patchID == gcvPATCH_GTFES30);
+}
+
+static gctBOOL
+_hasHalti4_orNotQuality(
+    IN gcLINKTREE Tree,
+    IN gcsCODE_GENERATOR_PTR CodeGen,
+    IN gcSL_INSTRUCTION Instruction,
+    IN OUT gctUINT32_PTR States
+    )
+{
+    return CodeGen->hasHalti4 || !_isQuality(Tree, CodeGen, Instruction, States);
 }
 
 static gctBOOL
@@ -5349,7 +5359,7 @@ rtz_for_HW_bug(
     {
         gctUINT value = (((((gctUINT32) (States[1])) >> (0 ? 2:0)) & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1)))))) );
 
-        if (!(Tree->patchID == gcvPATCH_DEQP || Tree->patchID == gcvPATCH_OESCTS))
+        if (!_isQuality(Tree, CodeGen, Instruction, States))
         {
             value = (value & 0x4) | 0x1;
             States[1] = ((((gctUINT32) (States[1])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -15411,7 +15421,7 @@ const gcsSL_PATTERN patterns_MAX[] =
         MAX 1, 2, 3
             select.lt 1, 2, 3, 2, 0
     */
-    { 1, gcSL_MAX, 1, 2, 3, 0, 0, _hasHalti4_orPerf },
+    { 1, gcSL_MAX, 1, 2, 3, 0, 0, _hasHalti4_orNotQuality },
         { -1, 0x0F, 1, 2, 3, 2, 0, conditionLT },
 
     /*
@@ -15442,7 +15452,7 @@ const gcsSL_PATTERN patterns_MIN[] =
         MIN 1, 2, 3
             select.gt 1, 2, 3, 2, 0
     */
-    { 1, gcSL_MIN, 1, 2, 3, 0, 0, _hasHalti4_orPerf },
+    { 1, gcSL_MIN, 1, 2, 3, 0, 0, _hasHalti4_orNotQuality },
         { -1, 0x0F, 1, 2, 3, 2, 0, conditionGT },
 
     /*
@@ -16242,7 +16252,7 @@ const gcsSL_PATTERN patterns_TAN[] =
         { -1, 0x03, 1, gcSL_CG_TEMP1, gcSL_CG_TEMP2, 0, 0, },
 
     /* tan(x) = sin(x) / cos(x) */
-    { 1, gcSL_TAN, 1, 2 },
+    { 1, gcSL_TAN, 1, 2, 0, 0, 0, _isQuality },
         /* mad TEMP1, 2, rcppi2, dot5
            frc TEMP1, TEMP1
            mad TEMP1, TEMP1, 2pi, -pi

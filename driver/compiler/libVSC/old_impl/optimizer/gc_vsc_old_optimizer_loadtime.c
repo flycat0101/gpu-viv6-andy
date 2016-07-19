@@ -621,6 +621,8 @@ _RemoveTargetFromLTCTempRegList(
 
             if (list->code->instruction.opcode == gcSL_CALL) continue;
 
+            if (gcList_FindNode(&Optimizer->theLTCRemoveCodeList, list->code, CompareCode)) continue;
+
             _AddToCodeList(&Optimizer->theLTCRemoveCodeList, list->code);
             _RemoveTargetFromLTCTempRegList(Optimizer, list->code, gcvTRUE);
             _RemoveCodeFromList(&Optimizer->theLTCCodeList, list->code);
@@ -1575,6 +1577,9 @@ _CreateMoveAndChangeDependencies(
 
     /* change the Code to MOV target, dummy_uniform */
     gcmSL_OPCODE_UPDATE(inst->opcode, Opcode, gcSL_MOV);
+
+    /* Clean the condition. */
+    inst->temp = gcmSL_TARGET_SET(inst->temp, Condition, gcSL_ALWAYS);
 
     swizzle = (ComponentMap[0] << 0 | ComponentMap[1] << 2
                | ComponentMap[2] << 4 | ComponentMap[3] << 6);

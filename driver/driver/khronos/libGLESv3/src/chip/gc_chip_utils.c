@@ -728,7 +728,7 @@ OnError:
 }
 
 #if gcdFRAMEINFO_STATISTIC
-extern GLboolean g_dbgDumpImagePerDraw;
+extern GLint g_dbgDumpImagePerDraw;
 
 gceSTATUS
 gcChipUtilsDumpTexture(
@@ -830,6 +830,7 @@ gcChipUtilsDumpRT(
     gctUINT fileNameOffset = 0;
     GLuint index;
     gctUINT32 frameCount, drawCount;
+    GLuint pID, ppID;
     static char *txTypeStr[] = { "2D",
                          "3D",
                          "CUBE",
@@ -854,6 +855,52 @@ gcChipUtilsDumpRT(
                             &drawCount);
     /* increased in begin */
     drawCount--;
+    pID = gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
+    ppID = gc->shaderProgram.currentProgram ? 0 : (gc->shaderProgram.boundPPO ? gc->shaderProgram.boundPPO->name : 0);
+
+    switch(flag)
+    {
+    case (__GL_PERDRAW_DUMP_CLEAR_RT | __GL_PERDRAW_DUMP_CLEAR_DS):
+        {
+            gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
+                                            __GLES_MAX_FILENAME_LEN,
+                                            &fileNameOffset,
+                                            "fID%04d_dID%04d(clear)_pID%04d_ppID%04d_",
+                                            frameCount,
+                                            drawCount,
+                                            pID,
+                                            ppID));
+        }
+        break;
+    case (__GL_PERDRAW_DUMP_DRAW_RT | __GL_PERDRAW_DUMP_DRAW_DS):
+        {
+            gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
+                                            __GLES_MAX_FILENAME_LEN,
+                                            &fileNameOffset,
+                                            "fID%04d_dID%04d(draw)_pID%04d_ppID%04d_",
+                                            frameCount,
+                                            drawCount,
+                                            pID,
+                                            ppID));
+        }
+    break;
+
+    case (__GL_PERDRAW_DUMP_BLITFBO_RT | __GL_PERDRAW_DUMP_BLITFBO_DS):
+        {
+            gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
+                                            __GLES_MAX_FILENAME_LEN,
+                                            &fileNameOffset,
+                                            "fID%04d_dID%04d(blit)_pID%04d_ppID%04d_",
+                                            frameCount,
+                                            drawCount,
+                                            pID,
+                                            ppID));
+        }
+        break;
+
+    default:
+        GL_ASSERT(0);
+    }
 
     for (index = 0; index < gc->constants.shaderCaps.maxDrawBuffers; ++index)
     {
@@ -861,7 +908,7 @@ gcChipUtilsDumpRT(
         if (rtView->surf)
         {
             gcsSURF_FORMAT_INFO_PTR formatInfo;
-            fileNameOffset = 0;
+            gctUINT fileNameOffset2 = fileNameOffset;
             gcmVERIFY_OK(gcoSURF_GetFormatInfo(rtView->surf, &formatInfo));
 
             if (gc->frameBuffer.drawFramebufObj->name)
@@ -877,82 +924,41 @@ gcChipUtilsDumpRT(
                 }
 
                 /* clear */
-                if (1 == flag)
-                {
-                    gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
-                                                    __GLES_MAX_FILENAME_LEN,
-                                                    &fileNameOffset,
-                                                    "fID%04d_clear_fbo%04d(%s[%s]ID%04d_%s_level%02d_face%d_layer%02d)_RT%d",
-                                                    frameCount,
-                                                    gc->frameBuffer.drawFramebufObj->name,
-                                                    (attachPoint->objType == GL_RENDERBUFFER) ? "rbo" : "tex",
-                                                    (attachPoint->objType == GL_RENDERBUFFER) ? "" : txTypeStr[texObj->targetIndex],
-                                                    attachPoint->objName,
-                                                    formatInfo->formatName,
-                                                    attachPoint->level,
-                                                    attachPoint->face,
-                                                    attachPoint->layer,
-                                                    index));
-                }
-                /* draw */
-                else
-                {
-                    gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
-                                                    __GLES_MAX_FILENAME_LEN,
-                                                    &fileNameOffset,
-                                                    "fID%04d_dID%04d(draw)_pID%04d_ppID%04d_fbo%04d(%s[%s]ID%04d_%s_level%02d_face%d_layer%02d)_RT%d",
-                                                    frameCount,
-                                                    drawCount,
-                                                    gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
-                                                    gc->shaderProgram.currentProgram ? 0 : gc->shaderProgram.boundPPO->name,
-                                                    gc->frameBuffer.drawFramebufObj->name,
-                                                    (attachPoint->objType == GL_RENDERBUFFER) ? "rbo" : "tex",
-                                                    (attachPoint->objType == GL_RENDERBUFFER) ? "" : txTypeStr[texObj->targetIndex],
-                                                    attachPoint->objName,
-                                                    formatInfo->formatName,
-                                                    attachPoint->level,
-                                                    attachPoint->face,
-                                                    attachPoint->layer,
-                                                    index));
-                }
+                gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
+                                                __GLES_MAX_FILENAME_LEN,
+                                                &fileNameOffset2,
+                                                "fbo%04d(%s[%s]ID%04d_%s_level%02d_face%d_layer%02d)_RT%d",
+                                                gc->frameBuffer.drawFramebufObj->name,
+                                                (attachPoint->objType == GL_RENDERBUFFER) ? "rbo" : "tex",
+                                                (attachPoint->objType == GL_RENDERBUFFER) ? "" : txTypeStr[texObj->targetIndex],
+                                                attachPoint->objName,
+                                                formatInfo->formatName,
+                                                attachPoint->level,
+                                                attachPoint->face,
+                                                attachPoint->layer,
+                                                index));
             }
             else
             {
                 GL_ASSERT(index == 0);
-                /* clear */
-                if (1 == flag)
-                {
-                    gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
-                                                    __GLES_MAX_FILENAME_LEN,
-                                                    &fileNameOffset,
-                                                    "fID%04d_clear_window_%s_RT",
-                                                    frameCount,
-                                                    formatInfo->formatName));
-                }
-                /* draw */
-                else
-                {
-                    gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
-                                                    __GLES_MAX_FILENAME_LEN,
-                                                    &fileNameOffset,
-                                                    "fID%04d_dID%04d(draw)_pID%04d_ppID%04d_window_%s_RT",
-                                                    frameCount,
-                                                    drawCount,
-                                                    gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
-                                                    gc->shaderProgram.currentProgram ? 0 : gc->shaderProgram.boundPPO->name,
-                                                    formatInfo->formatName));
-
-                }
+                gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
+                                                __GLES_MAX_FILENAME_LEN,
+                                                &fileNameOffset2,
+                                                "window_%s_RT",
+                                                formatInfo->formatName));
 
             }
             gcmVERIFY_OK(gcChipUtilsDumpSurface(gc, rtView, fileName, chipCtx->drawYInverted));
         }
     }
-    if ((dsView->surf) &&
-        ((g_dbgDumpImagePerDraw == 2) || (chipCtx->drawRTnum == 0)))
+    if ((dsView->surf)
+     && (((g_dbgDumpImagePerDraw & (__GL_PERDRAW_DUMP_CLEAR_DS
+                                  | __GL_PERDRAW_DUMP_DRAW_DS
+                                  | __GL_PERDRAW_DUMP_BLITFBO_DS))
+       || (chipCtx->drawRTnum == 0))))
     {
         gcsSURF_FORMAT_INFO_PTR formatInfo;
-        fileNameOffset = 0;
+        gctUINT fileNameOffset2 = fileNameOffset;
         gcmVERIFY_OK(gcoSURF_GetFormatInfo(dsView->surf, &formatInfo));
 
         if (gc->frameBuffer.drawFramebufObj->name)
@@ -966,75 +972,27 @@ gcChipUtilsDumpRT(
             {
                 texObj = (__GLtextureObject *)__glGetObject(gc, gc->texture.shared, attachPoint->objName);
             }
-
-            /* clear */
-            if (1 == flag)
-            {
-                gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
-                                                __GLES_MAX_FILENAME_LEN,
-                                                &fileNameOffset,
-                                                "fID%04d_clear_fbo%04d(%s[%s]ID%04d_%s_level%02d_face%d_layer%02d)_depth",
-                                                frameCount,
-                                                gc->frameBuffer.drawFramebufObj->name,
-                                                (attachPoint->objType == GL_RENDERBUFFER) ? "rbo" : "tex",
-                                                (attachPoint->objType == GL_RENDERBUFFER) ? "" : txTypeStr[texObj->targetIndex],
-                                                attachPoint->objName,
-                                                formatInfo->formatName,
-                                                attachPoint->level,
-                                                attachPoint->face,
-                                                attachPoint->layer));
-
-            }
-            /* draw */
-            else
-            {
-                gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
-                                                __GLES_MAX_FILENAME_LEN,
-                                                &fileNameOffset,
-                                                "fID%04d_dID%04d(draw)_pID%04d_ppID%04d_fbo%04d(%s[%s]ID%04d_%s_level%02d_face%d_layer%02d)_depth",
-                                                frameCount,
-                                                drawCount,
-                                                gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
-                                                gc->shaderProgram.currentProgram ? 0 : gc->shaderProgram.boundPPO->name,
-                                                gc->frameBuffer.drawFramebufObj->name,
-                                                (attachPoint->objType == GL_RENDERBUFFER) ? "rbo" : "tex",
-                                                (attachPoint->objType == GL_RENDERBUFFER) ? "" : txTypeStr[texObj->targetIndex],
-                                                attachPoint->objName,
-                                                formatInfo->formatName,
-                                                attachPoint->level,
-                                                attachPoint->face,
-                                                attachPoint->layer));
-            }
+            gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
+                                            __GLES_MAX_FILENAME_LEN,
+                                            &fileNameOffset2,
+                                            "fbo%04d(%s[%s]ID%04d_%s_level%02d_face%d_layer%02d)_depth",
+                                            gc->frameBuffer.drawFramebufObj->name,
+                                            (attachPoint->objType == GL_RENDERBUFFER) ? "rbo" : "tex",
+                                            (attachPoint->objType == GL_RENDERBUFFER) ? "" : txTypeStr[texObj->targetIndex],
+                                            attachPoint->objName,
+                                            formatInfo->formatName,
+                                            attachPoint->level,
+                                            attachPoint->face,
+                                            attachPoint->layer));
         }
         else
         {
-            /* clear */
-            if (1 == flag)
-            {
-                gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
-                                                __GLES_MAX_FILENAME_LEN,
-                                                &fileNameOffset,
-                                                "fID%04d_clear_window_%s_depth",
-                                                frameCount,
-                                                formatInfo->formatName
-                                                ));
-            }
-            /* draw */
-            else
-            {
-                gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
-                                                __GLES_MAX_FILENAME_LEN,
-                                                &fileNameOffset,
-                                                "fID%04d_dID%04d(draw)_pID%04d_ppID%04d_window_%s_depth",
-                                                frameCount,
-                                                drawCount,
-                                                gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
-                                                gc->shaderProgram.currentProgram ? 0 : gc->shaderProgram.boundPPO->name,
-                                                formatInfo->formatName
-                                                ));
-
-            }
-
+            gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
+                                            __GLES_MAX_FILENAME_LEN,
+                                            &fileNameOffset2,
+                                            "window_%s_depth",
+                                            formatInfo->formatName
+                                            ));
         }
         gcmVERIFY_OK(gcChipUtilsDumpSurface(gc, dsView, fileName, chipCtx->drawYInverted));
     }

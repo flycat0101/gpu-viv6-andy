@@ -93,7 +93,7 @@ clfSyncHostMemory(
     gctSIZE_T   readStride, writeStride;
     gctSIZE_T   readSlice, writeSlice;
     gctUINTPTR_T readBaseSlice, writeBaseSlice;
-    gctINT      targetHost, targetDevice;
+    gctUINTPTR_T targetHost, targetDevice;
     gctSIZE_T   lineSize;
     gctSIZE_T   j, k;
 

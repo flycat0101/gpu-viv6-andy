@@ -41,138 +41,138 @@ const char *kernel_test_int64 = "__kernel void test_int64(__global %s *out_val)\
 
 int test_int64(cl_device_id device, cl_context context, cl_command_queue queue, int num_elements, int &total,  int &passed, int &fail)
 {
-	cl_mem streams;
-	cl_program program = NULL;
-	cl_kernel kernel = NULL;
-	size_t threads[1];
-	char kernel_code_int[512];
-	const char *constkernelint;
-	cl_ulong *output_h;
+    cl_mem streams;
+    cl_program program = NULL;
+    cl_kernel kernel = NULL;
+    size_t threads[1];
+    char kernel_code_int[512];
+    const char *constkernelint;
+    cl_ulong *output_h;
 
-	int err;
-	int passCount = 0;
-	int typeIndex = 0;
+    int err;
+    int passCount = 0;
+    int typeIndex = 0;
 
-	const char    *types[] = {
-		"long", "ulong", "long2", "ulong2", "long4", "ulong4", "long8", "ulong8", "long16", "ulong16"
-	};
+    const char    *types[] = {
+        "long", "ulong", "long2", "ulong2", "long4", "ulong4", "long8", "ulong8", "long16", "ulong16"
+    };
 
 
-	for(int t=1; t<17; t*=2)
-	{
-		for(int i = 0; i < 2; i++)
-		{
-			if(i == 0)
-				printf("\n\nTESTING %s: \n", types[typeIndex]);
-			else
-				printf("\n\nTESTING %s: \n", types[typeIndex]);
+    for(int t=1; t<17; t*=2)
+    {
+        for(int i = 0; i < 2; i++)
+        {
+            if(i == 0)
+                printf("\n\nTESTING %s: \n", types[typeIndex]);
+            else
+                printf("\n\nTESTING %s: \n", types[typeIndex]);
 
-			size_t length = sizeof(cl_ulong) * num_elements * t;
-			output_h = (cl_ulong*)malloc(length);
+            size_t length = sizeof(cl_ulong) * num_elements * t;
+            output_h = (cl_ulong*)malloc(length);
 
-			streams = clCreateBuffer(context, CL_MEM_READ_WRITE, length, NULL, NULL);
-			if (!streams)
-			{
-				printf("clCreateBuffer failed\n");
-				free(output_h);
-				return -1;
-			}
+            streams = clCreateBuffer(context, CL_MEM_READ_WRITE, length, NULL, NULL);
+            if (!streams)
+            {
+                printf("clCreateBuffer failed\n");
+                free(output_h);
+                return -1;
+            }
 
-			sprintf(kernel_code_int, kernel_test_int64, types[typeIndex], types[typeIndex], types[typeIndex], types[typeIndex]);
-			constkernelint = kernel_code_int;
-			if(is_extension_available(device, "cles_khr_int64"))
-			{
-				err = create_kernel(context, &program, &kernel, 1, &constkernelint, "test_int64" );
-				if (err)
-				{
+            sprintf(kernel_code_int, kernel_test_int64, types[typeIndex], types[typeIndex], types[typeIndex], types[typeIndex]);
+            constkernelint = kernel_code_int;
+            if(is_extension_available(device, "cles_khr_int64"))
+            {
+                err = create_kernel(context, &program, &kernel, 1, &constkernelint, "test_int64" );
+                if (err)
+                {
 
-					printf("Kernel compilation error using long as a type.\n");
-					clReleaseMemObject(streams);
-					if(!kernel)
-						clReleaseKernel(kernel);
-					clReleaseProgram(program);
-					free(output_h);
-					return -1;
+                    printf("Kernel compilation error using long as a type.\n");
+                    clReleaseMemObject(streams);
+                    if(!kernel)
+                        clReleaseKernel(kernel);
+                    clReleaseProgram(program);
+                    free(output_h);
+                    return -1;
 
-					printf("\n!!Kernel build not successful.\n");
-					printf("cles_khr_int64 extension is not supported.!!\n");
-					printf("%s passed\n", types[typeIndex]);
+                    printf("\n!!Kernel build not successful.\n");
+                    printf("cles_khr_int64 extension is not supported.!!\n");
+                    printf("%s passed\n", types[typeIndex]);
 
-					passCount++;
-					typeIndex++;
-					continue;
-				}
-			}
-			else
-			{
-				clReleaseMemObject(streams);
-				if(!kernel)
-					clReleaseKernel(kernel);
-				clReleaseProgram(program);
-				free(output_h);
+                    passCount++;
+                    typeIndex++;
+                    continue;
+                }
+            }
+            else
+            {
+                clReleaseMemObject(streams);
+                if(!kernel)
+                    clReleaseKernel(kernel);
+                clReleaseProgram(program);
+                free(output_h);
 
-				passCount++;
+                passCount++;
 
-				printf("--------------------------------------------------------\n");
-				printf("cles_khr_int64 tests:\n");
-				printf("%d / %d internal tests passed.\n",passCount, typeIndex);
+                printf("--------------------------------------------------------\n");
+                printf("cles_khr_int64 tests:\n");
+                printf("%d / %d internal tests passed.\n",passCount, typeIndex);
 
-				return 0;
-			}
-			err  = clSetKernelArg(kernel, 0, sizeof streams, &streams);
-			if (err != CL_SUCCESS)
-			{
-				printf("clSetKernelArgs failed\n");
-				clReleaseMemObject(streams);
-				if(!kernel)
-					clReleaseKernel(kernel);
-				clReleaseProgram(program);
-				free(output_h);
-				return -1;
-			}
-			threads[0] = (unsigned int)num_elements;
-			err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, threads, NULL, 0, NULL, NULL);
-			if (err != CL_SUCCESS)
-			{
-				printf("clEnqueueNDRangeKernel failed\n");
-				clReleaseMemObject(streams);
-				if(!kernel)
-					clReleaseKernel(kernel);
-				clReleaseProgram(program);
-				free(output_h);
-				return -1;
-			}
-			err = clEnqueueReadBuffer(queue, streams, CL_TRUE, 0, length, output_h, 0, NULL, NULL);
-			if (err != CL_SUCCESS)
-			{
-				printf("clReadArray failed\n");
-				clReleaseMemObject(streams);
-				if(!kernel)
-					clReleaseKernel(kernel);
-				clReleaseProgram(program);
-				free(output_h);
-				return -1;
-			}
+                return 0;
+            }
+            err  = clSetKernelArg(kernel, 0, sizeof streams, &streams);
+            if (err != CL_SUCCESS)
+            {
+                printf("clSetKernelArgs failed\n");
+                clReleaseMemObject(streams);
+                if(!kernel)
+                    clReleaseKernel(kernel);
+                clReleaseProgram(program);
+                free(output_h);
+                return -1;
+            }
+            threads[0] = (unsigned int)num_elements;
+            err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, threads, NULL, 0, NULL, NULL);
+            if (err != CL_SUCCESS)
+            {
+                printf("clEnqueueNDRangeKernel failed\n");
+                clReleaseMemObject(streams);
+                if(!kernel)
+                    clReleaseKernel(kernel);
+                clReleaseProgram(program);
+                free(output_h);
+                return -1;
+            }
+            err = clEnqueueReadBuffer(queue, streams, CL_TRUE, 0, length, output_h, 0, NULL, NULL);
+            if (err != CL_SUCCESS)
+            {
+                printf("clReadArray failed\n");
+                clReleaseMemObject(streams);
+                if(!kernel)
+                    clReleaseKernel(kernel);
+                clReleaseProgram(program);
+                free(output_h);
+                return -1;
+            }
 
-			printf("%s test passed.\n", types[typeIndex]);
-			typeIndex++;
-			passCount++;
+            printf("%s test passed.\n", types[typeIndex]);
+            typeIndex++;
+            passCount++;
 
-			clReleaseMemObject(streams);
-			if(!kernel)
-				clReleaseKernel(kernel);
-			clReleaseProgram(program);
-			free(output_h);
-		}
+            clReleaseMemObject(streams);
+            if(!kernel)
+                clReleaseKernel(kernel);
+            clReleaseProgram(program);
+            free(output_h);
+        }
 
-	}
+    }
 
-	printf("--------------------------------------------------------\n");
-	printf("cles_khr_int64 tests:\n");
-	//printf("%d / %d internal tests passed.\n",passCount, typeIndex);
-	total += typeIndex;
-	passed += passCount;
-	fail += typeIndex-passCount;
+    printf("--------------------------------------------------------\n");
+    printf("cles_khr_int64 tests:\n");
+    //printf("%d / %d internal tests passed.\n",passCount, typeIndex);
+    total += typeIndex;
+    passed += passCount;
+    fail += typeIndex-passCount;
 
-	return 0;
+    return 0;
 }

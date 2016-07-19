@@ -352,23 +352,25 @@ gcoPROFILER_Initialize(
 
 
 #if VIVANTE_PROFILER_PROBE
-        if (_HAL && hardware)
+        if (_HAL)
         {
             int bufId = 0;
             gcoBUFOBJ counterBuf;
             gctHANDLE pid = gcoOS_GetCurrentProcessID();
             static gctUINT8 num = 1;
             gctUINT offset = 0;
+
             char* pos = gcvNULL;
 
-            gcoHARDWARE_EnableCounters(hardware);
+            gcoHARDWARE_EnableCounters(gcvNULL, &_HAL->profiler.probeBuffer);
             for (; bufId < NumOfDrawBuf;bufId++)
             {
                 gcoBUFOBJ_Construct(_HAL, gcvBUFOBJ_TYPE_GENERIC_BUFFER, &counterBuf);
                 gcoBUFOBJ_Upload(counterBuf, gcvNULL, 0, 1024*sizeof(gctUINT32), gcvBUFOBJ_USAGE_STATIC_DRAW);
-                _HAL->profiler.newCounterBuf[bufId] = (gctHANDLE)counterBuf;
+                _HAL->profiler.probeBuffer.newCounterBuf[bufId] = (gctHANDLE)counterBuf;
+                _HAL->profiler.probeBuffer.opType[bufId] = gcvCOUNTER_OP_NONE;
             }
-            _HAL->profiler.curBufId = 0;
+            _HAL->profiler.probeBuffer.curBufId = 0;
 
             /*generate file name for each context*/
             fileName = DEFAULT_PROBE_FILE_NAME;
@@ -380,8 +382,12 @@ gcoPROFILER_Initialize(
 
             num++;
             gcoOS_Open(gcvNULL, profilerName, gcvFILE_CREATETEXT, &_HAL->profiler.probeFile);
-        }
+#if !VIVANTE_PROFILER_PROBE_PERDRAW
+            gcoPROFILER_Begin(Hal, gcvCOUNTER_OP_NONE);
 #endif
+    }
+#endif
+
 
         gcmFOOTER();
         return status;
@@ -545,23 +551,19 @@ gcoPROFILER_Initialize(
     }
 
     gcmVERIFY_OK(gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL));
-    if (hardware)
-        gcoHARDWARE_EnableCounters(hardware);
 
 #if VIVANTE_PROFILER_PROBE
-    if (hardware)
+    int bufId = 0;
+    gcoBUFOBJ counterBuf;
+    for (; bufId < NumOfDrawBuf; bufId++)
     {
-        int bufId = 0;
-        gcoBUFOBJ counterBuf;
-        for (; bufId < NumOfDrawBuf;bufId++)
-        {
-            gcoBUFOBJ_Construct(_HAL, gcvBUFOBJ_TYPE_GENERIC_BUFFER, &counterBuf);
-            gcoBUFOBJ_Upload(counterBuf, gcvNULL, 0, 1024*sizeof(gctUINT32), gcvBUFOBJ_USAGE_STATIC_DRAW);
-            _HAL->profiler.newCounterBuf[bufId] = (gctHANDLE)counterBuf;
-        }
-        _HAL->profiler.curBufId = 0;
+        gcoBUFOBJ_Construct(_HAL, gcvBUFOBJ_TYPE_GENERIC_BUFFER, &counterBuf);
+        gcoBUFOBJ_Upload(counterBuf, gcvNULL, 0, 1024 * sizeof(gctUINT32), gcvBUFOBJ_USAGE_STATIC_DRAW);
+        _HAL->profiler.probeBuffer.newCounterBuf[bufId] = (gctHANDLE)counterBuf;
     }
+    _HAL->profiler.probeBuffer.curBufId = 0;
 #endif
+    gcoHARDWARE_EnableCounters(gcvNULL, gcvNULL);
 
     _HAL->profiler.enable = 1;
     gcoOS_GetTime(&_HAL->profiler.frameStart);
@@ -601,7 +603,7 @@ gcoPROFILER_Destroy(
 #if VIVANTE_PROFILER_PROBE
         gctUINT32 i = 0;
         for (i = 0;  i < NumOfDrawBuf; i++)
-            gcoBUFOBJ_Destroy(_HAL->profiler.newCounterBuf[i]);
+            gcoBUFOBJ_Destroy(_HAL->profiler.probeBuffer.newCounterBuf[i]);
 
         gcmWRITE_XML_STRING("</DrawCounter>\n");
         gcoPROFILER_Flush(gcvNULL);
@@ -885,22 +887,26 @@ gcoPROFILER_EndFrame(
     {
 #if VIVANTE_PROFILER_PROBE
 
-        if (_HAL->profiler.curBufId > 0)
+#if !VIVANTE_PROFILER_PROBE_PERDRAW
+        gcoPROFILER_End(Hal, gcvFALSE);
+#endif
+        if (_HAL->profiler.probeBuffer.curBufId > 0)
         {
             gcoHAL_Commit(_HAL, gcvTRUE);
             gcmWRITE_XML_STRING("\t<FrameID>\n");
             gcmWRITE_XML_STRING("\t\t");gcmWRITE_XML_Value("FrameNUM", frameNo, 1);
 
-            for (j = 0; j < _HAL->profiler.curBufId; j++)
+            for (j = 0; j < _HAL->profiler.probeBuffer.curBufId; j++)
             {
                 gctUINT32 min_latency = 0;
                 gctUINT32 max_latency = 0;
+                gceCOUNTER_OPTYPE operationType = _HAL->profiler.probeBuffer.opType[j];
 
                 gcmWRITE_XML_STRING("\t\t<Operation>\n");
-                gcmWRITE_XML_STRING("\t\t\t");gcmWRITE_XML_Value("OperationType",0,1);
-                gcmWRITE_XML_STRING("\t\t\t");gcmWRITE_XML_Value("OperationNumber",j,1);
+                gcmWRITE_XML_STRING("\t\t\t"); gcmWRITE_XML_Value("OperationType", operationType, 1);
+                gcmWRITE_XML_STRING("\t\t\t"); gcmWRITE_XML_Value("OperationNumber", j, 1);
 
-                gcoBUFOBJ_Lock(_HAL->profiler.newCounterBuf[j], &address, &memory);
+                gcoBUFOBJ_Lock(_HAL->profiler.probeBuffer.newCounterBuf[j], &address, &memory);
                 offset = 0;
                 /* module FE */
 
@@ -1127,8 +1133,11 @@ gcoPROFILER_EndFrame(
             }
             gcmWRITE_XML_STRING("\t</FrameID>\n");
             frameNo++;
-            _HAL->profiler.curBufId = 0;
+            _HAL->profiler.probeBuffer.curBufId = 0;
         }
+#endif
+#if !VIVANTE_PROFILER_PROBE_PERDRAW
+        gcoPROFILER_Begin(Hal, gcvCOUNTER_OP_NONE);
 #endif
         gcmFOOTER_NO();
         return gcvSTATUS_OK;
@@ -1183,13 +1192,13 @@ gcoPROFILER_EndFrame(
         gcoHAL_Commit(_HAL, gcvTRUE); /* TODO: Calling this function on multi-GPU board will cause GPU hang. */
 
         /* write per draw counter */
-        for (j = 0; j < _HAL->profiler.curBufId; j++)
+        for (j = 0; j < _HAL->profiler.probeBuffer.curBufId; j++)
         {
             gcmWRITE_CONST(VPG_ES30_DRAW);
             gcmWRITE_COUNTER(VPC_ES30_DRAW_NO, j);
             offset = 0;
 
-            gcoBUFOBJ_Lock(_HAL->profiler.newCounterBuf[j], &address, &memory);
+            gcoBUFOBJ_Lock(_HAL->profiler.probeBuffer.newCounterBuf[j], &address, &memory);
 
             /* module FE */
             gcmWRITE_CONST(VPG_FE);
@@ -1493,11 +1502,11 @@ gcoPROFILER_EndFrame(
                 gcmPRINT("Frame %d:\n", frameNo);
                 gcmPRINT("************\n");
 
-                for (j = 0; j < _HAL->profiler.curBufId; j++)
+                for (j = 0; j < _HAL->profiler.probeBuffer.curBufId; j++)
                 {
                     gcmPRINT("draw #%d\n", j);
                     gcmPRINT("************\n");
-                    gcoBUFOBJ_Lock(_HAL->profiler.newCounterBuf[j], &address, &memory);
+                    gcoBUFOBJ_Lock(_HAL->profiler.probeBuffer.newCounterBuf[j], &address, &memory);
                     offset = 0;
                     /* module FE */
                     for (i = 0; i < MODULE_FRONT_END_COUNTER_NUM; i++)
@@ -1579,7 +1588,7 @@ gcoPROFILER_EndFrame(
                     gcmPRINT("************\n");
                 }
                 frameNo++;
-                _HAL->profiler.curBufId = 0;
+                _HAL->profiler.probeBuffer.curBufId = 0;
 
 #else
 
@@ -1752,9 +1761,10 @@ CalcDelta(
 #endif
 
 gceSTATUS
-gcoPROFILER_BeginDraw(
-                    IN gcoHAL Hal
-                    )
+gcoPROFILER_Begin(
+                IN gcoHAL Hal,
+                IN gceCOUNTER_OPTYPE operationType
+                )
 {
 #if VIVANTE_PROFILER_PROBE
     gceSTATUS status;
@@ -1767,13 +1777,14 @@ gcoPROFILER_BeginDraw(
     }
 
     /* TODO */
-    if (_HAL->profiler.curBufId >= NumOfDrawBuf)
+    if (_HAL->profiler.probeBuffer.curBufId >= NumOfDrawBuf)
     {
         int bufId = 0;
-        _HAL->profiler.curBufId = 0;
+        _HAL->profiler.probeBuffer.curBufId = 0;
         for (; bufId < NumOfDrawBuf;bufId++)
         {
-            gcoBUFOBJ_Upload(_HAL->profiler.newCounterBuf[bufId], gcvNULL, 0, 1024*sizeof(gctUINT32), gcvBUFOBJ_USAGE_STATIC_DRAW);
+            gcoBUFOBJ_Upload(_HAL->profiler.probeBuffer.newCounterBuf[bufId], gcvNULL, 0, 1024 * sizeof(gctUINT32), gcvBUFOBJ_USAGE_STATIC_DRAW);
+            _HAL->profiler.probeBuffer.opType[bufId] = gcvCOUNTER_OP_NONE;
         }
     }
 
@@ -1783,12 +1794,13 @@ gcoPROFILER_BeginDraw(
         gctUINT32   address;
         gctINT32   module;
 
-        gcoBUFOBJ_Lock(_HAL->profiler.newCounterBuf[_HAL->profiler.curBufId], &address, gcvNULL);
+        gcoBUFOBJ_Lock(_HAL->profiler.probeBuffer.newCounterBuf[_HAL->profiler.probeBuffer.curBufId], &address, gcvNULL);
 
         for (module = 0; module < gcvCOUNTER_COUNT; module++)
         {
-            gcoHARDWARE_ProbeCounter(hardware, address, (gceCOUNTER)module, gcvTRUE);
+            gcoHARDWARE_ProbeCounter(hardware, address, (gceCOUNTER)module, gcvTRUE, gcvNULL);
         }
+        _HAL->profiler.probeBuffer.opType[_HAL->profiler.probeBuffer.curBufId] = operationType;
     }
 
 OnError:
@@ -1798,10 +1810,10 @@ OnError:
 }
 
 gceSTATUS
-gcoPROFILER_EndDraw(
-                    IN gcoHAL Hal,
-                    IN gctBOOL FirstDraw
-                    )
+gcoPROFILER_End(
+                IN gcoHAL Hal,
+                IN gctBOOL FirstDraw
+               )
 {
 #if VIVANTE_PROFILER_PROBE
     gceSTATUS status;
@@ -1814,7 +1826,7 @@ gcoPROFILER_EndDraw(
     }
 
     /* TODO */
-    if (_HAL->profiler.curBufId >= NumOfDrawBuf)
+    if (_HAL->profiler.probeBuffer.curBufId >= NumOfDrawBuf)
         return gcvSTATUS_NOT_SUPPORTED;
 
     gcmGETHARDWARE(hardware);
@@ -1823,14 +1835,14 @@ gcoPROFILER_EndDraw(
         gctUINT32   address;
         gctINT32    module;
 
-        gcoBUFOBJ_Lock(_HAL->profiler.newCounterBuf[_HAL->profiler.curBufId], &address, gcvNULL);
+        gcoBUFOBJ_Lock(_HAL->profiler.probeBuffer.newCounterBuf[_HAL->profiler.probeBuffer.curBufId], &address, gcvNULL);
 
         for (module = 0; module < gcvCOUNTER_COUNT; module++)
         {
-            gcoHARDWARE_ProbeCounter(hardware, address, (gceCOUNTER)module, gcvFALSE);
+            gcoHARDWARE_ProbeCounter(hardware, address, (gceCOUNTER)module, gcvFALSE, gcvNULL);
         }
 
-        _HAL->profiler.curBufId++;
+        _HAL->profiler.probeBuffer.curBufId++;
     }
 
 OnError:
@@ -2097,20 +2109,22 @@ gcoPROFILER_EndFrame(
 }
 
 gceSTATUS
-gcoPROFILER_BeginDraw(
-                    IN gcoHAL Hal
-                    )
+gcoPROFILER_Begin(
+                 IN gcoHAL Hal,
+                 IN gceCOUNTER_OPTYPE operationType
+                 )
 {
     gcmHEADER();
     gcmFOOTER_NO();
     return gcvSTATUS_INVALID_REQUEST;
 }
+
 /* Call to signal end of draw. */
 gceSTATUS
-gcoPROFILER_EndDraw(
-                    IN gcoHAL Hal,
-                    IN gctBOOL FirstDraw
-                    )
+gcoPROFILER_End(
+               IN gcoHAL Hal,
+               IN gctBOOL FirstDraw
+               )
 {
     gcmHEADER();
     gcmFOOTER_NO();

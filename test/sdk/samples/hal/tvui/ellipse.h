@@ -26,6 +26,8 @@
 *****************************************************************************/
 
 
+
+
 #ifndef __ellipse_h_
 #define __ellipse_h_
 
@@ -39,11 +41,11 @@ extern "C" {
 
 typedef enum _ELLIPSE_QUADRANT
 {
-	QUADRANT1     = (1 << 0),	/* Top right. */
-	QUADRANT2     = (1 << 1),	/* Top left. */
-	QUADRANT3     = (1 << 2),	/* Bottom left. */
-	QUADRANT4     = (1 << 3),	/* Bottom right. */
-	ALL_QUADRANTS = (QUADRANT1 | QUADRANT2 | QUADRANT3 | QUADRANT4)
+    QUADRANT1     = (1 << 0),    /* Top right. */
+    QUADRANT2     = (1 << 1),    /* Top left. */
+    QUADRANT3     = (1 << 2),    /* Bottom left. */
+    QUADRANT4     = (1 << 3),    /* Bottom right. */
+    ALL_QUADRANTS = (QUADRANT1 | QUADRANT2 | QUADRANT3 | QUADRANT4)
 }
 ELLIPSE_QUADRANT;
 
@@ -54,17 +56,17 @@ ELLIPSE_QUADRANT;
 
 gceSTATUS
 DrawEllipse(
-	IN gco2D Engine,
-	IN gcoSURF DestSurface,
-	IN gctINT CenterX,
-	IN gctINT CenterY,
-	IN gctUINT XRadius,
-	IN gctUINT YRadius,
-	IN gctUINT32 Color,
-	IN gctUINT BorderWidth,
-	IN gctBOOL Filled,
-	IN ELLIPSE_QUADRANT Quadrant
-	);
+    IN gco2D Engine,
+    IN gcoSURF DestSurface,
+    IN gctINT CenterX,
+    IN gctINT CenterY,
+    IN gctUINT XRadius,
+    IN gctUINT YRadius,
+    IN gctUINT32 Color,
+    IN gctUINT BorderWidth,
+    IN gctBOOL Filled,
+    IN ELLIPSE_QUADRANT Quadrant
+    );
 
 #ifdef __cplusplus
 }

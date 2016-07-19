@@ -132,13 +132,18 @@ typedef enum _gcePATCH_ID
     gcvPATCH_3DMARKSS,
     gcvPATCH_GFXBENCH4,
     gcvPATCH_BATCHCOUNT,
+    gcvPATCH_ANTUTU6X,      /* Antutu 6.x */
+    gcvPATCH_ANDROID_BROWSER,
 
     gcvPATCH_COUNT
 } gcePATCH_ID;
 
 
 #if gcdENABLE_3D
-#define gcdPROC_IS_WEBGL(patchId) ((patchId) == gcvPATCH_CHROME || (patchId) == gcvPATCH_FIREFOX || (patchId) == gcvPATCH_ANDROID_WEBGL)
+#define gcdPROC_IS_WEBGL(patchId)       ((patchId) == gcvPATCH_CHROME           || \
+                                         (patchId) == gcvPATCH_FIREFOX          || \
+                                         (patchId) == gcvPATCH_ANDROID_WEBGL    || \
+                                         (patchId) == gcvPATCH_ANDROID_BROWSER)
 #endif /* gcdENABLE_3D */
 
 

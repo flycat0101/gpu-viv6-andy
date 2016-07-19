@@ -37,16 +37,16 @@
 
 const char *kernel_restrict_local_enum =
 "#ifndef _TYPES2_H_                                                                                                                 \n"
-"#define _TYPES2_H_																												   \n"
-"																																   \n"
-"#ifdef __OPENCL_VERSION__																										   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
-"#else // __OPENCL_VERSION__																									   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType									   \n"
-"#endif // __OPENCL_VERSION__																									   \n"
-"																																   \n"
-"ALIGNED_STRUCT(enum, 32) InputA {																							       \n"
-"    volatile_e,_restrict_e,const_e																													   \n"
+"#define _TYPES2_H_                                                                                                                   \n"
+"                                                                                                                                   \n"
+"#ifdef __OPENCL_VERSION__                                                                                                           \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))                               \n"
+"#else // __OPENCL_VERSION__                                                                                                       \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType                                       \n"
+"#endif // __OPENCL_VERSION__                                                                                                       \n"
+"                                                                                                                                   \n"
+"ALIGNED_STRUCT(enum, 32) InputA {                                                                                                   \n"
+"    volatile_e,_restrict_e,const_e                                                                                                                       \n"
 "};                                                                                                                                \n"
 "                                                                                                                                  \n"
 "                                                                                                                                  \n"
@@ -65,13 +65,13 @@ const char *kernel_restrict_local_enum =
 "    float* restrict pin2;                                                                                                                                \n"
 "    int in1 = 2;                                                                                                                             \n"
 "    float in2 = 2.5;                                                                                                                             \n"
-"	 pin1 = &in1;									                                                           \n"
-"	 pin2 = &in2;									                                                           \n"
+"     pin1 = &in1;                                                                                               \n"
+"     pin2 = &in2;                                                                                               \n"
 "    __local float in3;                                                                                                                              \n"
 "    in3 = 1.0;                                                                                                                              \n"
-"	 pin3 = &in3;	                                                                                            \n"
+"     pin3 = &in3;                                                                                                \n"
 "    c[tid] = a[tid] + (*pin1)*(*pin2)*(*pin3);                                                                                                                           \n"
-"																															   \n"
+"                                                                                                                               \n"
 "}                                                                                                                                 \n";
 
 class TestCase {
@@ -121,9 +121,9 @@ public:
         _deviceResult = cl::Buffer(_context, CL_MEM_WRITE_ONLY, sizeof(Result) * _globalWorkSize);
 
         _kernel.setArg(0,sizeof (_deviceInputA), &_deviceInputA);
-		_kernel.setArg(1,sizeof (_deviceResult), &_deviceResult);
-		_kernel.setArg(2,sizeof (_numElements), &_numElements);
-		_kernel.setArg(3,sizeof (cl_float) , NULL);
+        _kernel.setArg(1,sizeof (_deviceResult), &_deviceResult);
+        _kernel.setArg(2,sizeof (_numElements), &_numElements);
+        _kernel.setArg(3,sizeof (cl_float) , NULL);
     }
 
     virtual bool Execute()
@@ -151,7 +151,7 @@ private:
     void _computeGoldStandard()
     {
         for (int i = 0; i < _numElements; i++) {
-			_goldStandard[i] = test3;
+            _goldStandard[i] = test3;
         }
     }
 
@@ -169,8 +169,8 @@ private:
     {
         for (int i = 0; i < _numElements; ++i) {
             if (_goldStandard[i] + 5 != _result[i]) {
-				//std::cout << "c:" << _goldStandard[i] << "ocl:" << _result[i] << std::endl;
-				return false;
+                //std::cout << "c:" << _goldStandard[i] << "ocl:" << _result[i] << std::endl;
+                return false;
             }
 
 
@@ -198,7 +198,7 @@ private:
 int restrict_local_enum(void)
 {
     cl_int err = CL_SUCCESS;
-	int cnt = 1;
+    int cnt = 1;
 
     try {
         std::vector<cl::Platform> platforms;
@@ -214,7 +214,7 @@ int restrict_local_enum(void)
 
         std::vector<cl::Device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
 
-
+        
         const char* clProgramSource = kernel_restrict_local_enum;//oclLoadProgSource("multiply.cl", "", &szKernelLength);
         if (clProgramSource == 0) {
             std::cerr << "OpenCL program not found." << std::endl;
@@ -238,13 +238,13 @@ int restrict_local_enum(void)
         std::cout << "Running test restrict_local_enum..." << std::endl;
         TestCase_restrict_local_enum restrict_local_enum(10, program_, context, devices);
 
-		bool control = true;
+        bool control = true;
         restrict_local_enum.SetUp();
         for (int i = 0; i < 10; ++i) {
-			if(!restrict_local_enum.Execute()){
-				control = false;
-				cnt = 0;
-			}
+            if(!restrict_local_enum.Execute()){
+                control = false;
+                cnt = 0;
+            }
             std::cout << "RUN " << i + 1<< ": " << (control ? "PASSED" : "FAILED!") << std::endl;
         }
         restrict_local_enum.TearDown();

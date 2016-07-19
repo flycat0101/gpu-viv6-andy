@@ -1,5 +1,3 @@
-
-
 package com.vivantecorp.graphics.sample1;
 
 // Wrapper for native library

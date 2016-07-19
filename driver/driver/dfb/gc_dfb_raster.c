@@ -284,6 +284,477 @@ _FlushPendingPrimitives( GalDriverData *vdrv,
     return status;
 }
 
+#if GAL_SURFACE_COMPRESSED
+static gceSTATUS
+_Compressed2Tmp2Compressed( GalDriverData *vdrv,
+                            GalDeviceData *vdev,
+                            gcsRECT_PTR src_rect,
+                            gcsRECT_PTR dst_rect )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcsRECT srect, drect;
+    unsigned int   hor_factor, ver_factor;
+
+    D_ASSERT( vdrv != NULL );
+    D_ASSERT( vdev != NULL );
+
+    do {
+        if (vdrv->tmp_dst_phys_addr == gcvINVALID_ADDRESS)
+        {
+            printf("No dst tmp surface.\n");
+            break;
+        }
+
+        /* Src->Tmp */
+        gcmERR_BREAK(gco2D_SetSourceTileStatus(
+            vdrv->engine_2d,
+            vdrv->src_tile_status,
+            vdrv->src_native_format,
+            0,
+            vdrv->src_tile_status_addr
+            ));
+
+        gcmERR_BREAK(gco2D_SetGenericSource(vdrv->engine_2d,
+                                            vdrv->src_phys_addr,
+                                            1U,
+                                            (unsigned int*) &vdrv->src_pitch,
+                                            1U,
+                                            vdrv->src_tiling,
+                                            vdrv->src_native_format,
+                                            gcvSURF_0_DEGREE,
+                                            vdrv->src_aligned_width,
+                                            vdrv->src_aligned_height));
+
+        gcmERR_BREAK(gco2D_SetTargetTileStatus(
+            vdrv->engine_2d,
+            gcv2D_TSC_DISABLE,
+            gcvSURF_UNKNOWN,
+            0,
+            gcvINVALID_ADDRESS
+            ));
+
+        gcmERR_BREAK(gco2D_SetGenericTarget(vdrv->engine_2d,
+                                            &vdrv->tmp_dst_phys_addr,
+                                            1U,
+                                            (unsigned int*) &vdrv->tmp_dst_pitch,
+                                            1U,
+                                            vdrv->dst_tiling,
+                                            vdrv->dst_native_format,
+                                            gcvSURF_0_DEGREE,
+                                            vdrv->tmp_dst_aligned_width,
+                                            vdrv->tmp_dst_aligned_height));
+
+        drect.left = drect.top = 0;
+        drect.right = dst_rect->right - dst_rect->left;
+        drect.bottom = dst_rect->bottom - dst_rect->top;
+
+        gcmERR_BREAK(gco2D_SetSource( vdrv->engine_2d,
+                                      src_rect ));
+
+        gcmERR_BREAK(gco2D_SetClipping(vdrv->engine_2d, &drect));
+
+        /* Calculate the stretch factors. */
+        gcmERR_BREAK(gal_get_stretch_factors( src_rect,
+                                              &drect,
+                                              &hor_factor,
+                                              &ver_factor ));
+
+        /* Program the stretch factors. */
+        gcmERR_BREAK(gco2D_SetStretchFactors( vdrv->engine_2d,
+                                              hor_factor,
+                                              ver_factor ));
+
+        gcmERR_BREAK(gco2D_SetBitBlitMirror( vdrv->engine_2d,
+                                             vdrv->backup_hor_mirror,
+                                             vdrv->backup_ver_mirror ));
+
+        gcmERR_BREAK(gco2D_DisableAlphaBlend(vdrv->engine_2d));
+
+        gcmERR_BREAK(gco2D_SetPixelMultiplyModeAdvanced( vdrv->engine_2d,
+                                                         gcv2D_COLOR_MULTIPLY_DISABLE,
+                                                         gcv2D_COLOR_MULTIPLY_DISABLE,
+                                                         gcv2D_GLOBAL_COLOR_MULTIPLY_DISABLE,
+                                                         gcv2D_COLOR_MULTIPLY_DISABLE ));
+
+        gcmERR_BREAK(gco2D_SetTransparencyAdvanced( vdrv->engine_2d,
+                                                    gcv2D_OPAQUE,
+                                                    gcv2D_OPAQUE,
+                                                    gcv2D_OPAQUE ));
+
+        gcmERR_BREAK(gco2D_StretchBlit( vdrv->engine_2d,
+                                        1,
+                                        &drect,
+                                        0xCC,
+                                        0xCC,
+                                        vdrv->dst_native_format ));
+
+        /* Tmp -> Dst */
+        gcmERR_BREAK(gco2D_SetSourceTileStatus(
+            vdrv->engine_2d,
+            gcv2D_TSC_DISABLE,
+            gcvSURF_UNKNOWN,
+            0,
+            gcvINVALID_ADDRESS
+            ));
+
+        gcmERR_BREAK(gco2D_SetGenericSource(vdrv->engine_2d,
+                                            &vdrv->tmp_dst_phys_addr,
+                                            1U,
+                                            (unsigned int*) &vdrv->tmp_dst_pitch,
+                                            1U,
+                                            vdrv->dst_tiling,
+                                            vdrv->dst_native_format,
+                                            gcvSURF_0_DEGREE,
+                                            vdrv->tmp_dst_aligned_width,
+                                            vdrv->tmp_dst_aligned_height));
+
+        gcmERR_BREAK(gco2D_SetTargetTileStatus(
+            vdrv->engine_2d,
+            vdrv->dst_tile_status,
+            vdrv->dst_native_format,
+            0,
+            vdrv->dst_tile_status_addr
+            ));
+
+        gcmERR_BREAK(gco2D_SetGenericTarget(vdrv->engine_2d,
+                                            &vdrv->dst_phys_addr,
+                                            1U,
+                                            (unsigned int*) &vdrv->dst_pitch,
+                                            1U,
+                                            vdrv->dst_tiling,
+                                            vdrv->dst_native_format,
+                                            gcvSURF_0_DEGREE,
+                                            vdrv->dst_aligned_width,
+                                            vdrv->dst_aligned_height));
+
+        srect = drect;
+
+        gcmERR_BREAK(gco2D_SetSource(vdrv->engine_2d, &srect));
+        gcmERR_BREAK(gco2D_SetClipping(vdrv->engine_2d, dst_rect));
+
+        if (vdrv->backup_blended)
+        {
+            gcmERR_BREAK(gco2D_EnableAlphaBlend(
+                vdrv->engine_2d,
+                vdrv->backup_src_global_alpha_value,
+                vdrv->backup_dst_global_alpha_value,
+                vdrv->backup_src_alpha_mode,
+                vdrv->backup_dst_alpha_mode,
+                vdrv->backup_src_global_alpha_mode,
+                vdrv->backup_dst_global_alpha_mode,
+                vdrv->backup_drc_factor_mode,
+                vdrv->backup_dst_factor_mode,
+                vdrv->backup_src_color_mode,
+                vdrv->backup_dst_color_mode));
+        }
+
+        gcmERR_BREAK(gco2D_SetPixelMultiplyModeAdvanced( vdrv->engine_2d,
+                                                         vdrv->backup_src_premultiply_src_alpha,
+                                                         vdrv->backup_dst_premultiply_dst_alpha,
+                                                         vdrv->backup_src_premultiply_global_mode,
+                                                         vdrv->backup_dst_demultiply_dst_alpha ));
+
+        gcmERR_BREAK(gco2D_SetTransparencyAdvanced( vdrv->engine_2d,
+                                                    vdrv->src_trans_mode,
+                                                    vdrv->dst_trans_mode,
+                                                    vdrv->pat_trans_mode ));
+
+        gcmERR_BREAK(gco2D_SetBitBlitMirror( vdrv->engine_2d,
+                                             gcvFALSE,
+                                             gcvFALSE ));
+
+        gcmERR_BREAK(gco2D_Blit( vdrv->engine_2d,
+                                 1,
+                                 dst_rect,
+                                 vdrv->blit_fg_rop,
+                                 vdrv->blit_bg_rop,
+                                 vdrv->dst_native_format ));
+
+        vdrv->dst_tile_status = gcv2D_TSC_2D_COMPRESSED;
+
+        /* Restore status. */
+        gcmERR_BREAK(gco2D_SetBitBlitMirror( vdrv->engine_2d,
+                                             vdrv->backup_hor_mirror,
+                                             vdrv->backup_ver_mirror ));
+    } while (0);
+
+    if (gcmIS_ERROR( status )) {
+        D_WARN( "Failed to clear dst and its tsb!!!!!!!!!! status: %d\n", status );
+    }
+
+    return status;
+}
+
+static gceSTATUS
+_ClearDstAndTileStatusBuffer( GalDriverData *vdrv,
+                              GalDeviceData *vdev,
+                              bool compressed)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcsRECT rect;
+
+    D_ASSERT( vdrv != NULL );
+    D_ASSERT( vdev != NULL );
+
+
+    do {
+        if (!compressed)
+        {
+            gcmERR_BREAK(gco2D_DisableAlphaBlend(vdrv->engine_2d));
+
+            gcmERR_BREAK(gco2D_SetPixelMultiplyModeAdvanced( vdrv->engine_2d,
+                                                             gcv2D_COLOR_MULTIPLY_DISABLE,
+                                                             gcv2D_COLOR_MULTIPLY_DISABLE,
+                                                             gcv2D_GLOBAL_COLOR_MULTIPLY_DISABLE,
+                                                             gcv2D_COLOR_MULTIPLY_DISABLE ));
+
+            gcmERR_BREAK(gco2D_SetTransparencyAdvanced( vdrv->engine_2d,
+                                                        gcv2D_OPAQUE,
+                                                        gcv2D_OPAQUE,
+                                                        gcv2D_OPAQUE ));
+
+            gcmERR_BREAK(gco2D_SetBitBlitMirror( vdrv->engine_2d,
+                                                 gcvFALSE,
+                                                 gcvFALSE ));
+
+            gcmERR_BREAK(gco2D_SetSourceTileStatus(
+                vdrv->engine_2d,
+                vdrv->dst_tile_status,
+                vdrv->dst_native_format,
+                0,
+                vdrv->dst_tile_status_addr
+                ));
+
+            gcmERR_BREAK(gco2D_SetGenericSource(vdrv->engine_2d,
+                                                &vdrv->dst_phys_addr,
+                                                1U,
+                                                (unsigned int*) &vdrv->dst_pitch,
+                                                1U,
+                                                vdrv->dst_tiling,
+                                                vdrv->dst_native_format,
+                                                gcvSURF_0_DEGREE,
+                                                vdrv->dst_aligned_width,
+                                                vdrv->dst_aligned_height));
+
+            gcmERR_BREAK(gco2D_SetTargetTileStatus(
+                vdrv->engine_2d,
+                gcv2D_TSC_DISABLE,
+                gcvSURF_UNKNOWN,
+                0,
+                gcvINVALID_ADDRESS
+                ));
+
+            gcmERR_BREAK(gco2D_SetGenericTarget(vdrv->engine_2d,
+                                                &vdrv->tmp_dst_phys_addr,
+                                                1U,
+                                                (unsigned int*) &vdrv->tmp_dst_pitch,
+                                                1U,
+                                                vdrv->dst_tiling,
+                                                vdrv->dst_native_format,
+                                                gcvSURF_0_DEGREE,
+                                                vdrv->tmp_dst_aligned_width,
+                                                vdrv->tmp_dst_aligned_height));
+
+            rect.left = rect.top = 0;
+            rect.right = vdrv->tmp_dst_aligned_width;
+            rect.bottom = vdrv->tmp_dst_aligned_height;
+
+            gcmERR_BREAK(gco2D_SetSource(vdrv->engine_2d, &rect));
+            gcmERR_BREAK(gco2D_SetClipping(vdrv->engine_2d, &rect));
+
+            gcmERR_BREAK(gco2D_Blit( vdrv->engine_2d,
+                                     1,
+                                     &rect,
+                                     0xCC, 0xCC,
+                                     vdrv->dst_native_format ));
+
+            {
+                gctUINT w, h, s;
+                w = vdrv->dst_aligned_width / 8;
+                h = vdrv->dst_aligned_height / 8;
+                s = w * 4;
+
+                gcmERR_BREAK(gco2D_SetTargetTileStatus(
+                    vdrv->engine_2d,
+                    gcv2D_TSC_DISABLE,
+                    gcvSURF_UNKNOWN,
+                    0,
+                    gcvINVALID_ADDRESS
+                    ));
+
+                /* Clear tile status buffer. */
+                gcmERR_BREAK(gco2D_SetGenericTarget(vdrv->engine_2d,
+                                                    &vdrv->dst_tile_status_addr,
+                                                    1U,
+                                                    &s,
+                                                    1U,
+                                                    vdrv->dst_tiling,
+                                                    vdrv->dst_native_format,
+                                                    gcvSURF_0_DEGREE,
+                                                    w, h));
+
+                rect.left = rect.top = 0;
+                rect.right = w;
+                rect.bottom = h;
+
+                gcmERR_BREAK(gco2D_SetClipping(vdrv->engine_2d, &rect));
+
+                gcmERR_BREAK(gco2D_Clear( vdrv->engine_2d,
+                                          1,
+                                          &rect,
+                                          vdrv->dst_native_format==gcvSURF_A8R8G8B8 ? 0x88888888:0x66666666,
+                                          0xCC, 0xCC,
+                                          vdrv->dst_native_format ));
+
+                gcmERR_BREAK(gco2D_Commit( vdrv->engine_2d, false ));
+            }
+
+            gcmERR_BREAK(gco2D_SetSourceTileStatus(
+                vdrv->engine_2d,
+                gcv2D_TSC_DISABLE,
+                gcvSURF_UNKNOWN,
+                0,
+                gcvINVALID_ADDRESS
+                ));
+
+            gcmERR_BREAK(gco2D_SetGenericSource(vdrv->engine_2d,
+                                                &vdrv->tmp_dst_phys_addr,
+                                                1U,
+                                                (unsigned int*) &vdrv->tmp_dst_pitch,
+                                                1U,
+                                                vdrv->dst_tiling,
+                                                vdrv->dst_native_format,
+                                                gcvSURF_0_DEGREE,
+                                                vdrv->tmp_dst_aligned_width,
+                                                vdrv->tmp_dst_aligned_height));
+
+            gcmERR_BREAK(gco2D_SetTargetTileStatus(
+                vdrv->engine_2d,
+                gcv2D_TSC_DISABLE,
+                gcvSURF_UNKNOWN,
+                0,
+                gcvINVALID_ADDRESS
+                ));
+
+            gcmERR_BREAK(gco2D_SetGenericTarget(vdrv->engine_2d,
+                                                &vdrv->dst_phys_addr,
+                                                1U,
+                                                (unsigned int*) &vdrv->dst_pitch,
+                                                1U,
+                                                vdrv->dst_tiling,
+                                                vdrv->dst_native_format,
+                                                gcvSURF_0_DEGREE,
+                                                vdrv->dst_aligned_width,
+                                                vdrv->dst_aligned_height));
+
+            rect.left = rect.top = 0;
+            rect.right = vdrv->dst_aligned_width;
+            rect.bottom = vdrv->dst_aligned_height;
+
+            gcmERR_BREAK(gco2D_SetSource(vdrv->engine_2d, &rect));
+            gcmERR_BREAK(gco2D_SetClipping(vdrv->engine_2d, &rect));
+
+            gcmERR_BREAK(gco2D_Blit( vdrv->engine_2d,
+                                     1,
+                                     &rect,
+                                     0xCC, 0xCC,
+                                     vdrv->dst_native_format ));
+
+            if (vdrv->backup_blended)
+            {
+                gcmERR_BREAK(gco2D_EnableAlphaBlend(
+                    vdrv->engine_2d,
+                    vdrv->backup_src_global_alpha_value,
+                    vdrv->backup_dst_global_alpha_value,
+                    vdrv->backup_src_alpha_mode,
+                    vdrv->backup_dst_alpha_mode,
+                    vdrv->backup_src_global_alpha_mode,
+                    vdrv->backup_dst_global_alpha_mode,
+                    vdrv->backup_drc_factor_mode,
+                    vdrv->backup_dst_factor_mode,
+                    vdrv->backup_src_color_mode,
+                    vdrv->backup_dst_color_mode));
+            }
+
+            gcmERR_BREAK(gco2D_SetPixelMultiplyModeAdvanced( vdrv->engine_2d,
+                                                             vdrv->backup_src_premultiply_src_alpha,
+                                                             vdrv->backup_dst_premultiply_dst_alpha,
+                                                             vdrv->backup_src_premultiply_global_mode,
+                                                             vdrv->backup_dst_demultiply_dst_alpha ));
+
+            gcmERR_BREAK(gco2D_SetTransparencyAdvanced( vdrv->engine_2d,
+                                                        vdrv->src_trans_mode,
+                                                        vdrv->dst_trans_mode,
+                                                        vdrv->pat_trans_mode ));
+
+            gcmERR_BREAK(gco2D_SetBitBlitMirror( vdrv->engine_2d,
+                                                 vdrv->backup_hor_mirror,
+                                                 vdrv->backup_ver_mirror ));
+        }
+
+
+        gcmERR_BREAK(gco2D_SetSourceTileStatus(
+            vdrv->engine_2d,
+            vdrv->src_tile_status,
+            vdrv->src_native_format,
+            0,
+            vdrv->src_tile_status_addr
+            ));
+
+        gcmERR_BREAK(gco2D_SetGenericSource(vdrv->engine_2d,
+                                            vdrv->src_phys_addr,
+                                            1U,
+                                            (unsigned int*) &vdrv->src_pitch,
+                                            1U,
+                                            vdrv->src_tiling,
+                                            vdrv->src_native_format,
+                                            vdrv->src_rotation,
+                                            vdrv->src_aligned_width,
+                                            vdrv->src_aligned_height));
+
+        vdrv->dst_tile_status = compressed ? gcv2D_TSC_2D_COMPRESSED : gcv2D_TSC_DISABLE;
+
+        if (compressed)
+        {
+            gcmERR_BREAK(gco2D_SetTargetTileStatus(
+                vdrv->engine_2d,
+                gcv2D_TSC_2D_COMPRESSED,
+                vdrv->dst_native_format,
+                0,
+                vdrv->dst_tile_status_addr
+                ));
+        }
+        else
+        {
+            gcmERR_BREAK(gco2D_SetTargetTileStatus(
+                vdrv->engine_2d,
+                gcv2D_TSC_DISABLE,
+                gcvSURF_UNKNOWN,
+                0,
+                gcvINVALID_ADDRESS
+                ));
+        }
+
+        gcmERR_BREAK(gco2D_SetGenericTarget(vdrv->engine_2d,
+                                            &vdrv->dst_phys_addr,
+                                            1U,
+                                            (unsigned int*) &vdrv->dst_pitch,
+                                            1U,
+                                            vdrv->dst_tiling,
+                                            vdrv->dst_native_format,
+                                            vdrv->dst_rotation,
+                                            vdrv->dst_aligned_width,
+                                            vdrv->dst_aligned_height));
+    } while (0);
+
+    if (gcmIS_ERROR( status )) {
+        D_WARN( "Failed to clear dst and its tsb!!!!!!!!!! status: %d\n", status );
+    }
+
+    return status;
+}
+#endif
+
 /**
  * Stretch blit function.
  *
@@ -323,6 +794,14 @@ bool galStretchBlit( void         *drv,
                    srect->x, srect->y, srect->w, srect->h,
                    drect->x, drect->y, drect->w, drect->h );
 
+#if GAL_SURFACE_COMPRESSED
+    if (srect->w == drect->w && srect->h == drect->h)
+    {
+        D_DEBUG_EXIT( Gal_2D, "\n" );
+        return galBlit(drv, dev, srect, drect->x, drect->y);
+    }
+#endif
+
     do {
         /* Check the threshold for small object rendering. */
         if (vdev->turn_on_threshold &&
@@ -340,6 +819,16 @@ bool galStretchBlit( void         *drv,
         /* No pending for galStretchBlit. */
         gcmERR_BREAK(_FlushPendingPrimitives( vdrv, vdev ));
 
+#if GAL_SURFACE_COMPRESSED
+        if (vdev->hw_2d_compression &&
+            vdrv->per_process_compression &&
+            vdrv->dst_tile_status != gcv2D_TSC_DISABLE)
+        {
+            gcmERR_BREAK(_ClearDstAndTileStatusBuffer(vdrv, vdev, false));
+            vdrv->flush = true;
+        }
+#endif
+
         if ((vdrv->src_is_yuv_format || vdrv->smooth_scale) &&
             !vdrv->ckey_w) {
             src_rect.left   = srect->x;
@@ -352,58 +841,69 @@ bool galStretchBlit( void         *drv,
             dst_rect.right  = dst_rect.left + drect->w;
             dst_rect.bottom = dst_rect.top + drect->h;
 
-            /* Clip it with dest sub rectangle. */
-            clip_rect.left   = MAX(vdrv->clip.left, dst_rect.left);
-            clip_rect.right  = MIN(vdrv->clip.right, dst_rect.right);
-            clip_rect.top    = MAX(vdrv->clip.top, dst_rect.top);
-            clip_rect.bottom = MIN(vdrv->clip.bottom, dst_rect.bottom);
-
-            if (dst_rect.left < 0)
+#if GAL_SURFACE_COMPRESSED
+            if (vdev->hw_2d_compression &&
+                !vdrv->per_process_compression &&
+                vdrv->dst_tile_status == gcv2D_TSC_2D_COMPRESSED)
             {
-                dst_sub_rect.left   = 0;
-                dst_sub_rect.right  = clip_rect.right - dst_rect.left;
+                gcmERR_BREAK(_Compressed2Tmp2Compressed(vdrv, vdev, &src_rect, &dst_rect));
             }
             else
+#endif
             {
-                dst_sub_rect.left   = clip_rect.left - dst_rect.left;
-                dst_sub_rect.right  = dst_sub_rect.left + (clip_rect.right - clip_rect.left);
-            }
-            if (dst_rect.top < 0)
-            {
-                dst_sub_rect.top    = 0;
-                dst_sub_rect.bottom = clip_rect.bottom - dst_rect.top;
-            }
-            else
-            {
-                dst_sub_rect.top    = clip_rect.top  - dst_rect.top;
-                dst_sub_rect.bottom = dst_sub_rect.top + (clip_rect.bottom - clip_rect.top);
-            }
+                /* Clip it with dest sub rectangle. */
+                clip_rect.left   = MAX(vdrv->clip.left, dst_rect.left);
+                clip_rect.right  = MIN(vdrv->clip.right, dst_rect.right);
+                clip_rect.top    = MAX(vdrv->clip.top, dst_rect.top);
+                clip_rect.bottom = MIN(vdrv->clip.bottom, dst_rect.bottom);
 
-            D_DEBUG_AT( Gal_2D, "src_rect(%d, %d, %d, %d)\n", GAL_RECTANGLE_VALS(&src_rect) );
-            D_DEBUG_AT( Gal_2D, "dst_rect(%d, %d, %d, %d)\n", GAL_RECTANGLE_VALS(&dst_rect) );
-            D_DEBUG_AT( Gal_2D, "dst_sub_rect(%d, %d, %d, %d)\n", GAL_RECTANGLE_VALS(&dst_sub_rect) );
+                if (dst_rect.left < 0)
+                {
+                    dst_sub_rect.left   = 0;
+                    dst_sub_rect.right  = clip_rect.right - dst_rect.left;
+                }
+                else
+                {
+                    dst_sub_rect.left   = clip_rect.left - dst_rect.left;
+                    dst_sub_rect.right  = dst_sub_rect.left + (clip_rect.right - clip_rect.left);
+                }
+                if (dst_rect.top < 0)
+                {
+                    dst_sub_rect.top    = 0;
+                    dst_sub_rect.bottom = clip_rect.bottom - dst_rect.top;
+                }
+                else
+                {
+                    dst_sub_rect.top    = clip_rect.top  - dst_rect.top;
+                    dst_sub_rect.bottom = dst_sub_rect.top + (clip_rect.bottom - clip_rect.top);
+                }
 
-            gal_get_kernel_size(&src_rect, &dst_rect, &horfactor, &verfactor);
-            gcmERR_BREAK(gco2D_SetKernelSize( vdrv->engine_2d, horfactor, verfactor));
+                D_DEBUG_AT( Gal_2D, "src_rect(%d, %d, %d, %d)\n", GAL_RECTANGLE_VALS(&src_rect) );
+                D_DEBUG_AT( Gal_2D, "dst_rect(%d, %d, %d, %d)\n", GAL_RECTANGLE_VALS(&dst_rect) );
+                D_DEBUG_AT( Gal_2D, "dst_sub_rect(%d, %d, %d, %d)\n", GAL_RECTANGLE_VALS(&dst_sub_rect) );
 
-            gcmERR_BREAK(gco2D_FilterBlit( vdrv->engine_2d,
-                                           vdrv->src_phys_addr[0],
-                                           vdrv->src_pitch[0],
-                                           vdrv->src_phys_addr[1],
-                                           vdrv->src_pitch[1],
-                                           vdrv->src_phys_addr[2],
-                                           vdrv->src_pitch[2],
-                                           vdrv->src_native_format,
-                                           vdrv->src_rotation,
-                                           vdrv->src_aligned_width,
-                                           &src_rect,
-                                           vdrv->dst_phys_addr,
-                                           vdrv->dst_pitch,
-                                           vdrv->dst_native_format,
-                                           vdrv->dst_rotation,
-                                           vdrv->dst_aligned_width,
-                                           &dst_rect,
-                                           &dst_sub_rect ));
+                gal_get_kernel_size(&src_rect, &dst_rect, &horfactor, &verfactor);
+                gcmERR_BREAK(gco2D_SetKernelSize( vdrv->engine_2d, horfactor, verfactor));
+
+                gcmERR_BREAK(gco2D_FilterBlit( vdrv->engine_2d,
+                                               vdrv->src_phys_addr[0],
+                                               vdrv->src_pitch[0],
+                                               vdrv->src_phys_addr[1],
+                                               vdrv->src_pitch[1],
+                                               vdrv->src_phys_addr[2],
+                                               vdrv->src_pitch[2],
+                                               vdrv->src_native_format,
+                                               vdrv->src_rotation,
+                                               vdrv->src_aligned_width,
+                                               &src_rect,
+                                               vdrv->dst_phys_addr,
+                                               vdrv->dst_pitch,
+                                               vdrv->dst_native_format,
+                                               vdrv->dst_rotation,
+                                               vdrv->dst_aligned_width,
+                                               &dst_rect,
+                                               &dst_sub_rect ));
+            }
         }
         else {
             if (vdrv->src_rotation == gcvSURF_0_DEGREE) {
@@ -447,53 +947,64 @@ bool galStretchBlit( void         *drv,
 
             checkConvert_valid_rectangle(1, &src_rect, &dst_rect);
 
-            if (!vdev->hw_2d_pe20 && vdrv->blit_blend && vdrv->dst_blend_no_alpha) {
-                D_DEBUG_AT( Gal_2D, "Work for destination blending no alpha.\n" );
-
-                gcmERR_BREAK(galStretchBlitDstNoAlpha( drv,
-                                                       dev,
-                                                       &src_rect,
-                                                       1,
-                                                       &dst_rect,
-                                                       1 ));
+#if GAL_SURFACE_COMPRESSED
+            if (vdev->hw_2d_compression &&
+                !vdrv->per_process_compression &&
+                vdrv->dst_tile_status == gcv2D_TSC_2D_COMPRESSED)
+            {
+                gcmERR_BREAK(_Compressed2Tmp2Compressed(vdrv, vdev, &src_rect, &dst_rect));
             }
-            else {
-                /* Set source rectangle. */
-                gcmERR_BREAK(gco2D_SetSource( vdrv->engine_2d,
-                                              &src_rect ));
+            else
+#endif
+            {
+                if (!vdev->hw_2d_pe20 && vdrv->blit_blend && vdrv->dst_blend_no_alpha) {
+                    D_DEBUG_AT( Gal_2D, "Work for destination blending no alpha.\n" );
 
-                /* Calculate the stretch factors. */
-                gcmERR_BREAK(gal_get_stretch_factors( &src_rect,
-                                                      &dst_rect,
-                                                      &hor_factor,
-                                                      &ver_factor ));
+                    gcmERR_BREAK(galStretchBlitDstNoAlpha( drv,
+                                                           dev,
+                                                           &src_rect,
+                                                           1,
+                                                           &dst_rect,
+                                                           1 ));
+                }
+                else {
+                    /* Set source rectangle. */
+                    gcmERR_BREAK(gco2D_SetSource( vdrv->engine_2d,
+                                                  &src_rect ));
 
-                /* Program the stretch factors. */
-                gcmERR_BREAK(gco2D_SetStretchFactors( vdrv->engine_2d,
-                                                      hor_factor,
-                                                      ver_factor ));
+                    /* Calculate the stretch factors. */
+                    gcmERR_BREAK(gal_get_stretch_factors( &src_rect,
+                                                          &dst_rect,
+                                                          &hor_factor,
+                                                          &ver_factor ));
 
-                D_DEBUG_AT( Gal_2D,
-                            "gco2D_StretchBlit\n"
-                            "dst rect (%u, %u, %u, %u)\n"
-                            "vdrv->blit_fg_rop: 0x%08X\n"
-                            "vdrv->blit_bg_rop: 0x%08X\n"
-                            "vdrv->dst_native_format: %u\n",
-                            dst_rect.left,
-                            dst_rect.top,
-                            dst_rect.right,
-                            dst_rect.bottom,
-                            vdrv->blit_fg_rop,
-                            vdrv->blit_bg_rop,
-                            vdrv->dst_native_format );
+                    /* Program the stretch factors. */
+                    gcmERR_BREAK(gco2D_SetStretchFactors( vdrv->engine_2d,
+                                                          hor_factor,
+                                                          ver_factor ));
 
-                gcmERR_BREAK(gco2D_StretchBlit( vdrv->engine_2d,
-                                                1,
-                                                &dst_rect,
-                                                vdrv->blit_fg_rop,
-                                                vdrv->blit_bg_rop,
-                                                vdrv->dst_native_format ));
+                    D_DEBUG_AT( Gal_2D,
+                                "gco2D_StretchBlit\n"
+                                "dst rect (%u, %u, %u, %u)\n"
+                                "vdrv->blit_fg_rop: 0x%08X\n"
+                                "vdrv->blit_bg_rop: 0x%08X\n"
+                                "vdrv->dst_native_format: %u\n",
+                                dst_rect.left,
+                                dst_rect.top,
+                                dst_rect.right,
+                                dst_rect.bottom,
+                                vdrv->blit_fg_rop,
+                                vdrv->blit_bg_rop,
+                                vdrv->dst_native_format );
 
+                    gcmERR_BREAK(gco2D_StretchBlit( vdrv->engine_2d,
+                                                    1,
+                                                    &dst_rect,
+                                                    vdrv->blit_fg_rop,
+                                                    vdrv->blit_bg_rop,
+                                                    vdrv->dst_native_format ));
+
+                }
             }
         }
 
@@ -566,6 +1077,17 @@ galFillRectangle( void            *drv,
             vdrv->pending_type = GAL_PENDING_FILL;
         }
 
+#if GAL_SURFACE_COMPRESSED
+        if (vdev->hw_2d_compression &&
+            vdrv->per_process_compression &&
+            vdrv->dst_tile_status != gcv2D_TSC_2D_COMPRESSED &&
+            vdrv->dst_tile_status_addr != gcvINVALID_ADDRESS)
+        {
+            gcmERR_BREAK(_ClearDstAndTileStatusBuffer(vdrv, vdev, true));
+            vdrv->flush = true;
+        }
+#endif
+
         /* Append to the pending list. */
         vdrv->pending_dst_rects[vdrv->pending_num].left   = rect->x;
         vdrv->pending_dst_rects[vdrv->pending_num].top    = rect->y;
@@ -579,9 +1101,10 @@ galFillRectangle( void            *drv,
             vdrv->pending_colors[vdrv->pending_num] = vdrv->color;
         }
 
-        if (++vdrv->pending_num >= vdev->max_pending_num) {
+        if (++vdrv->pending_num >= vdev->max_pending_num || vdrv->flush) {
             gcmERR_BREAK(_FillRectangles( vdrv, vdev ));
             vdrv->pending_num = 0;
+            vdrv->flush = 0;
         }
 
         /* HW accelerated flag. */
@@ -683,6 +1206,22 @@ galFillTriangle( void         *drv,
 
         /* No pending for galFillTriangle. */
         gcmERR_BREAK(_FlushPendingPrimitives( vdrv, vdev ));
+
+#if GAL_SURFACE_COMPRESSED
+        if (vdev->hw_2d_compression)
+        {
+            if (vdrv->per_process_compression &&
+                vdrv->dst_tile_status != gcv2D_TSC_DISABLE)
+            {
+                gcmERR_BREAK(_ClearDstAndTileStatusBuffer(vdrv, vdev, false));
+            }
+            else if (!vdrv->per_process_compression &&
+                     vdrv->dst_tile_status == gcv2D_TSC_2D_COMPRESSED)
+            {
+                vdrv->draw_bg_rop = 0xAA;
+            }
+        }
+#endif
 
         if (!vdev->hw_2d_pe20) {
             if (vdrv->draw_blend && vdrv->dst_blend_no_alpha) {
@@ -815,6 +1354,16 @@ galFillTrapezoid( void         *drv,
         /* No pending for galFillTrapezoid. */
         gcmERR_BREAK(_FlushPendingPrimitives( vdrv, vdev ));
 
+#if GAL_SURFACE_COMPRESSED
+        if (vdev->hw_2d_compression &&
+            vdrv->per_process_compression &&
+            vdrv->dst_tile_status != gcv2D_TSC_DISABLE)
+        {
+            gcmERR_BREAK(_ClearDstAndTileStatusBuffer(vdrv, vdev, false));
+            vdrv->flush = true;
+        }
+#endif
+
         if (!vdev->hw_2d_pe20) {
             if (vdrv->draw_blend && vdrv->dst_blend_no_alpha) {
                 gcmERR_BREAK(galStretchBlitDstNoAlpha( vdrv,
@@ -928,7 +1477,7 @@ galBatchFill( void                  *drv,
     gceHARDWARE_TYPE currentType = gcvHARDWARE_INVALID;
 
     gceSTATUS status  = gcvSTATUS_OK;
-    int numRect = 0;
+    int numRect = 0, noTileRect = 0;
     const DFBRectangle *rect;
     static gcsRECT drects[1024];
     bool Ret = true;
@@ -969,10 +1518,23 @@ galBatchFill( void                  *drv,
             drects[numRect].top    = rect->y;
             drects[numRect].right  = rect->x + rect->w;
             drects[numRect].bottom = rect->y + rect->h;
+            if (rect->w < 256 || rect->h < 256)
+                ++noTileRect;
             ++rect;
         } while(++numRect <= num);
 
         checkConvert_valid_rectangle( num, drects, drects );
+
+#if GAL_SURFACE_COMPRESSED
+        if (vdev->hw_2d_compression &&
+            vdrv->per_process_compression &&
+            vdrv->dst_tile_status != gcv2D_TSC_DISABLE &&
+            noTileRect >= numRect/2)
+        {
+            gcmERR_BREAK(_ClearDstAndTileStatusBuffer(vdrv, vdev, false));
+            vdrv->flush = true;
+        }
+#endif
 
         if (!vdev->hw_2d_pe20) {
             if (vdrv->draw_blend && vdrv->dst_blend_no_alpha) {
@@ -1135,6 +1697,24 @@ galDrawRectangle( void            *drv,
             gcmERR_BREAK(_FlushPendingPrimitives( vdrv, vdev ));
             vdrv->pending_type = GAL_PENDING_LINE;
         }
+
+#if GAL_SURFACE_COMPRESSED
+        if (vdev->hw_2d_compression)
+        {
+            if (vdrv->per_process_compression &&
+                vdrv->dst_tile_status != gcv2D_TSC_DISABLE)
+            {
+                gcmERR_BREAK(_ClearDstAndTileStatusBuffer(vdrv, vdev, false));
+                vdrv->flush = true;
+            }
+
+            if (!vdrv->per_process_compression &&
+                vdrv->dst_tile_status == gcv2D_TSC_2D_COMPRESSED)
+            {
+                vdrv->draw_bg_rop = 0xAA;
+            }
+        }
+#endif
 
         if (!vdev->hw_2d_pe20) {
             /* Decompose rect into 4 rectangles */
@@ -1308,9 +1888,10 @@ galDrawRectangle( void            *drv,
                 }
             }
 
-            if (vdrv->pending_num >= vdev->max_pending_num) {
+            if (vdrv->pending_num >= vdev->max_pending_num || vdrv->flush ) {
                 gcmERR_BREAK(_Line( vdrv, vdev ));
                 vdrv->pending_num = 0;
+                vdrv->flush = false;
             }
         }
 
@@ -1395,6 +1976,22 @@ galDrawLine( void *drv,
             vdrv->pending_type = GAL_PENDING_LINE;
         }
 
+#if GAL_SURFACE_COMPRESSED
+        if (vdev->hw_2d_compression)
+        {
+            if (vdrv->per_process_compression &&
+                vdrv->dst_tile_status != gcv2D_TSC_DISABLE)
+            {
+                gcmERR_BREAK(_ClearDstAndTileStatusBuffer(vdrv, vdev, false));
+            }
+            else if (!vdrv->per_process_compression &&
+                     vdrv->dst_tile_status == gcv2D_TSC_2D_COMPRESSED)
+            {
+                vdrv->draw_bg_rop = 0xAA;
+            }
+        }
+#endif
+
         if (!vdev->hw_2d_pe20) {
             /* Horizantal or vertical only. */
             if ((line->y1 != line->y2) &&
@@ -1474,9 +2071,10 @@ galDrawLine( void *drv,
 
                 vdrv->pending_colors[vdrv->pending_num] = vdrv->color;
 
-                if (++vdrv->pending_num >= vdev->max_pending_num) {
+                if (++vdrv->pending_num >= vdev->max_pending_num || vdrv->flush) {
                     gcmERR_BREAK(_Line( vdrv, vdev ));
                     vdrv->pending_num = 0;
+                    vdrv->flush = false;
                 }
             }
         }
@@ -1628,6 +2226,17 @@ galBlit( void         *drv,
                 vdrv->pending_type = GAL_PENDING_BLIT;
             }
 
+#if GAL_SURFACE_COMPRESSED
+            if (vdev->hw_2d_compression &&
+                vdrv->per_process_compression &&
+                vdrv->dst_tile_status != gcv2D_TSC_2D_COMPRESSED &&
+                vdrv->dst_tile_status_addr != gcvINVALID_ADDRESS)
+            {
+                gcmERR_BREAK(_ClearDstAndTileStatusBuffer(vdrv, vdev, true));
+                vdrv->flush = true;
+            }
+#endif
+
             if (vdrv->src_rotation == gcvSURF_0_DEGREE) {
                 src_rect.left   = rect->x;
                 src_rect.top    = rect->y;
@@ -1697,9 +2306,10 @@ galBlit( void         *drv,
                     max_pending_num = vdev->max_pending_num;
                 }
 
-                if (++vdrv->pending_num >= max_pending_num) {
+                if (++vdrv->pending_num >= max_pending_num || vdrv->flush) {
                     gcmERR_BREAK(_Blit( vdrv, vdev ));
                     vdrv->pending_num = 0;
+                    vdrv->flush =  false;
                 }
             }
         }

@@ -33,78 +33,78 @@
 
 void gridPos(Vec2f* V, int index, int total)
 {
-	int column = index % 3;
-	int row = 2 - (index / 3);
+    int column = index % 3;
+    int row = 2 - (index / 3);
 
-	int x = column - 1;
-	int y = row - 1;
+    int x = column - 1;
+    int y = row - 1;
 
-	V->v[0] = (float)x;
-	V->v[1] = (float)y;
+    V->v[0] = (float)x;
+    V->v[1] = (float)y;
 }
 
 
 
 Chiclet* ChicletConstruct(int i, float a)
 {
-	Vec2f gp;
+    Vec2f gp;
 
-	Chiclet* ch = (Chiclet*)malloc(sizeof (Chiclet));
-	if (ch == NULL)
-	{
-		return NULL;
-	}
-	ch->index = i;
-	ch->aspect = a;
-	ch->t = 0.0f;
-	ch->selected = 0;
+    Chiclet* ch = (Chiclet*)malloc(sizeof (Chiclet));
+    if (ch == NULL)
+    {
+        return NULL;
+    }
+    ch->index = i;
+    ch->aspect = a;
+    ch->t = 0.0f;
+    ch->selected = 0;
 
-	// grid position
-	gridPos(&gp, i, max_chiclets);
+    // grid position
+    gridPos(&gp, i, max_chiclets);
 
-	ch->home_x_spin = 0.0f;
-	ch->home_y_spin = 0.0f;
-	//	home_pos = Vec3<float>(gp[0], gp[1] * aspect, -1.6f);
-	ch->home_pos.v[0] = gp.v[0];
-	ch->home_pos.v[1] = gp.v[1] * ch->aspect;
-	ch->home_pos.v[2] = -2.6f;
+    ch->home_x_spin = 0.0f;
+    ch->home_y_spin = 0.0f;
+    //    home_pos = Vec3<float>(gp[0], gp[1] * aspect, -1.6f);
+    ch->home_pos.v[0] = gp.v[0];
+    ch->home_pos.v[1] = gp.v[1] * ch->aspect;
+    ch->home_pos.v[2] = -2.6f;
 
-	//	front_x_spin = 180.0f;
-	//	front_y_spin = -180.0f;
-	if ((i%2)==0)
-	{
-		ch->front_x_spin = 360.0f;
-		ch->front_y_spin = 0.0f;
-	}
-	else
-	{
-		ch->front_x_spin = 0.0f;
-		ch->front_y_spin = 360.0f;
-	}
+    //    front_x_spin = 180.0f;
+    //    front_y_spin = -180.0f;
+    if ((i%2)==0)
+    {
+        ch->front_x_spin = 360.0f;
+        ch->front_y_spin = 0.0f;
+    }
+    else
+    {
+        ch->front_x_spin = 0.0f;
+        ch->front_y_spin = 360.0f;
+    }
 
-	ch->front_pos.v[0] = 0.0f;
-	ch->front_pos.v[1] = 0.0f;
-	ch->front_pos.v[2] = -1.0f;
+    ch->front_pos.v[0] = 0.0f;
+    ch->front_pos.v[1] = 0.0f;
+    ch->front_pos.v[2] = -1.0f;
 
-	ch->x_spin = ch->home_x_spin;
-	ch->y_spin = ch->home_y_spin;
-	VecCopy3f(&ch->pos, &ch->home_pos);
+    ch->x_spin = ch->home_x_spin;
+    ch->y_spin = ch->home_y_spin;
+    VecCopy3f(&ch->pos, &ch->home_pos);
 
-	return ch;
+    return ch;
 }
 
 
 void ChicletDestroy(Chiclet* Ch)
 {
-	assert(Ch != NULL);
+    assert(Ch != NULL);
 
-	free(Ch);
+    free(Ch);
 }
 
 
 float ChicletGetZ(Chiclet* Ch)
 {
-	return Ch->pos.v[2];
+    return Ch->pos.v[2];
 }
 
 
@@ -115,62 +115,62 @@ void ChicletInit(Chiclet* Ch)
 
 void ChicletSelect(Chiclet* Ch, int s)
 {
-	Ch->selected = s;
+    Ch->selected = s;
 }
 
 
 int ChicletIsSelected(Chiclet* Ch)
 {
-	return (Ch->t == 1.0f);
+    return (Ch->t == 1.0f);
 }
 
 
 void ChicletTick(Chiclet* Ch, float dt)
 {
-	Matf m;
-	Vec3f v1;
-	Vec3f v2;
-	float f;
-	float h;
+    Matf m;
+    Vec3f v1;
+    Vec3f v2;
+    float f;
+    float h;
 
-	if (Ch->selected)
-	{
-		Ch->t += dt * 0.8f;
-		if (Ch->t > 1.0f)
-			Ch->t = 1.0f;
-	}
-	else
-	{
-		Ch->t -= dt * 1.0f;
-		if (Ch->t<0.0f)
-			Ch->t = 0.0f;
-	}
+    if (Ch->selected)
+    {
+        Ch->t += dt * 0.8f;
+        if (Ch->t > 1.0f)
+            Ch->t = 1.0f;
+    }
+    else
+    {
+        Ch->t -= dt * 1.0f;
+        if (Ch->t<0.0f)
+            Ch->t = 0.0f;
+    }
 
-	f = ease(Ch->t);
-	h = 1.0f - f;
+    f = ease(Ch->t);
+    h = 1.0f - f;
 
-	VecScale3f(&v1, &Ch->front_pos, f);
-	VecScale3f(&v2, &Ch->home_pos, h);
-	VecAdd3f(&Ch->pos, &v1, &v2);
+    VecScale3f(&v1, &Ch->front_pos, f);
+    VecScale3f(&v2, &Ch->home_pos, h);
+    VecAdd3f(&Ch->pos, &v1, &v2);
 
-	Ch->x_spin = Ch->front_x_spin * f + Ch->home_x_spin * h;
-	Ch->y_spin = Ch->front_y_spin * f + Ch->home_y_spin * h;
+    Ch->x_spin = Ch->front_x_spin * f + Ch->home_x_spin * h;
+    Ch->y_spin = Ch->front_y_spin * f + Ch->home_y_spin * h;
 
-	Ch->x_spin *= 2.0f;
-	Ch->y_spin *= 2.0f;
+    Ch->x_spin *= 2.0f;
+    Ch->y_spin *= 2.0f;
 
-	MatTranslatef(&Ch->mat, Ch->pos.v[0], Ch->pos.v[1], Ch->pos.v[2]);
+    MatTranslatef(&Ch->mat, Ch->pos.v[0], Ch->pos.v[1], Ch->pos.v[2]);
 
-	RotXDegf(&m, Ch->x_spin);
-	MatMulf(&Ch->mat, &m);
+    RotXDegf(&m, Ch->x_spin);
+    MatMulf(&Ch->mat, &m);
 
-	RotYDegf(&m, Ch->y_spin);
-	MatMulf(&Ch->mat, &m);
+    RotYDegf(&m, Ch->y_spin);
+    MatMulf(&Ch->mat, &m);
 }
 
 
 const Matf* ChicletGetMat(Chiclet* Ch)
 {
-	return &Ch->mat;
+    return &Ch->mat;
 }
 

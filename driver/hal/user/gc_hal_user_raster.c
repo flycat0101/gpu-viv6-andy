@@ -156,6 +156,34 @@ static gceSTATUS _CheckFormat(
         isYUV = gcvTRUE;
         break;
 
+    case gcvSURF_A2B10G10R10:
+    case gcvSURF_A2R10G10B10:
+    case gcvSURF_R10G10B10A2:
+    case gcvSURF_B10G10R10A2:
+        plane = 1;
+        bpp = 32;
+        break;
+
+    case gcvSURF_NV12_10BIT:
+    case gcvSURF_NV21_10BIT:
+        plane = 2;
+        bpp = 15;
+        isYUV = gcvTRUE;
+        break;
+
+    case gcvSURF_NV16_10BIT:
+    case gcvSURF_NV61_10BIT:
+        plane = 2;
+        bpp = 20;
+        isYUV = gcvTRUE;
+        break;
+
+    case gcvSURF_P010:
+        plane = 2;
+        bpp = 24;
+        isYUV = gcvTRUE;
+        break;
+
     default:
         return gcvSTATUS_NOT_SUPPORTED;
     }
@@ -227,6 +255,18 @@ static gceSTATUS _CheckSurface(
         }
         break;
 
+    case gcvTILED_8X4:
+    case gcvTILED_4X8:
+    case gcvTILED_32X4:
+    case gcvTILED_64X4:
+    case gcvTILED_8X8_XMAJOR:
+    case gcvTILED_8X8_YMAJOR:
+        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) != gcvTRUE)
+        {
+            return gcvSTATUS_NOT_SUPPORTED;
+        }
+        break;
+
     default:
         return gcvSTATUS_INVALID_ARGUMENT;
     }
@@ -280,6 +320,11 @@ static gceSTATUS _CheckSurface(
         case gcvSURF_A8B8G8R8:
         case gcvSURF_B8G8R8X8:
         case gcvSURF_B8G8R8A8:
+
+        case gcvSURF_A2B10G10R10:
+        case gcvSURF_A2R10G10B10:
+        case gcvSURF_R10G10B10A2:
+        case gcvSURF_B10G10R10A2:
             if ((Address[0] | Stride[0]) & 3)
             {
                 return gcvSTATUS_NOT_ALIGNED;
@@ -310,6 +355,29 @@ static gceSTATUS _CheckSurface(
         case gcvSURF_NV21:
         case gcvSURF_NV16:
         case gcvSURF_NV61:
+        case gcvSURF_P010:
+            if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION) == gcvTRUE)
+            {
+                if (Format == gcvSURF_NV12)
+                {
+                    if (((Address[0] | Address[1]) & 255) ||
+                        (( Stride[0] |  Stride[1]) &  31) ||
+                        (Width & 31))
+                    {
+                        return gcvSTATUS_NOT_ALIGNED;
+                    }
+                }
+                else if (Format == gcvSURF_P010)
+                {
+                    if (((Address[0] | Address[1]) & 511) ||
+                        (( Stride[0] |  Stride[1]) &  63) ||
+                        (Width & 31))
+                    {
+                        return gcvSTATUS_NOT_ALIGNED;
+                    }
+                }
+            }
+
             if (((Address[0] | Address[1]) & 63)
                 || ((Stride[0] | Stride[1]) & 7))
             {
@@ -320,7 +388,27 @@ static gceSTATUS _CheckSurface(
             {
                 return gcvSTATUS_INVALID_ARGUMENT;
             }
+            break;
 
+        case gcvSURF_NV12_10BIT:
+        case gcvSURF_NV21_10BIT:
+            if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION) == gcvTRUE)
+            {
+                if (((Address[0] + Address[1]) % 320) ||
+                    ((Stride[0] + Stride[1]) % 320)   ||
+                    (Width & 255))
+                {
+                    return gcvSTATUS_NOT_ALIGNED;
+                }
+            }
+
+        case gcvSURF_NV16_10BIT:
+        case gcvSURF_NV61_10BIT:
+            if (((Address[0] + Address[1]) % 80) ||
+                ((Stride[0] + Stride[1]) % 80))
+            {
+                return gcvSTATUS_NOT_ALIGNED;
+            }
             break;
 
         case gcvSURF_YVYU:
@@ -381,6 +469,11 @@ static gceSTATUS _CheckSurface(
         case gcvSURF_A8B8G8R8:
         case gcvSURF_B8G8R8X8:
         case gcvSURF_B8G8R8A8:
+
+        case gcvSURF_A2B10G10R10:
+        case gcvSURF_A2R10G10B10:
+        case gcvSURF_R10G10B10A2:
+        case gcvSURF_B10G10R10A2:
             if ((Address[0] | Stride[0]) & 15)
             {
                 return gcvSTATUS_NOT_ALIGNED;
@@ -413,6 +506,11 @@ static gceSTATUS _CheckSurface(
         case gcvSURF_NV21:
         case gcvSURF_NV16:
         case gcvSURF_NV61:
+        case gcvSURF_P010:
+        case gcvSURF_NV12_10BIT:
+        case gcvSURF_NV21_10BIT:
+        case gcvSURF_NV16_10BIT:
+        case gcvSURF_NV61_10BIT:
             if (((Address[0] | Address[1]) & 63)
                 || ((Stride[0] | Stride[1]) & 7))
             {
@@ -515,14 +613,28 @@ gco2D_Construct(
 
             src->srcType = gcv2D_SOURCE_INVALID;
             src->srcSurface.tiling = gcvLINEAR;
-            src->srcYUVMode = gcv2D_YUV_601;
+            if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION) == gcvTRUE)
+            {
+                src->srcYUVMode = gcv2D_YUV_709;
+            }
+            else
+            {
+                src->srcYUVMode = gcv2D_YUV_601;
+            }
             src->srcDeGamma = gcvFALSE;
             src->enableGDIStretch = gcvFALSE;
         }
 
         engine->state.dstSurface.tiling = gcvLINEAR;
         engine->state.dstEnGamma = gcvFALSE;
-        engine->state.dstYUVMode = gcv2D_YUV_601;
+        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION) == gcvTRUE)
+        {
+            engine->state.dstYUVMode = gcv2D_YUV_709;
+        }
+        else
+        {
+            engine->state.dstYUVMode = gcv2D_YUV_601;
+        }
 
         engine->state.superTileVersion = gcv2D_SUPER_TILE_VERSION_V2;
         engine->state.unifiedDstRect = gcvFALSE;
@@ -2791,7 +2903,8 @@ gco2D_Line(
     gcmVERIFY_OBJECT(Brush, gcvOBJ_BRUSH);
     gcmVERIFY_ARGUMENT(DstFormat != gcvSURF_UNKNOWN);
 
-    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_ANDROID_ONLY) == gcvTRUE)
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_ANDROID_ONLY) == gcvTRUE &&
+        !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION))
     {
         gcmFOOTER_ARG("status=%d", gcvSTATUS_NOT_SUPPORTED);
         return gcvSTATUS_NOT_SUPPORTED;
@@ -2902,7 +3015,8 @@ gco2D_ColorLine(
     gcmVERIFY_ARGUMENT(Position != gcvNULL);
     gcmVERIFY_ARGUMENT(DstFormat != gcvSURF_UNKNOWN);
 
-    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_ANDROID_ONLY) == gcvTRUE)
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_ANDROID_ONLY) == gcvTRUE &&
+        !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION))
     {
         gcmFOOTER_ARG("status=%d", gcvSTATUS_NOT_SUPPORTED);
         return gcvSTATUS_NOT_SUPPORTED;
@@ -3178,7 +3292,9 @@ gco2D_StretchBlit(
 
     gcmONERROR(_CheckFormat(DstFormat, &planes, gcvNULL, &isYUV));
 
-    if ((planes != 1) || isYUV || (RectCount == 0)
+    if ((!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_YUV420_OUTPUT_LINEAR) &&
+         ((planes != 1) || isYUV))
+        || (RectCount == 0)
         || (Rect == gcvNULL))
     {
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
@@ -4158,26 +4274,29 @@ gco2D_FilterBlitEx2(
     case gcvSURF_NV12:
     case gcvSURF_NV61:
     case gcvSURF_NV21:
-        if (((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_MULTI_SOURCE_BLT) != gcvTRUE)
-             || ((SrcFormat != gcvSURF_YUY2) && (SrcFormat != gcvSURF_UYVY)
-                 && (SrcFormat != gcvSURF_YVYU) && (SrcFormat != gcvSURF_VYUY)))
-            &&(SrcFormat != DstFormat))
+        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_YUV420_OUTPUT_LINEAR) != gcvTRUE)
         {
-            gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-        }
+            if (((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_MULTI_SOURCE_BLT) != gcvTRUE)
+                 || ((SrcFormat != gcvSURF_YUY2) && (SrcFormat != gcvSURF_UYVY)
+                     && (SrcFormat != gcvSURF_YVYU) && (SrcFormat != gcvSURF_VYUY)))
+                &&(SrcFormat != DstFormat))
+            {
+                gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+            }
 
-        if (SrcFormat != DstFormat &&
-            ((SrcRect->right != DstRect->right)
-            || (SrcRect->left !=  DstRect->left)
-            || (SrcRect->bottom != DstRect->bottom)
-            || (SrcRect->top != DstRect->top)
-            || (SrcRotation != gcvSURF_0_DEGREE)
-            || (DstRotation != gcvSURF_0_DEGREE)))
-        {
-            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-        }
+            if (SrcFormat != DstFormat &&
+                ((SrcRect->right != DstRect->right)
+                || (SrcRect->left !=  DstRect->left)
+                || (SrcRect->bottom != DstRect->bottom)
+                || (SrcRect->top != DstRect->top)
+                || (SrcRotation != gcvSURF_0_DEGREE)
+                || (DstRotation != gcvSURF_0_DEGREE)))
+            {
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            }
 
-        multiYUV = gcvTRUE;
+            multiYUV = gcvTRUE;
+        }
         break;
 
     default:
@@ -5403,6 +5522,12 @@ gco2D_SetYUVColorMode(
         gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
 
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION) == gcvTRUE &&
+        Mode == gcv2D_YUV_601)
+    {
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+
     if (((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_COLOR_SPACE_CONVERSION) != gcvTRUE) ||
          (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_NO_USER_CSC) == gcvTRUE))
         && ((Mode & gcv2D_YUV_DST) || (Mode > gcv2D_YUV_709)))
@@ -6167,6 +6292,11 @@ gco2D_MultiSourceBlit(
         {
             maxSrc = 8;
         }
+        else if (gcoHAL_IsFeatureAvailable(gcvNULL,
+            gcvFEATURE_2D_MULTI_SRC_BLT_1_5_ENHANCEMENT) == gcvTRUE)
+        {
+            maxSrc = 8;
+        }
         else
         {
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
@@ -6303,6 +6433,8 @@ gco2D_MultiSourceBlit(
                 if (gcoHAL_IsFeatureAvailable(gcvNULL,
                     gcvFEATURE_2D_MULTI_SOURCE_BLT_EX2) != gcvTRUE &&
                     gcoHAL_IsFeatureAvailable(gcvNULL,
+                    gcvFEATURE_2D_MULTI_SRC_BLT_1_5_ENHANCEMENT) != gcvTRUE &&
+                    gcoHAL_IsFeatureAvailable(gcvNULL,
                     gcvFEATURE_2D_MULTI_SRC_BLT_BILINEAR_FILTER) != gcvTRUE)
                 {
                     /* HW cannot support more than one before V2. */
@@ -6403,7 +6535,7 @@ gco2D_SetGdiStretchMode(
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_MULTI_SOURCE_BLT) != gcvTRUE &&
-        gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_MULTI_SRC_BLT_BILINEAR_FILTER) != gcvTRUE)
+        gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_MULTI_SRC_BLT_1_5_ENHANCEMENT) != gcvTRUE)
     {
         gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
@@ -6479,18 +6611,18 @@ gco2D_SetSourceTileStatus(
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
     }
-#if gcdENABLE_THIRD_PARTY_OPERATION
-    else if (TileStatusConfig == gcv2D_TSC_TPC_COMPRESSED)
+    else if (TileStatusConfig & gcv2D_TSC_TPC_COMPRESSED)
     {
-        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPC_COMPRESSION) != gcvTRUE)
+        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPC_COMPRESSION) != gcvTRUE &&
+            gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION) != gcvTRUE)
         {
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         }
     }
-#elif gcdENABLE_DEC_COMPRESSION
     else if (TileStatusConfig & gcv2D_TSC_DEC_COMPRESSED)
     {
-        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC_COMPRESSION) != gcvTRUE)
+        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC_COMPRESSION) != gcvTRUE &&
+            gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_FC_SOURCE) != gcvTRUE)
         {
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         }
@@ -6503,7 +6635,6 @@ gco2D_SetSourceTileStatus(
             }
         }
     }
-#endif
     else if (TileStatusConfig == gcv2D_TSC_DISABLE)
     {
         ClearValue = 0;
@@ -6595,15 +6726,14 @@ gco2D_SetTargetTileStatus(
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
     }
-#if gcdENABLE_THIRD_PARTY_OPERATION
-    else if (TileStatusConfig == gcv2D_TSC_TPC_COMPRESSED)
+    else if (TileStatusConfig & gcv2D_TSC_TPC_COMPRESSED)
     {
-        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPC_COMPRESSION) != gcvTRUE)
+        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPC_COMPRESSION) != gcvTRUE &&
+            gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION) != gcvTRUE)
         {
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         }
     }
-#elif gcdENABLE_DEC_COMPRESSION
     else if (TileStatusConfig & gcv2D_TSC_DEC_COMPRESSED)
     {
         if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC_COMPRESSION) != gcvTRUE)
@@ -6619,7 +6749,6 @@ gco2D_SetTargetTileStatus(
             }
         }
     }
-#endif
     else if (TileStatusConfig == gcv2D_TSC_DISABLE)
     {
         ClearValue = 0;
@@ -6866,11 +6995,9 @@ gco2D_SetStateU32(
 #endif
         break;
 
-#if gcdENABLE_DEC_COMPRESSION
     case gcv2D_STATE_DEC_TPC_NV12_10BIT:
         Engine->state.multiSrc[Engine->state.currentSrcIndex].srcSurface.srcDECTPC10BitNV12 = (Value == 0) ? gcvFALSE : gcvTRUE;
         break;
-#endif
 
     case gcv2D_STATE_XRGB_ENABLE:
         Engine->state.enableXRGB = (Value == 0) ? gcvFALSE : gcvTRUE;
@@ -6985,7 +7112,6 @@ gco2D_SetStateArrayU32(
 
         break;
 
-#if gcdENABLE_DEC_COMPRESSION
     case gcv2D_STATE_ARRAY_YUV_SRC_TILE_STATUS_ADDR:
     case gcv2D_STATE_ARRAY_YUV_DST_TILE_STATUS_ADDR:
         {
@@ -7006,7 +7132,6 @@ gco2D_SetStateArrayU32(
                 surface->tileStatusGpuAddressEx[i] = Array[i];
         }
         break;
-#endif
 
     default:
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);

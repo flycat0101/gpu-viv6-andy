@@ -334,8 +334,17 @@ static struct _gcsSURF_FORMAT_INFO formatRGB[] =
         1, 0, 0, gcvFALSE,
         {{{ 30, 2 }, { 20, 10 }, { 10, 10 }, { 0, 10 }, {0}, {0}}},
         {{{ 30, 2 }, { 20, 10 }, { 10, 10 }, { 0, 10 }, {0}, {0}}},
-        gcvSURF_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
-        gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
+        gcvSURF_A2R10G10B10, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_A2R10G10B10, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(R10G10B10A2), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
+        1, 0, 0, gcvFALSE,
+        {{{ 0, 2 }, { 22, 10 }, { 12, 10 }, { 2, 10 }, {0}, {0}}},
+        {{{ 0, 2 }, { 22, 10 }, { 12, 10 }, { 2, 10 }, {0}, {0}}},
+        gcvSURF_R10G10B10A2, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_R10G10B10A2, gcmINVALID_TEXTURE_FORMAT_ENTRY
     },
 
     {
@@ -567,6 +576,15 @@ static struct _gcsSURF_FORMAT_INFO formatBGR[] =
         {{{ 0, 8 }, { 8, 8 }, { 16, 8 }, { 24, 8 }, {0}, {0}}},
         gcvSURF_A8R8G8B8, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8R8G8B8, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(B10G10R10A2), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
+        1, 0, 0, gcvFALSE,
+        {{{ 0, 2 }, { 2, 10 }, { 12, 10 }, { 22, 10 }, {0}, {0}}},
+        {{{ 0, 2 }, { 2, 10 }, { 12, 10 }, { 22, 10 }, {0}, {0}}},
+        gcvSURF_B10G10R10A2, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvSURF_B10G10R10A2, gcmINVALID_TEXTURE_FORMAT_ENTRY
     },
 
     {
@@ -922,6 +940,51 @@ static struct _gcsSURF_FORMAT_INFO formatYUV[] =
         1, 0, 0, gcvFALSE,
         {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
         {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvINVALID_TEXTURE_FORMAT, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(NV12_10BIT), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 15, 8, 2, 240,
+        1, 0, 0, gcvFALSE,
+        {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
+        {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvINVALID_TEXTURE_FORMAT, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(NV21_10BIT), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 15, 8, 2, 240,
+        1, 0, 0, gcvFALSE,
+        {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
+        {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvINVALID_TEXTURE_FORMAT, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(NV16_10BIT), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 20, 8, 2, 240,
+        1, 0, 0, gcvFALSE,
+        {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
+        {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvINVALID_TEXTURE_FORMAT, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(NV61_10BIT), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 20, 8, 2, 240,
+        1, 0, 0, gcvFALSE,
+        {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
+        {{{ 0, 10 }, { 0, 10 }, { 0, 10 }, {0}, {0}, {0}}},
+        gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
+        gcvINVALID_TEXTURE_FORMAT, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(P010), gcvFORMAT_CLASS_YUV, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, 32, 8, 2, 240,
+        1, 0, 0, gcvFALSE,
+        {{{ 0, 16 }, { 0, 16 }, { 0, 16 }, {0}, {0}, {0}}},
+        {{{ 0, 16 }, { 0, 16 }, { 0, 16 }, {0}, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvINVALID_TEXTURE_FORMAT, gcmINVALID_TEXTURE_FORMAT_ENTRY
     },
@@ -4590,6 +4653,119 @@ OnError:
     return status;
 }
 
+/*******************************************************************************
+**
+**  gcoHARDWARE_QueryBPP
+**
+**  Return pixel format parameters.
+**
+**  INPUT:
+**
+**      gceSURF_FORMAT Format
+**          API format.
+**
+**  OUTPUT:
+**
+**      gctFLOAT_PTR BppArray
+**          Pointer to a array that will hold the bytes per pixel for each planar.
+**
+*/
+gceSTATUS
+gcoHARDWARE_QueryBPP(
+    IN gceSURF_FORMAT Format,
+    OUT gctFLOAT_PTR BppArray
+    )
+{
+    gctUINT32 bpp;
+    gctFLOAT bpps[3] = {1.0};
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Format=0x%08X (%d)", Format, Format);
+
+    /* Verify the arguments. */
+    gcmDEBUG_VERIFY_ARGUMENT(BppArray != gcvNULL);
+
+    gcmONERROR(gcoHARDWARE_ConvertFormat(Format, &bpp, gcvNULL));
+
+    /* Palettized formats. */
+    if (Format >= 100 && Format < 200)
+    {
+        bpps[0] = 1.0;
+    }
+    /* RGB formats. */
+    else if (Format >= 200 && Format < 400)
+    {
+        bpps[0] = (gctFLOAT)(bpp / 8);
+    }
+    /* Alpha formats & R/RG/RA formats. */
+    else if ((Format >=  700 && Format <  800) ||
+             (Format >= 1100 && Format < 1200))
+    {
+        bpps[0] = bpp < 8 ? (gctFLOAT)1.0 : (gctFLOAT)(bpp / 8);
+    }
+    /* YUV formats. */
+    else if (Format >= 500 && Format < 600)
+    {
+        switch(Format)
+        {
+            case gcvSURF_YUY2:
+            case gcvSURF_UYVY:
+            case gcvSURF_YVYU:
+            case gcvSURF_VYUY:
+            case gcvSURF_AYUV:
+                bpps[0] = 2.0;
+                break;
+
+            case gcvSURF_NV12:
+            case gcvSURF_NV21:
+            case gcvSURF_NV16:
+            case gcvSURF_NV61:
+                bpps[0] = 1.0;
+                bpps[1] = 2.0;
+                break;
+
+            case gcvSURF_YV12:
+            case gcvSURF_I420:
+                bpps[0] = 1.0;
+                bpps[1] = 1.0;
+                bpps[2] = 1.0;
+                break;
+
+            case gcvSURF_NV12_10BIT:
+            case gcvSURF_NV21_10BIT:
+            case gcvSURF_NV16_10BIT:
+            case gcvSURF_NV61_10BIT:
+                bpps[0] = 1.25;
+                bpps[1] = 2.5;
+                break;
+
+            case gcvSURF_P010:
+                bpps[0] = 2.0;
+                bpps[1] = 2.0;
+                break;
+
+            default:
+                status = gcvSTATUS_NOT_SUPPORTED;
+                break;
+        }
+    }
+    else
+    {
+        status = gcvSTATUS_NOT_SUPPORTED;
+    }
+
+    if (BppArray != gcvNULL)
+    {
+        BppArray[0] = bpps[0];
+        BppArray[1] = bpps[1];
+        BppArray[2] = bpps[2];
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
 /******************************************************************************\
 ****************************** gcoHARDWARE API Code *****************************
 \******************************************************************************/
@@ -4735,10 +4911,14 @@ gcoHARDWARE_QueryCommandBuffer(
     OUT gctUINT32 * ReservedHead,
     OUT gctUINT32 * ReservedTail,
     OUT gctUINT32 * ReservedUser,
-    OUT gceCMDBUF_SOURCE *Source
+    OUT gceCMDBUF_SOURCE * Source,
+    OUT gctUINT32 * MGPUModeSwitchBytes
     )
 {
     gceSTATUS status;
+    gctUINT32 mGpuFlushBytes = 0;
+    gctUINT32 mGpuSyncBytes = 0;
+    gctUINT32 mGpuModeSwitchBytes = 0;
 
     gcmHEADER_ARG("Alignment=0x%x ReservedHead=0x%x ReservedTail=0x%x",
                   Alignment, ReservedHead, ReservedTail);
@@ -4793,30 +4973,26 @@ gcoHARDWARE_QueryCommandBuffer(
         }
     }
 
+    if (Hardware->config->gpuCoreCount > 1)
+    {
+        gcoHARDWARE_QueryMultiGPUSyncLength(Hardware, &mGpuSyncBytes);
+        mGpuModeSwitchBytes = (mGpuSyncBytes * 2) + 4 * gcmSIZEOF(gctUINT32);
+
+        gcoHARDWARE_QueryMultiGPUCacheFlushLength(Hardware, &mGpuFlushBytes);
+    }
+
     if (ReservedUser != gcvNULL)
     {
-        *ReservedUser = gcdRESERVED_FLUSHCACHE_LENGTH;
-        *ReservedUser += gcdRESERVED_PAUSE_OQ_LENGTH;
+        *ReservedUser  = (gcdRESERVED_FLUSHCACHE_LENGTH + mGpuFlushBytes + mGpuSyncBytes);
+        *ReservedUser += (gcdRESERVED_HW_FENCE + mGpuModeSwitchBytes - mGpuSyncBytes);
+        *ReservedUser += (gcdRESERVED_PAUSE_OQ_LENGTH + mGpuModeSwitchBytes);
 
         if (Hardware->features[gcvFEATURE_HW_TFB])
         {
-            *ReservedUser += gcdRESERVED_PAUSE_XFBWRITTEN_QUERY_LENGTH + gcdRESERVED_PAUSE_PRIMGEN_QUERY_LENGTH;
-            *ReservedUser += gcdRESERVED_PAUSE_XFB_LENGTH;
+            *ReservedUser += (gcdRESERVED_PAUSE_XFBWRITTEN_QUERY_LENGTH + mGpuModeSwitchBytes);
+            *ReservedUser += (gcdRESERVED_PAUSE_PRIMGEN_QUERY_LENGTH    + mGpuModeSwitchBytes);
+            *ReservedUser += (gcdRESERVED_PAUSE_XFB_LENGTH              + mGpuModeSwitchBytes);
         }
-
-        if (Hardware->config->gpuCoreCount > 1)
-        {
-            gctUINT32 bytes;
-
-            gcoHARDWARE_QueryMultiGPUSyncLength(Hardware, &bytes);
-
-            *ReservedUser += bytes;
-            /* need reserve more space for sendHwfence*/
-            *ReservedUser += bytes + 4 * gcmSIZEOF(gctUINT32);
-            /* need reserve more space for pauseOQ*/
-            *ReservedUser += (bytes * 2) + 4 * gcmSIZEOF(gctUINT32);
-        }
-        *ReservedUser += gcdRESERVED_HW_FENCE;
     }
 
     if (Source != gcvNULL)
@@ -4832,13 +5008,18 @@ gcoHARDWARE_QueryCommandBuffer(
         *Source = gcvCMDBUF_VIRTUAL;
 #endif
 
-#if gcdSECURITY
+#if gcdSECURITY || gcdDISABLE_GPU_VIRTUAL_ADDRESS
         *Source = gcvCMDBUF_CONTIGUOUS;
 #endif
 
 #if gcdALLOC_CMD_FROM_RESERVE
         *Source = gcvCMDBUF_RESERVED;
 #endif
+    }
+
+    if (MGPUModeSwitchBytes)
+    {
+        *MGPUModeSwitchBytes = mGpuModeSwitchBytes;
     }
 
     /* Success. */
@@ -6768,7 +6949,7 @@ gcoHARDWARE_QueryCoreIndex(
 
     gcmGETHARDWARE(Hardware);
 
-    *CoreIndex = CoreID;
+    *CoreIndex = Hardware->coreIndexs[CoreID];
 
 OnError:
     gcmFOOTER();
@@ -6883,6 +7064,46 @@ gcoHARDWARE_QueryMultiGPUSyncLength(
         /* Lock/Unlock command for blt engine.*/
         *Bytes += 4 * gcmSIZEOF(gctUINT32);
     }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoHARDWARE_QueryMultiGPUCacheFlushLength(
+    IN gcoHARDWARE Hardware,
+    OUT gctUINT32_PTR Bytes
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER();
+
+    gcmGETHARDWARE(Hardware);
+
+    gcmASSERT(Hardware->config->gpuCoreCount > 1);
+
+    *Bytes = ((4 + 4) /* two pair of semaphore-stall */
+           +  (2 + 2) /* flush c/z/shL$ and flush vst */
+           +  (2));     /* flush tile status */
+
+    if (Hardware->features[gcvFEATURE_HALTI5])
+    {
+        *Bytes += (2); /* flush I$ */
+    }
+
+    if (Hardware->features[gcvFEATURE_TX_DESCRIPTOR])
+    {
+        *Bytes += (2); /* flush tx desctriptor cache */
+    }
+
+    if (Hardware->features[gcvFEATURE_HW_TFB])
+    {
+        *Bytes += (2); /* flush TFB cache */
+    }
+
+    *Bytes *= gcmSIZEOF(gctUINT32);
 
 OnError:
     gcmFOOTER();

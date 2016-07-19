@@ -26,6 +26,7 @@
 ##############################################################################
 
 
+
 DOSYSGEN=1
 
 SYNCHRONIZE_DRAIN=1
@@ -40,7 +41,7 @@ WARNISERROR = 0
 SOURCES= \
 	main.cpp
 
-INCLUDES=$(INCLUDES);$(VIVANTE_SDK_INC);$(AQROOT)/sdk/inc
+INCLUDES=$(INCLUDES);$(VIVANTE_SDK_INC)
 
 TARGETLIBS= \
   $(VIVANTE_SDK_LIB)\libOpenCL.lib \

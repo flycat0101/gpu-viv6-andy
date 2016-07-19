@@ -34,9 +34,9 @@
 #include <galUtil.h>
 
 static const char *sBitmapFile[] = {
-	"resource/zero2_YUY2_640X480_Linear.vimg",
-	"resource/zero2_UYVY_640X480_Linear.vimg",
-	"resource/zero2_YUV420_640X480_Linear.vimg",
+    "resource/zero2_YUY2_640X480_Linear.vimg",
+    "resource/zero2_UYVY_640X480_Linear.vimg",
+    "resource/zero2_YUV420_640X480_Linear.vimg",
 };
 
 static gctCONST_STRING s_CaseDescription = \
@@ -64,67 +64,67 @@ typedef struct Test2D {
     GalTest     base;
     GalRuntime  *runtime;
 
-	// destination surface
-    gcoSURF			dstSurf;
-	gceSURF_FORMAT	dstFormat;
-	gctUINT			dstWidth;
-	gctUINT			dstHeight;
-	gctINT			dstStride;
-	gctUINT32		dstPhyAddr;
-	gctPOINTER		dstLgcAddr;
+    // destination surface
+    gcoSURF            dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT            dstWidth;
+    gctUINT            dstHeight;
+    gctINT            dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
 
-	//source surface
-    gcoSURF			srcSurf;
-	gceSURF_FORMAT	srcFormat;
-	gctUINT			srcWidth;
-	gctUINT			srcHeight;
-	gctINT			srcStride;
-	gctUINT32		srcPhyAddr;
-	gctPOINTER		srcLgcAddr;
+    //source surface
+    gcoSURF            srcSurf;
+    gceSURF_FORMAT    srcFormat;
+    gctUINT            srcWidth;
+    gctUINT            srcHeight;
+    gctINT            srcStride;
+    gctUINT32        srcPhyAddr;
+    gctPOINTER        srcLgcAddr;
 
 } Test2D;
 
 static gctBOOL CDECL LoadSourceSurface(Test2D *t2d, const char * sourcefile)
 {
-	gceSTATUS status = gcvSTATUS_OK;
-	gctUINT32 address[3];
-	gctPOINTER memory[3];
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT32 address[3];
+    gctPOINTER memory[3];
 
-	// destroy source surface
-	if (t2d->srcSurf != gcvNULL)
+    // destroy source surface
+    if (t2d->srcSurf != gcvNULL)
     {
-		if (t2d->srcLgcAddr)
-		{
-			gcmONERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcLgcAddr));
-			t2d->srcLgcAddr = 0;
-		}
+        if (t2d->srcLgcAddr)
+        {
+            gcmONERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcLgcAddr));
+            t2d->srcLgcAddr = 0;
+        }
 
         if (gcmIS_ERROR(gcoSURF_Destroy(t2d->srcSurf)))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
-		}
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
+        }
     }
 
-	// create source surface
+    // create source surface
     gcmONERROR(GalLoadVimgToSurface(sourcefile, &t2d->srcSurf));
 
     gcmONERROR(gcoSURF_GetAlignedSize(t2d->srcSurf,
-										gcvNULL,
-										gcvNULL,
-										&t2d->srcStride));
+                                        gcvNULL,
+                                        gcvNULL,
+                                        &t2d->srcStride));
 
-	gcmONERROR(gcoSURF_GetSize(t2d->srcSurf,
-								&t2d->srcWidth,
-								&t2d->srcHeight,
-								gcvNULL));
+    gcmONERROR(gcoSURF_GetSize(t2d->srcSurf,
+                                &t2d->srcWidth,
+                                &t2d->srcHeight,
+                                gcvNULL));
 
-	gcmONERROR(gcoSURF_GetFormat(t2d->srcSurf, gcvNULL, &t2d->srcFormat));
+    gcmONERROR(gcoSURF_GetFormat(t2d->srcSurf, gcvNULL, &t2d->srcFormat));
 
-	gcmONERROR(gcoSURF_Lock(t2d->srcSurf, address, memory));
-	t2d->srcPhyAddr = address[0];
-	t2d->srcLgcAddr = memory[0];
+    gcmONERROR(gcoSURF_Lock(t2d->srcSurf, address, memory));
+    t2d->srcPhyAddr = address[0];
+    t2d->srcLgcAddr = memory[0];
 
-	return gcvTRUE;
+    return gcvTRUE;
 
 OnError:
 
@@ -133,30 +133,30 @@ OnError:
 
 static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 {
-	gctUINT8 horKernel = 1, verKernel = 1;
-	gcsRECT srcRect;
-	gco2D egn2D = t2d->runtime->engine2d;
-	gceSTATUS status;
-	gcsRECT dstRect = {0, 0, t2d->dstWidth, t2d->dstHeight};
+    gctUINT8 horKernel = 1, verKernel = 1;
+    gcsRECT srcRect;
+    gco2D egn2D = t2d->runtime->engine2d;
+    gceSTATUS status;
+    gcsRECT dstRect = {0, 0, t2d->dstWidth, t2d->dstHeight};
 
-	if (!sBitmapFile[frameNo] || !LoadSourceSurface(t2d, sBitmapFile[frameNo]))
-		return gcvFALSE;
-	srcRect.left = 0;
-	srcRect.top = 0;
-	srcRect.right = t2d->srcWidth;
-	srcRect.bottom = t2d->srcHeight;
+    if (!sBitmapFile[frameNo] || !LoadSourceSurface(t2d, sBitmapFile[frameNo]))
+        return gcvFALSE;
+    srcRect.left = 0;
+    srcRect.top = 0;
+    srcRect.right = t2d->srcWidth;
+    srcRect.bottom = t2d->srcHeight;
 
-	// set clippint rect
-	gcmONERROR(gco2D_SetClipping(egn2D, &dstRect));
+    // set clippint rect
+    gcmONERROR(gco2D_SetClipping(egn2D, &dstRect));
 
-	// set kernel size
-	gcmONERROR(gco2D_SetKernelSize(egn2D, horKernel, verKernel));
+    // set kernel size
+    gcmONERROR(gco2D_SetKernelSize(egn2D, horKernel, verKernel));
 
-	gcmONERROR(gcoSURF_FilterBlit(t2d->srcSurf, t2d->dstSurf, &srcRect, &dstRect, &dstRect));
+    gcmONERROR(gcoSURF_FilterBlit(t2d->srcSurf, t2d->dstSurf, &srcRect, &dstRect, &dstRect));
 
-	gcmONERROR(gco2D_Flush(egn2D));
+    gcmONERROR(gco2D_Flush(egn2D));
 
-	gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
+    gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
 
     return gcvTRUE;
 
@@ -170,7 +170,7 @@ OnError:
 
 static void CDECL Destroy(Test2D *t2d)
 {
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
     if ((t2d->dstSurf != gcvNULL) && (t2d->dstLgcAddr != gcvNULL))
     {
         if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
@@ -180,7 +180,7 @@ static void CDECL Destroy(Test2D *t2d)
         t2d->dstLgcAddr = gcvNULL;
     }
 
-	// destroy source surface
+    // destroy source surface
     if (t2d->srcSurf != gcvNULL)
     {
         if (t2d->srcLgcAddr)
@@ -208,7 +208,7 @@ const gceFEATURE FeatureList[]=
 
 static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 {
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
     gctUINT32 k, listLen = sizeof(FeatureList)/sizeof(gctINT);
     gctBOOL featureStatus;
     char featureName[FEATURE_NAME_LEN], featureMsg[FEATURE_MSG_LEN];
@@ -237,39 +237,39 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     if (runtime->notSupport)
         return gcvFALSE;
 
-	t2d->dstSurf    = runtime->target;
-	t2d->dstFormat = runtime->format;
-	t2d->dstWidth = 0;
-	t2d->dstHeight = 0;
-	t2d->dstStride = 0;
-	t2d->dstPhyAddr = 0;
-	t2d->dstLgcAddr = 0;
+    t2d->dstSurf    = runtime->target;
+    t2d->dstFormat = runtime->format;
+    t2d->dstWidth = 0;
+    t2d->dstHeight = 0;
+    t2d->dstStride = 0;
+    t2d->dstPhyAddr = 0;
+    t2d->dstLgcAddr = 0;
 
-	t2d->srcSurf    = gcvNULL;
-	t2d->srcWidth = 0;
-	t2d->srcHeight = 0;
-	t2d->srcStride = 0;
-	t2d->srcPhyAddr = 0;
-	t2d->srcLgcAddr = 0;
-	t2d->srcFormat = gcvSURF_UNKNOWN;
+    t2d->srcSurf    = gcvNULL;
+    t2d->srcWidth = 0;
+    t2d->srcHeight = 0;
+    t2d->srcStride = 0;
+    t2d->srcPhyAddr = 0;
+    t2d->srcLgcAddr = 0;
+    t2d->srcFormat = gcvSURF_UNKNOWN;
 
-	gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
-										&t2d->dstWidth,
-										&t2d->dstHeight,
-										&t2d->dstStride));
+    gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
+                                        &t2d->dstWidth,
+                                        &t2d->dstHeight,
+                                        &t2d->dstStride));
 
-	gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
+    gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
 
     t2d->base.render     = (PGalRender)Render;
     t2d->base.destroy    = (PGalDestroy)Destroy;
-	t2d->base.description = s_CaseDescription;
+    t2d->base.description = s_CaseDescription;
     t2d->base.frameCount = sizeof(sBitmapFile)/sizeof(sBitmapFile[0]);
 
-	if (gcoHAL_IsFeatureAvailable(t2d->runtime->hal, gcvFEATURE_YUV420_SCALER)!= gcvTRUE)
-	{
-	    t2d->base.frameCount -= 1;
-		GalOutput(GalOutputType_Result, "YUV420 scaler is not supported.\n");
-	}
+    if (gcoHAL_IsFeatureAvailable(t2d->runtime->hal, gcvFEATURE_YUV420_SCALER)!= gcvTRUE)
+    {
+        t2d->base.frameCount -= 1;
+        GalOutput(GalOutputType_Result, "YUV420 scaler is not supported.\n");
+    }
 
     return gcvTRUE;
 

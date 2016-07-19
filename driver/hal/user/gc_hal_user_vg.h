@@ -474,7 +474,8 @@ gcoVGHARDWARE_AllocateLinearVideoMemory(
 gceSTATUS
 gcoVGHARDWARE_FreeVideoMemory(
     IN gcoVGHARDWARE Hardware,
-    IN gctUINT32 Node
+    IN gctUINT32 Node,
+    IN gctBOOL asynchroneous
     );
 
 /* Schedule to free linear video memory allocated. */
@@ -934,8 +935,19 @@ gcoVGHARDWARE_TesselateImage(
     IN gcsVG_RECT_PTR Rectangle,
     IN gceIMAGE_FILTER Filter,
     IN gctBOOL Mask,
+#if gcdMOVG
+    IN gctFLOAT *StepX,
+    IN gctFLOAT *StepY,
+    IN gctFLOAT *Const,
+    IN gctFLOAT point0[2],
+    IN gctFLOAT point1[2],
+    IN gctFLOAT point2[2],
+    IN gctFLOAT point3[2],
+    IN gctBOOL  FirstTess,
+#else
     IN gctFLOAT UserToSurface[9],
     IN gctFLOAT SurfaceToImage[9],
+#endif
     IN gcsTESSELATION_PTR TessellationBuffer
     );
 

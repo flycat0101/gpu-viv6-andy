@@ -670,24 +670,7 @@ static clsBUILTIN_FUNCTION    ConvBuiltinFunctions[] =
 
 #define _cldConvBuiltinFunctionCount (sizeof(ConvBuiltinFunctions) / sizeof(clsBUILTIN_FUNCTION))
 
-/* Macro names and corresponding values defined by OpenCL
- * Copied from <CL>/cl_platform.h
- */
-#define CL_CHAR_BIT         8
-#define CL_SCHAR_MAX        127
-#define CL_SCHAR_MIN        (-127-1)
-#define CL_CHAR_MAX         CL_SCHAR_MAX
-#define CL_CHAR_MIN         CL_SCHAR_MIN
-#define CL_UCHAR_MAX        255
-#define CL_SHRT_MAX         32767
-#define CL_SHRT_MIN         (-32767-1)
-#define CL_USHRT_MAX        65535
-#define CL_INT_MAX          2147483647
-#define CL_INT_MIN          (-2147483647-1)
-#define CL_UINT_MAX         0xffffffffU
-#define CL_LONG_MAX         ((cl_long) 0x7FFFFFFFFFFFFFFFLL)
-#define CL_LONG_MIN         ((cl_long) -0x7FFFFFFFFFFFFFFFLL - 1LL)
-#define CL_ULONG_MAX        ((cl_ulong) 0xFFFFFFFFFFFFFFFFULL)
+#include "CL/cl_platform.h"
 
 /* Rounding Mode */
 typedef enum _cleBUILTIN_ROUNDING_MODE
@@ -4353,6 +4336,8 @@ _GenAs_TypeCode(
 {
     gceSTATUS    status;
     clsROPERAND rOperand;
+    clsIOPERAND iOperandBuf[1];
+    clsIOPERAND *iOperand;
 
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
     clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
@@ -4362,6 +4347,8 @@ _GenAs_TypeCode(
 
     /* return input parameter as output */
     rOperand = OperandsParameters[0].rOperands[0];
+    iOperand = IOperand;
+
     if(clmIsElementTypeHighPrecision(IOperand->dataType.elementType))
     {
         if(clmGEN_CODE_IsScalarDataType(IOperand->dataType))
@@ -4380,15 +4367,58 @@ _GenAs_TypeCode(
                                              rOperand.dataType.elementType);
         }
     }
-    else
-    {
-        rOperand.dataType.elementType = IOperand->dataType.elementType;
+    else {
+        if(clmGEN_CODE_IsScalarDataType(IOperand->dataType))
+        {
+            if(clmGEN_CODE_IsVectorDataType(rOperand.dataType)) {
+                rOperand.vectorIndex.mode = clvINDEX_CONSTANT;
+                rOperand.vectorIndex.u.constant = 0;
+                rOperand.dataType = gcGetVectorSliceDataType(rOperand.dataType, 1);
+            }
+        }
+        else if(clmGEN_CODE_IsScalarDataType(rOperand.dataType))
+        {
+            clsIOPERAND intermIOperand[1];
+            clsLOPERAND intermLOperand[1];
+            clsGEN_CODE_DATA_TYPE dataType;
+
+            /* just to match the expected vector size */
+            dataType = gcConvScalarToVectorDataType(rOperand.dataType,
+                                                    clmGEN_CODE_vectorSize_GET(IOperand->dataType));
+            clsIOPERAND_New(Compiler, intermIOperand, dataType);
+            clsLOPERAND_InitializeUsingIOperand(intermLOperand, intermIOperand);
+            status = clGenAssignCode(Compiler,
+                                     PolynaryExpr->exprBase.base.lineNo,
+                                     PolynaryExpr->exprBase.base.stringNo,
+                                     intermLOperand,
+                                     &rOperand);
+            if (gcmIS_ERROR(status)) return status;
+            clsROPERAND_InitializeUsingIOperand(&rOperand, intermIOperand);
+        }
+        else {
+            if(clmGEN_CODE_vectorSize_GET(rOperand.dataType) >
+               clmGEN_CODE_vectorSize_GET(IOperand->dataType)) {
+                clGetVectorROperandSlice(&rOperand,
+                                         0,
+                                         clmGEN_CODE_vectorSize_GET(IOperand->dataType),
+                                         &rOperand);
+            }
+            else if(clmGEN_CODE_vectorSize_GET(IOperand->dataType) >
+                    clmGEN_CODE_vectorSize_GET(rOperand.dataType)) {
+                clGetVectorIOperandSlice(IOperand,
+                                         0,
+                                         clmGEN_CODE_vectorSize_GET(rOperand.dataType),
+                                         iOperandBuf);
+                iOperand = iOperandBuf;
+            }
+        }
     }
+
     status = clGenGenericCode1(Compiler,
                                PolynaryExpr->exprBase.base.lineNo,
                                PolynaryExpr->exprBase.base.stringNo,
                                clvOPCODE_ASTYPE,
-                               IOperand,
+                               iOperand,
                                &rOperand);
     if (gcmIS_ERROR(status)) return status;
 

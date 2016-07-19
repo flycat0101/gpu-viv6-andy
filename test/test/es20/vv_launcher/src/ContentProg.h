@@ -39,15 +39,15 @@ extern "C" {
 
 typedef struct _ContentProg
 {
-	int pos_attr;
-	int uv_attr;
+    int pos_attr;
+    int uv_attr;
 
-	int proj_unif;
-	int modelview_unif;
+    int proj_unif;
+    int modelview_unif;
 
-	int tex_unif;
+    int tex_unif;
 
-	ShaderProgram* prog;
+    ShaderProgram* prog;
 } ContentProg;
 
 ContentProg* ContentProgConstruct();

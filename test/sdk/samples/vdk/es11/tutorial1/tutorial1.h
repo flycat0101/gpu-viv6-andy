@@ -36,9 +36,9 @@
 #include <gc_vdk.h>
 #endif
 
-#define FixedFromInt(n)	(GLfixed) ((n) << 16)
-#define ZERO			FixedFromInt(0)
-#define ONE				FixedFromInt(1)
+#define FixedFromInt(n)    (GLfixed) ((n) << 16)
+#define ZERO            FixedFromInt(0)
+#define ONE                FixedFromInt(1)
 
 
 void PrintHelp();

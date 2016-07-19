@@ -181,15 +181,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
     gcmONERROR(gco2D_Blit(egn2D, 1, &rect, 0xCC, 0xCC, surf->format));
 
-#if 0
-    {
-        char name[200];
-
-        gcmONERROR(gcoHAL_Commit(gcvNULL, gcvTRUE));
-        sprintf(name, "gal2DFormatCompressedTPC003_intermediate_%03d.bmp", frameNo);
-        GalSaveTSurfToDIB(surf, name);
-    }
-#endif
 
     len = (gcmMIN(surf->width, surf->height)) >> 1;
 

@@ -457,7 +457,16 @@ typedef enum _sleEXTENSION
     slvEXTENSION_EXT_TEXTURE_BUFFER                         = 0x00800000,
     slvEXTENSION_EXT_PRIMITIVE_BOUNDING_BOX                 = 0x01000000,
 
-    slvEXTENSION_ES_32                                      = 0x02000000,
+    slvEXTENSION_ES_32                                      = 0x02000000 | slvEXTENSION_TEXTURE_CUBE_MAP_ARRAY
+                                                                         | slvEXTENSION_EXT_GEOMETRY_SHADER
+                                                                         | slvEXTENSION_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY
+                                                                         | slvEXTENSION_SHADOW_SAMPLER
+                                                                         | slvEXTENSION_GPU_SHADER5
+                                                                         | slvEXTENSION_EXT_TEXTURE_BUFFER
+                                                                         | slvEXTENSION_SAMPLE_VARIABLES
+                                                                         | slvEXTENSION_SHADER_MULTISAMPLE_INTERPOLATION
+                                                                         | slvEXTENSION_EXT_PRIMITIVE_BOUNDING_BOX
+                                                                         | slvEXTENSION_BLEND_EQUATION_ADVANCED,
 
     slvEXTENSION_ES_30_AND_ABOVE                            = slvEXTENSION_HALTI |
                                                               slvEXTENSION_ES_31 |

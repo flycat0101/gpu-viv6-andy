@@ -36,46 +36,46 @@
 
 void
 ivdkLockVisual(
-	void
-	)
+    void
+    )
 {
-	/* Get a pointer to the visual object. */
-	gcsCOMMONVISUAL_PTR visual = (gcsCOMMONVISUAL_PTR) ivdkGetVisual();
+    /* Get a pointer to the visual object. */
+    gcsCOMMONVISUAL_PTR visual = (gcsCOMMONVISUAL_PTR) ivdkGetVisual();
 
-	/* Acquire the mutex. */
-	if (visual->visualMutex != gcvNULL)
-	{
-		vdkAcquireMutex(visual->visualMutex, gcvINFINITE);
-	}
+    /* Acquire the mutex. */
+    if (visual->visualMutex != gcvNULL)
+    {
+        vdkAcquireMutex(visual->visualMutex, gcvINFINITE);
+    }
 }
 
 void
 ivdkUnlockVisual(
-	void
-	)
+    void
+    )
 {
-	/* Get a pointer to the visual object. */
-	gcsCOMMONVISUAL_PTR visual = (gcsCOMMONVISUAL_PTR) ivdkGetVisual();
+    /* Get a pointer to the visual object. */
+    gcsCOMMONVISUAL_PTR visual = (gcsCOMMONVISUAL_PTR) ivdkGetVisual();
 
-	/* Release the mutex. */
-	if (visual->visualMutex != gcvNULL)
-	{
-		vdkReleaseMutex(visual->visualMutex);
-	}
+    /* Release the mutex. */
+    if (visual->visualMutex != gcvNULL)
+    {
+        vdkReleaseMutex(visual->visualMutex);
+    }
 }
 
 gctBOOL
 ivdkServeTimer(
-	void
-	)
+    void
+    )
 {
-	/* Get a pointer to the visual object. */
-	gcsCOMMONVISUAL_PTR visual = (gcsCOMMONVISUAL_PTR) ivdkGetVisual();
+    /* Get a pointer to the visual object. */
+    gcsCOMMONVISUAL_PTR visual = (gcsCOMMONVISUAL_PTR) ivdkGetVisual();
 
-	/* Serve the event. */
-	return (visual->timerEvent == gcvNULL)
-		? gcvTRUE
-		: (*visual->timerEvent) (visual->eventArgument);
+    /* Serve the event. */
+    return (visual->timerEvent == gcvNULL)
+        ? gcvTRUE
+        : (*visual->timerEvent) (visual->eventArgument);
 }
 
 
@@ -95,22 +95,22 @@ ivdkServeTimer(
 **
 **  OUTPUT:
 **
-**		gctUINT* Width
-**		gctUINT* Height
-**			Pointers to the area size.
+**        gctUINT* Width
+**        gctUINT* Height
+**            Pointers to the area size.
 **
 */
 
 void
 vdkGetDesktopSize(
-	IN OUT gctUINT* Width,
-	IN OUT gctUINT* Height
-	)
+    IN OUT gctUINT* Width,
+    IN OUT gctUINT* Height
+    )
 {
-	/* Get a pointer to the visual object. */
-	gcsCOMMONVISUAL_PTR visual = (gcsCOMMONVISUAL_PTR) ivdkGetVisual();
+    /* Get a pointer to the visual object. */
+    gcsCOMMONVISUAL_PTR visual = (gcsCOMMONVISUAL_PTR) ivdkGetVisual();
 
-	/* Retrieve the size. */
-	*Width  = visual->desktopWidth;
-	*Height = visual->desktopHeight;
+    /* Retrieve the size. */
+    *Width  = visual->desktopWidth;
+    *Height = visual->desktopHeight;
 }

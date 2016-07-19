@@ -60,8 +60,12 @@ LOCAL_SHARED_LIBRARIES := \
 	liblog \
 	libdl \
 	libVSC \
-	libGLESv2 \
-	libGAL
+	libGAL \
+
+ifeq ($(ENABLE_CL_GL), 1)
+LOCAL_SHARED_LIBRARIES += \
+                       libGLESv2
+endif
 
 ifeq ($(BUILD_OPENCL_ICD),1)
 LOCAL_CFLAGS         += -DBUILD_OPENCL_ICD=1
@@ -75,7 +79,9 @@ LOCAL_CFLAGS         += -DBUILD_OPENCL_FP=1
 endif
 
 ifeq ($(ENABLE_CL_GL), 1)
-LOCAL_CFLAGS         += -DENABLE_CL_GL=1
+LOCAL_CFLAGS         += -DgcdENABLE_CL_GL=1
+else
+LOCAL_CFLAGS         += -DgcdENABLE_CL_GL=0
 endif
 
 LOCAL_MODULE_TAGS    := optional

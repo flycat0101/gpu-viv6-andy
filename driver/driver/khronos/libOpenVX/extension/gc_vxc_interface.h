@@ -17,11 +17,11 @@
 #include <gc_vxk_common.h>
 
 #if defined(__ANDROID__)
-#define VX_SHADER_SOURCE_PATH				"/sdcard/vx/";
+#define VX_SHADER_SOURCE_PATH                "/sdcard/vx/";
 #elif defined(__linux__)
-#define VX_SHADER_SOURCE_PATH				"/home/vx/";
+#define VX_SHADER_SOURCE_PATH                "/home/vx/";
 #elif defined(_WIN32) || defined(UNDER_CE)
-#define VX_SHADER_SOURCE_PATH				"e:\\vx1\\";
+#define VX_SHADER_SOURCE_PATH                "e:\\vx1\\";
 #endif
 
 enum

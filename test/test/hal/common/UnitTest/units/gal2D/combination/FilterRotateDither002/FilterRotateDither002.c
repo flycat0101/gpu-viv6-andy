@@ -76,7 +76,7 @@ Test2D;
 
 static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 {
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
     gco2D egn2D      = t2d->runtime->engine2d;
     gcsRECT srcRect  = { 0, 0, t2d->srcWidth, t2d->srcHeight };
     gcsRECT destRect;
@@ -159,18 +159,18 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 OnError:
     GalOutput(GalOutputType_Error | GalOutputType_Console,
         "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
-	return gcvFALSE;
+    return gcvFALSE;
 }
 
 static void CDECL Destroy(Test2D *t2d)
 {
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
     if ((t2d->dstSurf != gcvNULL) && (t2d->dstLgcAddr != gcvNULL))
     {
         if (gcmIS_ERROR((gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr))))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
-		}
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
+        }
         t2d->dstLgcAddr = gcvNULL;
     }
 
@@ -180,16 +180,16 @@ static void CDECL Destroy(Test2D *t2d)
         if (t2d->srcLgcAddr != gcvNULL)
         {
             if (gcmIS_ERROR((gcoSURF_Unlock(t2d->srcSurf, t2d->srcLgcAddr))))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
-		}
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
+        }
             t2d->srcLgcAddr = gcvNULL;
         }
 
         if (gcmIS_ERROR(gcoSURF_Destroy(t2d->srcSurf)))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
-		}
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
+        }
     }
 
     free(t2d);
@@ -245,10 +245,10 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     // create source surface
     t2d->srcSurf = GalLoadDIB2Surface(t2d->runtime->hal, sourcefile);
     if (t2d->srcSurf == gcvNULL)
-	{
+    {
         GalOutput(GalOutputType_Error | GalOutputType_Console, "Load source surface failed.\n");
-		gcmONERROR(gcvSTATUS_NOT_FOUND);
-	}
+        gcmONERROR(gcvSTATUS_NOT_FOUND);
+    }
     gcmONERROR(gcoSURF_GetAlignedSize(t2d->srcSurf,
                                         gcvNULL,
                                         gcvNULL,
@@ -291,7 +291,7 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 OnError:
     GalOutput(GalOutputType_Error | GalOutputType_Console,
         "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
-	return gcvFALSE;
+    return gcvFALSE;
 }
 
 GalTest * CDECL GalCreateTestObject(GalRuntime *runtime)

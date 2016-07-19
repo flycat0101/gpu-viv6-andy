@@ -58,8 +58,8 @@ extern "C" {
     A8, L8, A8L8
 */
 
-#define MAX_MIPMAPS 		16
-#define NUM_CUBEMAP_FACES	6
+#define MAX_MIPMAPS         16
+#define NUM_CUBEMAP_FACES    6
 
 typedef struct _Image
 {

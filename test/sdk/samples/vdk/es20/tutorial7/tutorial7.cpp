@@ -630,8 +630,8 @@ int main(int argc, char** argv)
         return 1;
     }
 
-	/* Adjust the window size to make sure these size values does not go beyound the screen limits. */
-	vdkGetWindowInfo(egl.window, NULL, NULL, &width, &height, NULL, NULL);
+    /* Adjust the window size to make sure these size values does not go beyound the screen limits. */
+    vdkGetWindowInfo(egl.window, NULL, NULL, &width, &height, NULL, NULL);
 
     /* Set window title and show the window.*/
     vdkSetWindowTitle(egl.window, TUTORIAL_NAME);

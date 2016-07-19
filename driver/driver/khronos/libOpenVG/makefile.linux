@@ -45,17 +45,9 @@ INCLUDE += -I$(AQROOT)/sdk/inc
 INCLUDE += -I$(AQROOT)/compiler/libVSC/include
 INCLUDE += -I$(AQROOT)/driver/khronos/libEGL/inc
 INCLUDE += -I$(AQROOT)/hal/os/linux/user
-ifeq ($(EGL_API_DFB), 1)
-    INCLUDE += -I$(DFB_DIR)/usr/include
-    INCLUDE += -I$(DFB_DIR)/include
-    INCLUDE += -I$(DFB_DIR)/include/directfb-internal
-    INCLUDE += -I$(DFB_DIR)/include/directfb
-endif
-ifeq ($(EGL_API_DRI), 1)
-INCLUDE += -I$(X11_ARM_DIR)/include
-endif
-ifeq ($(EGL_API_X), 1)
-INCLUDE += -I$(X11_ARM_DIR)/include
+
+ifeq ($(filter 1,$(EGL_API_X) $(EGL_API_DRI)),1)
+  INCLUDE += -I$(X11_ARM_DIR)/include
 endif
 
 CFLAGS += $(INCLUDE)
@@ -64,17 +56,9 @@ CFLAGS += $(INCLUDE)
 # Add extra flags for object files.
 
 CFLAGS += -fPIC -D__GL_EXPORTS -Werror
-ifneq ($(USE_ARMCC), 1)
-ifeq ($(EGL_API_DFB), 1)
-CFLAGS  += -pipe -fPIC
-endif
-endif
 
 ifeq ($(ADROID),0)
 CFLAGS += -ansi
-endif
-ifeq ($(EGL_API_DFB), 1)
-CFLAGS  += -DPIC
 endif
 
 LFLAGS += -Wl,--version-script=libOpenVG.map

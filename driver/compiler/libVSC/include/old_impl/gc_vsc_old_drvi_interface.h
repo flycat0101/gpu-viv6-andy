@@ -634,6 +634,9 @@ struct _gcsHINT
 
     gctINT      psOutCntl0to3;
     gctINT      psOutCntl4to7;
+
+    /* per-vertex attributeCount. */
+    gctUINT     tcsPerVertexAttributeCount;
 };
 
 #define gcsHINT_isCLShader(Hint)            ((Hint)->clShader)
@@ -977,6 +980,10 @@ typedef enum _Dual16_PrecisionRule
     /*  immediate is always mediump */
     Dual16_PrecisionRule_IMMED_MP               = 1 << 4,
 
+    /* HW Cvt2OutColFmt has issue with 0x2,
+    thus require output to be highp */
+    Dual16_PrecisionRule_OUTPUT_HP              = 1 << 5,
+
     /*  default rules */
     Dual16_PrecisionRule_DEFAULT                = Dual16_PrecisionRule_TEXLD_COORD_HP |
                                                   Dual16_PrecisionRule_RCP_HP         |
@@ -1305,6 +1312,14 @@ typedef struct _gcOPTIMIZER_OPTION
      */
     gctBOOL     createDefaultUBO;
 
+    /*
+     * Handle OCL  relaxing local address space in OCV
+     *
+     *   VC_OPTION=-OCLOCVLOCALADDRESSSPACE:0|1
+     *
+     */
+    gctBOOL    oclOcvLocalAddressSpace;
+
     /*  OCL has long:
      *
      *   VC_OPTION=-OCLHASLONG:0|1
@@ -1446,6 +1461,7 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_ForceInline()        (gcmGetOptimizerOption()->forceInline)
 #define gcmOPT_UploadUBO()          (gcmGetOptimizerOption()->uploadUBO)
 #define gcmOPT_oclFpCaps()          (gcmGetOptimizerOption()->oclFpCaps)
+#define gcmOPT_oclOcvLocalAddressSpace() (gcmGetOptimizerOption()->oclOcvLocalAddressSpace)
 #define gcmOPT_oclHasLong()         (gcmGetOptimizerOption()->oclHasLong)
 #define gcmOPT_oclUseNeg()          (gcmGetOptimizerOption()->oclUseNeg)
 #define gcmOPT_oclUseImgIntrinsicQuery()   (gcmGetOptimizerOption()->oclUseImgIntrinsicQuery)

@@ -141,58 +141,6 @@
         gcoOS_BinaryTrace;
         gcoOS_FscanfI;
 
-        gcoOS_GetDisplay;
-        gcoOS_GetDisplayByIndex;
-        gcoOS_GetDisplayInfo;
-        gcoOS_GetDisplayInfoEx;
-        gcoOS_GetDisplayVirtual;
-        gcoOS_GetDisplayBackbuffer;
-        gcoOS_CancelDisplayBackbuffer;
-        gcoOS_SetDisplayVirtual;
-        gcoOS_SetSwapInterval;
-        gcoOS_SetSwapIntervalEx;
-        gcoOS_GetSwapInterval;
-        gcoOS_DestroyDisplay;
-        gcoOS_CreateWindow;
-        gcoOS_GetWindowInfo;
-        gcoOS_DestroyWindow;
-        gcoOS_DrawImage;
-        gcoOS_GetImage;
-        gcoOS_CreatePixmap;
-        gcoOS_GetPixmapInfo;
-        gcoOS_DrawPixmap;
-        gcoOS_DestroyPixmap;
-        gcoOS_LoadEGLLibrary;
-        gcoOS_FreeEGLLibrary;
-        gcoOS_ShowWindow;
-        gcoOS_HideWindow;
-        gcoOS_SetWindowTitle;
-        gcoOS_CapturePointer;
-        gcoOS_GetEvent;
-        gcoOS_CreateClientBuffer;
-        gcoOS_GetClientBufferInfo;
-        gcoOS_DestroyClientBuffer;
-        gcoOS_InitLocalDisplayInfo;
-        gcoOS_DeinitLocalDisplayInfo;
-        gcoOS_GetDisplayInfoEx2;
-        gcoOS_GetDisplayBackbufferEx;
-        gcoOS_IsValidDisplay;
-        gcoOS_SynchronousFlip;
-        gcoOS_GetNativeVisualId;
-        gcoOS_GetWindowInfoEx;
-        gcoOS_DrawImageEx;
-        gcoOS_SetWindowFormat;
-        gcoOS_GetPixmapInfoEx;
-        gcoOS_CopyPixmapBits;
-        gcoOS_CreateContext;
-        gcoOS_DestroyContext;
-        gcoOS_MakeCurrent;
-        gcoOS_CreateDrawable;
-        gcoOS_DestroyDrawable;
-        gcoOS_SwapBuffers;
-        gcoOS_SetDisplayVirtualEx;
-        gcoOS_ResizeWindow;
-
         gcoOS_CloseFD;
         gcoOS_DupFD;
 
@@ -302,6 +250,11 @@
         gcoHAL_WriteShBuffer;
         gcoHAL_ReadShBuffer;
         gcoHAL_SetCoreIndex;
+
+        gcoHAL_AllocateVideoMemory;
+        gcoHAL_ReleaseVideoMemory;
+        gcoHAL_LockVideoMemory;
+        gcoHAL_UnlockVideoMemory;
 
         gcoDUMP_AddSurface;
         gcoDUMP_Construct;
@@ -858,8 +811,8 @@
         gcoPROFILER_Write;
         gcoPROFILER_Flush;
         gcoPROFILER_EndFrame;
-        gcoPROFILER_BeginDraw;
-        gcoPROFILER_EndDraw;
+        gcoPROFILER_Begin;
+        gcoPROFILER_End;
         gcoPROFILER_ShaderFS;
         gcoPROFILER_ShaderVS;
 

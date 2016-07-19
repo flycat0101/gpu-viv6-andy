@@ -86,6 +86,11 @@ typedef struct __GLchipMipmapInfoRec
 
     /* format mapping information */
     __GLchipFmtMapInfo *formatMapInfo;
+
+    /* ASTC compressed data */
+    GLubyte    *astcData;
+    gctSIZE_T   astcBytes;  /* Size in byte of the astcData */
+    gcoSURF     astcSurf;
 } __GLchipMipmapInfo;
 
 

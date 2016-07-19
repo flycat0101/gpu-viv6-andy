@@ -78,7 +78,9 @@ CFLAGS += -DBUILD_OPENCL_FP=1
 endif
 
 ifeq ($(ENABLE_CL_GL), 1)
-CFLAGS += -DENABLE_CL_GL=1
+CFLAGS += -DgcdENABLE_CL_GL=1
+else
+CFLAGS += -DgcdENABLE_CL_GL=0
 endif
 
 ifneq ($(USE_ARMCC), 1)
@@ -92,9 +94,15 @@ endif
 # Add extra library path.
 LIBS += -L $(AQROOT)/build/sdk/drivers
 LIBS += -L $(AQROOT)/hal/user/$(OBJ_DIR)
+ifeq ($(ENABLE_CL_GL), 1)
 LIBS += -L $(AQROOT)/driver/khronos/libGLESv3/$(OBJ_DIR)
+endif
 LIBS += -L $(AQROOT)/compiler/libVSC/$(OBJ_DIR)
+ifeq ($(ENABLE_CL_GL), 1)
 LIBS += -l GAL -lVSC -l GLESv2 -lm
+else
+LIBS += -l GAL -lVSC -lm
+endif
 
 ################################################################################
 # Add extra include path.

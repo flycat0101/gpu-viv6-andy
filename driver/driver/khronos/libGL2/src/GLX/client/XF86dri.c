@@ -194,7 +194,7 @@ Bool XF86DRIOpenConnection(dpy, screen, hSAREA, busIdString)
     }
 
     *hSAREA = rep.hSAREALow;
-#ifdef LONG64
+#if defined(LONG64) && !defined(__linux__)
     *hSAREA |= ((drm_handle_t)rep.hSAREAHigh) << 32;
 #endif
 
@@ -537,7 +537,7 @@ Bool XF86DRIGetDeviceInfo(dpy, screen, hFrameBuffer,
     }
 
     *hFrameBuffer = rep.hFrameBufferLow;
-#ifdef LONG64
+#if defined(LONG64) && !defined(__linux__)
     *hFrameBuffer |= ((drm_handle_t)rep.hFrameBufferHigh) << 32;
 #endif
 

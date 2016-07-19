@@ -33,40 +33,40 @@
 
 Test3DFloat::Test3DFloat(const size_t sizeX, const size_t sizeY, const size_t sizeZ):
 MultiDimensionalArraysTest3D("float", sizeX, sizeY, sizeZ) {
-	inputAHost = new cl_float[size];
-	inputBHost = new cl_float[size];
-	resultHost = new cl_float[size];
-	inputA = inputAHost;
-	inputB = inputBHost;
-	result = resultHost;
+    inputAHost = new cl_float[size];
+    inputBHost = new cl_float[size];
+    resultHost = new cl_float[size];
+    inputA = inputAHost;
+    inputB = inputBHost;
+    result = resultHost;
 }
 
 Test3DFloat::~Test3DFloat() {
-	delete[] inputAHost;
-	delete[] inputBHost;
-	delete[] resultHost;
+    delete[] inputAHost;
+    delete[] inputBHost;
+    delete[] resultHost;
 }
 
 const int Test3DFloat::getMemSize() const {
-	return sizeof(cl_float)*size;
+    return sizeof(cl_float)*size;
 }
 
 void Test3DFloat::generateInput(const unsigned int &kernelIndex) {
-	for (unsigned int k=0; k<size; k++) {
-		inputAHost[k] = randFloat();
-		if (getKernelInputArgNum(kernelIndex) == 2)
-			inputBHost[k] = randFloat();
-	}
+    for (unsigned int k=0; k<size; k++) {
+        inputAHost[k] = randFloat();
+        if (getKernelInputArgNum(kernelIndex) == 2)
+            inputBHost[k] = randFloat();
+    }
 }
 
 void* Test3DFloat::getInputAElement(const unsigned int &index) const {
-	return &inputAHost[index];
+    return &inputAHost[index];
 }
 
 void* Test3DFloat::getInputBElement(const unsigned int &index) const {
-	return &inputBHost[index];
+    return &inputBHost[index];
 }
 
 void* Test3DFloat::getResultElement(const unsigned int &index) const {
-	return &resultHost[index];
+    return &resultHost[index];
 }

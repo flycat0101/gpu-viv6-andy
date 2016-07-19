@@ -106,14 +106,12 @@ endif
 ################################################################
 # Initialize build flags.
 
-ifeq ($(MAKELEVEL),0)
-  ORIG_CFLAGS       := $(CFLAGS)
-  ORIG_CXXFLAGS     := $(CXXFLAGS)
-  ORIG_LFLAGS       := $(LFLAGS)
-  ORIG_PFLAGS       := $(PFLAGS)
+ORIG_CFLAGS       ?= $(CFLAGS)
+ORIG_CXXFLAGS     ?= $(CXXFLAGS)
+ORIG_LFLAGS       ?= $(LFLAGS)
+ORIG_PFLAGS       ?= $(PFLAGS)
 
-  export ORIG_CFLAGS ORIG_CXXFLAGS ORIG_LFLAGS ORIG_PFLAGS
-endif
+export ORIG_CFLAGS ORIG_CXXFLAGS ORIG_LFLAGS ORIG_PFLAGS
 
 CFLAGS              := $(ORIG_CFLAGS)
 CXXFLAGS            := $(ORIG_CXXFLAGS)
@@ -229,7 +227,7 @@ endif
 
 ifneq ($(FPU),)
   CFLAGS            += -mfpu=$(FPU)
-  CXXFLAGS          += -mfloat-abi=$(FLOAT_ABI)
+  CXXFLAGS          += -mfpu=$(FPU)
 endif
 
 ifneq ($(FLOAT_ABI),)
@@ -297,8 +295,12 @@ ifeq ($(USE_BANK_ALIGNMENT),1)
   endif
 endif
 
-ifeq ($(EGL_API_GBM), 1)
-  CFLAGS            += -DEGL_API_GBM -D__GBM__
+ifeq ($(EGL_API_GBM),1)
+  CFLAGS            += -DEGL_API_GBM -D__GBM__=1
+endif
+
+ifeq ($(EGL_API_NULLWS), 1)
+  CFLAGS            += -DEGL_API_NULLWS
 endif
 
 ifeq ($(EGL_API_FB), 1)
@@ -317,6 +319,7 @@ ifeq ($(EGL_API_DRI),1)
   endif
 
   CFLAGS            += -DEGL_API_DRI
+  CFLAGS            += -I$(X11_ARM_DIR)/include
   CFLAGS            += -I$(X11_ARM_DIR)/include/arm-linux-gnueabi
 endif
 
@@ -326,6 +329,7 @@ endif
 
 ifeq ($(EGL_API_X), 1)
   CFLAGS            += -DEGL_API_X
+  CFLAGS            += -I$(X11_ARM_DIR)/include
   CFLAGS            += -I$(X11_ARM_DIR)/include/arm-linux-gnueabi
 endif
 
@@ -430,8 +434,6 @@ else
 EXA_DIR             := $(AQROOT)/driver/X/EXA/src
 endif
 
-WLSERVER_DIR        := $(AQROOT)/driver/wl
-
 GL21_DIR            := $(AQROOT)/driver/khronos/libGL2
 
 CL11_DIR            := $(AQROOT)/driver/khronos/libCL
@@ -509,9 +511,3 @@ VVLAUNCHER_DIR      := $(ES2X_TEST_DIR)/vv_launcher
 VIDEOCUBE_DIR       := $(AQROOT)/test/es11/extern/VideoCube
 VC_TESTCASE_DIR     := $(AQROOT)/test/es20/vCompiler_Testcase
 
-
-################################################################################
-# Platform specific configs.
-
-THIRDPARTY_CUSTOMER ?=
-THIRDPARTY_TYPE     ?=

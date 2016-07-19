@@ -865,7 +865,7 @@ static void beginDraw(IN glsCONTEXT_PTR Context){
 }
 
 static void endDraw(IN glsCONTEXT_PTR Context){
-    gcoPROFILER_EndDraw(GLFFPROFILER_HAL,(gctBOOL)(Context->profiler.drawCount == 0));
+    gcoPROFILER_End(GLFFPROFILER_HAL,(gctBOOL)(Context->profiler.drawCount == 0));
 }
 #endif
 

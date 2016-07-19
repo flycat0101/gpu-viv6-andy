@@ -36,7 +36,7 @@ EXEENTRY=WinMainCRTStartup
 SOURCES=            \
     ddso.cpp       \
 
-INCLUDES = $(INCLUDES);$(VIVANTE_SDK_INC);$(VIVANTE_SDK_INC)/HAL;$(AQROOT)/sdk/inc
+INCLUDES = $(INCLUDES);$(VIVANTE_SDK_INC)
 
 TARGETLIBS = $(_SYSGENSDKROOT)\lib\$(_CPUINDPATH)\coredll.lib \
              $(_SYSGENSDKROOT)\lib\$(_CPUINDPATH)\ddraw.lib \

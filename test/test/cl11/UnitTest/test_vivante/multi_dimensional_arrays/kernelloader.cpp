@@ -31,22 +31,22 @@
 #include <malloc.h>
 
 int loadSource(const char* fileName, size_t* fileSize, char** kernelSource) {
-	char ch;
-	int i=0;
-	FILE *file = NULL;
-	file = fopen(fileName, "r");
-	if (!file)
-		return 1;
-	fseek(file, 0, SEEK_END);
-	*fileSize = ftell(file);
-	fseek(file, 0, SEEK_SET);
-	*kernelSource = (char*)malloc(sizeof(char)*(*fileSize+1));
-	while ((ch=getc(file)) != EOF) {
-		(*kernelSource)[i] = ch;
-		i++;
-	}
-	(*kernelSource)[i] = '\0';
-	if (fclose(file) != 0)
-		return 1;
-	return 0;
+    char ch;
+    int i=0;
+    FILE *file = NULL;
+    file = fopen(fileName, "r");
+    if (!file)
+        return 1;
+    fseek(file, 0, SEEK_END);
+    *fileSize = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    *kernelSource = (char*)malloc(sizeof(char)*(*fileSize+1));
+    while ((ch=getc(file)) != EOF) {
+        (*kernelSource)[i] = ch;
+        i++;
+    }
+    (*kernelSource)[i] = '\0';
+    if (fclose(file) != 0)
+        return 1;
+    return 0;
 }

@@ -591,6 +591,7 @@ _LoadBuiltinConstants(IN cloCOMPILER Compiler)
         __BUILD_BUILT_IN(ANY)
         __BUILD_BUILT_IN(ALL)
         __BUILD_BUILT_IN(NOT)
+        __BUILD_BUILT_IN(NEG)
 
         __BUILD_BUILT_IN(SIN)
         __BUILD_BUILT_IN(COS)
@@ -637,6 +638,7 @@ _LoadBuiltinConstants(IN cloCOMPILER Compiler)
         __BUILD_BUILT_IN(DOT)
         __BUILD_BUILT_IN(CROSS)
         __BUILD_BUILT_IN(NORMALIZE)
+        __BUILD_BUILT_IN(POPCOUNT)
 
         /* Branch Operations */
         __BUILD_BUILT_IN(JUMP)
@@ -3872,47 +3874,47 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
 #endif
 
     /* Reinterpreting types */
-    {"as_char",       gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
-    {"as_char2",      gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_char3",      gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_Type3Code},
-    {"as_char4",      gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_char8",      gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_char16",     gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_char",       gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_char2",      gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_char3",      gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_Type3Code},
+    {"as_char4",      gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_char8",      gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_char16",     gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
 
-    {"as_uchar",      gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
-    {"as_uchar2",     gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_uchar3",     gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_Type3Code},
-    {"as_uchar4",     gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_uchar8",     gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_uchar16",    gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_uchar",      gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_uchar2",     gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_uchar3",     gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_Type3Code},
+    {"as_uchar4",     gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_uchar8",     gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_uchar16",    gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
 
-    {"as_short",      gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
-    {"as_short2",     gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_short3",     gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_Type3Code},
-    {"as_short4",     gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_short8",     gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_short16",    gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_short",      gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_short2",     gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_short3",     gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_Type3Code},
+    {"as_short4",     gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_short8",     gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_short16",    gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
 
-    {"as_ushort",     gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
-    {"as_ushort2",    gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_ushort3",    gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_Type3Code},
-    {"as_ushort4",    gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_ushort8",    gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_ushort16",   gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_ushort",     gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_ushort2",    gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_ushort3",    gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_Type3Code},
+    {"as_ushort4",    gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_ushort8",    gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_ushort16",   gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
 
-    {"as_int",        gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
-    {"as_int2",       gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_int3",       gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_Type3Code},
-    {"as_int4",       gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_int8",       gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_int16",      gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_int",        gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_int2",       gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_int3",       gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_Type3Code},
+    {"as_int4",       gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_int8",       gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_int16",      gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
 
-    {"as_uint",       gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
-    {"as_uint2",      gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_uint3",      gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_Type3Code},
-    {"as_uint4",      gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_uint8",      gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
-    {"as_uint16",     gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_uint",       gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_uint2",      gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_uint3",      gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_Type3Code},
+    {"as_uint4",      gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_uint8",      gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_uint16",     gcvFALSE,    gcvFALSE,    gcvNULL,    _GenAs_TypeCode},
 
     {"as_long",       gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
     {"as_long2",      gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
@@ -3929,9 +3931,9 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"as_ulong16",    gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
 
     {"as_float",      gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
-    {"as_float2",     gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_float2",     gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
     {"as_float3",     gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_Type3Code},
-    {"as_float4",     gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
+    {"as_float4",     gcvFALSE,    gcvFALSE,   gcvNULL,    _GenAs_TypeCode},
     {"as_float8",     gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
     {"as_float16",    gcvFALSE,    gcvTRUE,    gcvNULL,    _GenAs_TypeCode},
 

@@ -1,5 +1,3 @@
-
-
 package com.vivantecorp.graphics.sample6;
 
 import android.app.Activity;

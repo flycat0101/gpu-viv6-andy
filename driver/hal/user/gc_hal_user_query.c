@@ -878,7 +878,12 @@ gcoHAL_SetHardwareType(
 
     if (__tls__->currentType != HardwardType)
     {
-        /* When hardware type is changed, reset currentCore to 0,
+        /* When hardware type is changed, reset currentCore according to
+        ** multiple GPUs affinity setting.
+        **
+        ** If mode is gcvMULTI_GPU_MODE_COMBINED, always uses 0 as main
+        ** core index.
+        **
         ** so hardware with single core works without considering core index,
         ** hardware with multiple cores must specify core index explicitly
         ** before every device control calls.
@@ -888,7 +893,22 @@ gcoHAL_SetHardwareType(
         ** If a gcoHARDWARE object uses two of them 2 and 3, it should set
         ** currentCore to 2/3 when call device control, instead of 0/1
         */
-        __tls__->currentCoreIndex = 0;
+
+        gceMULTI_GPU_MODE mode;
+        gctUINT mainCoreIndex = 0;
+
+        gcmVERIFY_OK(gcoHAL_QueryMultiGPUAffinityConfig(
+            HardwardType,
+            &mode,
+            &mainCoreIndex
+            ));
+
+        if (mode == gcvMULTI_GPU_MODE_COMBINED)
+        {
+            mainCoreIndex = 0;
+        }
+
+        __tls__->currentCoreIndex = mainCoreIndex;
     }
 
     __tls__->currentType = HardwardType;
@@ -1246,7 +1266,7 @@ gcoHAL_QueryChipLimits(
     status = gcvSTATUS_OK;
 
 OnError:
-	/* Restore the current hardware type */
+    /* Restore the current hardware type */
     gcmVERIFY_OK(gcoHAL_SetHardwareType(gcvNULL, currentType));
     return status;
 
@@ -1299,5 +1319,151 @@ gcoHAL_QuerySuperTileMode(
     )
 {
     return gcoHARDWARE_QuerySuperTileMode(gcvNULL, SuperTileMode);
+}
+
+/*******************************************************************************
+**
+**  gcoHAL_QueryMultiGPUAffinityConfig
+**
+**  Check and parse configure from "VIV_MGPU_AFFINITY".
+**
+**  1) HAL level Multi GPUs affinity configure through "VIV_MGPU_AFFINITY".
+**
+**    VIV_MGPU_AFFINITY is an environment variable to control the multi GPUs
+**    affinity configure in HAL. It provides a way to configure multi GPUs affinity
+**    when client driver don't handle it. No matter how it is set, client drivers
+**    think they are using a standalone GPU through a gcoHARDWARE object.
+**
+**    Possible value:
+**
+**    Not defined or defined as "0"
+**        gcoHARDWARE objects work in gcvMULTI_GPU_COMBINED mode.
+**    "1:0"
+**        gcoHARDWARE objects work in gcvMULTI_GPU_INDEPEDNENT mode and GPU 0 is used
+**    "1:1"
+**        gcoHARDWARE objects work in gcvMULTI_GPU_INDEPEDNENT mode and GPU 1 is used
+**
+**
+**  2) Client driver can have their own multi GPU affinity policy.
+**
+**    Client driver doesn't need "VIV_MGPU_AFFINITY", and it can override it by using
+**    its own policy.
+**
+**    gcoHAL_SetCurrentCoreIndex() is used to define current core index which is used
+**    by gcoHARDWARE objects, it needs to be set before gcoHARDWARE objects created.
+**
+**    gcoHARDWARE_SetMultiGPUMode() is used to set the mode of specified gcoHARDWARE
+**    object after which is created.
+**
+**    Client driver can call gcoHAL_SetCurrentCoreIndex() after gcoHAL_SetHardwareType()
+**    to set core index it wants.
+**
+**    Client driver can call gcoHARDWARE_SetMultiGPUMode() after gcoHARDWARE_Construct()
+**    to change the mode it wants.
+**
+**    Example 1, a client wants to use 3D GPU1 only, it should do like this:
+**      a) gcoHAL_SetHardwareType(gcvHARDWARE_3D)
+**      b) gcoHAL_SetCurrentCoreIndex(1)
+**      c) gcoHARDWARE_Construct()
+**      d) gcoHARDWARE_SetMultiGPUMode(gcvMULTI_GPU_MODE_INDEPENENT)
+**
+**    Example 2, a client wants to use 3D GPU0 and 3D GPU1 separately, it should do like this:
+**      a) gcoHAL_SetHardwareType(gcvHARDWARE_3D)
+**      b) gcoHAL_SetCurrentCoreIndex(0)
+**      c) hardware0 = gcoHARDWARE_Construct()
+**      d) gcoHARDWARE_SetMultiGPUMode(hardware0, gcvMULTI_GPU_MODE_INDEPENENT)
+**      e) gcoHAL_SetCurrentCoreIndex(1)
+**      f) hardware1 = gcoHARDWARE_Construct()
+**      g) gcoHARDWARE_SetMultiGPUMode(hardware1, gcvMULTI_GPU_MODE_INDEPENENT)
+**      h) gcoHAL_SetCurrentCoreIndex(0)
+**      i) submit hardware0 related command to kernel
+**      j) gcoHAL_SetCurrentCoreIndex(1)
+**      k) submit hardware1 related command to kernel
+**
+**  INPUT:
+**
+**
+**  OUTPUT:
+**
+**      gceMULTI_GPU_MODE *Mode
+**          Pointer to a variable that indicates what mode should be used.
+**
+**      gctUINT32_PTR Mode
+**          Pointer to a variable that indicates which core mode should be
+**          used as main core. It is meaningless when multi GPUs work in
+**          combined mode.
+*/
+gceSTATUS
+gcoHAL_QueryMultiGPUAffinityConfig(
+    IN gceHARDWARE_TYPE Type,
+    OUT gceMULTI_GPU_MODE *Mode,
+    OUT gctUINT32_PTR CoreIndex
+    )
+{
+    gctSTRING affinity = gcvNULL;
+    gctSIZE_T length;
+
+    if (Type != gcvHARDWARE_3D && Type != gcvHARDWARE_3D2D)
+    {
+        if (Mode)
+        {
+            *Mode = gcvMULTI_GPU_MODE_COMBINED;
+        }
+
+        return gcvSTATUS_OK;
+    }
+
+    gcoOS_GetEnv(gcvNULL, "VIV_MGPU_AFFINITY", &affinity);
+
+    if (affinity == gcvNULL)
+    {
+        /* No configure specified, use default. */
+        if (Mode)
+        {
+            *Mode = gcvMULTI_GPU_MODE_COMBINED;
+        }
+
+        return gcvSTATUS_OK;
+    }
+
+    gcoOS_StrLen(affinity, &length);
+
+    if (length < 1)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    if (affinity[0] == '0')
+    {
+        if (Mode)
+        {
+            *Mode = gcvMULTI_GPU_MODE_COMBINED;
+        }
+
+        return gcvSTATUS_OK;
+    }
+    else
+    {
+        if (length != 3
+         || affinity[0] != '1'
+         || affinity[1] != ':'
+         || (affinity[2] != '0' && affinity[2] != '1')
+         )
+        {
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
+
+        if (Mode)
+        {
+            *Mode = gcvMULTI_GPU_MODE_INDEPENDENT;
+        }
+
+        if (CoreIndex)
+        {
+            *CoreIndex = affinity[2] - '0';
+        }
+    }
+
+    return gcvSTATUS_OK;
 }
 

@@ -78,8 +78,9 @@
 
 typedef void (GL_APIENTRY *PFNGLTEXDIRECTVIV) (GLenum Target, GLsizei Width, GLsizei Height, GLenum Format, GLvoid ** Pixels);
 typedef void (GL_APIENTRY *PFNGLTEXDIRECTINVALIDATEVIV) (GLenum Target);
-static PFNGLTEXDIRECTVIV pFNglTexDirectVIV = NULL;
-static PFNGLTEXDIRECTINVALIDATEVIV pFNglTexDirectInvalidateVIV = NULL;
+
+static PFNGLTEXDIRECTVIV            pFNglTexDirectVIV           = NULL;
+static PFNGLTEXDIRECTINVALIDATEVIV  pFNglTexDirectInvalidateVIV = NULL;
 
 // Wrapper to load vetex and pixel shader.
 void LoadShaders(const char * vShaderFName, const char * pShaderFName);
@@ -87,16 +88,16 @@ void LoadShaders(const char * vShaderFName, const char * pShaderFName);
 void DestroyShaders();
 
 #ifndef ANDROID_JNI
-vdkEGL egl;
+vdkEGL  egl;
 #endif
 
-int width  = 0;
-int height = 0;
-int posX   = -1;
-int posY   = -1;
-int samples = 0;
-int frames = 0;
-int curFrame = 0;
+int     width                   = 0;
+int     height                  = 0;
+int     posX                    = -1;
+int     posY                    = -1;
+int     samples                 = 0;
+int     frames                  = 0;
+int     curFrame                = 0;
 int     nCounter                = 0;
 bool    bUseYUVTex              = true;
 
@@ -121,23 +122,23 @@ char    texFileName[256]        = "snake-reptile.ktx";
 
 
 // Global Variables, attribute and uniform
-GLint locVertices     = 0;
-GLint locTransformMat = 0;
-GLint locTexcoord      = 0;
-GLint locSampler = 0;
+GLint   locVertices             = 0;
+GLint   locTransformMat         = 0;
+GLint   locTexcoord             = 0;
+GLint   locSampler              = 0;
 GLuint  gNV21TexObj             = 0;
 GLuint  gRGBTexObj              = 0;
 
 // Global Variables, shader handle and program handle
-GLuint vertShaderNum  = 0;
-GLuint pixelShaderNum = 0;
-GLuint programHandle  = 0;
+GLuint  vertShaderNum           = 0;
+GLuint  pixelShaderNum          = 0;
+GLuint  programHandle           = 0;
 
 #ifndef ANDROID_JNI
-int argCount = 6;
-char argSpec = '-';
-char argNames[] = {'x', 'y', 'w', 'h', 's', 'f'};
-char argValues[][255] = {
+int     argCount = 6;
+char    argSpec = '-';
+char    argNames[] = {'x', 'y', 'w', 'h', 's', 'f'};
+char    argValues[][255] = {
     "x_coord",
     "y_coord",
     "width",
@@ -145,7 +146,7 @@ char argValues[][255] = {
     "samples",
     "frames",
 };
-char argDescs[][255] = {
+char    argDescs[][255] = {
     "x coordinate of the window, default is -1(screen center)",
     "y coordinate of the window, default is -1(screen center)",
     "width  of the window in pixels, default is 0(fullscreen)",
@@ -153,8 +154,8 @@ char argDescs[][255] = {
     "sample count for MSAA, 0/2/4, default is 0 (no MSAA)",
     "frames to run, default is 0 (no frame limit, escape to exit)",
 };
-int noteCount = 1;
-char argNotes[][255] = {
+int     noteCount = 1;
+char    argNotes[][255] = {
     "Exit: [ESC] or the frame count reached."
 };
 #endif
@@ -187,11 +188,11 @@ GLfloat transformMatrix[16] =
 ***************************************************************************************/
 void        *nv21Planes[3];
 void        *rgbPlanes[3];
-void *planes[3];
-int vFrames = 0;
+void        *planes[3];
+int         vFrames             = 0;
 FILE        *nv21File           = NULL;
 FILE        *rgbFile            = NULL;
-FILE *file = NULL;
+FILE        *file               = NULL;
 long long   nv21FileSize        = 0;
 int         nv21FileFrameSize   = 0;
 int         ySize               = 0;
@@ -216,7 +217,7 @@ int LoadFrame()
         if (fread(nv21Planes[1], vSize, 1, nv21File) <= 0)
         {
             return 0;
-    }
+        }
     }
 
     if (uSize > 0)
@@ -224,7 +225,7 @@ int LoadFrame()
         if (fread(nv21Planes[2], uSize, 1, nv21File) <= 0)
         {
             return 0;
-    }
+        }
     }
 
     /* Mark as dirty. */
@@ -234,8 +235,8 @@ int LoadFrame()
 }
 
 GLuint Load420Texture(const char* FileName,
-    int Width,
-    int Height,
+                      int Width,
+                      int Height,
                       int format)
 {
     GLuint result = 0;
@@ -293,7 +294,7 @@ GLuint Load420Texture(const char* FileName,
         nv21FileFrameSize   = ySize + uSize + vSize;
         nv21FileSize        = ftell(nv21File);
         vFrames             = (int)nv21FileSize/nv21FileFrameSize;
-        curFrame  = 0;
+        curFrame            = 0;
 
         /* Determine the number of frames in the file. */
         if ((nv21FileSize <= 0) || (nv21FileFrameSize <= 0))
@@ -311,9 +312,9 @@ GLuint Load420Texture(const char* FileName,
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
         (*pFNglTexDirectVIV)(GL_TEXTURE_2D,
-            Width,
-            Height,
-            format,
+                             Width,
+                             Height,
+                             format,
                              (GLvoid**) &nv21Planes);
         if (glGetError() != GL_NO_ERROR)
         {
@@ -332,7 +333,7 @@ GLuint Load420Texture(const char* FileName,
             if (fread(nv21Planes[1], vSize, 1, nv21File) <= 0)
             {
                 return 0;
-        }
+            }
         }
 
         if (uSize > 0)
@@ -340,7 +341,7 @@ GLuint Load420Texture(const char* FileName,
             if (fread(nv21Planes[2], uSize, 1, nv21File) <= 0)
             {
                 return 0;
-        }
+            }
         }
 
         /* Mark as dirty. */
@@ -350,6 +351,7 @@ GLuint Load420Texture(const char* FileName,
         result = name;
     }
     while (0);
+
     /* Return result. */
     return result;
 }
@@ -401,9 +403,9 @@ GLuint LoadTGA( const char* strFileName)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     (*pFNglTexDirectVIV)(GL_TEXTURE_2D,
-            header.ImageWidth,
-            header.ImageHeight,
-            format,
+                         header.ImageWidth,
+                         header.ImageHeight,
+                         format,
                          (GLvoid**) &rgbPlanes);
 
     int err = glGetError();
@@ -417,8 +419,8 @@ GLuint LoadTGA( const char* strFileName)
         return 0;
     }
 
-        /* Mark as dirty. */
-        (*pFNglTexDirectInvalidateVIV)(GL_TEXTURE_2D);
+    /* Mark as dirty. */
+    (*pFNglTexDirectInvalidateVIV)(GL_TEXTURE_2D);
 
     /* Success. */
     return name;
@@ -616,6 +618,7 @@ GLuint LoadKTX( const char* strFileName)
 #else
     file = fopen( strFileName, "rb" );
 #endif
+
     if(file)
     {
         //read ktx header..
@@ -790,10 +793,12 @@ void Render()
 
     // flush all commands.
     glFlush ();
+
 #ifndef ANDROID_JNI
     // swap display with drawn surface.
     vdkSwapEGL(&egl);
 #endif
+
     LoadFrame();
 }
 
@@ -826,6 +831,7 @@ void RenderCleanup()
 int CompileShader(const char * FName, GLuint ShaderNum)
 {
     FILE * fptr = NULL;
+
 #ifdef UNDER_CE
     static wchar_t buffer[MAX_PATH + 1];
     int i = GetModuleFileName(NULL, buffer, MAX_PATH);
@@ -836,6 +842,7 @@ int CompileShader(const char * FName, GLuint ShaderNum)
 #else
     fptr = fopen(FName, "rb");
 #endif
+
     if (fptr == NULL)
     {
         return 0;
@@ -935,6 +942,7 @@ void LoadShaders(const char * vShaderFName, const char * pShaderFName)
 
         return;
     }
+
     glUseProgram(programHandle);
 }
 
@@ -1091,8 +1099,8 @@ int main(int argc, char** argv)
         return 1;
     }
 
-	// Adjust the window size to make sure these size values does not go beyound the screen limits.
-	vdkGetWindowInfo(egl.window, NULL, NULL, &width, &height, NULL, NULL);
+    // Adjust the window size to make sure these size values does not go beyound the screen limits.
+    vdkGetWindowInfo(egl.window, NULL, NULL, &width, &height, NULL, NULL);
 
     // Set window title and show the window.
     vdkSetWindowTitle(egl.window, TUTORIAL_NAME);
@@ -1100,6 +1108,7 @@ int main(int argc, char** argv)
 
     // load and compiler vertex/fragment shaders.
     LoadShaders("vs_es20t5.vert", "ps_es20t5.frag");
+
     if (programHandle != 0)
     {
         if (!RenderInit())

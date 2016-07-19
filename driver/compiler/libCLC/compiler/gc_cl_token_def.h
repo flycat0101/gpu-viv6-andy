@@ -521,25 +521,25 @@
 #if !defined (YYSTYPE) && ! defined (YYSTYPE_IS_DECLARED)
 #line 29 "gc_cl.y"
 typedef union YYSTYPE {
-	clsLexToken		token;
-	slsSLINK_LIST *		typeQualifierList;
-	clsDeclOrDeclList	*declOrDeclList;
-	slsDLINK_LIST *		fieldDeclList;
-	clsFieldDecl *		fieldDecl;
-	clsDATA_TYPE *		dataType;
-	clsDECL			decl;
-	cloIR_EXPR		expr;
-	clsNAME	*		funcName;
-	clsNAME	*		paramName;
-	clsATTRIBUTE *		attr;
-	slsSLINK_LIST *		enumeratorList;
-	clsNAME	*		enumeratorName;
-	cloIR_SET		statements;
-	cloIR_BASE		statement;
-	clsIfStatementPair	ifStatementPair;
-	clsForExprPair		forExprPair;
-	cloIR_POLYNARY_EXPR	funcCall;
-	gceSTATUS		status;
+    clsLexToken        token;
+    slsSLINK_LIST *        typeQualifierList;
+    clsDeclOrDeclList    *declOrDeclList;
+    slsDLINK_LIST *        fieldDeclList;
+    clsFieldDecl *        fieldDecl;
+    clsDATA_TYPE *        dataType;
+    clsDECL            decl;
+    cloIR_EXPR        expr;
+    clsNAME    *        funcName;
+    clsNAME    *        paramName;
+    clsATTRIBUTE *        attr;
+    slsSLINK_LIST *        enumeratorList;
+    clsNAME    *        enumeratorName;
+    cloIR_SET        statements;
+    cloIR_BASE        statement;
+    clsIfStatementPair    ifStatementPair;
+    clsForExprPair        forExprPair;
+    cloIR_POLYNARY_EXPR    funcCall;
+    gceSTATUS        status;
 } YYSTYPE;
 /* Line 1268 of yacc.c.  */
 #line 531 "gc_cl.tab.h"

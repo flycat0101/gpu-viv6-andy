@@ -365,7 +365,7 @@ VX_PRIVATE_API vx_context vxoContext_Create()
         gcoOS_GetEnv(gcvNULL, "VX_EXTENSION_LIBS", &oldEnv);
         if (oldEnv != NULL)
         {
-			vxLoadKernels(context, oldEnv);
+            vxLoadKernels(context, oldEnv);
         }
     }
     else

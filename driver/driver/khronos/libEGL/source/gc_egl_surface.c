@@ -631,6 +631,7 @@ veglResizeSurface(
     {
         VEGLThreadData thread;
         VEGLContext current;
+        VEGLPlatform platform = Display->platform;
         gcmASSERT(Surface->type & EGL_WINDOW_BIT);
 
         /* Get thread data. */
@@ -716,18 +717,18 @@ veglResizeSurface(
         /* Cancel window back buffer. */
         if (Surface->backBuffer.surface != gcvNULL)
         {
-            veglCancelWindowBackBuffer(Display, Surface, &Surface->backBuffer);
+            platform->cancelWindowBackBuffer(Display, Surface, &Surface->backBuffer);
 
             Surface->backBuffer.context = gcvNULL;
             Surface->backBuffer.surface = gcvNULL;
         }
 
         gcmASSERT(Surface->bound);
-        veglUnbindWindow(Display, Surface);
+        platform->unbindWindow(Display, Surface);
         Surface->bound = EGL_FALSE;
 
         /* Re-bind window for rendering. */
-        if (!veglBindWindow(Display, Surface, &Surface->renderMode))
+        if (!platform->bindWindow(Display, Surface, &Surface->renderMode))
         {
             eglResult = EGL_BAD_NATIVE_WINDOW;
             break;
@@ -748,7 +749,7 @@ veglResizeSurface(
             EGLBoolean result;
 
             /* Get window back buffer for new swap model. */
-            result = veglGetWindowBackBuffer(Display, Surface, &Surface->backBuffer);
+            result = platform->getWindowBackBuffer(Display, Surface, &Surface->backBuffer);
 
             if (!result)
             {
@@ -1094,7 +1095,7 @@ _InitializeSurface(
     surface->type             = Type;
     surface->buffer           = EGL_BACK_BUFFER;
     surface->colorType        = gcvSURF_COLOR_UNKNOWN;
-    surface->bufferAge        = 0;
+    surface->initialFrame     = EGL_TRUE;
 
     surface->vgColorSpace     = EGL_VG_COLORSPACE_sRGB;
     surface->vgAlphaFormat    = EGL_VG_ALPHA_FORMAT_NONPRE;
@@ -1259,6 +1260,7 @@ _CreateSurface(
     IN VEGLSurface Surface
     )
 {
+    VEGLPlatform platform = Display->platform;
     EGLint eglResult = EGL_SUCCESS;
 
     do
@@ -1286,7 +1288,7 @@ _CreateSurface(
                 );
 
             /* Query window size. */
-            result = veglGetWindowSize(Display, Surface, &width, &height);
+            result = platform->getWindowSize(Display, Surface, &width, &height);
 
             if (!result)
             {
@@ -1331,11 +1333,11 @@ _CreateSurface(
                 );
 
             /* Get pixmap size. */
-            result = veglGetPixmapSize(Display,
-                                       Surface->pixmap,
-                                       Surface->pixInfo,
-                                       &width,
-                                       &height);
+            result = platform->getPixmapSize(Display,
+                                             Surface->pixmap,
+                                             Surface->pixInfo,
+                                             &width,
+                                             &height);
 
             if (!result)
             {
@@ -1414,16 +1416,17 @@ _DestroySurface(
     IN VEGLSurface Surface
     )
 {
+    VEGLPlatform platform = Display->platform;
     gcmVERIFY_OK(_DestroySurfaceObjects(Thread, Surface));
 
     if (Surface->type & EGL_WINDOW_BIT)
     {
-        if (Surface->hwnd != (NativeWindowType) gcvNULL)
+        if (Surface->hwnd != gcvNULL)
         {
             if (Surface->backBuffer.surface != gcvNULL)
             {
-                veglCancelWindowBackBuffer(Display, Surface,
-                                           &Surface->backBuffer);
+                platform->cancelWindowBackBuffer(Display, Surface,
+                                                 &Surface->backBuffer);
 
                 Surface->backBuffer.context = gcvNULL;
                 Surface->backBuffer.surface = gcvNULL;
@@ -1432,15 +1435,15 @@ _DestroySurface(
             if (Surface->winInfo)
             {
                 /* Disconnect window. */
-                veglDisconnectWindow(Display, Surface);
+                platform->disconnectWindow(Display, Surface);
             }
 
-            Surface->hwnd = (NativeWindowType) gcvNULL;
+            Surface->hwnd = gcvNULL;
         }
     }
     else if (Surface->type & EGL_PIXMAP_BIT)
     {
-        if (Surface->pixmap != (NativePixmapType) gcvNULL)
+        if (Surface->pixmap != gcvNULL)
         {
             if (Surface->pixmapSurface != gcvNULL)
             {
@@ -1452,12 +1455,12 @@ _DestroySurface(
             if (Surface->pixInfo)
             {
                 /* Disconnect pixmap. */
-                veglDisconnectPixmap(Display,
-                                     Surface->pixmap,
-                                     Surface->pixInfo);
+                platform->disconnectPixmap(Display,
+                                           (void *) Surface->pixmap,
+                                           Surface->pixInfo);
             }
 
-            Surface->pixmap = (NativePixmapType) gcvNULL;
+            Surface->pixmap = gcvNULL;
         }
     }
 
@@ -1866,7 +1869,6 @@ veglCreatePlatformWindowSurface(
     EGLint type = EGL_WINDOW_BIT;
     VEGLConfig eglConfig;
     gceSTATUS status;
-    NativeWindowType window = (NativeWindowType) native_window;
 
     /* Get thread data. */
     thread = veglGetThreadData();
@@ -1973,12 +1975,12 @@ veglCreatePlatformWindowSurface(
     }
 
     /* Set Window attributes. */
-    surface->hwnd   = window;
+    surface->hwnd   = native_window;
     surface->buffer = renderBuffer;
     surface->protectedContent = protectedContent;
 
     /* Connect to window. */
-    result = veglConnectWindow(dpy, surface, surface->hwnd);
+    result = dpy->platform->connectWindow(dpy, surface, surface->hwnd);
 
     if (!result)
     {
@@ -2048,6 +2050,39 @@ eglCreatePlatformWindowSurface(
     VEGL_TRACE_API_POST(CreatePlatformWindowSurface)(dpy, config, native_window, attrib_list, surface);
 
     gcmDUMP_API("${EGL eglCreatePlatformWindowSurface 0x%08X 0x%08X 0x%08X (0x%08X) := "
+                "0x%08X (%dx%d)",
+                dpy, config, native_window, attrib_list, surface,
+                surface->config.width, surface->config.height);
+    gcmDUMP_API_ARRAY_TOKEN(attrib_list, EGL_NONE);
+    gcmDUMP_API("$}");
+
+    gcmFOOTER_ARG("return=0x%x", surface);
+    return surface;
+}
+
+/* EGL_EXT_platform_base. */
+EGLAPI EGLSurface EGLAPIENTRY
+eglCreatePlatformWindowSurfaceEXT(
+    EGLDisplay dpy,
+    EGLConfig config,
+    void *native_window,
+    const EGLint *attrib_list
+    )
+{
+    VEGLSurface surface;
+
+    gcmHEADER_ARG("dpy=0x%x config=0x%x native_window=%d attrib_list=0x%x",
+                    dpy, config, native_window, attrib_list);
+
+    VEGL_TRACE_API_PRE(CreatePlatformWindowSurfaceEXT)(dpy, config, native_window, attrib_list);
+
+    /* Call internal implmentation. */
+    surface = (VEGLSurface) veglCreatePlatformWindowSurface(
+                dpy, config, native_window, attrib_list, EGL_TRUE);
+
+    VEGL_TRACE_API_POST(CreatePlatformWindowSurfaceEXT)(dpy, config, native_window, attrib_list, surface);
+
+    gcmDUMP_API("${EGL eglCreatePlatformWindowSurfaceEXT 0x%08X 0x%08X 0x%08X (0x%08X) := "
                 "0x%08X (%dx%d)",
                 dpy, config, native_window, attrib_list, surface,
                 surface->config.width, surface->config.height);
@@ -2718,6 +2753,7 @@ eglSurfaceAttrib(
     VEGLSurface surface;
     gceSTATUS status;
     VEGLContext current;
+    VEGLPlatform platform;
 
     gcmHEADER_ARG("Dpy=0x%x Surface=0x%x attribute=%d value=%d",
                     Dpy, Surface, attribute, value);
@@ -2763,6 +2799,9 @@ eglSurfaceAttrib(
         veglSetEGLerror(thread, EGL_BAD_SURFACE);
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
+
+    /* Get shortcut. */
+    platform = dpy->platform;
 
     switch (attribute)
     {
@@ -2812,7 +2851,7 @@ eglSurfaceAttrib(
         /* Cancel window back buffer. */
         if (surface->backBuffer.surface != gcvNULL)
         {
-            veglCancelWindowBackBuffer(dpy, surface, &surface->backBuffer);
+            platform->cancelWindowBackBuffer(dpy, surface, &surface->backBuffer);
 
             surface->backBuffer.context = gcvNULL;
             surface->backBuffer.surface = gcvNULL;
@@ -2832,11 +2871,11 @@ eglSurfaceAttrib(
         }
 
         gcmASSERT(surface->bound);
-        veglUnbindWindow(dpy, surface);
+        platform->unbindWindow(dpy, surface);
         surface->bound = EGL_FALSE;
 
         /* Re-bind window for rendering. */
-        if (!veglBindWindow(dpy, surface, &surface->renderMode))
+        if (!platform->bindWindow(dpy, surface, &surface->renderMode))
         {
             veglSetEGLerror(thread, EGL_BAD_ALLOC);
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
@@ -2856,7 +2895,7 @@ eglSurfaceAttrib(
         {
             /* Get window back buffer for new swap model. */
             /* TODO: handle get back buffer failure? */
-            veglGetWindowBackBuffer(dpy, surface, &surface->backBuffer);
+            platform->getWindowBackBuffer(dpy, surface, &surface->backBuffer);
         }
 
         if (surface->renderMode > 0)
@@ -3155,15 +3194,24 @@ eglQuerySurface(
     case EGL_BUFFER_AGE_EXT:
         if (thread->context && thread->context->draw == surface)
         {
+            if (surface->initialFrame)
+            {
+                *value = 0;
+                break;
+            }
+
             if ((surface->swapBehavior == EGL_BUFFER_PRESERVED) ||
-                ((surface->renderTarget != gcvNULL) &&
-                 (surface->backBuffer.surface == gcvNULL)))
+                (surface->renderMode == VEGL_INDIRECT_RENDERING))
             {
                 *value = 1;
                 break;
             }
 
-            if (veglQueryBufferAge(dpy, surface, &surface->backBuffer, value))
+            if (dpy->platform &&
+                dpy->platform->queryBufferAge(dpy,
+                                               surface,
+                                               &surface->backBuffer,
+                                               value))
             {
                 break;
             }
@@ -3215,12 +3263,11 @@ veglCreatePlatformPixmapSurface(
     VEGLDisplay dpy;
     VEGLConfig eglConfig;
     VEGLSurface surface;
+    VEGLPlatform platform;
     EGLint type = EGL_PIXMAP_BIT;
     EGLint error;
     EGLBoolean result;
     gceSTATUS status;
-
-    NativePixmapType pixmap = (NativePixmapType) native_pixmap;
 
     /* Get thread data. */
     thread = veglGetThreadData();
@@ -3252,20 +3299,8 @@ veglCreatePlatformPixmapSurface(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    /* Test for platform type. */
-    switch (dpy->platform)
-    {
-    case EGL_PLATFORM_ANDROID_KHR:
-    case EGL_PLATFORM_GBM_KHR:
-    case EGL_PLATFORM_WAYLAND_KHR:
-        /* Not allowed. */
-        veglSetEGLerror(thread, EGL_BAD_PARAMETER);;
-        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-        break;
-    case EGL_PLATFORM_X11_KHR:
-    default:
-        break;
-    }
+    /* Get shortcut. */
+    platform = dpy->platform;
 
     /* Test for valid config. */
     if (((EGLint)(intptr_t)Config <= __EGL_INVALID_CONFIG__)
@@ -3336,14 +3371,14 @@ veglCreatePlatformPixmapSurface(
     }
 
     /* Set Pixmap attributes. */
-    surface->pixmap = pixmap;
+    surface->pixmap = native_pixmap;
     surface->buffer = EGL_SINGLE_BUFFER;
 
     /* Connect to pixmap. */
-    result = veglConnectPixmap(dpy,
-                               pixmap,
-                               &surface->pixInfo,
-                               &surface->pixmapSurface);
+    result = platform->connectPixmap(dpy,
+                                     native_pixmap,
+                                     &surface->pixInfo,
+                                     &surface->pixmapSurface);
 
     if (!result)
     {
@@ -3356,7 +3391,7 @@ veglCreatePlatformPixmapSurface(
     }
 
     /* Sync pixels. */
-    veglSyncFromPixmap(pixmap, surface->pixInfo);
+    platform->syncFromPixmap(native_pixmap, surface->pixInfo);
 
     /* Reference the pixmap surface. */
     gcoSURF_ReferenceSurface(surface->pixmapSurface);
@@ -3410,6 +3445,36 @@ eglCreatePlatformPixmapSurface(
     VEGL_TRACE_API_POST(CreatePlatformPixmapSurface)(dpy, config, native_pixmap, attrib_list, surface);
 
     gcmDUMP_API("${EGL eglCreatePlatformPixmapSurface 0x%08X 0x%08X 0x%08X (0x%08X) := 0x%08X",
+                dpy, config, native_pixmap, attrib_list, surface);
+    gcmDUMP_API_ARRAY_TOKEN(attrib_list, EGL_NONE);
+    gcmDUMP_API("$}");
+
+    gcmFOOTER_ARG("return=0x%x", surface);
+    return surface;
+}
+
+EGLAPI EGLSurface EGLAPIENTRY
+eglCreatePlatformPixmapSurfaceEXT(
+    EGLDisplay dpy,
+    EGLConfig config,
+    void *native_pixmap,
+    const EGLint *attrib_list
+    )
+{
+    EGLSurface surface;
+
+    gcmHEADER_ARG("dpy=0x%x config=0x%x native_pixmap=0x%x attrib_list=0x%x",
+                    dpy, config, native_pixmap, attrib_list);
+
+    VEGL_TRACE_API_PRE(CreatePlatformPixmapSurfaceEXT)(dpy, config, native_pixmap, attrib_list);
+
+    /* Call internal implementation. */
+    surface = veglCreatePlatformPixmapSurface(
+                dpy, config, native_pixmap, attrib_list, EGL_TRUE);
+
+    VEGL_TRACE_API_POST(CreatePlatformPixmapSurfaceEXT)(dpy, config, native_pixmap, attrib_list, surface);
+
+    gcmDUMP_API("${EGL eglCreatePlatformPixmapSurfaceEXT 0x%08X 0x%08X 0x%08X (0x%08X) := 0x%08X",
                 dpy, config, native_pixmap, attrib_list, surface);
     gcmDUMP_API_ARRAY_TOKEN(attrib_list, EGL_NONE);
     gcmDUMP_API("$}");

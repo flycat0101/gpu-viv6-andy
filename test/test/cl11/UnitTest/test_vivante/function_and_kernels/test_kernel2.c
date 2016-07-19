@@ -56,8 +56,8 @@ const char *kernel_code_test_kernel2 = "__kernel void kernel2(__global unsigned 
 "\n"
 "__kernel void test_kernel2(__global unsigned char *src, __global unsigned char *dst)\n"
 "{\n"
-"	__private unsigned char n;\n"
-"	n= 8;\n"
+"    __private unsigned char n;\n"
+"    n= 8;\n"
 "\n"
  "   kernel2(src, dst, n);\n"
 "\n"
@@ -68,12 +68,12 @@ verify_test_kernel2(unsigned char *inptr, unsigned char *outptr, int n)
 {
     int i;
 
-	for(i=0 ; i<n; i++){
+    for(i=0 ; i<n; i++){
 
-		if( outptr[i] != i % (1 << (inptr[i] % 8)))
-			return -1;
+        if( outptr[i] != i % (1 << (inptr[i] % 8)))
+            return -1;
 
-	}
+    }
 
     log_info("test_kernel2 test passed\n");
     return 0;
@@ -82,19 +82,19 @@ verify_test_kernel2(unsigned char *inptr, unsigned char *outptr, int n)
 int test_kernel2(cl_device_id device, cl_context context, cl_command_queue queue, int num_elements)
 {
 
-	cl_mem streams[2];
-	unsigned char *input_h, *output_h;
-	cl_program program;
-	cl_kernel kernel;
-	size_t threads[1];
-	int err, i;
+    cl_mem streams[2];
+    unsigned char *input_h, *output_h;
+    cl_program program;
+    cl_kernel kernel;
+    size_t threads[1];
+    int err, i;
     MTdata d = init_genrand( gRandomSeed );
 
-  	//kernel_code_test_kernel2 = (const char*)read_source_file("test_kernel2.cl");
+      //kernel_code_test_kernel2 = (const char*)read_source_file("test_kernel2.cl");
 
-	size_t length = sizeof(unsigned char) * num_elements;
-	input_h  = (unsigned char*)malloc(length);
-	output_h = (unsigned char*)malloc(length);
+    size_t length = sizeof(unsigned char) * num_elements;
+    input_h  = (unsigned char*)malloc(length);
+    output_h = (unsigned char*)malloc(length);
 
     streams[0] = clCreateBuffer(context, CL_MEM_READ_WRITE, length, NULL, NULL);
     if (!streams[0])
@@ -109,11 +109,11 @@ int test_kernel2(cl_device_id device, cl_context context, cl_command_queue queue
         return -1;
     }
 
-	for (i=0; i<num_elements; i++){
+    for (i=0; i<num_elements; i++){
 
-		input_h[i] = ((unsigned int)genrand_int32(d))%256;
+        input_h[i] = ((unsigned int)genrand_int32(d))%256;
 
-	}
+    }
 
     free_mtdata(d); d = NULL;
 
@@ -130,13 +130,13 @@ int test_kernel2(cl_device_id device, cl_context context, cl_command_queue queue
 
   err  = clSetKernelArg(kernel, 0, sizeof streams[0], &streams[0]);
   err |= clSetKernelArg(kernel, 1, sizeof streams[1], &streams[1]);
-	if (err != CL_SUCCESS)
-	{
-		log_error("clSetKernelArgs failed\n");
-		return -1;
-	}
+    if (err != CL_SUCCESS)
+    {
+        log_error("clSetKernelArgs failed\n");
+        return -1;
+    }
 
-	threads[0] = (unsigned int)num_elements;
+    threads[0] = (unsigned int)num_elements;
   err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, threads, NULL, 0, NULL, NULL);
   if (err != CL_SUCCESS)
   {
@@ -153,15 +153,15 @@ int test_kernel2(cl_device_id device, cl_context context, cl_command_queue queue
 
   err = verify_test_kernel2(input_h, output_h, num_elements);
 
-	// cleanup
-	clReleaseMemObject(streams[0]);
-	clReleaseMemObject(streams[1]);
-	clReleaseKernel(kernel);
-	clReleaseProgram(program);
-	free(input_h);
-	free(output_h);
+    // cleanup
+    clReleaseMemObject(streams[0]);
+    clReleaseMemObject(streams[1]);
+    clReleaseKernel(kernel);
+    clReleaseProgram(program);
+    free(input_h);
+    free(output_h);
 
-	return err;
+    return err;
 }
 
 

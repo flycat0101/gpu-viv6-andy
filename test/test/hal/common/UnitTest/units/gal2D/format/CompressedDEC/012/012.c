@@ -196,7 +196,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
     gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
 
-#if 1
     if (!t2d->runtime->noSaveTargetNew)
     {
         char name[200];
@@ -205,7 +204,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         sprintf(name, "gal2DFormatCompressedDEC012_intermediate_%03d.bmp", frameNo);
         GalSaveTSurfToDIB(t2d->surf[9], name);
     }
-#endif
 
     /* render the result to uncompressed dst surface. */
     gcmONERROR(gco2D_SetGenericSource(
@@ -294,7 +292,7 @@ static void CDECL Destroy(Test2D *t2d)
 
 const gceFEATURE FeatureList[]=
 {
-    gcvFEATURE_DEC_COMPRESSION,
+    gcvFEATURE_DEC300_COMPRESSION,
     gcvFEATURE_2D_MULTI_SOURCE_BLT_EX2,
 };
 

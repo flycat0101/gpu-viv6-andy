@@ -3364,7 +3364,8 @@ gcoHARDWARE_SetVertexArrayEx(
 
             stride = streamPtr->stream == gcvNULL ? streamPtr->dynamicCacheStride : streamPtr->stride;
             divisor = streamPtr->divisor;
-            base    = streamPtr->attributePtr->offset;
+            /* now, the offset become the real offset, not a pointer address, < 4GB is safe.*/
+            gcmSAFECASTSIZET(base, streamPtr->attributePtr->offset);
 
             if (streamPtr->stream != gcvNULL)
             {
@@ -3504,13 +3505,16 @@ gcoHARDWARE_SetVertexArrayEx(
             for (attrPtr = streamPtr->attributePtr, fetchSize = 0; attrPtr != gcvNULL; attrPtr = attrPtr->next)
             {
                 gctUINT32 link = attrPtr->linkage;
-                gctUINT32 offset = attrPtr->offset;
+                gctUINT32 offset = 0;
                 gctUINT32 normalize;
                 gctUINT32 fetchBreak = 0;
                 gctUINT32 format = 0;
                 gctUINT32 endian = 0;
 
                 gcmCOMPUTE_FORMAT_AND_ENDIAN();
+
+                /* Now, the offset become the real offset, not a pointer address, < 4GB is safe.*/
+                gcmSAFECASTSIZET(offset, attrPtr->offset);
 
                 /* Get normalized flag. */
                 normalize = (attrPtr->normalized)

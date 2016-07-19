@@ -41,16 +41,20 @@ INCLUDE := -I$(AQROOT)/hal/inc \
            -I$(AQROOT)/hal/user \
            -I$(AQARCH)/cmodel/inc \
            -I$(AQROOT)/hal/user/arch \
-           -I$(AQROOT)/hal/user/archvg \
-           -I$(AQROOT)/compiler/libVSC/include
 
-  INCLUDE += -I$(AQROOT)/hal/os/linux/user
+ifeq ($(VIVANTE_ENABLE_3D),1)
+  INCLUDE += -I$(AQROOT)/compiler/libVSC/include
 
-ifneq ($(THIRDPARTY_CUSTOMER),)
-  ifneq ($(THIRDPARTY_TYPE),)
-    INCLUDE += -I$(AQROOT)/hal/user/arch/thirdparty_special/$(THIRDPARTY_CUSTOMER)
-  endif
 endif
+ifeq ($(VIVANTE_ENABLE_2D),1)
+  INCLUDE += -I$(AQROOT)/hal/user/arch/thirdparty_special
+
+endif
+ifeq ($(VIVANTE_ENABLE_VG),1)
+  INCLUDE += -I$(AQROOT)/hal/user/archvg \
+
+endif
+  INCLUDE += -I$(AQROOT)/hal/os/linux/user
 
 CFLAGS += $(INCLUDE)
 
@@ -59,7 +63,9 @@ CFLAGS += $(INCLUDE)
 
 
 ifneq ($(USE_ARMCC), 1)
-    CFLAGS += -fPIC -Wno-unused-function -Werror -ansi
+  CFLAGS += -fPIC -Wno-unused-function -Werror
+
+    CFLAGS += -ansi
 endif
 
 ################################################################################
@@ -77,12 +83,6 @@ OBJECTS  := $(OBJ_DIR)/gc_hal_user_hardware_blt.o \
             $(OBJ_DIR)/gc_hal_user_hardware_target.o \
             $(OBJ_DIR)/gc_hal_user_hardware_dec.o
 
-ifneq ($(THIRDPARTY_CUSTOMER),)
-  ifneq ($(THIRDPARTY_TYPE),)
-    OBJECTS += $(OBJ_DIR)/gc_hal_user_hardware_thirdparty_$(THIRDPARTY_TYPE).o
-  endif
-endif
-
 ifeq ($(VIVANTE_ENABLE_3D),1)
   OBJECTS += $(OBJ_DIR)/gc_hal_user_hardware_composition.o \
              $(OBJ_DIR)/gc_hal_user_hardware_clear.o \
@@ -97,6 +97,13 @@ ifeq ($(VIVANTE_ENABLE_3D),1)
   ifeq ($(USE_OPENVX),1)
     OBJECTS += $(OBJ_DIR)/gc_hal_user_hardware_vx.o
   endif
+endif
+
+ifeq ($(VIVANTE_ENABLE_2D),1)
+  OBJECTS += $(OBJ_DIR)/gc_hal_user_hardware_thirdparty.o \
+             $(OBJ_DIR)/gc_hal_user_hardware_thirdparty_v10.o \
+             $(OBJ_DIR)/gc_hal_user_hardware_thirdparty_v11.o
+
 endif
 
 ################################################################################
@@ -129,14 +136,9 @@ endif
 ################################################################################
 # Object rules.
 
-ifneq ($(THIRDPARTY_CUSTOMER),)
-  ifneq ($(THIRDPARTY_TYPE),)
-$(OBJ_DIR)/%.o: ./thirdparty_special/$(THIRDPARTY_CUSTOMER)/%.c
+$(OBJ_DIR)/%.o: ./thirdparty_special/%.c
 	@mkdir -p $(OBJ_DIR)
 	$(CC) -c $(CFLAGS) -MMD -o $@ $<
-
-  endif
-endif
 
 $(OBJ_DIR)/%.o: %.c
 	@mkdir -p $(OBJ_DIR)

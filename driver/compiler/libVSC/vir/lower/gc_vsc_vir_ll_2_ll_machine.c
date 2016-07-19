@@ -24,6 +24,33 @@ _hasNEW_SIN_COS_LOG_DIV(
     return ((VIR_PatternLowerContext *)Context)->hwCfg->hwFeatureFlags.hasNewSinCosLogDiv;
 }
 
+static gctBOOL
+_SetUIntFloatFour(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_ScalarConstVal imm0;
+
+    imm0.uValue = 0xf0000004,
+
+    VIR_Operand_SetImmediate(Opnd,
+        VIR_TYPE_UINT32,
+        imm0);
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_hasNot32IntDIV(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return gcvTRUE;
+}
+
 static VIR_PatternMatchInst _divPatInst0[] = {
     { VIR_OP_DIV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasNEW_SIN_COS_LOG_DIV, VIR_Lower_IsFloatOpcode }, VIR_PATN_MATCH_FLAG_AND },
 };
@@ -38,6 +65,112 @@ static VIR_Pattern _divPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
+/*
+** MOD, temp(1), temp(2), temp(3)
+** -->
+** DIV, temp(4), temp(2), temp(3)
+** FLOOR, temp(4), temp(4)
+** MAD, temp(1), -temp(3),temp(4), temp(2)
+*/
+static VIR_PatternMatchInst _modPatInst0[] = {
+    { VIR_OP_MOD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_IsDstFloat }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _modRepInst0[] = {
+    { VIR_OP_DIV, 0, 0, { -1, 2, 3, 0 }, { 0 } },
+    { VIR_OP_FLOOR, 0, 0, { -1, -1, 0, 0 }, { 0 } },
+    { VIR_OP_MAD, 0, 0, { 1, 3, -1, 2 }, { 0, VIR_Lower_SetOpndNeg, 0, 0 } },
+};
+
+static VIR_PatternMatchInst _modPatInst1[] = {
+    { VIR_OP_MOD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasNot32IntDIV, VIR_Lower_IsIntOpcode, VIR_Lower_IsDstInt32, VIR_Lower_IsDstSigned }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _modRepInst1[] = {
+    { VIR_OP_SIGN, 0, 0, { -1, 3, 0, 0 }, { 0 } },
+    { VIR_OP_SIGN, 0, 0, { -2, 2, 0, 0 }, { 0 } },
+    { VIR_OP_MUL, 0, 0, { -1, -1, -2, 0 }, { 0 } },
+    { VIR_OP_ABS, 0, 0, { -3, 2, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_ABS, 0, 0, { -4, 3, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_JMPC, VIR_COP_LESS_OR_EQUAL, 0, { 0, -4, 0, 0 }, { 0, 0, VIR_Lower_SetUIntOne } },
+    { VIR_OP_AQ_I2F, 0, 0, { -5, -4, 0, 0 }, { VIR_Lower_SetOpndFloat } },
+    { VIR_OP_ADD, 0, 0, { -6, -5, 0, 0 }, { VIR_Lower_SetOpndUINT32, 0, _SetUIntFloatFour } },
+    { VIR_OP_RCP, 0, 0, { -7, -6, 0, 0 }, { VIR_Lower_SetOpndFloat } },
+    { VIR_OP_AQ_F2I, 0, 0, { -8, -7, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_SUB, 0, 0, { -9, 0, -4, 0 }, { VIR_Lower_SetOpndUINT32, VIR_Lower_SetIntZero} },
+    { VIR_OP_MUL, 0, 0, { -10, -9, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_MULHI, 0, 0, { -11, -10, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_ADD, 0, 0, { -12, -11, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_MUL, 0, 0, { -13, -12, -4, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_JMPC, VIR_COP_GREATER, 0, { 0, -13, -9, 0 }, { 0 } },
+    { VIR_OP_ADD, 0, 0, { -12, -12, 0, 0 }, { VIR_Lower_SetOpndUINT32, 0, VIR_Lower_SetUIntOne} },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg2 } },
+    { VIR_OP_MULHI, 0, 0, { -13, -12, -3, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_MUL, 0, 0, { -14, -13, -9, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_ADD, 0, 0, { -14, -3, -14, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_JMPC, VIR_COP_LESS, 0, { 0, -14, -4, 0 }, { 0 } },
+    { VIR_OP_ADD, 0, 0, { 1, -13, 0, 0 }, { 0, 0, VIR_Lower_SetUIntOne} },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3 } },
+    { VIR_OP_MOV, 0, 0, { 1, -13, 0, 0 }, { 0 } },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg22 } },
+    { VIR_OP_MOV, 0, 0, { 1, -3, 0, 0 }, { 0 } },
+    { VIR_OP_LABEL, 0, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3_6 } },
+    { VIR_OP_MUL, 0, 0, { 1, -1, 1, 0 }, { 0 } },
+    { VIR_OP_MUL, 0, 0, { 1, 3, 1, 0 }, { 0 } },
+    { VIR_OP_SUB, 0, 0, { 1, 2, 1, 0 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _modPatInst2[] = {
+    { VIR_OP_MOD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasNot32IntDIV, VIR_Lower_IsIntOpcode, VIR_Lower_IsDstInt32 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _modRepInst2[] = {
+    { VIR_OP_JMPC, VIR_COP_LESS_OR_EQUAL, 0, { 0, 3, 0, 0 }, { 0, 0, VIR_Lower_SetUIntOne } },
+    { VIR_OP_AQ_I2F, 0, 0, { -5, 3, 0, 0 }, { VIR_Lower_SetOpndFloat } },
+    { VIR_OP_ADD, 0, 0, { -6, -5, 0, 0 }, { VIR_Lower_SetOpndUINT32, 0, _SetUIntFloatFour } },
+    { VIR_OP_RCP, 0, 0, { -7, -6, 0, 0 }, { VIR_Lower_SetOpndFloat } },
+    { VIR_OP_AQ_F2I, 0, 0, { -8, -7, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_SUB, 0, 0, { -9, 0, 3, 0 }, { VIR_Lower_SetOpndUINT32, VIR_Lower_SetIntZero} },
+    { VIR_OP_MUL, 0, 0, { -10, -9, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_MULHI, 0, 0, { -11, -10, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_ADD, 0, 0, { -12, -11, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_MUL, 0, 0, { -13, -12, 3, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_JMPC, VIR_COP_GREATER, 0, { 0, -13, -9, 0 }, { 0 } },
+    { VIR_OP_ADD, 0, 0, { -12, -12, 0, 0 }, { VIR_Lower_SetOpndUINT32, 0, VIR_Lower_SetUIntOne} },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg2 } },
+    { VIR_OP_MULHI, 0, 0, { -13, -12, 2, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_MUL, 0, 0, { -14, -13, -9, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_ADD, 0, 0, { -14, 2, -14, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_JMPC, VIR_COP_LESS, 0, { 0, -14, 3, 0 }, { 0 } },
+    { VIR_OP_ADD, 0, 0, { 1, -13, 0, 0 }, { 0, 0, VIR_Lower_SetUIntOne} },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3 } },
+    { VIR_OP_MOV, 0, 0, { 1, -13, 0, 0 }, { 0 } },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg22 } },
+    { VIR_OP_MOV, 0, 0, { 1, 2, 0, 0 }, { 0 } },
+    { VIR_OP_LABEL, 0, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3_6 } },
+    { VIR_OP_MUL, 0, 0, { 1, 3, 1, 0 }, { 0 } },
+    { VIR_OP_SUB, 0, 0, { 1, 2, 1, 0 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _modPatInst3[] = {
+    { VIR_OP_MOD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _modRepInst3[] = {
+    { VIR_OP_AQ_IMOD, 0, 0, { 1, 2, 3, 0 }, { 0 } },
+};
+
+static VIR_Pattern _modPattern[] = {
+    { VIR_PATN_FLAG_RECURSIVE_SCAN, CODEPATTERN(_mod, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_mod, 1) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_mod, 2) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_mod, 3) },
+    { VIR_PATN_FLAG_NONE }
+};
 
 static VIR_PatternMatchInst _sinpiPatInst0[] = {
     { VIR_OP_SINPI, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _hasNEW_SIN_COS_LOG_DIV }, VIR_PATN_MATCH_FLAG_AND },
@@ -164,6 +297,8 @@ _GetLowerPatternPhaseMachine(
     {
     case VIR_OP_DIV:
         return _divPattern;
+    case VIR_OP_MOD:
+        return _modPattern;
     case VIR_OP_PRE_LOG2:
         return _logPattern;
     case VIR_OP_SINPI:

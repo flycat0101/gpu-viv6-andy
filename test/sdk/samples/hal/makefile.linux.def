@@ -31,14 +31,20 @@
 
 include $(AQROOT)/makefile.linux.def
 
-ifeq ($(EGL_API_FB), 0)
+ifeq ($(EGL_API_FB), 1)
+CFLAGS += $(INCLUDE) -DFBDriver
+endif
+
 ifeq ($(EGL_API_DFB), 1)
 CFLAGS += $(INCLUDE) -DFBDriver
-else
+endif
+
+ifeq ($(EGL_API_DRI), 1)
 CFLAGS += $(INCLUDE) -DX11
 endif
-else
-CFLAGS += $(INCLUDE) -DFBDriver
+
+ifeq ($(EGL_API_X), 1)
+CFLAGS += $(INCLUDE) -DX11
 endif
 
 ifeq ($(VIVANTE_NO_3D),1)
@@ -48,7 +54,7 @@ endif
 ################################################################################
 # Supply additional include directories.
 
-INCLUDE += -I$(AQROOT)/sdk/inc -I$(VIVANTE_SDK_INC)
+INCLUDE += -I$(VIVANTE_SDK_INC)
 INCLUDE += -I$(VIVANTE_SDK_INC)/HAL -I$(AQROOT)/sdk/inc
 
 ################################################################################
@@ -69,18 +75,22 @@ LIBS += $(LIB_DIR)/libdl.a
 LIBS += $(LIB_DIR)/librt.a
 else
 
-ifeq ($(EGL_API_FB), 0)
 ifeq ($(EGL_API_DFB), 1)
 INCLUDE += -I$(DFB_DIR)/include/directfb
 LIBS += -Wl,-rpath $(DFB_DIR)/lib
-else
+endif
+
+ifeq ($(EGL_API_DRI), 1)
 INCLUDE += -I$(X11_ARM_DIR)/include
-LIBS += -L$(X11_ARM_DIR)/lib -lX11 -lXau -lXdmcp
-endif
+LIBS += -L$(X11_ARM_DIR)/lib  -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11
 endif
 
+ifeq ($(EGL_API_X), 1)
+INCLUDE += -I$(X11_ARM_DIR)/include
+LIBS += -L$(X11_ARM_DIR)/lib -lXau -lXdmcp -lX11
+endif
 
-LIBS += -L$(VIVANTE_SDK_LIB) -l GAL
+LIBS += -L$(VIVANTE_SDK_LIB) -lGAL
 LIBS += -lm -lpthread -ldl -lrt
 endif
 

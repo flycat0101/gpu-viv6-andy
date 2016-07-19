@@ -57,7 +57,7 @@ OES_fixed_point is a core addition. The other extensions are listed and explaine
 OpenGL ES 1.1 specification.*/
 
 #define PRECISION 16
-#define ONE	(1 << PRECISION)
+#define ONE    (1 << PRECISION)
 #define ZERO 0
 //inline GLfixed FixedFromInt(int value) {return value << PRECISION;};
 
@@ -94,7 +94,7 @@ OpenGL ES 1.1 specification.*/
  *
  *//**
  * \file
- * \brief	Header for including the Tiger image data.
+ * \brief    Header for including the Tiger image data.
  * \note
  *//*-------------------------------------------------------------------*/
 #include "vgframe.h"

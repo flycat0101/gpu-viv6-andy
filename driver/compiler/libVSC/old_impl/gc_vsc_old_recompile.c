@@ -179,8 +179,8 @@ typedef enum
     gcvUIntUniformIndex,
     gcvFloatUniformIndex,
     gcvIntAttributeIndex,
-	gcvUIntAttributeIndex,
-	gcvFloatAttributeIndex,
+    gcvUIntAttributeIndex,
+    gcvFloatAttributeIndex,
     gcvDest
 }
 _sourceType;
@@ -326,32 +326,32 @@ _copySource(
         sourceIndex = (gctUINT16) ((SourceValue->i32) & 0xFFFF);
         sourceIndexed = 0;
         break;
-    	case gcvIntAttributeIndex:
-		source = gcmSL_SOURCE_SET(0, Type, gcSL_ATTRIBUTE);
-		source = gcmSL_SOURCE_SET(source, Format, gcSL_INT32);
-		source = gcmSL_SOURCE_SET(source, Swizzle, srcSwizzle);
-		source = gcmSL_SOURCE_SET(source, Precision, SourcePrecision);
-		sourceIndex = (gctUINT16)((SourceValue->i32) & 0xFFFF);
-		sourceIndexed = 0;
-		break;
+        case gcvIntAttributeIndex:
+        source = gcmSL_SOURCE_SET(0, Type, gcSL_ATTRIBUTE);
+        source = gcmSL_SOURCE_SET(source, Format, gcSL_INT32);
+        source = gcmSL_SOURCE_SET(source, Swizzle, srcSwizzle);
+        source = gcmSL_SOURCE_SET(source, Precision, SourcePrecision);
+        sourceIndex = (gctUINT16)((SourceValue->i32) & 0xFFFF);
+        sourceIndexed = 0;
+        break;
 
-	case gcvUIntAttributeIndex:
-		source = gcmSL_SOURCE_SET(0, Type, gcSL_ATTRIBUTE);
-		source = gcmSL_SOURCE_SET(source, Format, gcSL_UINT32);
-		source = gcmSL_SOURCE_SET(source, Swizzle, srcSwizzle);
-		source = gcmSL_SOURCE_SET(source, Precision, SourcePrecision);
-		sourceIndex = (gctUINT16)((SourceValue->u32) & 0xFFFF);
-		sourceIndexed = 0;
-		break;
+    case gcvUIntAttributeIndex:
+        source = gcmSL_SOURCE_SET(0, Type, gcSL_ATTRIBUTE);
+        source = gcmSL_SOURCE_SET(source, Format, gcSL_UINT32);
+        source = gcmSL_SOURCE_SET(source, Swizzle, srcSwizzle);
+        source = gcmSL_SOURCE_SET(source, Precision, SourcePrecision);
+        sourceIndex = (gctUINT16)((SourceValue->u32) & 0xFFFF);
+        sourceIndexed = 0;
+        break;
 
-	case gcvFloatAttributeIndex:
-		source = gcmSL_SOURCE_SET(0, Type, gcSL_ATTRIBUTE);
-		source = gcmSL_SOURCE_SET(source, Format, gcSL_FLOAT);
-		source = gcmSL_SOURCE_SET(source, Swizzle, srcSwizzle);
-		source = gcmSL_SOURCE_SET(source, Precision, SourcePrecision);
-		sourceIndex = (gctUINT16)((SourceValue->i32) & 0xFFFF);
-		sourceIndexed = 0;
-		break;
+    case gcvFloatAttributeIndex:
+        source = gcmSL_SOURCE_SET(0, Type, gcSL_ATTRIBUTE);
+        source = gcmSL_SOURCE_SET(source, Format, gcSL_FLOAT);
+        source = gcmSL_SOURCE_SET(source, Swizzle, srcSwizzle);
+        source = gcmSL_SOURCE_SET(source, Precision, SourcePrecision);
+        sourceIndex = (gctUINT16)((SourceValue->i32) & 0xFFFF);
+        sourceIndexed = 0;
+        break;
 
     case gcvDest:
         gcmASSERT(FromCode != gcvNULL);
@@ -3780,7 +3780,7 @@ _addRtWidthUniform(
     for(i = 0; i < Shader->uniformCount; i++)
     {
         uniform = Shader->uniforms[i];
-        if(uniform && uniform->name)
+        if(uniform)
         {
             if(gcmIS_SUCCESS(gcoOS_StrCmp(uniform->name, name)))
             {
@@ -3822,7 +3822,7 @@ _addRtHeightUniform(
     for(i = 0; i < Shader->uniformCount; i++)
     {
         uniform = Shader->uniforms[i];
-        if(uniform && uniform->name)
+        if(uniform)
         {
             if(gcmIS_SUCCESS(gcoOS_StrCmp(uniform->name, name)))
             {
@@ -3864,7 +3864,7 @@ _addBlendSamplerUniform(
     for(i = 0; i < Shader->uniformCount; i++)
     {
         uniform = Shader->uniforms[i];
-        if(uniform && uniform->name)
+        if(uniform)
         {
             if(gcmIS_SUCCESS(gcoOS_StrCmp(uniform->name, name)))
             {
@@ -3906,7 +3906,7 @@ _addBlendModeUniform(
     for(i = 0; i < Shader->uniformCount; i++)
     {
         uniform = Shader->uniforms[i];
-        if(uniform && uniform->name)
+        if(uniform)
         {
             if(gcmIS_SUCCESS(gcoOS_StrCmp(uniform->name, name)))
             {
@@ -6264,78 +6264,78 @@ gctSTRING BlendRecompilerShaderSource = gcvNULL;
 
 gceSTATUS
 gcSHADER_FreeBlendLibrary(
-	void
-	)
+    void
+    )
 {
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
 
-	gcmHEADER();
+    gcmHEADER();
 
-	if (gcBlendLibrary)
-	{
-		/* Free library. */
-		gcSHADER_Destroy(gcBlendLibrary);
-		gcBlendLibrary = gcvNULL;
+    if (gcBlendLibrary)
+    {
+        /* Free library. */
+        gcSHADER_Destroy(gcBlendLibrary);
+        gcBlendLibrary = gcvNULL;
 
-		if (BlendRecompilerShaderSource)
-		{
-			gcmOS_SAFE_FREE(gcvNULL, BlendRecompilerShaderSource);
-		}
-	}
+        if (BlendRecompilerShaderSource)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, BlendRecompilerShaderSource);
+        }
+    }
 
-	gcmFOOTER();
-	return status;
+    gcmFOOTER();
+    return status;
 }
 
 gceSTATUS
 gcLoadBlendLibrary(
-	void
-	)
+    void
+    )
 {
-	gceSTATUS status = gcvSTATUS_OK;
-	gctSTRING log = gcvNULL;
+    gceSTATUS status = gcvSTATUS_OK;
+    gctSTRING log = gcvNULL;
 
-	if (gcBlendLibrary == gcvNULL)
-	{
-		gcSHADER library = gcvNULL;
+    if (gcBlendLibrary == gcvNULL)
+    {
+        gcSHADER library = gcvNULL;
 
-		gctSIZE_T sourceSize, length;
-		gctPOINTER  pointer = gcvNULL;
+        gctSIZE_T sourceSize, length;
+        gctPOINTER  pointer = gcvNULL;
 
-		if (gcGLSLCompiler == gcvNULL)
-		{
-			return gcvSTATUS_INVALID_ADDRESS;
-		}
+        if (gcGLSLCompiler == gcvNULL)
+        {
+            return gcvSTATUS_INVALID_ADDRESS;
+        }
 
-		gcmONERROR(gcoOS_Allocate(gcvNULL, __BLEND_RECOMPILER_SHADER_LENGTH__, &pointer));
-		BlendRecompilerShaderSource = pointer;
+        gcmONERROR(gcoOS_Allocate(gcvNULL, __BLEND_RECOMPILER_SHADER_LENGTH__, &pointer));
+        BlendRecompilerShaderSource = pointer;
 
-		length = gcoOS_StrLen(gcLibConvertBlend_Func, gcvNULL);
-		gcoOS_StrCopySafe(BlendRecompilerShaderSource, length + 1, gcLibConvertBlend_Func);
+        length = gcoOS_StrLen(gcLibConvertBlend_Func, gcvNULL);
+        gcoOS_StrCopySafe(BlendRecompilerShaderSource, length + 1, gcLibConvertBlend_Func);
 
-		sourceSize = gcoOS_StrLen(BlendRecompilerShaderSource, gcvNULL);
-		status = (*gcGLSLCompiler)(gcvNULL,
-			gcSHADER_TYPE_FRAGMENT /*gcSHADER_TYPE_LIBRARY*/,
-			sourceSize,
-			BlendRecompilerShaderSource,
-			&library,
-			&log);
+        sourceSize = gcoOS_StrLen(BlendRecompilerShaderSource, gcvNULL);
+        status = (*gcGLSLCompiler)(gcvNULL,
+            gcSHADER_TYPE_FRAGMENT /*gcSHADER_TYPE_LIBRARY*/,
+            sourceSize,
+            BlendRecompilerShaderSource,
+            &library,
+            &log);
 
-		if (status != gcvSTATUS_OK)
-		{
-			/* report error */
-			gcoOS_Print("Compiler Error:\n%s\n", log);
-			goto OnError;
-		}
+        if (status != gcvSTATUS_OK)
+        {
+            /* report error */
+            gcoOS_Print("Compiler Error:\n%s\n", log);
+            goto OnError;
+        }
 
-		gcBlendLibrary = library;
-		return gcvSTATUS_OK;
-	}
+        gcBlendLibrary = library;
+        return gcvSTATUS_OK;
+    }
 
 OnError:
-	gcmOS_SAFE_FREE(gcvNULL, BlendRecompilerShaderSource);
-	/* Return the status. */
-	return status;
+    gcmOS_SAFE_FREE(gcvNULL, BlendRecompilerShaderSource);
+    /* Return the status. */
+    return status;
 }
 
 static gceSTATUS
@@ -6344,122 +6344,122 @@ IN OUT gcSHADER                 Shader,
 IN OUT gcsPatchAlphaBlend  *    alphaBlend
 )
 {
-	gceSTATUS    status = gcvSTATUS_OK;
-	gcUNIFORM    uniform;
-	gctCHAR      name[64];
-	gctUINT      offset = 0;
+    gceSTATUS    status = gcvSTATUS_OK;
+    gcUNIFORM    uniform;
+    gctCHAR      name[64];
+    gctUINT      offset = 0;
 
-	/* create alphaBlendEquation uniform. */
-	gcoOS_PrintStrSafe(name, sizeof(name), &offset, "#sh_alphaBlendEquation");
-	gcmONERROR(gcSHADER_AddUniformEx1(Shader,
-		name,
-		gcSHADER_FLOAT_X4,
-		gcSHADER_PRECISION_HIGH,
+    /* create alphaBlendEquation uniform. */
+    gcoOS_PrintStrSafe(name, sizeof(name), &offset, "#sh_alphaBlendEquation");
+    gcmONERROR(gcSHADER_AddUniformEx1(Shader,
+        name,
+        gcSHADER_FLOAT_X4,
+        gcSHADER_PRECISION_HIGH,
         -1,
         -1,
         -1,
-		0,
-		gcvNULL,
-		gcSHADER_VAR_CATEGORY_NORMAL,
-		(gctUINT16)-1,
-		-1,
-		-1,
+        0,
+        gcvNULL,
+        gcSHADER_VAR_CATEGORY_NORMAL,
+        (gctUINT16)-1,
+        -1,
+        -1,
         (gctINT16)-1,
-		gcvNULL,
-		&uniform));
-	alphaBlend->alphaBlendEquation = uniform;
+        gcvNULL,
+        &uniform));
+    alphaBlend->alphaBlendEquation = uniform;
     SetUniformFlag(uniform, gcvUNIFORM_FLAG_COMPILER_GEN);
 
-	/* create alphaBlendFunction uniform. */
-	offset = 0;
-	gcoOS_PrintStrSafe(name, sizeof(name), &offset, "#sh_alphaBlendFunction");
-	gcmONERROR(gcSHADER_AddUniformEx1(Shader,
-		name,
-		gcSHADER_FLOAT_X4,
-		gcSHADER_PRECISION_HIGH,
+    /* create alphaBlendFunction uniform. */
+    offset = 0;
+    gcoOS_PrintStrSafe(name, sizeof(name), &offset, "#sh_alphaBlendFunction");
+    gcmONERROR(gcSHADER_AddUniformEx1(Shader,
+        name,
+        gcSHADER_FLOAT_X4,
+        gcSHADER_PRECISION_HIGH,
         -1,
        -1,
         -1,
-		0,
-		gcvNULL,
-		gcSHADER_VAR_CATEGORY_NORMAL,
-		(gctUINT16)-1,
-		-1,
+        0,
+        gcvNULL,
+        gcSHADER_VAR_CATEGORY_NORMAL,
+        (gctUINT16)-1,
+        -1,
         -1,
         (gctUINT16)-1,
-		gcvNULL,
-		&uniform));
-	alphaBlend->alphaBlendFunction = uniform;
+        gcvNULL,
+        &uniform));
+    alphaBlend->alphaBlendFunction = uniform;
     SetUniformFlag(uniform, gcvUNIFORM_FLAG_COMPILER_GEN);
 
-	/* create rtWidthHeight uniform. */
-	offset = 0;
-	gcoOS_PrintStrSafe(name, sizeof(name), &offset, "#sh_rt_WidthHeight");
-	gcmONERROR(gcSHADER_AddUniformEx1(Shader,
-		name,
-		gcSHADER_FLOAT_X2,
-		gcSHADER_PRECISION_HIGH,
+    /* create rtWidthHeight uniform. */
+    offset = 0;
+    gcoOS_PrintStrSafe(name, sizeof(name), &offset, "#sh_rt_WidthHeight");
+    gcmONERROR(gcSHADER_AddUniformEx1(Shader,
+        name,
+        gcSHADER_FLOAT_X2,
+        gcSHADER_PRECISION_HIGH,
         -1,
         -1,
         -1,
-		0,
-		gcvNULL,
-		gcSHADER_VAR_CATEGORY_NORMAL,
-		(gctUINT16)-1,
-		-1,
+        0,
+        gcvNULL,
+        gcSHADER_VAR_CATEGORY_NORMAL,
+        (gctUINT16)-1,
+        -1,
         -1,
         (gctUINT16)-1,
-		gcvNULL,
-		&uniform));
-	alphaBlend->rtWidthHeight = uniform;
+        gcvNULL,
+        &uniform));
+    alphaBlend->rtWidthHeight = uniform;
      SetUniformFlag(uniform, gcvUNIFORM_FLAG_COMPILER_GEN);
 
-	/* create blendConstColor uniform. */
-	offset = 0;
-	gcoOS_PrintStrSafe(name, sizeof(name), &offset, "#sh_blendConstColor");
-	gcmONERROR(gcSHADER_AddUniformEx1(Shader,
-		name,
-		gcSHADER_FLOAT_X4,
-		gcSHADER_PRECISION_HIGH,
+    /* create blendConstColor uniform. */
+    offset = 0;
+    gcoOS_PrintStrSafe(name, sizeof(name), &offset, "#sh_blendConstColor");
+    gcmONERROR(gcSHADER_AddUniformEx1(Shader,
+        name,
+        gcSHADER_FLOAT_X4,
+        gcSHADER_PRECISION_HIGH,
         -1,
         -1,
         -1,
-		0,
-		gcvNULL,
-		gcSHADER_VAR_CATEGORY_NORMAL,
-		(gctUINT16)-1,
-		-1,
+        0,
+        gcvNULL,
+        gcSHADER_VAR_CATEGORY_NORMAL,
+        (gctUINT16)-1,
+        -1,
         -1,
         (gctUINT16)-1,
-		gcvNULL,
-		&uniform));
-	alphaBlend->blendConstColor = uniform;
+        gcvNULL,
+        &uniform));
+    alphaBlend->blendConstColor = uniform;
      SetUniformFlag(uniform, gcvUNIFORM_FLAG_COMPILER_GEN);
 
-	/* create rtSampler uniform */
-	offset = 0;
-	gcoOS_PrintStrSafe(name, sizeof(name), &offset, "#sh_alphablend_sampler");
-	gcmONERROR(gcSHADER_AddUniformEx1(Shader,
-		name,
-		gcSHADER_SAMPLER_2D,
-		gcSHADER_PRECISION_HIGH,
+    /* create rtSampler uniform */
+    offset = 0;
+    gcoOS_PrintStrSafe(name, sizeof(name), &offset, "#sh_alphablend_sampler");
+    gcmONERROR(gcSHADER_AddUniformEx1(Shader,
+        name,
+        gcSHADER_SAMPLER_2D,
+        gcSHADER_PRECISION_HIGH,
         -1,
         -1,
         -1,
-		0,
-		gcvNULL,
-		gcSHADER_VAR_CATEGORY_NORMAL,
-		(gctUINT16)0,
-		-1,
+        0,
+        gcvNULL,
+        gcSHADER_VAR_CATEGORY_NORMAL,
+        (gctUINT16)0,
+        -1,
         -1,
         (gctUINT16)-1,
-		gcvNULL,
-		&uniform));
-	alphaBlend->rtSampler = uniform;
+        gcvNULL,
+        &uniform));
+    alphaBlend->rtSampler = uniform;
     SetUniformFlag(uniform, gcvUNIFORM_FLAG_COMPILER_GEN);
 
     offset = 0;
-	gcoOS_PrintStrSafe(name, sizeof(name), &offset, "#sh_yInvert");
+    gcoOS_PrintStrSafe(name, sizeof(name), &offset, "#sh_yInvert");
     gcmONERROR(gcSHADER_AddUniform(Shader, name, gcSHADER_FLOAT_X1, 1, gcSHADER_PRECISION_HIGH, &uniform));
     SetUniformFlag(uniform, gcvUNIFORM_FLAG_COMPILER_GEN);
     alphaBlend->yInvert = uniform;
@@ -6467,7 +6467,7 @@ IN OUT gcsPatchAlphaBlend  *    alphaBlend
 
 
 OnError:
-	return status;
+    return status;
 }
 
 gceSTATUS
@@ -6478,32 +6478,32 @@ IN gcsPatchAlphaBlend   *alphaBlend,
 OUT gcFUNCTION          *ConvertFunction
 )
 {
-	gceSTATUS       status = gcvSTATUS_OK;
-	gctSTRING       convertFuncName = "_blend_func";
+    gceSTATUS       status = gcvSTATUS_OK;
+    gctSTRING       convertFuncName = "_blend_func";
 
-	gcmASSERT(Library != gcvNULL);
+    gcmASSERT(Library != gcvNULL);
 
-	/* Check if convertFunction already exists. */
-	gcmONERROR(gcSHADER_GetFunctionByName(Shader,
-		convertFuncName,
-		ConvertFunction));
+    /* Check if convertFunction already exists. */
+    gcmONERROR(gcSHADER_GetFunctionByName(Shader,
+        convertFuncName,
+        ConvertFunction));
 
-	if (*ConvertFunction == gcvNULL)
-	{
-		/* Link the convert function from library */
-		gcmONERROR(gcSHADER_LinkLibFunction(Shader,
-			Library,
-			convertFuncName,
-			ConvertFunction));
+    if (*ConvertFunction == gcvNULL)
+    {
+        /* Link the convert function from library */
+        gcmONERROR(gcSHADER_LinkLibFunction(Shader,
+            Library,
+            convertFuncName,
+            ConvertFunction));
 
-		if (*ConvertFunction == gcvNULL)
-		{
-			status = gcvSTATUS_NAME_NOT_FOUND;
-		}
-	}
+        if (*ConvertFunction == gcvNULL)
+        {
+            status = gcvSTATUS_NAME_NOT_FOUND;
+        }
+    }
 
 OnError:
-	return status;
+    return status;
 }
 
 static gcFUNCTION
@@ -6514,152 +6514,152 @@ IN gcFUNCTION            ConvertFunction,
 IN gctUINT               CodeIndex
 )
 {
-	gctCHAR          funcName[32];
-	gctUINT          offset = 0;
-	gcFUNCTION       stubFunction = gcvNULL;
-	gctUINT          argNo;
-	gcSL_INSTRUCTION tempCode = gcvNULL;
-	gctPOINTER       pointer = gcvNULL;
-	gcSL_INSTRUCTION code;
-	gcsValue         val0;
-	gcSL_SWIZZLE     srcSwizzle;
-	gcATTRIBUTE      fragCoord = gcvNULL;
+    gctCHAR          funcName[32];
+    gctUINT          offset = 0;
+    gcFUNCTION       stubFunction = gcvNULL;
+    gctUINT          argNo;
+    gcSL_INSTRUCTION tempCode = gcvNULL;
+    gctPOINTER       pointer = gcvNULL;
+    gcSL_INSTRUCTION code;
+    gcsValue         val0;
+    gcSL_SWIZZLE     srcSwizzle;
+    gcATTRIBUTE      fragCoord = gcvNULL;
 
-	gcmVERIFY_OK(
-		gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
-		"_alphaBlend_%d", CodeIndex));
+    gcmVERIFY_OK(
+        gcoOS_PrintStrSafe(funcName, sizeof(funcName), &offset,
+        "_alphaBlend_%d", CodeIndex));
 
-	gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
+    gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, sizeof(struct _gcSL_INSTRUCTION), &pointer));
 
-	tempCode = (gcSL_INSTRUCTION)pointer;
+    tempCode = (gcSL_INSTRUCTION)pointer;
 
-	if (tempCode == gcvNULL)
-	{
-		return gcvNULL;
-	}
+    if (tempCode == gcvNULL)
+    {
+        return gcvNULL;
+    }
 
-	gcoOS_MemCopy(tempCode, &Shader->code[CodeIndex], sizeof(struct _gcSL_INSTRUCTION));
+    gcoOS_MemCopy(tempCode, &Shader->code[CodeIndex], sizeof(struct _gcSL_INSTRUCTION));
 
-	code = tempCode;
+    code = tempCode;
 
-	/* Add stubFunction to Shader. */
-	gcSHADER_AddFunction(Shader, funcName, &stubFunction);
+    /* Add stubFunction to Shader. */
+    gcSHADER_AddFunction(Shader, funcName, &stubFunction);
 
-	/* add arguments */
-	/*
-	10  call stub_10
+    /* add arguments */
+    /*
+    10  call stub_10
 
-	stub_10:
-	mov  arg0, outputs[0]'s tempIndex
-	mov  arg1, rtSampler
-	mov  arg2, rtWidth
-	mov  arg3, rtHeight
-	mov  arg4, equalFunc
-	mov  arg5, constColor
-	mov  arg6, fragCoord
-	call _convert_func_n
-	mov  outputs[0], arg6
-	...
-	ret
-	*/
-	gcSHADER_BeginFunction(Shader, stubFunction);
+    stub_10:
+    mov  arg0, outputs[0]'s tempIndex
+    mov  arg1, rtSampler
+    mov  arg2, rtWidth
+    mov  arg3, rtHeight
+    mov  arg4, equalFunc
+    mov  arg5, constColor
+    mov  arg6, fragCoord
+    call _convert_func_n
+    mov  outputs[0], arg6
+    ...
+    ret
+    */
+    gcSHADER_BeginFunction(Shader, stubFunction);
 
-	argNo = 0;
+    argNo = 0;
 
-	/* mov  arg0, output */
-	val0.i32 = (gctSIZE_T)AlphaBlend->outputs[0]->tempIndex;
-	srcSwizzle = _ConvertShaderTypeToSwizzle(AlphaBlend->outputs[0]->type);
+    /* mov  arg0, output */
+    val0.i32 = (gctSIZE_T)AlphaBlend->outputs[0]->tempIndex;
+    srcSwizzle = _ConvertShaderTypeToSwizzle(AlphaBlend->outputs[0]->type);
     _addArgPassInst(Shader, ConvertFunction, stubFunction, code, argNo++,
         gcvFloatTempIndex, &val0, srcSwizzle, gcvFALSE, AlphaBlend->outputs[0]->precision);
 
-	/* mov  arg1, rtSampler */
-	val0.i32 = (gctSIZE_T)AlphaBlend->rtSampler->physical;
-	srcSwizzle = gcSL_SWIZZLE_XXXX;
+    /* mov  arg1, rtSampler */
+    val0.i32 = (gctSIZE_T)AlphaBlend->rtSampler->physical;
+    srcSwizzle = gcSL_SWIZZLE_XXXX;
     _addArgPassInst(Shader, ConvertFunction, stubFunction, code, argNo++,
         gcvIntConstant, &val0, srcSwizzle, gcvFALSE, AlphaBlend->rtSampler->precision);
 
-	/* mov  arg2, rtWidth */
-	val0.i32 = (gctSIZE_T)AlphaBlend->rtWidthHeight->index;
-	srcSwizzle = gcSL_SWIZZLE_XXXX;
+    /* mov  arg2, rtWidth */
+    val0.i32 = (gctSIZE_T)AlphaBlend->rtWidthHeight->index;
+    srcSwizzle = gcSL_SWIZZLE_XXXX;
     _addArgPassInst(Shader, ConvertFunction, stubFunction, code, argNo++,
         gcvFloatUniformIndex, &val0, srcSwizzle, gcvFALSE, AlphaBlend->rtWidthHeight->precision);
 
-	/* mov  arg3, rtHeight */
-	val0.i32 = (gctSIZE_T)AlphaBlend->rtWidthHeight->index;
-	srcSwizzle = gcSL_SWIZZLE_YYYY;
+    /* mov  arg3, rtHeight */
+    val0.i32 = (gctSIZE_T)AlphaBlend->rtWidthHeight->index;
+    srcSwizzle = gcSL_SWIZZLE_YYYY;
     _addArgPassInst(Shader, ConvertFunction, stubFunction, code, argNo++,
         gcvFloatUniformIndex, &val0, srcSwizzle, gcvFALSE, AlphaBlend->rtWidthHeight->precision);
 
-	/* mov  arg4, equalTion */
-	val0.i32 = (gctSIZE_T)AlphaBlend->alphaBlendEquation->index;
-	srcSwizzle = gcSL_SWIZZLE_XYZW;
+    /* mov  arg4, equalTion */
+    val0.i32 = (gctSIZE_T)AlphaBlend->alphaBlendEquation->index;
+    srcSwizzle = gcSL_SWIZZLE_XYZW;
     _addArgPassInst(Shader, ConvertFunction, stubFunction, code, argNo++,
         gcvIntUniformIndex, &val0, srcSwizzle, gcvFALSE, AlphaBlend->alphaBlendEquation->precision);
 
-	/* mov  arg5, Func */
-	val0.i32 = (gctSIZE_T)AlphaBlend->alphaBlendFunction->index;
-	srcSwizzle = gcSL_SWIZZLE_XYZW;
+    /* mov  arg5, Func */
+    val0.i32 = (gctSIZE_T)AlphaBlend->alphaBlendFunction->index;
+    srcSwizzle = gcSL_SWIZZLE_XYZW;
     _addArgPassInst(Shader, ConvertFunction, stubFunction, code, argNo++,
         gcvIntUniformIndex, &val0, srcSwizzle, gcvFALSE, AlphaBlend->alphaBlendFunction->precision);
 
-	/* mov  arg6, constColor */
-	val0.i32 = (gctSIZE_T)AlphaBlend->blendConstColor->index;
-	srcSwizzle = gcSL_SWIZZLE_XYZW;
+    /* mov  arg6, constColor */
+    val0.i32 = (gctSIZE_T)AlphaBlend->blendConstColor->index;
+    srcSwizzle = gcSL_SWIZZLE_XYZW;
     _addArgPassInst(Shader, ConvertFunction, stubFunction, code, argNo++,
         gcvIntUniformIndex, &val0, srcSwizzle, gcvFALSE, AlphaBlend->blendConstColor->precision);
 
-	/* Find gl_FragCoord. */
-	gcSHADER_GetAttributeByName(Shader, gcvNULL, (gctUINT32)gcSL_POSITION, &fragCoord);
-	if (fragCoord == gcvNULL)
-	{
-		gcSHADER_AddAttributeWithLocation(Shader,
-			"#Position",
-			gcSHADER_FLOAT_X4,
-			gcSHADER_PRECISION_MEDIUM,
-			1,
+    /* Find gl_FragCoord. */
+    gcSHADER_GetAttributeByName(Shader, gcvNULL, (gctUINT32)gcSL_POSITION, &fragCoord);
+    if (fragCoord == gcvNULL)
+    {
+        gcSHADER_AddAttributeWithLocation(Shader,
+            "#Position",
+            gcSHADER_FLOAT_X4,
+            gcSHADER_PRECISION_MEDIUM,
+            1,
             0,
-			gcvFALSE,
-			gcSHADER_SHADER_SMOOTH,
-			-1,
+            gcvFALSE,
+            gcSHADER_SHADER_SMOOTH,
+            -1,
             -1,
             gcvFALSE,
             gcvFALSE,
-			&fragCoord);
-	}
-	gcmASSERT(fragCoord != gcvNULL);
-	/* mov  arg7, fragCoord */
-	val0.i32 = fragCoord->index;
-	srcSwizzle = gcSL_SWIZZLE_XYZW;
+            &fragCoord);
+    }
+    gcmASSERT(fragCoord != gcvNULL);
+    /* mov  arg7, fragCoord */
+    val0.i32 = fragCoord->index;
+    srcSwizzle = gcSL_SWIZZLE_XYZW;
     _addArgPassInst(Shader, ConvertFunction, stubFunction, code, argNo++,
-		gcvFloatAttributeIndex, &val0, srcSwizzle, gcvFALSE, fragCoord->precision);
+        gcvFloatAttributeIndex, &val0, srcSwizzle, gcvFALSE, fragCoord->precision);
 
      /* mov  arg8, yinvert */
     val0.i32 = AlphaBlend->yInvert->index;
-	srcSwizzle = gcSL_SWIZZLE_XYZW;
+    srcSwizzle = gcSL_SWIZZLE_XYZW;
     _addArgPassInst(Shader, ConvertFunction, stubFunction, code, argNo++,
-		gcvIntUniformIndex, &val0, srcSwizzle, gcvFALSE, AlphaBlend->yInvert->precision);
+        gcvIntUniformIndex, &val0, srcSwizzle, gcvFALSE, AlphaBlend->yInvert->precision);
 
 
-	/* call _convert_func_n */
-	_addCallInst(Shader, ConvertFunction);
+    /* call _convert_func_n */
+    _addCallInst(Shader, ConvertFunction);
 
-	/* mov outputs[0], arg6 */
-	val0.i32 = (gctSIZE_T)AlphaBlend->outputs[0]->tempIndex;
-	_addRetValueInst(Shader, ConvertFunction, code, argNo++,
-		gcvFloatTempIndex, &val0);
+    /* mov outputs[0], arg6 */
+    val0.i32 = (gctSIZE_T)AlphaBlend->outputs[0]->tempIndex;
+    _addRetValueInst(Shader, ConvertFunction, code, argNo++,
+        gcvFloatTempIndex, &val0);
     Shader->code[Shader->lastInstruction].temp = gcmSL_TARGET_SET(Shader->code[Shader->lastInstruction].temp, Precision, AlphaBlend->outputs[0]->precision);
-	/* ret */
-	_addRetInst(Shader);
+    /* ret */
+    _addRetInst(Shader);
 
-	gcSHADER_EndFunction(Shader, stubFunction);
+    gcSHADER_EndFunction(Shader, stubFunction);
 
-	if (tempCode)
-	{
-		/* Free the current code buffer. */
-		gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, tempCode));
-	}
+    if (tempCode)
+    {
+        /* Free the current code buffer. */
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, tempCode));
+    }
 
-	return stubFunction;
+    return stubFunction;
 }
 
 static gceSTATUS
@@ -6668,82 +6668,82 @@ IN OUT gcSHADER                 Shader,
 IN OUT gcsPatchAlphaBlend  *    AlphaBlend
 )
 {
-	gceSTATUS   status = gcvSTATUS_OK;
-	gcOUTPUT    output = gcvNULL;
-	gcFUNCTION  convertFunction = gcvNULL;
-	gcFUNCTION  stubFunction = gcvNULL;
-	gctINT      tempCodeIndex;
-	gctUINT     i;
-	gctUINT     lastInstruction;
-	gcSHADER_INSTRUCTION_INDEX instrIndex;
-	gcSL_INSTRUCTION  tempCode;
+    gceSTATUS   status = gcvSTATUS_OK;
+    gcOUTPUT    output = gcvNULL;
+    gcFUNCTION  convertFunction = gcvNULL;
+    gcFUNCTION  stubFunction = gcvNULL;
+    gctINT      tempCodeIndex;
+    gctUINT     i;
+    gctUINT     lastInstruction;
+    gcSHADER_INSTRUCTION_INDEX instrIndex;
+    gcSL_INSTRUCTION  tempCode;
 
-	/* Only fragment shader needs to patch output. */
-	if (Shader->type != gcSHADER_TYPE_FRAGMENT)
-	{
-		return gcvSTATUS_OK;
-	}
+    /* Only fragment shader needs to patch output. */
+    if (Shader->type != gcSHADER_TYPE_FRAGMENT)
+    {
+        return gcvSTATUS_OK;
+    }
 
-	/* Load blend library. */
-	if (gcBlendLibrary == gcvNULL)
-	{
-		gcmONERROR(gcLoadBlendLibrary());
-	}
+    /* Load blend library. */
+    if (gcBlendLibrary == gcvNULL)
+    {
+        gcmONERROR(gcLoadBlendLibrary());
+    }
 
-	/* Find the output variable. */
-	for (i = 0; i < Shader->outputCount; i++)
-	{
-		if (Shader->outputs[i] && Shader->outputs[i]->location == AlphaBlend->outputLocation)
-		{
-			output = Shader->outputs[i];
-			break;
-		}
-	}
+    /* Find the output variable. */
+    for (i = 0; i < Shader->outputCount; i++)
+    {
+        if (Shader->outputs[i] && Shader->outputs[i]->location == AlphaBlend->outputLocation)
+        {
+            output = Shader->outputs[i];
+            break;
+        }
+    }
 
-	if (output == gcvNULL)
-	{
-		gcmASSERT(gcvFALSE);
-		return status;
-	}
+    if (output == gcvNULL)
+    {
+        gcmASSERT(gcvFALSE);
+        return status;
+    }
 
-	AlphaBlend->outputs[0] = output;
+    AlphaBlend->outputs[0] = output;
 
-	/* Add uniforms. */
-	_addAlphaBlendUniforms(Shader, AlphaBlend);
+    /* Add uniforms. */
+    _addAlphaBlendUniforms(Shader, AlphaBlend);
 
-	/* insert a NOP to the end of main(). */
-	tempCodeIndex = _insertNOP2Main(Shader, 1);
+    /* insert a NOP to the end of main(). */
+    tempCodeIndex = _insertNOP2Main(Shader, 1);
 
-	/* Construct convert function. */
-	gcmONERROR(_createAlphaBlendFunction(Shader,
-		gcBlendLibrary,
-		AlphaBlend,
-		&convertFunction));
+    /* Construct convert function. */
+    gcmONERROR(_createAlphaBlendFunction(Shader,
+        gcBlendLibrary,
+        AlphaBlend,
+        &convertFunction));
 
-	/* Construct call stub function. */
-	stubFunction = _createAlphaBlendStubFunction(Shader,
-		AlphaBlend,
-		convertFunction,
-		tempCodeIndex);
+    /* Construct call stub function. */
+    stubFunction = _createAlphaBlendStubFunction(Shader,
+        AlphaBlend,
+        convertFunction,
+        tempCodeIndex);
 
 
-	/* Call the stub function. */
-	tempCode = &Shader->code[tempCodeIndex];
-	if (gcmSL_OPCODE_GET(tempCode->opcode, Opcode) != gcSL_NOP)
-	{
-		gcmASSERT(gcvFALSE);
-	}
+    /* Call the stub function. */
+    tempCode = &Shader->code[tempCodeIndex];
+    if (gcmSL_OPCODE_GET(tempCode->opcode, Opcode) != gcSL_NOP)
+    {
+        gcmASSERT(gcvFALSE);
+    }
 
-	lastInstruction = Shader->lastInstruction;
-	instrIndex = Shader->instrIndex;
-	Shader->lastInstruction = tempCodeIndex;
-	Shader->instrIndex = gcSHADER_OPCODE;
-	_addCallInst(Shader, stubFunction);
-	Shader->lastInstruction = lastInstruction;
-	Shader->instrIndex = instrIndex;
+    lastInstruction = Shader->lastInstruction;
+    instrIndex = Shader->instrIndex;
+    Shader->lastInstruction = tempCodeIndex;
+    Shader->instrIndex = gcSHADER_OPCODE;
+    _addCallInst(Shader, stubFunction);
+    Shader->lastInstruction = lastInstruction;
+    Shader->instrIndex = instrIndex;
 
 OnError:
-	return status;
+    return status;
 }
 
 static gcSL_SWIZZLE
@@ -12952,7 +12952,7 @@ _addTextureGradUniform(
     for(i = 0; i < Shader->uniformCount; i++)
     {
         rectUniform = Shader->uniforms[i];
-        if(rectUniform && rectUniform->name)
+        if(rectUniform)
         {
             if(gcmIS_SUCCESS(gcoOS_StrCmp(rectUniform->name, name)))
             {
@@ -12992,7 +12992,7 @@ _addTextureGradUniform(
     for(i = 0; i < Shader->uniformCount; i++)
     {
         lodMinMaxUniform = Shader->uniforms[i];
-        if(lodMinMaxUniform && lodMinMaxUniform->name)
+        if(lodMinMaxUniform)
         {
             if(gcmIS_SUCCESS(gcoOS_StrCmp(lodMinMaxUniform->name, name)))
             {

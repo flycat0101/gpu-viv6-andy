@@ -6,11 +6,6 @@
 		vdkGetDisplayByIndex;
 		vdkGetDisplay;
 		vdkGetDisplayInfo;
-		vdkDisplayBuffer;
-		vdkGetDisplayInfoEx;
-		vdkGetDisplayVirtual;
-		vdkSetDisplayVirtual;
-		vdkGetDisplayBackbuffer;
 		vdkDestroyDisplay;
 
 		vdkCreateWindow;
@@ -19,13 +14,11 @@
 		vdkSetWindowTitle;
 		vdkShowWindow;
 		vdkHideWindow;
-		vdkDrawImage;
 		vdkGetImage;
 		vdkCapturePointer;
 
 		vdkCreatePixmap;
 		vdkGetPixmapInfo;
-		vdkDrawPixmap;
 		vdkDestroyPixmap;
 
 		vdkCreateClientBuffer;

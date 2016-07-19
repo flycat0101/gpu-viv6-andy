@@ -1,4 +1,3 @@
-
 package com.vivantecorp.graphics.shareContext;
 
 import android.content.Context;

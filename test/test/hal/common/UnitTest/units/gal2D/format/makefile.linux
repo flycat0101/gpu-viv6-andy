@@ -43,7 +43,9 @@ CASELIST := A8 \
             Gamma \
             Compressed2D \
             CompressedTPC \
+            CompressedTPCV11 \
             CompressedDEC \
+            CompressedDEC400 \
             10Bit
 
 

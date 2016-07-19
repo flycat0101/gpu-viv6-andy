@@ -39,11 +39,11 @@ CC ?= $(CROSS_COMPILE)g++
 ##############################################
 # Supply additional include directories.
 
-INCLUDE += -I$(VIVANTE_SDK_INC)
+INCLUDE += -I$(SDK_DIR)/include
 CFLAGS += $(INCLUDE)
 
 ifeq ($(ARCH_TYPE), e2k)
-CFLAGS += -msse
+CFLAGS += $(INCLUDE) -msse
 endif
 
 ##############################################
@@ -60,14 +60,14 @@ LIBS +=  $(LIB_DIR)/libstdc++.a
 LIBS +=  $(LIB_DIR)/libdl.a
 LIBS +=  $(LIB_DIR)/librt.a
 else
-# Specify Vivante OpenCL libraries.
-LIBS += -L $(VIVANTE_SDK_LIB) -l OpenCL -lGLESv2
+# Specify Vivante libraries.
+LIBS += -L $(VIVANTE_SDK_LIB) -l OpenCL -l GLESv2
 LIBS += -l m -l pthread -l dl -l stdc++ -l rt
 ifeq ($(EGL_API_DRI), 1)
-    LIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11
+    LIBS += -L$(X11_ARM_DIR)/lib -Wl,-rpath-link,$(X11_ARM_DIR)/lib -lX11
 endif
 ifeq ($(EGL_API_X), 1)
-    LIBS += -L$(X11_ARM_DIR)/lib -lXau -lXdmcp -lX11
+    LIBS += -L$(X11_ARM_DIR)/lib -Wl,-rpath-link,$(X11_ARM_DIR)/lib -lX11
 endif
 ifeq ($(EGL_API_DFB), 1)
     LIBS += -L$(DFB_DIR)/lib -ldirectfb -ldirect -lfusion

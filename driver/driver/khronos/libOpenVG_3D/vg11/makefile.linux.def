@@ -29,15 +29,7 @@ INCLUDE += -I$(AQROOT)/sdk/inc
 INCLUDE += -I$(AQROOT)/compiler/libVSC/include
 
 ifneq ($(USE_ARMCC), 1)
-ifeq ($(EGL_API_DFB), 1)
-CFLAGS  += -pipe -fPIC
-else
 CFLAGS += -Werror -ansi
-endif
-endif
-
-ifeq ($(EGL_API_DFB), 1)
-CFLAGS  += -DPIC
 endif
 
 CFLAGS += $(INCLUDE)

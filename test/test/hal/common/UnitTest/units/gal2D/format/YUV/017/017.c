@@ -72,26 +72,26 @@ typedef struct Test2D {
     GalRuntime  *runtime;
 
     // destination surface
-    gcoSURF		dstSurf;
-    gceSURF_FORMAT	dstFormat;
-    gctUINT		dstWidth;
-    gctUINT		dstHeight;
-    gctINT		dstStride;
-    gctUINT32		dstPhyAddr;
-    gctPOINTER		dstLgcAddr;
+    gcoSURF        dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT        dstWidth;
+    gctUINT        dstHeight;
+    gctINT        dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
 
     T2D_SURF_PTR        dstTemp;
 
     //source surface
-    gcoSURF		srcSurf;
-    gceSURF_FORMAT	srcFormat;
-    gctUINT		srcWidth;
-    gctUINT		srcHeight;
-    gctINT		srcStride[3];
+    gcoSURF        srcSurf;
+    gceSURF_FORMAT    srcFormat;
+    gctUINT        srcWidth;
+    gctUINT        srcHeight;
+    gctINT        srcStride[3];
     gctINT              srcStrideNum;
     gctINT              srcAddressNum;
-    gctUINT32		srcPhyAddr[3];
-    gctPOINTER		srcLgcAddr[3];
+    gctUINT32        srcPhyAddr[3];
+    gctPOINTER        srcLgcAddr[3];
 
 } Test2D;
 
@@ -196,18 +196,6 @@ gceSURF_FORMAT sFormat[] =
 {
     gcvSURF_NV12,
     gcvSURF_NV21,
-    gcvSURF_NV16,
-    gcvSURF_NV61,
-};
-
-static gceSURF_ROTATION sRots[] =
-{
-    gcvSURF_0_DEGREE,
-    gcvSURF_90_DEGREE,
-    gcvSURF_180_DEGREE,
-    gcvSURF_270_DEGREE,
-    gcvSURF_FLIP_X,
-    gcvSURF_FLIP_Y,
 };
 
 static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
@@ -215,7 +203,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     gceSTATUS status;
     gcsRECT Rect, dstRect;
     gco2D egn2D = t2d->runtime->engine2d;
-    gceSURF_ROTATION rot = sRots[frameNo % gcmCOUNTOF(sRots)];
     gctUINT32 horFactor, verFactor;
 
     gcmONERROR(ReloadSourceSurface(t2d, sSrcFile[frameNo%gcmCOUNTOF(sSrcFile)]));
@@ -225,51 +212,20 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         sFormat[frameNo/gcmCOUNTOF(sSrcFile)],
         gcvLINEAR,
         gcv2D_TSC_DISABLE,
-        t2d->srcWidth, t2d->srcHeight,
+        t2d->srcWidth,
+        t2d->srcHeight,
         &t2d->dstTemp
         ));
 
-    Rect.left   = dstRect.left   = 0;
-    Rect.top    = dstRect.top    = 0;
-    Rect.right  = dstRect.right  = t2d->dstTemp->width;
-    Rect.bottom = dstRect.bottom = t2d->dstTemp->height;
+    dstRect.left   = 0;
+    dstRect.top    = 0;
+    dstRect.right  = t2d->dstTemp->width;
+    dstRect.bottom = t2d->dstTemp->height;
 
-    if (rot == gcvSURF_90_DEGREE || rot == gcvSURF_270_DEGREE)
-    {
-        dstRect.left = 0;
-        dstRect.top = 0;
-        dstRect.right = t2d->dstTemp->height;
-        dstRect.bottom = t2d->dstTemp->width;
-    }
-    else
-    {
-        dstRect.left = 0;
-        dstRect.top = 0;
-        dstRect.right = t2d->dstTemp->width;
-        dstRect.bottom = t2d->dstTemp->height;
-    }
-
-    switch (frameNo % 4)
-    {
-        case 0:
-            // disable mirror
-            gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvFALSE, gcvFALSE));
-            break;
-        case 1:
-            // enable horizontal mirror
-            gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvTRUE, gcvFALSE));
-            break;
-        case 2:
-            // enable vertical mirror
-            gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvFALSE, gcvTRUE));
-            break;
-        case 3:
-            // enable horizontal & vertical mirror
-            gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvTRUE, gcvTRUE));
-            break;
-        default:
-            return gcvFALSE;
-    }
+    Rect.left = 0;
+    Rect.top = 0;
+    Rect.right = t2d->srcWidth;
+    Rect.bottom = t2d->srcHeight;
 
     // set clippint rect
     gcmONERROR(gco2D_SetClipping(egn2D, &dstRect));
@@ -296,9 +252,9 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         t2d->dstTemp->validStrideNum,
         t2d->dstTemp->tiling,
         t2d->dstTemp->format,
-        rot,
-        t2d->dstTemp->width,
-        t2d->dstTemp->height));
+        gcvSURF_0_DEGREE,
+        t2d->dstTemp->aWidth,
+        t2d->dstTemp->aHeight));
 
     gcmONERROR(gco2D_CalcStretchFactor(egn2D, Rect.right - Rect.left,
             dstRect.right - dstRect.left, &horFactor));
@@ -330,8 +286,8 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         t2d->dstTemp->tiling,
         t2d->dstTemp->format,
         t2d->dstTemp->rotation,
-        t2d->dstTemp->width,
-        t2d->dstTemp->height));
+        t2d->dstTemp->aWidth,
+        t2d->dstTemp->aHeight));
 
     gcmONERROR(gco2D_SetGenericTarget(
         egn2D,

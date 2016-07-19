@@ -72,26 +72,26 @@ typedef struct Test2D {
     GalRuntime  *runtime;
 
     // destination surface
-    gcoSURF		dstSurf;
-    gceSURF_FORMAT	dstFormat;
-    gctUINT		dstWidth;
-    gctUINT		dstHeight;
-    gctINT		dstStride;
-    gctUINT32		dstPhyAddr;
-    gctPOINTER		dstLgcAddr;
+    gcoSURF        dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT        dstWidth;
+    gctUINT        dstHeight;
+    gctINT        dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
 
     T2D_SURF_PTR        dstTemp;
 
     //source surface
-    gcoSURF		srcSurf;
-    gceSURF_FORMAT	srcFormat;
-    gctUINT		srcWidth;
-    gctUINT		srcHeight;
-    gctINT		srcStride[3];
+    gcoSURF        srcSurf;
+    gceSURF_FORMAT    srcFormat;
+    gctUINT        srcWidth;
+    gctUINT        srcHeight;
+    gctINT        srcStride[3];
     gctINT              srcStrideNum;
     gctINT              srcAddressNum;
-    gctUINT32		srcPhyAddr[3];
-    gctPOINTER		srcLgcAddr[3];
+    gctUINT32        srcPhyAddr[3];
+    gctPOINTER        srcLgcAddr[3];
 
 } Test2D;
 
@@ -196,8 +196,6 @@ gceSURF_FORMAT sFormat[] =
 {
     gcvSURF_NV12,
     gcvSURF_NV21,
-    gcvSURF_NV16,
-    gcvSURF_NV61,
 };
 
 static gceSURF_ROTATION sRots[] =
@@ -227,7 +225,8 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         sFormat[frameNo/gcmCOUNTOF(sSrcFile)],
         gcvLINEAR,
         gcv2D_TSC_DISABLE,
-        len, len,
+        len,
+        len,
         &t2d->dstTemp
         ));
 
@@ -235,28 +234,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     Rect.top    = dstRect.top    = 0;
     Rect.right  = dstRect.right  = t2d->dstTemp->width;
     Rect.bottom = dstRect.bottom = t2d->dstTemp->height;
-
-    switch (frameNo % 4)
-    {
-        case 0:
-            // disable mirror
-            gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvFALSE, gcvFALSE));
-            break;
-        case 1:
-            // enable horizontal mirror
-            gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvTRUE, gcvFALSE));
-            break;
-        case 2:
-            // enable vertical mirror
-            gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvFALSE, gcvTRUE));
-            break;
-        case 3:
-            // enable horizontal & vertical mirror
-            gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvTRUE, gcvTRUE));
-            break;
-        default:
-            return gcvFALSE;
-    }
 
     // set clippint rect
     gcmONERROR(gco2D_SetClipping(egn2D, &dstRect));
@@ -271,7 +248,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         t2d->srcStrideNum,
         gcvLINEAR,
         t2d->srcFormat,
-        gcvSURF_0_DEGREE,
+        rot,
         t2d->srcWidth,
         t2d->srcHeight));
 
@@ -283,9 +260,9 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         t2d->dstTemp->validStrideNum,
         t2d->dstTemp->tiling,
         t2d->dstTemp->format,
-        rot,
-        t2d->dstTemp->width,
-        t2d->dstTemp->height));
+        gcvSURF_0_DEGREE,
+        t2d->dstTemp->aWidth,
+        t2d->dstTemp->aHeight));
 
     gcmONERROR(gco2D_Blit(egn2D, 1, &dstRect, 0xCC, 0xCC, t2d->dstTemp->format));
 
@@ -311,8 +288,8 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         t2d->dstTemp->tiling,
         t2d->dstTemp->format,
         t2d->dstTemp->rotation,
-        t2d->dstTemp->width,
-        t2d->dstTemp->height));
+        t2d->dstTemp->aWidth,
+        t2d->dstTemp->aHeight));
 
     gcmONERROR(gco2D_SetGenericTarget(
         egn2D,

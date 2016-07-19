@@ -1350,7 +1350,7 @@ eglCreateContext(
     }
 
 #ifdef EGL_API_DRI
-    gcoOS_CreateContext(dpy->localInfo, context);
+    dpy->platform->createContext(dpy->localInfo, context);
 #endif
 
     /* Useful for debugging */
@@ -1394,23 +1394,32 @@ _DestroyContext(
     )
 {
     VEGLContext current;
+    gceHARDWARE_TYPE currentType  = gcvHARDWARE_INVALID;
+    gceHARDWARE_TYPE requiredType;
 
     gcmHEADER_ARG("Thread=0x%x Display=0x%x Context=0x%x",
                   Thread, Display, Context);
+
+    /* Get current hardwaret type. */
+    gcmVERIFY_OK(gcoHAL_GetHardwareType(gcvNULL, &currentType));
 
     switch (Context->api)
     {
     case EGL_OPENGL_API:
         current = Thread->glContext;
+        requiredType = currentType;
         break;
     case EGL_OPENGL_ES_API:
         current = Thread->esContext;
+        requiredType = gcvHARDWARE_3D;
         break;
     case EGL_OPENVG_API:
         current = Thread->vgContext;
+        requiredType = Thread->openVGpipe ?  gcvHARDWARE_VG : gcvHARDWARE_3D;
         break;
     default:
         current = gcvNULL;
+        requiredType = currentType;
         gcmTRACE(gcvLEVEL_ERROR,
                  "%s(%d): _DestroyContext bad current rendering API.",
                  __FUNCTION__, __LINE__);
@@ -1429,6 +1438,12 @@ _DestroyContext(
 
         gcmFOOTER_ARG("%d", EGL_TRUE);
         return EGL_TRUE;
+    }
+
+    if (requiredType != currentType)
+    {
+        /* Switch hardware type. */
+        gcoHAL_SetHardwareType(gcvNULL, requiredType);
     }
 
     if (current == Context)
@@ -1450,6 +1465,12 @@ _DestroyContext(
     {
         _DestroyApiContext(Thread, Context, Context->context);
         Context->context = gcvNULL;
+    }
+
+    if (requiredType != currentType)
+    {
+        /* Restore hardware type. */
+        gcoHAL_SetHardwareType(gcvNULL, currentType);
     }
 
     /* Deference any surfaces. */
@@ -1511,7 +1532,7 @@ _DestroyContext(
     Context->api    = EGL_NONE;
 
 #ifdef EGL_API_DRI
-    gcoOS_DestroyContext(Display->localInfo, Context);
+    Display->platform->destroyContext(Display->localInfo, Context);
 #endif
 
     /* Execute events accumulated in the buffer if any. */
@@ -1643,6 +1664,7 @@ veglMakeCurrent(
     VEGLSurface draw;
     VEGLSurface read;
     VEGLContext ctx, current;
+    VEGLPlatform platform;
     EGLint width = 0, height = 0;
     gceSTATUS status;
 
@@ -1674,6 +1696,9 @@ veglMakeCurrent(
         gcmFOOTER_ARG("%d", EGL_FALSE);
         return EGL_FALSE;
     }
+
+    /* Get shortcut. */
+    platform = dpy->platform;
 
     /* Test for valid EGLContext structure */
     ctx = (VEGLContext)veglGetResObj(dpy,
@@ -1722,7 +1747,7 @@ veglMakeCurrent(
     if (draw && (draw->type & EGL_WINDOW_BIT))
     {
         /* Validate native window. */
-        result = veglGetWindowSize(dpy, draw, &width, &height);
+        result = platform->getWindowSize(dpy, draw, &width, &height);
 
         if (!result)
         {
@@ -1735,9 +1760,9 @@ veglMakeCurrent(
     else if (draw && (draw->type & EGL_PIXMAP_BIT))
     {
         /* Validate native pixmap. */
-        result = veglGetPixmapSize(dpy, draw->pixmap,
-                                   draw->pixInfo,
-                                   &width, &height);
+        result = platform->getPixmapSize(dpy, draw->pixmap,
+                                         draw->pixInfo,
+                                         &width, &height);
 
         if (!result)
         {
@@ -1808,7 +1833,7 @@ veglMakeCurrent(
                          * A back buffer should be acquired if new swap model.
                          * No if failed to get window back buffer previously.
                          */
-                        veglCancelWindowBackBuffer(dpy, sur, &sur->backBuffer);
+                        platform->cancelWindowBackBuffer(dpy, sur, &sur->backBuffer);
 
                         /* Clear back buffer. */
                         sur->backBuffer.context = gcvNULL;
@@ -1816,7 +1841,7 @@ veglMakeCurrent(
                     }
 
                     /* Unbind this window. */
-                    veglUnbindWindow(dpy, sur);
+                    platform->unbindWindow(dpy, sur);
                     sur->bound = EGL_FALSE;
                 }
 
@@ -2046,7 +2071,7 @@ veglMakeCurrent(
                          * A back buffer should be acquired if new swap model.
                          * No if failed to get window back buffer previously.
                          */
-                        veglCancelWindowBackBuffer(dpy, sur, &sur->backBuffer);
+                        platform->cancelWindowBackBuffer(dpy, sur, &sur->backBuffer);
 
                         /* Clear back buffer. */
                         sur->backBuffer.context = gcvNULL;
@@ -2054,7 +2079,7 @@ veglMakeCurrent(
                     }
 
                     /* Unbind this window. */
-                    veglUnbindWindow(dpy, sur);
+                    platform->unbindWindow(dpy, sur);
                     sur->bound = EGL_FALSE;
                 }
 
@@ -2214,7 +2239,7 @@ veglMakeCurrent(
     if (draw && (draw->type & EGL_WINDOW_BIT) && !draw->bound)
     {
         /* Bind native window for rendering. */
-        result = veglBindWindow(dpy, draw, &draw->renderMode);
+        result = platform->bindWindow(dpy, draw, &draw->renderMode);
 
         if (!result)
         {
@@ -2242,7 +2267,7 @@ veglMakeCurrent(
              */
             if (draw->backBuffer.surface == gcvNULL)
             {
-                result = veglGetWindowBackBuffer(dpy, draw, &draw->backBuffer);
+                result = platform->getWindowBackBuffer(dpy, draw, &draw->backBuffer);
 
                 if (!result)
                 {
@@ -2357,7 +2382,7 @@ veglMakeCurrent(
     if (draw && (draw->type & EGL_WINDOW_BIT))
     {
         /* Detect native window resize. */
-        result = veglGetWindowSize(dpy, draw, &width, &height);
+        result = platform->getWindowSize(dpy, draw, &width, &height);
 
         if (result == EGL_FALSE)
         {
@@ -2431,18 +2456,18 @@ veglMakeCurrent(
         struct eglBackBuffer backBuffer;
 
         /* Borrow it from window back buffer. */
-        veglGetWindowBackBuffer(dpy, draw, &backBuffer);
+        platform->getWindowBackBuffer(dpy, draw, &backBuffer);
 
-        gcoOS_MakeCurrent(
+        platform->makeCurrent(
             dpy->localInfo,
-            (HALNativeWindowType) draw->hwnd,
-            (HALNativeWindowType) read->hwnd,
+            draw->hwnd,
+            read->hwnd,
             ctx,
             backBuffer.surface
             );
 
         /* Cancel the back buffer, actually does nothing for DRI. */
-        veglCancelWindowBackBuffer(dpy, draw, &backBuffer);
+        platform->cancelWindowBackBuffer(dpy, draw, &backBuffer);
     }
 #endif
 
@@ -2715,7 +2740,7 @@ _SyncPixmap(
         gcoHAL_Commit(gcvNULL, gcvTRUE);
 
         /* Wait native pixmap. */
-        veglSyncToPixmap(surface->pixmap, surface->pixInfo);
+        Dpy->platform->syncToPixmap(surface->pixmap, surface->pixInfo);
     }
     while (gcvFALSE);
 #endif  /* gcdENABLE_3D */

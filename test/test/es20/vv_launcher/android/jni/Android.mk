@@ -39,7 +39,6 @@ endif
 VV_TOP := ../..
 
 LOCAL_MODULE:= libvv_launcher
-LOCAL_MODULE_TAGS := optional
 
 LOCAL_CFLAGS := \
 				-DLINUX \
@@ -77,6 +76,7 @@ LOCAL_SRC_FILES:= \
 
 LOCAL_LDFLAGS += -lEGL -lGLESv2 -ldl -llog
 
+LOCAL_MODULE_TAGS := optional
 LOCAL_PRELINK_MODULE:= false
 LOCAL_ARM_MODE := $(VIV_TARGET_ABI)
 LOCAL_MODULE_PATH := $(LOCAL_PATH)/../libs/$(VIV_TARGET_ABI)

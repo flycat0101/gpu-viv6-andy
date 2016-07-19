@@ -30,20 +30,20 @@
 #include "kernelgenerator.h"
 
 MultiDimensionalArraysTest2D::MultiDimensionalArraysTest2D(const char *typeName,
-														   const size_t sizeX,
-														   const size_t sizeY):
+                                                           const size_t sizeX,
+                                                           const size_t sizeY):
 MultiDimensionalArraysTest(typeName, "2D", sizeX*sizeY),
 sizeX(sizeX),
 sizeY(sizeY) {
 }
 
 cl_int MultiDimensionalArraysTest2D::enqueueKernel(cl_kernel kernel) {
-	const size_t globalWS[2] = {sizeX, sizeY};
-	const size_t localWS[2] = {sizeX, sizeY};
-	return clEnqueueNDRangeKernel(queue, kernel, 2, NULL, globalWS, localWS, 0, NULL, NULL);
+    const size_t globalWS[2] = {sizeX, sizeY};
+    const size_t localWS[2] = {sizeX, sizeY};
+    return clEnqueueNDRangeKernel(queue, kernel, 2, NULL, globalWS, localWS, 0, NULL, NULL);
 }
 
 void MultiDimensionalArraysTest2D::generateSource(char *source, unsigned int *sourceSize) {
-	const unsigned int dimensions[2] = {sizeX, sizeY};
-	generateKernels(typeName, source, sourceSize, 2, dimensions);
+    const unsigned int dimensions[2] = {sizeX, sizeY};
+    generateKernels(typeName, source, sourceSize, 2, dimensions);
 }

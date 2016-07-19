@@ -30,67 +30,67 @@
 
 float Dot3f(Vec3f* V1, Vec3f* V2)
 {
-	return (V1->v[0] * V2->v[0] + V1->v[1] * V2->v[1] + V1->v[2] * V2->v[2]);
+    return (V1->v[0] * V2->v[0] + V1->v[1] * V2->v[1] + V1->v[2] * V2->v[2]);
 }
 
 
 void VecNormalize3f(Vec3f* V)
 {
-	float inv_sqrt = invSqrt(Dot3f(V, V));
-	V->v[0] *= inv_sqrt;
-	V->v[1] *= inv_sqrt;
-	V->v[2] *= inv_sqrt;
+    float inv_sqrt = invSqrt(Dot3f(V, V));
+    V->v[0] *= inv_sqrt;
+    V->v[1] *= inv_sqrt;
+    V->v[2] *= inv_sqrt;
 }
 
 
 void VecAdd3f(Vec3f* Res, Vec3f* V1, Vec3f* V2)
 {
-	Res->v[0] = V1->v[0] + V2->v[0];
-	Res->v[1] = V1->v[1] + V2->v[1];
-	Res->v[2] = V1->v[2] + V2->v[2];
+    Res->v[0] = V1->v[0] + V2->v[0];
+    Res->v[1] = V1->v[1] + V2->v[1];
+    Res->v[2] = V1->v[2] + V2->v[2];
 }
 
 
 void VecSub3f(Vec3f* Res, Vec3f* V1, Vec3f* V2)
 {
-	Res->v[0] = V1->v[0] - V2->v[0];
-	Res->v[1] = V1->v[1] - V2->v[1];
-	Res->v[2] = V1->v[2] - V2->v[2];
+    Res->v[0] = V1->v[0] - V2->v[0];
+    Res->v[1] = V1->v[1] - V2->v[1];
+    Res->v[2] = V1->v[2] - V2->v[2];
 }
 
 
 void VecScale3f(Vec3f* Res, Vec3f* V1, float Factor)
 {
-	Res->v[0] = V1->v[0] * Factor;
-	Res->v[1] = V1->v[1] * Factor;
-	Res->v[2] = V1->v[2] * Factor;
+    Res->v[0] = V1->v[0] * Factor;
+    Res->v[1] = V1->v[1] * Factor;
+    Res->v[2] = V1->v[2] * Factor;
 }
 
 
 void VecCross3f(Vec3f* Res, Vec3f* V1, Vec3f* V2)
 {
-	Res->v[0] = V1->v[1]*V2->v[2] - V1->v[2]*V2->v[1];
-	Res->v[1] = V1->v[2]*V2->v[0] - V1->v[0]*V2->v[2];
-	Res->v[2] = V1->v[0]*V2->v[1] - V1->v[1]*V2->v[0];
+    Res->v[0] = V1->v[1]*V2->v[2] - V1->v[2]*V2->v[1];
+    Res->v[1] = V1->v[2]*V2->v[0] - V1->v[0]*V2->v[2];
+    Res->v[2] = V1->v[0]*V2->v[1] - V1->v[1]*V2->v[0];
 }
 
 
 void VecCopy3f(Vec3f* V1, Vec3f* V2)
 {
-	V1->v[0] = V2->v[0];
-	V1->v[1] = V2->v[1];
-	V1->v[2] = V2->v[2];
+    V1->v[0] = V2->v[0];
+    V1->v[1] = V2->v[1];
+    V1->v[2] = V2->v[2];
 }
 
 
 void VecSet3f(Vec3f* V, float f1, float f2, float f3)
 {
-	V->v[0] =  f1;
+    V->v[0] =  f1;
 #ifndef ANDROID
-	V->v[2] =  f2;
-	V->v[3] =  f3;
+    V->v[2] =  f2;
+    V->v[3] =  f3;
 #endif
-	V->v[1] =  f2;
+    V->v[1] =  f2;
     V->v[2] =  f3;
 }
 

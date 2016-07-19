@@ -1280,9 +1280,9 @@ typedef struct _vx_kernel_description_s
     vx_kernel_optimization_attribute_s      optAttributes;
 #endif
 
-	struct{
-		vx_char*     						source;
-	}extension;
+    struct{
+        vx_char*                             source;
+    }extension;
 }
 vx_kernel_description_s;
 

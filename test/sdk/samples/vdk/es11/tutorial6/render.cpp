@@ -64,8 +64,8 @@ bool InitGLES()
     particles = new ParticleSystem("spot.raw",25,0,0,0);
     mesh = new Mesh("plane.gsd");
 #else
-	particles = new ParticleSystem("/sdcard/es11/tutorial6/spot.raw",25,0,0,0);
-	mesh = new Mesh("/sdcard/es11/tutorial6/plane.gsd");
+    particles = new ParticleSystem("/sdcard/es11/tutorial6/spot.raw",25,0,0,0);
+    mesh = new Mesh("/sdcard/es11/tutorial6/plane.gsd");
 #endif
     bool result = mesh->GetState();
 #ifndef ANDROID_JNI
@@ -97,7 +97,7 @@ bool InitGLES()
 #ifndef ANDROID_JNI
     floorTexture = new Texture("floor.tga",GL_LINEAR_MIPMAP_LINEAR);
 #else
-	floorTexture = new Texture("/sdcard/es11/tutorial6/floor.tga",GL_LINEAR_MIPMAP_LINEAR);
+    floorTexture = new Texture("/sdcard/es11/tutorial6/floor.tga",GL_LINEAR_MIPMAP_LINEAR);
 #endif
     result &= floorTexture->GetState();
     return result;

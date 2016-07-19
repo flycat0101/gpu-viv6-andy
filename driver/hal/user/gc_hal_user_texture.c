@@ -3949,6 +3949,17 @@ _UpdateTextureDesc(
         }
     }
 
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_ASTC_BASE_LOD_FIX) == gcvFALSE &&
+        baseSurf->formatInfo.fmtClass == gcvFORMAT_CLASS_ASTC &&
+        baseLevel > 0)
+    {
+        for (i = 0; i < baseLevel; ++i)
+        {
+            updateInfo.astcSize[i] = updateInfo.astcSize[baseLevel];
+            updateInfo.astcSRGB[i] = updateInfo.astcSRGB[baseLevel];
+        }
+    }
+
     updateInfo.type = Texture->type;
     updateInfo.unsizedDepthTexture = Texture->unsizedDepthTexture;
     updateInfo.baseLevelSurf = baseSurf;

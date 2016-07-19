@@ -42,7 +42,7 @@ INSTALL_DIR         := $(SDK_DIR)/drivers
 
 INCLUDE := \
     -I$(AQROOT)/hal/inc \
-    -I$(AQROOT)/hal/user/ \
+    -I$(AQROOT)/hal/user \
     -I$(AQROOT)/hal/os/linux/user \
     -I$(AQROOT)/compiler/libVSC/include \
     -I$(AQROOT)/sdk/inc \
@@ -51,59 +51,67 @@ INCLUDE := \
     -I$(AQROOT)/driver/khronos/libEGL/api \
     -I$(AQROOT)/driver/khronos/libEGL/inc
 
-ifeq ($(EGL_API_DFB),1)
-  INCLUDE += -I$(DFB_DIR)/usr/include
-  INCLUDE += -I$(DFB_DIR)/include
-  INCLUDE += -I$(DFB_DIR)/include/directfb-internal
-  INCLUDE += -I$(DFB_DIR)/include/directfb
-endif
-
-ifeq ($(EGL_API_DRI),1)
-  INCLUDE += -I$(X11_ARM_DIR)/include
-endif
-
 ifeq ($(EGL_API_X),1)
   INCLUDE += -I$(X11_ARM_DIR)/include
 endif
 
+ifeq ($(EGL_API_DRI),1)
+  INCLUDE += -I$(X11_ARM_DIR)/include \
+             -I$(X11_ARM_DIR)/include/X11/extensions \
+             -I$(X11_ARM_DIR)/include/libdrm \
+             -I$(AQROOT)/driver/X/DRI/src
+endif
 
-ifeq ($(EGL_API_WL), 1)
-  INCLUDE += -I$(AQROOT)/driver/wl/
-  INCLUDE += -I$(WAYLAND_DIR)/include
-  INCLUDE += -I$(WAYLAND_DIR)/include/wayland-viv
+ifeq ($(EGL_API_GBM),1)
+  GBM_INCLUDE := $(shell $(PKG_CONFIG) --cflags gbm 2>/dev/null)
+
+  ifneq ($(GBM_INCLUDE),)
+    INCLUDE += $(GBM_INCLUDE)
+  else
+    INCLUDE += -I$(AQROOT)/driver/gbm/main
+    INCLUDE += -I$(AQROOT)/driver/gbm/backends/viv
+  endif
+endif
+
+ifeq ($(EGL_API_WL),1)
+  INCLUDE += -I$(AQROOT)/driver/wl \
+             -I$(WAYLAND_DIR)/include
+endif
+
+ifeq ($(EGL_API_DFB),1)
+  INCLUDE += -I$(DFB_DIR)/usr/include \
+             -I$(DFB_DIR)/include \
+             -I$(DFB_DIR)/include/directfb-internal \
+             -I$(DFB_DIR)/include/directfb
 endif
 
 CFLAGS  += $(INCLUDE)
 
+
 ################################################################################
 # Add extra flags for object files.
 
+ifneq ($(filter 1,$(EGL_API_X) $(EGL_API_DRI)),)
+  CFLAGS += -DX11
+endif
+
+ifeq ($(EGL_API_DRI), 1)
+  CFLAGS += -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast
+endif
+
 ifneq ($(USE_ARMCC),1)
-  ifeq ($(EGL_API_DFB),1)
-    CFLAGS  += -pipe -fPIC
-  else
-    ifeq ($(EGL_API_WL),1)
-      CFLAGS += -Werror
-    else
-      CFLAGS += -Werror -ansi
-    endif
+  CFLAGS += -fPIC -Werror
+
+  # These header files don't follow ansi.
+  ifeq ($(filter 1,$(EGL_API_WL) $(EGL_API_DFB) $(EGL_API_GBM)),)
+    CFLAGS += -ansi
   endif
 endif
 
 ifeq ($(EGL_API_DFB),1)
-  CFLAGS  += -DPIC
-endif
-
-ifeq ($(EGL_API_DRI),1)
-  CFLAGS += -DX11
-endif
-
-ifeq ($(EGL_API_X),1)
-  CFLAGS += -DX11
-endif
-
-ifneq ($(USE_ARMCC),1)
-  CFLAGS += -fPIC
+  CFLAGS += -DDIRECTFB_MAJOR_VERSION=$(DIRECTFB_MAJOR_VERSION) \
+            -DDIRECTFB_MINOR_VERSION=$(DIRECTFB_MINOR_VERSION) \
+            -DDIRECTFB_MICRO_VERSION=$(DIRECTFB_MICRO_VERSION)
 endif
 
 ifeq ($(CUSTOM_PIXMAP),1)
@@ -117,34 +125,58 @@ endif
 ################################################################################
 # Define flags for the linker.
 
+LDFLAGS := \
+    $(LFLAGS)
+
 ifneq ($(USE_ARMCC),1)
   ifeq ($(EGL_APPENDIX),)
-    LFLAGS += -Wl,--version-script=source/libEGL.map
+    LDFLAGS += -Wl,--version-script=source/libEGL.map
   endif
 endif
 
 ifeq ($(USE_ARMCC),1)
-  LFLAGS += --shared -L--soname=,$(TARGET_SONAME)
+  LDFLAGS += -pthread --shared -L--soname=,$(TARGET_SONAME)
 else
-  LFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
+  LDFLAGS += -pthread -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
 endif
 
 ################################################################################
 # Supply dependent libraries.
 
-LIBS := -L$(SDK_DIR)/drivers -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL
+LDLIBS := -L$(SDK_DIR)/drivers -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL -ldl
 
-ifeq ($(EGL_API_WL), 1)
-  LIBS += -L$(WAYLAND_DIR)/lib
-  LIBS += -lwayland-server -lwayland-client -lgc_wayland_protocol
+ifeq ($(EGL_API_X),1)
+  LDLIBS += -L$(X11_ARM_DIR)/lib -lX11
 endif
 
+ifeq ($(EGL_API_DRI),1)
+  LDLIBS += -L$(X11_ARM_DIR)/lib -lX11 -lXext -ldrm
+endif
+
+ifeq ($(EGL_API_GBM),1)
+  GBM_LIBS := $(shell $(PKG_CONFIG) --libs gbm 2>/dev/null)
+
+  ifneq ($(GBM_LIBS),)
+    LDLIBS += $(GBM_LIBS)
+  else
+    LDLIBS += -L$(SDK_DIR)/drivers -L$(AQROOT)/driver/gbm/main/$(OBJ_DIR) -lgbm
+  endif
+endif
+
+ifeq ($(EGL_API_WL),1)
+  LDLIBS += -L$(WAYLAND_DIR)/lib \
+            -lwayland-server \
+            -lwayland-client
+endif
+
+ifeq ($(EGL_API_DFB),1)
+  LDLIBS += -L$(DFB_DIR)/lib -ldirectfb
+endif
 
 ################################################################################
 # Describe object files.
 
 OBJECTS := \
-    $(OBJ_DIR)/gc_egl_platform.o \
     $(OBJ_DIR)/gc_egl_query.o \
     $(OBJ_DIR)/gc_egl_config.o \
     $(OBJ_DIR)/gc_egl_context.o \
@@ -154,6 +186,38 @@ OBJECTS := \
     $(OBJ_DIR)/gc_egl_sync.o \
     $(OBJ_DIR)/gc_egl_image.o \
     $(OBJ_DIR)/gc_egl.o
+
+# Always keep nullws.
+OBJECTS += \
+    $(OBJ_DIR)/gc_egl_nullws.o
+
+ifeq ($(EGL_API_X),1)
+  OBJECTS += $(OBJ_DIR)/gc_egl_x11.o
+endif
+
+ifeq ($(EGL_API_DRI),1)
+  OBJECTS += $(OBJ_DIR)/gc_egl_dri.o
+  OBJECTS += $(OBJ_DIR)/XF86dri.o
+endif
+
+ifeq ($(EGL_API_WL),1)
+  OBJECTS += $(OBJ_DIR)/gc_egl_wayland.o
+
+  OBJECTS += $(OBJ_DIR)/gc_wayland_protocol.o \
+             $(OBJ_DIR)/wayland-viv-protocol.o
+endif
+
+ifeq ($(EGL_API_GBM),1)
+  OBJECTS += $(OBJ_DIR)/gc_egl_gbm.o
+endif
+
+ifeq ($(EGL_API_FB),1)
+  OBJECTS += $(OBJ_DIR)/gc_egl_fbdev.o
+endif
+
+ifeq ($(EGL_API_DFB),1)
+  OBJECTS += $(OBJ_DIR)/gc_egl_dfb.o
+endif
 
 ################################################################################
 # Define targets.
@@ -191,7 +255,7 @@ $(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so \
                              $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.a)
 
 $(TARGET_MODULE): $(OBJECTS)
-	$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LIBS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LDLIBS)
 endif
 
 ################################################################################
@@ -200,6 +264,14 @@ endif
 vpath
 vpath %.c api
 vpath %.c source
+
+ifeq ($(EGL_API_DRI),1)
+  vpath %.c ../../X/DRI/src
+endif
+
+ifeq ($(EGL_API_WL),1)
+  vpath %.c ../../wl
+endif
 
 $(OBJ_DIR)/%.o: %.c
 	@mkdir -p $(OBJ_DIR)

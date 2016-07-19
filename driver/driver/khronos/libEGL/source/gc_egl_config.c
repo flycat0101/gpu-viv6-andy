@@ -1062,7 +1062,7 @@ eglChooseConfig(
 
             pixmap = (NativePixmapType) gcmINT2PTR(criteria.matchNativePixmap);
 
-            if (!veglMatchPixmap(dpy, pixmap, configuration))
+            if (!dpy->platform->matchPixmap(dpy, (void *) pixmap, configuration))
             {
                 /* Criterium doesn't match. */
                 gcmTRACE_ZONE(gcvLEVEL_INFO, gcdZONE_EGL_CONFIG,
@@ -1388,7 +1388,7 @@ eglGetConfigAttrib(
         break;
 
     case EGL_NATIVE_VISUAL_ID:
-        *value = veglGetNativeVisualId(dpy, eglConfig);
+        *value = dpy->platform->getNativeVisualId(dpy, eglConfig);
         break;
 
     case EGL_NATIVE_VISUAL_TYPE:
@@ -1433,7 +1433,7 @@ eglGetConfigAttrib(
         break;
 
     case EGL_MIN_SWAP_INTERVAL:
-        if (!veglGetSwapInterval(dpy, &min, &max))
+        if (!dpy->platform->getSwapInterval(dpy, &min, &max))
         {
             *value = 1;
         }
@@ -1444,7 +1444,7 @@ eglGetConfigAttrib(
         break;
 
     case EGL_MAX_SWAP_INTERVAL:
-        if (!veglGetSwapInterval(dpy, &min, &max))
+        if (!dpy->platform->getSwapInterval(dpy, &min, &max))
         {
             *value = 1;
         }

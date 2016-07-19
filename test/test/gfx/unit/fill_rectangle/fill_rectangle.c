@@ -48,64 +48,64 @@ static IDirectFB *dfb;
 
 int main( int argc, char *argv[] )
 {
-	DFBResult			    err;
-	DFBAccelerationMask     mask;
-	IDirectFBDisplayLayer  *layer;
-	IDirectFBSurface       *primary;
+    DFBResult                err;
+    DFBAccelerationMask     mask;
+    IDirectFBDisplayLayer  *layer;
+    IDirectFBSurface       *primary;
 
-	int width, height, w, h, x, y;
+    int width, height, w, h, x, y;
 
-	/* Initialize the core. */
-	DFBCHECK(DirectFBInit( &argc, &argv ));
+    /* Initialize the core. */
+    DFBCHECK(DirectFBInit( &argc, &argv ));
 
-	/* Create the super interface. */
-	DFBCHECK(DirectFBCreate( &dfb ));
+    /* Create the super interface. */
+    DFBCHECK(DirectFBCreate( &dfb ));
 
-	/* Get the Layer Interface for the primary layer. */
-	DFBCHECK(dfb->GetDisplayLayer( dfb, DLID_PRIMARY, &layer ));
+    /* Get the Layer Interface for the primary layer. */
+    DFBCHECK(dfb->GetDisplayLayer( dfb, DLID_PRIMARY, &layer ));
 
-	/* Set the layer cooperative level. */
-	DFBCHECK(layer->SetCooperativeLevel( layer, DLSCL_ADMINISTRATIVE ));
-	DFBCHECK(layer->SetBackgroundColor( layer, 0, 0, 0, 0xFF ));
-	DFBCHECK(layer->SetBackgroundMode( layer, DLBM_COLOR ));
+    /* Set the layer cooperative level. */
+    DFBCHECK(layer->SetCooperativeLevel( layer, DLSCL_ADMINISTRATIVE ));
+    DFBCHECK(layer->SetBackgroundColor( layer, 0, 0, 0, 0xFF ));
+    DFBCHECK(layer->SetBackgroundMode( layer, DLBM_COLOR ));
 
-	/* Get the layer's surface. */
-	DFBCHECK(layer->GetSurface( layer, &primary ));
+    /* Get the layer's surface. */
+    DFBCHECK(layer->GetSurface( layer, &primary ));
 
-	DFBCHECK(primary->GetSize( primary, &width, &height ));
-	DFBCHECK(primary->Clear( primary, 0, 0, 0, 0x80 ));
+    DFBCHECK(primary->GetSize( primary, &width, &height ));
+    DFBCHECK(primary->Clear( primary, 0, 0, 0, 0x80 ));
 
-	DFBCHECK(primary->SetDrawingFlags( primary, DSDRAW_NOFX ));
+    DFBCHECK(primary->SetDrawingFlags( primary, DSDRAW_NOFX ));
 
-	DFBCHECK(primary->GetAccelerationMask( primary, NULL, &mask ));
+    DFBCHECK(primary->GetAccelerationMask( primary, NULL, &mask ));
 
-	if (mask & DFXL_FILLRECTANGLE) {
-		printf( "DFXL_FILLRECTANGLE is accelerated.\n" );
-	} else {
-		printf( "DFXL_FILLRECTANGLE is NOT accelerated.\n" );
-	}
+    if (mask & DFXL_FILLRECTANGLE) {
+        printf( "DFXL_FILLRECTANGLE is accelerated.\n" );
+    } else {
+        printf( "DFXL_FILLRECTANGLE is NOT accelerated.\n" );
+    }
 
-	w = width / 2;
-	h = height / 2;
-	x = (width - w) / 2;
-	y = (height - h) / 2;
+    w = width / 2;
+    h = height / 2;
+    x = (width - w) / 2;
+    y = (height - h) / 2;
 
-	DFBCHECK(primary->SetColor( primary, 0, 0xFF, 0, 0xFF ));
+    DFBCHECK(primary->SetColor( primary, 0, 0xFF, 0, 0xFF ));
 
-	DFBCHECK(primary->FillRectangle( primary, x, y, w, h ));
+    DFBCHECK(primary->FillRectangle( primary, x, y, w, h ));
 
-	DFBCHECK(primary->Flip( primary, NULL, DSFLIP_NONE ));
+    DFBCHECK(primary->Flip( primary, NULL, DSFLIP_NONE ));
 
-	/* Save the picture. */
-	DFBCHECK(primary->Dump( primary, ".", "fill_rectangle" ));
+    /* Save the picture. */
+    DFBCHECK(primary->Dump( primary, ".", "fill_rectangle" ));
 
-	/* Make sure all of the hardware operations have completed. */
-	DFBCHECK(dfb->WaitIdle( dfb ));
+    /* Make sure all of the hardware operations have completed. */
+    DFBCHECK(dfb->WaitIdle( dfb ));
 
-	/* Release the resources. */
-	DFBCHECK(primary->Release( primary ));
-	DFBCHECK(layer->Release( layer ));
-	DFBCHECK(dfb->Release( dfb ));
+    /* Release the resources. */
+    DFBCHECK(primary->Release( primary ));
+    DFBCHECK(layer->Release( layer ));
+    DFBCHECK(dfb->Release( dfb ));
 
-	return EXIT_SUCCESS;
+    return EXIT_SUCCESS;
 }

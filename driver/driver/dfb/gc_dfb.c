@@ -1096,6 +1096,18 @@ gal_setup_driver( GalDriverData *drv,
                                                               gcvFEATURE_2D_MULTI_SOURCE_BLT)
                                    == gcvSTATUS_TRUE;
 
+#if GAL_SURFACE_COMPRESSED
+           /* Determine whether 2D hardware support compression. */
+            vdev->hw_2d_compression = gcoHAL_IsFeatureAvailable(vdrv->hal, gcvFEATURE_2D_COMPRESSION)
+                                      == gcvTRUE;
+
+            vdrv->per_process_compression = gcoOS_DetectProcessByEncryptedName("\x9b\x99\xa0\x9b\x90\x94")
+                                            == gcvTRUE;
+#else
+            vdev->hw_2d_compression = gcvFALSE;
+            vdrv->per_process_compression = gcvFALSE;
+#endif
+
             /* Initialize pending primitives. */
             /* TODO: Overrided with the value from config file. */
             vdev->max_pending_num  = MAX_PENDING_NUM;
@@ -1157,6 +1169,14 @@ gal_setup_driver( GalDriverData *drv,
             vdrv->tmp_dst_width      = 0;
             vdrv->tmp_dst_height     = 0;
         }
+
+        /* Initialize tile. */
+        vdrv->src_tiling = gcvLINEAR;
+        vdrv->src_tile_status = gcv2D_TSC_DISABLE;
+        vdrv->src_tile_status_addr = gcvINVALID_ADDRESS;
+        vdrv->dst_tiling = gcvLINEAR;
+        vdrv->dst_tile_status = gcv2D_TSC_DISABLE;
+        vdrv->dst_tile_status_addr = gcvINVALID_ADDRESS;
 
         /* Initialize pending primitives. */
         vdrv->pending_num  = 0;

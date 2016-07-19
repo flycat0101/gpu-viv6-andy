@@ -31,9 +31,7 @@ Files layout
     |        stretch_blit_rotate90
     |
     +---hal
-    |      |  clear
     |      |  tvui (2D case)
-    |      |  virtual
     |      |
     |      \---unit_test (2D case)
     |

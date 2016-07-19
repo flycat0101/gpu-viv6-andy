@@ -43,15 +43,15 @@ typedef struct _Stack Stack;
 
 typedef struct _Texture2DRenderSurface
 {
-	Texture2D* texture;
+    Texture2D* texture;
 
-	int initialized;
-	int include_depth;
-	int include_alpha;
+    int initialized;
+    int include_depth;
+    int include_alpha;
 
-	Stack* fbo_stack;
-	GLuint fbo;
-	GLuint depth_buffer;
+    Stack* fbo_stack;
+    GLuint fbo;
+    GLuint depth_buffer;
 
 } Texture2DRenderSurface;
 
@@ -65,10 +65,10 @@ typedef struct _Texture2DRenderSurface
   hasn't been already.
 */
 Texture2DRenderSurface* Texture2DRenderSurfaceConstruct(
-	unsigned int width,
-	unsigned int height,
-	int include_depth,
-	int include_alpha
+    unsigned int width,
+    unsigned int height,
+    int include_depth,
+    int include_alpha
 );
 
 

@@ -12,7 +12,6 @@
 
 
 #include <gc_egl_precomp.h>
-#include <gc_hal_eglplatform.h>
 
 /*
  * To enable verbose messages, see cutils/log.h.
@@ -48,37 +47,43 @@
 #include <gc_gralloc_priv.h>
 #include <errno.h>
 
+typedef struct ANativeWindow *       PlatformWindowType;
+typedef struct egl_native_pixmap_t * PlatformPixmapType;
+typedef void *                       PlatformDisplayType;
+
+
+#define ANDROID_DUMMY (31415926)
 
 /******************************************************************************/
 /* Display. */
 
 static hw_module_t const* gralloc = gcvNULL;
 
-NativeDisplayType
-veglGetDefaultDisplay(
+static void *
+_GetDefaultDisplay(
     void
     )
 {
     /* Just a silly, non-zero value. */
-    NativeDisplayType display = (NativeDisplayType) ANDROID_DUMMY;
+    void * display = (void *) ANDROID_DUMMY;
     return display;
 }
 
-void
-veglReleaseDefaultDisplay(
-    IN NativeDisplayType Display
+static void
+_ReleaseDefaultDisplay(
+    IN void * Display
     )
 {
     /* Nothing to do. */
-    if (Display == (NativeDisplayType)ANDROID_DUMMY)
+    if (Display == (void *) ANDROID_DUMMY)
     {
         return;
     }
 }
 
-EGLBoolean
-veglIsValidDisplay(
-    IN NativeDisplayType Display
+static EGLBoolean
+_IsValidDisplay(
+    IN void * Display
     )
 {
     const unsigned int NUM_DISPLAYS = 1;
@@ -94,8 +99,8 @@ veglIsValidDisplay(
     return EGL_TRUE;
 }
 
-EGLBoolean
-veglInitLocalDisplayInfo(
+static EGLBoolean
+_InitLocalDisplayInfo(
     IN VEGLDisplay Display
     )
 {
@@ -117,8 +122,8 @@ veglInitLocalDisplayInfo(
     return EGL_TRUE;
 }
 
-EGLBoolean
-veglDeinitLocalDisplayInfo(
+static EGLBoolean
+_DeinitLocalDisplayInfo(
     IN VEGLDisplay Display
     )
 {
@@ -126,8 +131,8 @@ veglDeinitLocalDisplayInfo(
     return EGL_TRUE;
 }
 
-EGLint
-veglGetNativeVisualId(
+static EGLint
+_GetNativeVisualId(
     IN VEGLDisplay Display,
     IN struct eglConfig * Config
     )
@@ -177,8 +182,8 @@ veglGetNativeVisualId(
 }
 
 /* Query of swap interval range. */
-EGLBoolean
-veglGetSwapInterval(
+static EGLBoolean
+_GetSwapInterval(
     IN VEGLDisplay Display,
     OUT EGLint * Max,
     OUT EGLint * Min
@@ -187,8 +192,8 @@ veglGetSwapInterval(
     return EGL_FALSE;
 }
 
-EGLBoolean
-veglSetSwapInterval(
+static EGLBoolean
+_SetSwapInterval(
     IN VEGLDisplay Display,
     IN EGLint Interval
     )
@@ -248,7 +253,7 @@ struct eglWindowInfo
 
 static int
 _CancelBuffer(
-    NativeWindowType Window,
+    PlatformWindowType Window,
     android_native_buffer_t * Buffer
     )
 {
@@ -284,7 +289,7 @@ _CancelBuffer(
 
 static int
 _QueueBuffer(
-    NativeWindowType Window,
+    PlatformWindowType Window,
     android_native_buffer_t * Buffer,
     int FenceFd
     )
@@ -305,7 +310,7 @@ _QueueBuffer(
 
 static int
 _DequeueBuffer(
-    NativeWindowType Window,
+    PlatformWindowType Window,
     android_native_buffer_t ** Buffer
     )
 {
@@ -410,7 +415,7 @@ _DequeueBuffer(
 
 static int
 _TryDequeueBuffer(
-    NativeWindowType Window,
+    PlatformWindowType Window,
     android_native_buffer_t ** Buffer
     )
 {
@@ -504,7 +509,7 @@ _TranslateFormat(
 
 static EGLBoolean
 _GetWindowProperties(
-    IN NativeWindowType Window,
+    IN PlatformWindowType Window,
     IN VEGLWindowInfo Info
     )
 {
@@ -513,7 +518,7 @@ _GetWindowProperties(
      * Determine buffer count to be set for native window.
      * Only available for Honeycomb and later
      */
-    NativeWindowType win = Window;
+    PlatformWindowType win = Window;
 
     /* Query concrete type. */
     win->query(win, NATIVE_WINDOW_CONCRETE_TYPE, &Info->concreteType);
@@ -632,7 +637,7 @@ bufferCountList[] =
 static void
 _SetBufferCount(
     IN VEGLDisplay Display,
-    IN NativeWindowType Window,
+    IN PlatformWindowType Window,
     IN VEGLWindowInfo Info
     )
 {
@@ -641,7 +646,7 @@ _SetBufferCount(
      * Only available for Honeycomb and later
      */
 #if ANDROID_SDK_VERSION >= 11
-    NativeWindowType win = Window;
+    PlatformWindowType win = Window;
 
     if (Info->concreteType == NATIVE_WINDOW_FRAMEBUFFER)
     {
@@ -769,7 +774,7 @@ _SetBufferCount(
 static void
 _UnsetBufferCount(
     IN VEGLDisplay Display,
-    IN NativeWindowType Window,
+    IN PlatformWindowType Window,
     IN VEGLWindowInfo Info
     )
 {
@@ -785,11 +790,11 @@ _UnsetBufferCount(
 
 static void
 _ApiConnect(
-    IN NativeWindowType Window
+    IN PlatformWindowType Window
     )
 {
 #if ANDROID_SDK_VERSION >= 14
-    NativeWindowType win  = Window;
+    PlatformWindowType win  = Window;
     VEGLThreadData thread = veglGetThreadData();
 
     if (thread && thread->api == EGL_OPENVG_API)
@@ -801,11 +806,11 @@ _ApiConnect(
 
 static void
 _ApiDisconnect(
-    IN NativeWindowType Window
+    IN PlatformWindowType Window
     )
 {
 #if ANDROID_SDK_VERSION >= 14
-    NativeWindowType win  = Window;
+    PlatformWindowType win  = Window;
     VEGLThreadData thread = veglGetThreadData();
 
     if (thread && (thread->api == EGL_OPENVG_API))
@@ -821,7 +826,7 @@ _ApiDisconnect(
 
 static inline void
 _CacheWindowBuffer(
-    NativeWindowType Window,
+    PlatformWindowType Window,
     VEGLWindowInfo Info,
     android_native_buffer_t * Buffer
     )
@@ -872,7 +877,7 @@ static gcePATCH_ID indirectList[] =
  */
 static EGLBoolean
 _IsFormatCompatible(
-    NativeWindowType Win,
+    PlatformWindowType Win,
     IN VEGLConfig Config,
     IN gceSURF_FORMAT RenderTargetFormat
     )
@@ -970,7 +975,7 @@ _QueryRenderMode(
      * Determine render into window level.
      */
     EGLint renderMode = 0;
-    NativeWindowType win = Surface->hwnd;
+    PlatformWindowType win = Surface->hwnd;
     VEGLWindowInfo info  = Surface->winInfo;
     VEGLConfig config    = &Surface->config;
 
@@ -1331,7 +1336,7 @@ _SetBufferUsage(
     IN EGLint RenderMode
     )
 {
-    NativeWindowType win = Surface->hwnd;
+    PlatformWindowType win = Surface->hwnd;
     VEGLWindowInfo info  = Surface->winInfo;
 
     /* Default hw render producer usage. */
@@ -1409,20 +1414,20 @@ _SetBufferUsage(
     }
 }
 
-EGLBoolean
-veglConnectWindow(
+static EGLBoolean
+_ConnectWindow(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
-    IN NativeWindowType Window
+    IN void * Window
     )
 {
     gceSTATUS status;
     VEGLWindowInfo info = gcvNULL;
-    NativeWindowType win = Window;
+    PlatformWindowType win = (PlatformWindowType) Window;
     gctPOINTER pointer;
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
-    gcmASSERT(win != (NativeWindowType) gcvNULL);
+    gcmASSERT(win != (PlatformWindowType) gcvNULL);
     gcmASSERT(Surface->winInfo == gcvNULL);
 
     /*
@@ -1483,14 +1488,14 @@ OnError:
     return EGL_FALSE;
 }
 
-EGLBoolean
-veglDisconnectWindow(
+static EGLBoolean
+_DisconnectWindow(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface
     )
 {
     /* Get shortcut. */
-    NativeWindowType win = Surface->hwnd;
+    PlatformWindowType win = Surface->hwnd;
     VEGLWindowInfo info = Surface->winInfo;
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
@@ -1517,15 +1522,15 @@ veglDisconnectWindow(
     return EGL_TRUE;
 }
 
-EGLBoolean
-veglBindWindow(
+static EGLBoolean
+_BindWindow(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
     OUT EGLint * RenderMode
     )
 {
     EGLint renderMode;
-    NativeWindowType win = Surface->hwnd;
+    PlatformWindowType win = Surface->hwnd;
     VEGLWindowInfo info  = Surface->winInfo;
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
@@ -1543,8 +1548,8 @@ veglBindWindow(
     return EGL_TRUE;
 }
 
-EGLBoolean
-veglUnbindWindow(
+static EGLBoolean
+_UnbindWindow(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface
     )
@@ -1553,8 +1558,8 @@ veglUnbindWindow(
     return EGL_TRUE;
 }
 
-EGLBoolean
-veglGetWindowSize(
+static EGLBoolean
+_GetWindowSize(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
     OUT EGLint * Width,
@@ -1566,11 +1571,11 @@ veglGetWindowSize(
     EGLint height;
 
     /* Get shortcut. */
-    NativeWindowType win = Surface->hwnd;
+    PlatformWindowType win = Surface->hwnd;
     VEGLWindowInfo info = Surface->winInfo;
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
-    gcmASSERT(win != (NativeWindowType) gcvNULL);
+    gcmASSERT(win != (PlatformWindowType) gcvNULL);
     gcmASSERT(info);
 
     if (info->bufferWidth && info->bufferHeight)
@@ -1613,14 +1618,14 @@ veglGetWindowSize(
     return EGL_TRUE;
 }
 
-EGLBoolean
-veglGetWindowBackBuffer(
+static EGLBoolean
+_GetWindowBackBuffer(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
     IN struct eglBackBuffer * BackBuffer
     )
 {
-    NativeWindowType win = Surface->hwnd;
+    PlatformWindowType win = Surface->hwnd;
     VEGLWindowInfo info  = Surface->winInfo;
     android_native_buffer_t *buffer;
     struct gc_native_handle_t *hnd;
@@ -1679,8 +1684,8 @@ veglGetWindowBackBuffer(
     return EGL_TRUE;
 }
 
-EGLBoolean
-veglUpdateBufferAge(
+static EGLBoolean
+_UpdateBufferAge(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
     IN struct eglBackBuffer * BackBuffer
@@ -1705,8 +1710,8 @@ veglUpdateBufferAge(
     return EGL_TRUE;
 }
 
-EGLBoolean
-veglQueryBufferAge(
+static EGLBoolean
+_QueryBufferAge(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
     IN struct eglBackBuffer * BackBuffer,
@@ -1731,8 +1736,8 @@ veglQueryBufferAge(
     return EGL_FALSE;
 }
 
-EGLBoolean
-veglPostWindowBackBuffer(
+static EGLBoolean
+_PostWindowBackBuffer(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
     IN struct eglBackBuffer * BackBuffer,
@@ -1740,7 +1745,7 @@ veglPostWindowBackBuffer(
     IN EGLint Rects[]
     )
 {
-    NativeWindowType win = Surface->hwnd;
+    PlatformWindowType win = Surface->hwnd;
     android_native_buffer_t * buffer;
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
@@ -1767,14 +1772,14 @@ veglPostWindowBackBuffer(
 }
 
 #if gcdANDROID_NATIVE_FENCE_SYNC >= 2
-EGLBoolean
-veglPostWindowBackBufferFence(
+static EGLBoolean
+_PostWindowBackBufferFence(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
     IN struct eglBackBuffer * BackBuffer
     )
 {
-    NativeWindowType win = Surface->hwnd;
+    PlatformWindowType win = Surface->hwnd;
     android_native_buffer_t * buffer;
     gctSYNC_POINT syncPoint;
     int fenceFd = -1;
@@ -1841,14 +1846,14 @@ veglPostWindowBackBufferFence(
 }
 #endif
 
-EGLBoolean
-veglCancelWindowBackBuffer(
+static EGLBoolean
+_CancelWindowBackBuffer(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
     IN struct eglBackBuffer * BackBuffer
     )
 {
-    NativeWindowType win = Surface->hwnd;
+    PlatformWindowType win = Surface->hwnd;
     android_native_buffer_t * buffer;
 
     /* Extract objects. */
@@ -1866,14 +1871,14 @@ veglCancelWindowBackBuffer(
     return EGL_TRUE;
 }
 
-EGLBoolean
-veglSynchronousPost(
+static EGLBoolean
+_SynchronousPost(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface
     )
 {
 #if ANDROID_SDK_VERSION >= 11
-    NativeWindowType win = Surface->hwnd;
+    PlatformWindowType win = Surface->hwnd;
     VEGLWindowInfo info  = Surface->winInfo;
     EGLBoolean sync = EGL_FALSE;
 
@@ -1952,8 +1957,8 @@ veglSynchronousPost(
 #endif
 }
 
-EGLBoolean
-veglHasWindowBuffer(
+static EGLBoolean
+_HasWindowBuffer(
     IN VEGLSurface Surface,
     EGLClientBuffer Handle
     )
@@ -1992,7 +1997,7 @@ struct eglPixmapInfo
 
 static void
 _DoSyncFromPixmap(
-    NativePixmapType Pixmap,
+    PlatformPixmapType Pixmap,
     VEGLPixmapInfo Info
     )
 {
@@ -2045,7 +2050,7 @@ OnError:
 
 static void
 _DoSyncToPixmap(
-    NativePixmapType Pixmap,
+    PlatformPixmapType Pixmap,
     VEGLPixmapInfo Info
     )
 {
@@ -2097,25 +2102,26 @@ OnError:
 }
 
 
-EGLBoolean
-veglMatchPixmap(
+static EGLBoolean
+_MatchPixmap(
     IN VEGLDisplay Display,
-    IN NativePixmapType Pixmap,
+    IN void * Pixmap,
     IN struct eglConfig * Config
     )
 {
     gceSTATUS status;
     gceSURF_FORMAT pixmapFormat;
     EGLBoolean match = EGL_TRUE;
+    PlatformPixmapType pixmap = (PlatformPixmapType) Pixmap;
 
-    if (Pixmap->version != sizeof (egl_native_pixmap_t))
+    if (pixmap->version != sizeof (egl_native_pixmap_t))
     {
         LOGE("This is not an Android pixmap");
         return EGL_FALSE;
     }
 
     /* Translate to HAL format. */
-    pixmapFormat = _TranslateFormat(Pixmap->format);
+    pixmapFormat = _TranslateFormat(pixmap->format);
 
     if (pixmapFormat == gcvSURF_UNKNOWN)
     {
@@ -2152,10 +2158,10 @@ veglMatchPixmap(
     return match;
 }
 
-EGLBoolean
-veglConnectPixmap(
+static EGLBoolean
+_ConnectPixmap(
     IN VEGLDisplay Display,
-    IN NativePixmapType Pixmap,
+    IN void * Pixmap,
     OUT VEGLPixmapInfo * Info,
     OUT gcoSURF * Surface
     )
@@ -2168,16 +2174,17 @@ veglConnectPixmap(
     gcoSURF shadow = gcvNULL;
     gctPOINTER pointer;
     VEGLPixmapInfo info = gcvNULL;
+    PlatformPixmapType pixmap = (PlatformPixmapType) Pixmap;
 
-    if ((Pixmap == (NativePixmapType) gcvNULL) ||
-        (Pixmap->version != sizeof (egl_native_pixmap_t)))
+    if ((pixmap == (PlatformPixmapType) gcvNULL) ||
+        (pixmap->version != sizeof (egl_native_pixmap_t)))
     {
         LOGE("This is not an Android pixmap");
         return EGL_FALSE;
     }
 
     /* Translate to HAL format. */
-    pixmapFormat = _TranslateFormat(Pixmap->format);
+    pixmapFormat = _TranslateFormat(pixmap->format);
 
     /* Get native pixmap stride. */
     switch (pixmapFormat)
@@ -2185,16 +2192,16 @@ veglConnectPixmap(
     case gcvSURF_R4G4B4A4:
     case gcvSURF_R5G5B5A1:
     case gcvSURF_R5G6B5:
-        pixmapStride = Pixmap->stride * 2;
+        pixmapStride = pixmap->stride * 2;
         break;
     case gcvSURF_A8B8G8R8:
     case gcvSURF_X8B8G8R8:
     case gcvSURF_A8R8G8B8:
-        pixmapStride = Pixmap->stride * 4;
+        pixmapStride = pixmap->stride * 4;
         break;
     case gcvSURF_A8:
         /* Need shadow. */
-        pixmapStride = Pixmap->stride;
+        pixmapStride = pixmap->stride;
         break;
         /* Resolve can not support the two format. */
     default:
@@ -2204,13 +2211,13 @@ veglConnectPixmap(
 
     do
     {
-        if (((gctUINTPTR_T) Pixmap->data) & 0x3F)
+        if (((gctUINTPTR_T) pixmap->data) & 0x3F)
         {
             needShadow = gcvTRUE;
             break;
         }
 
-        if (Pixmap->stride < 16)
+        if (pixmap->stride < 16)
         {
             /* Too small in width. */
             needShadow = gcvTRUE;
@@ -2219,11 +2226,11 @@ veglConnectPixmap(
 
 
         gctINT vstride;
-        vstride = (Pixmap->vstride != 0) ? Pixmap->vstride : Pixmap->height;
+        vstride = (pixmap->vstride != 0) ? pixmap->vstride : pixmap->height;
 
          /* Height needs to be 4 aligned or vstride is large enough. */
-        if ((Pixmap->height & 3) &&
-            (vstride < ((Pixmap->height + 3) & ~3)))
+        if ((pixmap->height & 3) &&
+            (vstride < ((pixmap->height + 3) & ~3)))
         {
             /*
              * Not enough memory in height.
@@ -2240,8 +2247,8 @@ veglConnectPixmap(
         /* Construct pixmap wrapper. */
         gcmONERROR(
             gcoSURF_Construct(gcvNULL,
-                              Pixmap->width,
-                              Pixmap->height,
+                              pixmap->width,
+                              pixmap->height,
                               1,
                               gcvSURF_BITMAP,
                               pixmapFormat,
@@ -2253,7 +2260,7 @@ veglConnectPixmap(
                                    gcvSURF_BITMAP,
                                    pixmapFormat,
                                    pixmapStride,
-                                   Pixmap->data,
+                                   pixmap->data,
                                    gcvINVALID_ADDRESS);
 
         if (gcmIS_ERROR(status))
@@ -2265,8 +2272,8 @@ veglConnectPixmap(
         /* Do the wrap. */
         status = gcoSURF_SetWindow(wrapper,
                                    0, 0,
-                                   Pixmap->width,
-                                   Pixmap->height);
+                                   pixmap->width,
+                                   pixmap->height);
     }
     while (gcvFALSE);
 
@@ -2285,8 +2292,8 @@ veglConnectPixmap(
         /* Construct the shadow surface. */
         gcmONERROR(
             gcoSURF_Construct(gcvNULL,
-                              Pixmap->width,
-                              Pixmap->height,
+                              pixmap->width,
+                              pixmap->height,
                               1,
                               gcvSURF_BITMAP,
                               pixmapFormat,
@@ -2303,15 +2310,15 @@ veglConnectPixmap(
     info = pointer;
 
     /* Save flags. */
-    info->width    = Pixmap->width;
-    info->height   = Pixmap->height;
+    info->width    = pixmap->width;
+    info->height   = pixmap->height;
     info->format   = pixmapFormat;
     info->stride   = pixmapStride;
     info->wrapper  = wrapper;
     info->shadow   = shadow;
 
     LOGV("%s(%d): display=%p pixmap=%p wrapper=%p shadow=%p",
-         __func__, __LINE__, Display, Pixmap, wrapper, shadow);
+         __func__, __LINE__, Display, pixmap, wrapper, shadow);
 
     /* Output. */
     *Info    = info;
@@ -2341,10 +2348,10 @@ OnError:
     return EGL_FALSE;
 }
 
-EGLBoolean
-veglDisconnectPixmap(
+static EGLBoolean
+_DisconnectPixmap(
     IN VEGLDisplay Display,
-    IN NativePixmapType Pixmap,
+    IN void * Pixmap,
     IN VEGLPixmapInfo Info
     )
 {
@@ -2370,16 +2377,17 @@ veglDisconnectPixmap(
     return EGL_TRUE;
 }
 
-EGLBoolean
-veglGetPixmapSize(
+static EGLBoolean
+_GetPixmapSize(
     IN VEGLDisplay Display,
-    IN NativePixmapType Pixmap,
+    IN void * Pixmap,
     IN VEGLPixmapInfo Info,
     OUT EGLint * Width,
     OUT EGLint * Height
     )
 {
-    if (Pixmap->version != sizeof (egl_native_pixmap_t))
+    PlatformPixmapType pixmap = (PlatformPixmapType) Pixmap;
+    if (pixmap->version != sizeof (egl_native_pixmap_t))
     {
         return EGL_FALSE;
     }
@@ -2390,18 +2398,19 @@ veglGetPixmapSize(
     return EGL_TRUE;
 }
 
-EGLBoolean
-veglSyncFromPixmap(
-    IN NativePixmapType Pixmap,
+static EGLBoolean
+_SyncFromPixmap(
+    IN void * Pixmap,
     IN VEGLPixmapInfo Info
     )
 {
+    PlatformPixmapType pixmap = (PlatformPixmapType) Pixmap;
     LOGV("%s(%d): pixmap=%p", __func__, __LINE__, Pixmap);
 
     if (Info->shadow != gcvNULL)
     {
         /* Copy if not wrapped. */
-        _DoSyncFromPixmap(Pixmap, Info);
+        _DoSyncFromPixmap(pixmap, Info);
     }
     else
     {
@@ -2415,20 +2424,67 @@ veglSyncFromPixmap(
     return EGL_TRUE;
 }
 
-EGLBoolean
-veglSyncToPixmap(
-    IN NativePixmapType Pixmap,
+static EGLBoolean
+_SyncToPixmap(
+    IN void * Pixmap,
     IN VEGLPixmapInfo Info
     )
 {
+    PlatformPixmapType pixmap = (PlatformPixmapType) Pixmap;
     LOGV("%s(%d): pixmap=%p", __func__, __LINE__, Pixmap);
 
     if (Info->shadow != gcvNULL)
     {
         /* Copy if not wrapped. */
-        _DoSyncToPixmap(Pixmap, Info);
+        _DoSyncToPixmap(pixmap, Info);
     }
 
     return EGL_TRUE;
+}
+
+
+static struct eglPlatform androidPlatform =
+{
+    EGL_PLATFORM_ANDROID_KHR,
+
+    _GetDefaultDisplay,
+    _ReleaseDefaultDisplay,
+    _IsValidDisplay,
+    _InitLocalDisplayInfo,
+    _DeinitLocalDisplayInfo,
+    _GetNativeVisualId,
+    _GetSwapInterval,
+    _SetSwapInterval,
+    _ConnectWindow,
+    _DisconnectWindow,
+    _BindWindow,
+    _UnbindWindow,
+    _GetWindowSize,
+    _GetWindowBackBuffer,
+    _PostWindowBackBuffer,
+#if gcdANDROID_NATIVE_FENCE_SYNC >= 2
+    _PostWindowBackBufferFence,
+#else
+    gcvNULL,
+#endif
+    _CancelWindowBackBuffer,
+    _SynchronousPost,
+    _HasWindowBuffer,
+    _UpdateBufferAge,
+    _QueryBufferAge,
+    _MatchPixmap,
+    _ConnectPixmap,
+    _DisconnectPixmap,
+    _GetPixmapSize,
+    _SyncFromPixmap,
+    _SyncToPixmap,
+};
+
+VEGLPlatform
+veglGetAndroidPlatform(
+    void * NativeDisplay
+    )
+{
+    return &androidPlatform;
 }
 

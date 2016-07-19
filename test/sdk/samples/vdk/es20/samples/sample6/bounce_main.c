@@ -27,8 +27,8 @@
 
 
 /*
-*	History : 2009.01.25, Created by qizhuang.liu.
-*			  2009.02.01, Finished by qizhuang.liu.
+*    History : 2009.01.25, Created by qizhuang.liu.
+*              2009.02.01, Finished by qizhuang.liu.
 */
 #include "vdk_sample_common.h"
 
@@ -44,165 +44,165 @@ int VDKS_Val_WindowsHeight = 240;
 char* VDKS_ARG0 = NULL;
 #endif
 /*
-*	Save Screen.
+*    Save Screen.
 */
 
 int SaveResult = 0;
 
 /*
-*	Effect Routine(s).
+*    Effect Routine(s).
 */
 
-VDKS_BOOL	BallInit();
-void		BallPass();
+VDKS_BOOL    BallInit();
+void        BallPass();
 
-VDKS_BOOL	TerrainInit();
-void		TerrainPass();
+VDKS_BOOL    TerrainInit();
+void        TerrainPass();
 
 /*
-*	passed_time
+*    passed_time
 */
 
 float passed_time;
 
 /*
-*	Eye Position
+*    Eye Position
 */
 
 float EyePosition [] = {0.0f, 400.0f, 400.0f};
 //float EyePosition [] = {0.0f, 0.0f, 400.0f};
 
-const float	ModelView	[16];
-const float	Projection	[16];
-const float	MVP			[16];
+const float    ModelView    [16];
+const float    Projection    [16];
+const float    MVP            [16];
 
 VDKS_BOOL Init()
 {
-	//return BallInit();
+    //return BallInit();
 
-	/*
-	 * Matrix
-	*/
+    /*
+     * Matrix
+    */
 
-	float Radius = 500.0f;
+    float Radius = 500.0f;
 
-	do
-	{
-		float * view =  EyePosition;
-		float focus [3] = {0.0, 0.0, 0.0};
-		float up	[3] = {0.0, 1.0, 0.0};
+    do
+    {
+        float * view =  EyePosition;
+        float focus [3] = {0.0, 0.0, 0.0};
+        float up    [3] = {0.0, 1.0, 0.0};
 
-		/*
-		 * Assume
-		*/
+        /*
+         * Assume
+        */
 
-		VDKS_Func_LoadIdentity((float *)ModelView);
-		VDKS_Func_LoadIdentity((float *)Projection);
-		VDKS_Func_LoadIdentity((float *)MVP);
+        VDKS_Func_LoadIdentity((float *)ModelView);
+        VDKS_Func_LoadIdentity((float *)Projection);
+        VDKS_Func_LoadIdentity((float *)MVP);
 
-		VDKS_Func_Matrix_LookAt(view, focus, up, (float *)ModelView);
+        VDKS_Func_Matrix_LookAt(view, focus, up, (float *)ModelView);
 
-		VDKS_Func_Matrix_Ortho(
-			-1.0f * Radius, Radius,	/*left, right*/
-			-1.0f * Radius, Radius,	/*bottom, up*/
-			1.0f, EyePosition[2] * 2, /*near, far*/
-			(float *)Projection);
+        VDKS_Func_Matrix_Ortho(
+            -1.0f * Radius, Radius,    /*left, right*/
+            -1.0f * Radius, Radius,    /*bottom, up*/
+            1.0f, EyePosition[2] * 2, /*near, far*/
+            (float *)Projection);
 
-		VDKS_Func_Matrix_Mul4by4((float *)MVP, Projection, ModelView);
-	}
-	while(0);
+        VDKS_Func_Matrix_Mul4by4((float *)MVP, Projection, ModelView);
+    }
+    while(0);
 
 
-	BallInit();
-	return TerrainInit();
+    BallInit();
+    return TerrainInit();
 }
 
 
 void Run ()
 {
-	passed_time += 0.03f;
+    passed_time += 0.03f;
 
-	glEnable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
 
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	BallPass();
+    BallPass();
 
-	TerrainPass();
+    TerrainPass();
 
 
 
-	if (SaveResult)
-	{
-		char szBMPFile[MAX_PATH + 1];
+    if (SaveResult)
+    {
+        char szBMPFile[MAX_PATH + 1];
 #ifndef ANDROID
-		VDKS_Func_GetCurrentDir(szBMPFile);
+        VDKS_Func_GetCurrentDir(szBMPFile);
 #else
-		strcpy(szBMPFile,"/sdcard/sample/sample6/");
+        strcpy(szBMPFile,"/sdcard/sample/sample6/");
 #endif
-		strcat(szBMPFile, "vdksample6_es20_result.bmp");
-		VDKS_Func_SaveScreen(szBMPFile);
-	}
+        strcat(szBMPFile, "vdksample6_es20_result.bmp");
+        VDKS_Func_SaveScreen(szBMPFile);
+    }
 #ifndef ANDROID
-	vdkSwapEGL(&VdkEgl);
+    vdkSwapEGL(&VdkEgl);
 #endif
-	VDKS_Macro_CheckGLError();
+    VDKS_Macro_CheckGLError();
 }
 
 int main(int argc, char * argv[])
 {
-	int i = 0;
-	int count = 100;
+    int i = 0;
+    int count = 100;
 
-	/*
-	 * Miscellaneous
-	*/
-	if (argc == 2)
-	{
-		count = atoi(argv[1]);
-	}
-	else if(argc == 4)
-	{
-		count = atoi(argv[1]);
-		VDKS_Val_WindowsWidth = atoi(argv[2]);
-		VDKS_Val_WindowsHeight = atoi(argv[3]);
-	}
-	else if(argc == 5)
-	{
-		count = atoi(argv[1]);
-		VDKS_Val_WindowsWidth = atoi(argv[2]);
-		VDKS_Val_WindowsHeight = atoi(argv[3]);
-		SaveResult = atoi(argv[4]);;
-	}
+    /*
+     * Miscellaneous
+    */
+    if (argc == 2)
+    {
+        count = atoi(argv[1]);
+    }
+    else if(argc == 4)
+    {
+        count = atoi(argv[1]);
+        VDKS_Val_WindowsWidth = atoi(argv[2]);
+        VDKS_Val_WindowsHeight = atoi(argv[3]);
+    }
+    else if(argc == 5)
+    {
+        count = atoi(argv[1]);
+        VDKS_Val_WindowsWidth = atoi(argv[2]);
+        VDKS_Val_WindowsHeight = atoi(argv[3]);
+        SaveResult = atoi(argv[4]);;
+    }
 
-	/*
-	 * VDKS
-	*/
+    /*
+     * VDKS
+    */
 #ifndef ANDROID
-	VDKS_ARG0 = argv[0];
+    VDKS_ARG0 = argv[0];
 
-	memset(&VdkEgl, 0, sizeof(vdkEGL));
+    memset(&VdkEgl, 0, sizeof(vdkEGL));
 
-	VDKS_Init(&VdkEgl);
+    VDKS_Init(&VdkEgl);
 
-	vdkShowWindow(VdkEgl.window);
+    vdkShowWindow(VdkEgl.window);
 #endif
-	/*
-	 * App Data
-	*/
+    /*
+     * App Data
+    */
 
-	if (VDKS_TRUE != Init())
-	{
-		printf("main : Failed to init case.");
-		return 1;
-	}
+    if (VDKS_TRUE != Init())
+    {
+        printf("main : Failed to init case.");
+        return 1;
+    }
 
-	for(i = 0; i < count; i++)
-	{
-		Run();
-	}
+    for(i = 0; i < count; i++)
+    {
+        Run();
+    }
 #ifndef ANDROID
-	vdkFinishEGL(&VdkEgl);
+    vdkFinishEGL(&VdkEgl);
 #endif
-	return 0;
+    return 0;
 }

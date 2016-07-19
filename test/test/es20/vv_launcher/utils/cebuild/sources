@@ -59,7 +59,7 @@ SOURCES=\
 
 INCLUDES=$(INCLUDES);	\
 	$(_SYSGENSDKROOT)\inc;	\
-	$(VIVANTE_SDK_INC);$(VIVANTE_SDK_INC)/HAL;$(AQROOT)/sdk/inc;	\
+	$(VIVANTE_SDK_INC);	\
 	..\..\lib\glutils;	\
 	..\..\lib\math;	\
 	..\..\lib\rc;	\
@@ -95,4 +95,4 @@ EXTRA_COMMAND =(  xcopy  /I /R /Y ..\..\src\shaders\*.frag $(INSTALL_PATH)\shade
   & xcopy  /I /R /Y ..\..\src\shaders\*.vert $(INSTALL_PATH)\shaders\ \
   & xcopy  /I /R /Y ..\..\src\textures\*.dds $(INSTALL_PATH)\textures\ )
 
-!INCLUDE $(BUILDROOT)\wince_install.inc
+!INCLUDE $(AQROOT)\wince_install.inc

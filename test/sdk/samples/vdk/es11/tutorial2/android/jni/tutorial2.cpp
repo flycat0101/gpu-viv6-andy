@@ -94,28 +94,28 @@ extern "C" {
     JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial2_GL11JNILib_init(JNIEnv * env, jobject obj,  jint w, jint h);
     JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial2_GL11JNILib_repaint(JNIEnv * env, jobject obj);
     JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial2_GL11JNILib_changeBackground(JNIEnv * env, jobject obj);
-	JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial2_GL11JNILib_key(JNIEnv * env, jobject obj, jint k, jboolean d);
+    JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial2_GL11JNILib_key(JNIEnv * env, jobject obj, jint k, jboolean d);
 };
 
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial2_GL11JNILib_init(JNIEnv * env, jobject obj,  jint w, jint h)
 {
-	width  = w;
-	height = h;
+    width  = w;
+    height = h;
 
-	InitGLES();
+    InitGLES();
 
-	gettimeofday(&tm, NULL);
+    gettimeofday(&tm, NULL);
     start = tm.tv_sec * 1000 + tm.tv_usec / 1000;
 
 
-	return true;
+    return true;
 }
 static bool done = false;
 static bool paused = false;
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial2_GL11JNILib_repaint(JNIEnv * env, jobject obj)
 {
-	LOGI("start repaint");
-//	InitGLES();
+    LOGI("start repaint");
+//    InitGLES();
     if(!done)
     {
          if(key!=0)
@@ -130,17 +130,17 @@ JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial2_GL11JNILi
                      done = true;
                      LOGI("BACK pressed, case stopping!");
                      break;
-				  case KEYCODE_DPAD_LEFT :
-					 SwitchOrtho();
-					 paused =false;
-					 break;
+                  case KEYCODE_DPAD_LEFT :
+                     SwitchOrtho();
+                     paused =false;
+                     break;
                   case KEYCODE_DPAD_RIGHT :
                      SwitchOrtho();
-					 break;
+                     break;
                   default:
                      break;
               }
-			key = 0;
+            key = 0;
           }
           if (!paused)
           {
@@ -153,7 +153,7 @@ JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial2_GL11JNILi
     end = tm.tv_sec * 1000 + tm.tv_usec / 1000;
     float fps = frameCount / ((end - start) / 1000.0f);
 
-	if((end-start)>1000 && !paused)
+    if((end-start)>1000 && !paused)
     {
             LOGI("%d frames in %d ticks -> %.3f fps\n", frameCount, end - start, fps);
             start = end;
@@ -166,15 +166,15 @@ JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial2_GL11JNILi
 
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial2_GL11JNILib_changeBackground(JNIEnv * env, jobject obj)
 {
-	return true;
+    return true;
 }
 
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_gl11tutorial2_GL11JNILib_key(JNIEnv * env, jobject obj, jint k, jboolean d)
 {
-	LOGI("Key Event : %d, d:%d",k,d);
+    LOGI("Key Event : %d, d:%d",k,d);
     if (d)
     {
         key = k;
     }
-	return true;
+    return true;
 }

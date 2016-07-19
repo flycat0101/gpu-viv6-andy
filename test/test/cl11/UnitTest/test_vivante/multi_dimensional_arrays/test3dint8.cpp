@@ -35,42 +35,42 @@
 
 Test3DInt8::Test3DInt8(const size_t sizeX, const size_t sizeY, const size_t sizeZ):
 MultiDimensionalArraysTest3D("int8", sizeX, sizeY, sizeZ) {
-	inputAHost = new cl_int8[size];
-	inputBHost = new cl_int8[size];
-	resultHost = new cl_int8[size];
-	inputA = inputAHost;
-	inputB = inputBHost;
-	result = resultHost;
+    inputAHost = new cl_int8[size];
+    inputBHost = new cl_int8[size];
+    resultHost = new cl_int8[size];
+    inputA = inputAHost;
+    inputB = inputBHost;
+    result = resultHost;
 }
 
 Test3DInt8::~Test3DInt8() {
-	delete[] inputAHost;
-	delete[] inputBHost;
-	delete[] resultHost;
+    delete[] inputAHost;
+    delete[] inputBHost;
+    delete[] resultHost;
 }
 
 const int Test3DInt8::getMemSize() const {
-	return sizeof(cl_int8)*size;
+    return sizeof(cl_int8)*size;
 }
 
 void Test3DInt8::generateInput(const unsigned int &kernelIndex) {
-	for (unsigned int i=0; i<VECTOR_SIZE; i++) {
-		for (unsigned int k=0; k<size; k++) {
-			inputAHost[k].s[i] = randInt();
-			if (getKernelInputArgNum(kernelIndex) == 2)
-				inputBHost[k].s[i] = randInt();
-		}
-	}
+    for (unsigned int i=0; i<VECTOR_SIZE; i++) {
+        for (unsigned int k=0; k<size; k++) {
+            inputAHost[k].s[i] = randInt();
+            if (getKernelInputArgNum(kernelIndex) == 2)
+                inputBHost[k].s[i] = randInt();
+        }
+    }
 }
 
 void* Test3DInt8::getInputAElement(const unsigned int &index) const {
-	return inputAHost[index].s;
+    return inputAHost[index].s;
 }
 
 void* Test3DInt8::getInputBElement(const unsigned int &index) const {
-	return &inputBHost[index].s;
+    return &inputBHost[index].s;
 }
 
 void* Test3DInt8::getResultElement(const unsigned int &index) const {
-	return &resultHost[index].s;
+    return &resultHost[index].s;
 }

@@ -224,7 +224,7 @@ typedef struct _khrEGL_IMAGE
 
         struct _khrEGL_IMAGE_PIXMAP
         {
-            NativePixmapType    nativePixmap;
+            void *              nativePixmap;
             void *              pixInfo;
 
             /* Native pixmap information. */

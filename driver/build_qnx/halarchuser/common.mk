@@ -29,8 +29,15 @@ EXTRA_INCVPATH += $(driver_root)/hal/inc
 EXTRA_INCVPATH += $(driver_root)/hal/user
 EXTRA_INCVPATH += $(driver_root)/hal/os/qnx/user
 EXTRA_INCVPATH += $(driver_root)/arch/XAQ2/cmodel/inc
-EXTRA_INCVPATH += $(driver_root)/hal/user/archvg
+ifeq ($(VIVANTE_ENABLE_3D), 1)
 EXTRA_INCVPATH += $(driver_root)/compiler/libVSC/include
+endif
+ifeq ($(VIVANTE_ENABLE_2D), 1)
+EXTRA_INCVPATH += $(driver_root)/hal/user/arch/thirdparty_special
+endif
+ifeq ($(VIVANTE_ENABLE_VG), 1)
+EXTRA_INCVPATH += $(driver_root)/hal/user/archvg
+endif
 
 # from libhalarchuser (trunk/hal/user/arch/Makefile.linux)
 SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_blt.o
@@ -57,7 +64,16 @@ SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_stream.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_shader.o
 endif
 
+ifeq ($(VIVANTE_ENABLE_2D), 1)
+SOURCE_OBJECTS += $(driver_root)/hal/user/arch/thirdparty_special/gc_hal_user_hardware_thirdparty.o
+SOURCE_OBJECTS += $(driver_root)/hal/user/arch/thirdparty_special/gc_hal_user_hardware_thirdparty_v10.o
+SOURCE_OBJECTS += $(driver_root)/hal/user/arch/thirdparty_special/gc_hal_user_hardware_thirdparty_v11.o
+endif
+
 EXTRA_SRCVPATH += $(driver_root)/hal/user/arch
+ifeq ($(VIVANTE_ENABLE_2D), 1)
+EXTRA_SRCVPATH += $(driver_root)/hal/user/arch/thirdparty_special
+endif
 
 EXTRA_LIBVPATH += $(LOCAL_INSTALL)
 

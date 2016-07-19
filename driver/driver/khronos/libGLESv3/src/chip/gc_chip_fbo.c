@@ -28,8 +28,10 @@
 
 extern __GLformatInfo __glFormatInfoTable[];
 
-#if (defined(DEBUG) || defined(_DEBUG))
+#if gcdFRAMEINFO_STATISTIC
 extern GLboolean g_dbgPerDrawKickOff;
+extern GLint g_dbgDumpImagePerDraw;
+extern GLboolean g_dbgSkipDraw;
 #endif
 
 /************************************************************************/
@@ -424,6 +426,52 @@ OnError:
 }
 
 
+gceSTATUS gcChipFBOSyncAttachment(__GLcontext *gc, __GLfboAttachPoint * attachPoint)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("gc=0x%x  attachPoint=0x%x", gc, attachPoint);
+
+    if (attachPoint->objType == GL_TEXTURE)
+    {
+        __GLtextureObject *texObj = (__GLtextureObject*)attachPoint->object;
+        if(texObj)
+        {
+            __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)texObj->privateData;
+            if ((texInfo && texInfo->eglImage.image) ||
+                (texInfo && texInfo->direct.source) )
+            {
+                gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc,
+                    texObj,
+                    attachPoint->face,
+                    attachPoint->level,
+                    attachPoint->layer));
+            }
+            /* Sync Master to direct source. */
+            if(texInfo && texInfo->direct.source &&
+                !texInfo->direct.directSample &&
+                attachPoint->level == 0
+                )
+            {
+                gcmONERROR(gcChipTexDirectSourceSyncFromMipSlice(gc,
+                    texObj));
+            }
+        }
+    }
+    else if (attachPoint->objType == GL_RENDERBUFFER)
+    {
+        __GLrenderbufferObject *rbo = (__GLrenderbufferObject*)attachPoint->object;
+        if (rbo && rbo->eglImage)
+        {
+            gcChipRboSyncFromShadow(gc, rbo);
+
+        }
+    }
+OnError:
+    gcmFOOTER();
+    return status;
+
+}
+
 /*
 ** For FBO rendering, this function is to sync shadow(RT) to master at some sync points.
 */
@@ -550,10 +598,11 @@ __glChipFramebufferRenderbuffer(
     __GLcontext *gc,
     __GLframebufferObject *fbo,
     GLint attachIndex,
-    __GLrenderbufferObject *rbo
+    __GLrenderbufferObject *rbo,
+      __GLfboAttachPoint *preAttach
     )
 {
-
+    gcChipFBOSyncAttachment(gc, preAttach);
 }
 
 GLboolean
@@ -566,16 +615,18 @@ __glChipFramebufferTexture(
     GLint face,
     GLsizei samples,
     GLint zoffset,
-    GLboolean layered
+    GLboolean layered,
+     __GLfboAttachPoint *preAttach
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     gceSTATUS status = gcvSTATUS_OK;
     __GLmipMapLevel *mipmap;
 
-    gcmHEADER_ARG("gc=0x%x fbo=0x%x attachIndex=%d texObj=0x%x level=%d face=%d samples=%d zoffset=%d layered=%d",
-                  gc, fbo, attachIndex, texObj, level, face, samples, zoffset, layered);
+    gcmHEADER_ARG("gc=0x%x fbo=0x%x attachIndex=%d texObj=0x%x level=%d face=%d samples=%d zoffset=%d layered=%d preAttach=0x%x",
+        gc, fbo, attachIndex, texObj, level, face, samples, zoffset, layered, preAttach);
 
+    gcmONERROR(gcChipFBOSyncAttachment(gc,preAttach));
     mipmap = texObj ? &texObj->faceMipmap[face][level] : gcvNULL;
 
     if (mipmap && (mipmap->width * mipmap->height * mipmap->depth))
@@ -748,6 +799,13 @@ __glChipIsFramebufferComplete(
         gcmFOOTER_ARG("return=%d", ret);
         return ret;
     }
+
+    /* Zero flag and masks before starting evaluation */
+    framebufferObj->flag = 0;
+    framebufferObj->fbIntMask = 0;
+    framebufferObj->fbFloatMask = 0;
+    framebufferObj->fbUIntMask = 0;
+    framebufferObj->fbUNormalizedMask = 0;
 
     for (i = 0; i < __GL_MAX_ATTACHMENTS; i++)
     {
@@ -1544,6 +1602,19 @@ __glChipBlitFramebufferBegin(
     __GLcontext *gc
     )
 {
+#if gcdFRAMEINFO_STATISTIC
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+
+    gcoHAL_FrameInfoOps(chipCtx->hal,
+                        gcvFRAMEINFO_DRAW_NUM,
+                        gcvFRAMEINFO_OP_INC,
+                        gcvNULL);
+    if (g_dbgSkipDraw)
+    {
+        return GL_FALSE;
+    }
+#endif
+
     return GL_TRUE;
 }
 
@@ -1578,14 +1649,14 @@ __glChipBlitFramebufferEnd(
     __GLcontext *gc
     )
 {
-#if (defined(DEBUG) || defined(_DEBUG)) || (gcdDUMP && gcdDUMP_VERIFY_PER_DRAW)
+#if gcdFRAMEINFO_STATISTIC || (gcdDUMP && gcdDUMP_VERIFY_PER_DRAW)
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("gc=0x%x", gc);
 #endif
 
-#if (defined(DEBUG) || defined(_DEBUG))
+#if gcdFRAMEINFO_STATISTIC
     if (g_dbgPerDrawKickOff)
     {
         /* Flush the cache. */
@@ -1594,13 +1665,18 @@ __glChipBlitFramebufferEnd(
         /* Commit command buffer. */
         gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
     }
+
+    if (g_dbgDumpImagePerDraw & (__GL_PERDRAW_DUMP_BLITFBO_RT | __GL_PERDRAW_DUMP_BLITFBO_DS))
+    {
+        gcmONERROR(gcChipUtilsDumpRT(gc, (__GL_PERDRAW_DUMP_BLITFBO_RT | __GL_PERDRAW_DUMP_BLITFBO_DS)));
+    }
 #endif
 
 #if (gcdDUMP && gcdDUMP_VERIFY_PER_DRAW)
     gcmONERROR(gcChipUtilsVerifyRT(gc));
 #endif
 
-#if (defined(DEBUG) || defined(_DEBUG)) || (gcdDUMP && gcdDUMP_VERIFY_PER_DRAW)
+#if gcdFRAMEINFO_STATISTIC || (gcdDUMP && gcdDUMP_VERIFY_PER_DRAW)
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;

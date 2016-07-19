@@ -32,9 +32,8 @@ EXTRA_INCVPATH += $(driver_root)/sdk/inc
 
 # from libVDK (trunk/sdk/vdk/Makefile.linux)
 SOURCE_OBJECTS += $(driver_root)/sdk/vdk/gc_vdk_egl.o
-SOURCE_OBJECTS += $(driver_root)/sdk/vdk/gc_vdk_hal.o
 SOURCE_OBJECTS += $(driver_root)/sdk/vdk/gc_vdk_gl.o
-SOURCE_OBJECTS += $(driver_root)/sdk/vdk/gc_vdk.o
+SOURCE_OBJECTS += $(driver_root)/sdk/vdk/gc_vdk_qnx.o
 
 EXTRA_SRCVPATH += $(driver_root)/sdk/vdk
 

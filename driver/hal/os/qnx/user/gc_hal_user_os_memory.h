@@ -14,7 +14,9 @@
 #ifndef __gc_hal_user_os_memory_h_
 #define __gc_hal_user_os_memory_h_
 
-#define _ISOC99_SOURCE
+#ifndef _ISOC99_SOURCE
+#  define _ISOC99_SOURCE
+#endif
 
 #include <string.h>
 #if gcdUSE_FAST_MEM_COPY

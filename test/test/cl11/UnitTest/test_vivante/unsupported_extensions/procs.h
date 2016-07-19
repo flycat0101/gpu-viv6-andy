@@ -36,11 +36,11 @@
 #include <string.h>
 #include <time.h>
 
-#define print_error(errCode,msg)	printf( "ERROR: %s! (%s from %s:%d)\n", msg, get_error_string( errCode ), __FILE__, __LINE__ );
+#define print_error(errCode,msg)    printf( "ERROR: %s! (%s from %s:%d)\n", msg, get_error_string( errCode ), __FILE__, __LINE__ );
 
 //extern int      create_program_and_kernel(const char *source, const char *kernel_name, cl_program *program_ret, cl_kernel *kernel_ret);
 
-const char	*get_error_string( int clErrorCode );
+const char    *get_error_string( int clErrorCode );
 int create_kernel( cl_context context, cl_program *outProgram, cl_kernel *outKernel, unsigned int numKernelLines, const char **kernelProgram, const char *kernelName );
 int is_extension_available( cl_device_id device, const char *extensionName );
 

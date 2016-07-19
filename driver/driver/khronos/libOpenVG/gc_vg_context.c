@@ -1071,6 +1071,23 @@ veglSetContext(
             }
             else
             {
+#if gcdGC355_PROFILER
+                /* Set target. */
+                gcmERR_BREAK(gcoVG_SetTarget(
+                    context->vg,
+                    (gcsPROFILERFUNCNODE *)context->funcDList,
+                    context->TreeDepth,
+                    context->saveLayerTreeDepth,
+                    context->varTreeDepth,
+                    gcvNULL,
+                    gcvORIENTATION_TOP_BOTTOM
+                    ));
+#else
+                /* Set target. */
+                gcmERR_BREAK(gcoVG_SetTarget(
+                    context->vg, gcvNULL, gcvORIENTATION_TOP_BOTTOM
+                    ));
+#endif
                 break;
             }
 
@@ -1868,7 +1885,7 @@ veglCreateImageParentImage(
 
 
     /* Test for VgImage validation. */
-    vgimage_obj = (vgsIMAGE_PTR)Image;
+    vgimage_obj = (vgsIMAGE_PTR)(unsigned long)Image;
 
     if  ((vgimage_obj == gcvNULL) ||
          (vgimage_obj->parent != vgimage_obj))
@@ -1898,7 +1915,7 @@ veglCreateImageParentImage(
 
     /* Fill the root image. */
     {
-        child_obj = (vgsIMAGE_PTR)Image;
+        child_obj = (vgsIMAGE_PTR)(unsigned long)Image;
         khImage = (khrEGL_IMAGE *) *Images;
 
         khImage->magic = KHR_EGL_IMAGE_MAGIC_NUM;

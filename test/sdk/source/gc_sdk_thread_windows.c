@@ -36,19 +36,19 @@
 
 static DWORD WINAPI
 _ThreadStarter(
-	gctPOINTER Argument
-	)
+    gctPOINTER Argument
+    )
 {
-	/* Copy information. */
-	gctTHREADROUTINE routine = ((gcsTHREADINFO_PTR) Argument)->routine;
-	gctPOINTER argument = ((gcsTHREADINFO_PTR) Argument)->argument;
+    /* Copy information. */
+    gctTHREADROUTINE routine = ((gcsTHREADINFO_PTR) Argument)->routine;
+    gctPOINTER argument = ((gcsTHREADINFO_PTR) Argument)->argument;
 
-	/* Free the info structure. */
-	free(Argument);
+    /* Free the info structure. */
+    free(Argument);
 
-	/* Call the thread. */
-	(*routine) (argument);
-	return 0;
+    /* Call the thread. */
+    (*routine) (argument);
+    return 0;
 }
 
 
@@ -58,408 +58,408 @@ _ThreadStarter(
 
 /*******************************************************************************
 **
-**	vdkSleep
+**    vdkSleep
 **
-**	Sleep for specified number of milliseconds.
+**    Sleep for specified number of milliseconds.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctUINT Milliseconds
-**			Number of milliseconds to sleep for.
+**        gctUINT Milliseconds
+**            Number of milliseconds to sleep for.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkSleep(
-	gctUINT Milliseconds
-	)
+    gctUINT Milliseconds
+    )
 {
-	Sleep(Milliseconds);
+    Sleep(Milliseconds);
 }
 
 /*******************************************************************************
 **
-**	vdkCreateThread
+**    vdkCreateThread
 **
-**	Create and start a new thread.
+**    Create and start a new thread.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctTHREADROUTINE ThreadRoutine
-**			Pointer to the thread routine.
+**        gctTHREADROUTINE ThreadRoutine
+**            Pointer to the thread routine.
 **
-**		gctPOINTER Argument
-**			Argument to be passed to the thread routine.
+**        gctPOINTER Argument
+**            Argument to be passed to the thread routine.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		gctHANDLE
-**			Handle of the new thread.
+**        gctHANDLE
+**            Handle of the new thread.
 */
 
 gctHANDLE
 vdkCreateThread(
-	gctTHREADROUTINE ThreadRoutine,
-	gctPOINTER Argument
-	)
+    gctTHREADROUTINE ThreadRoutine,
+    gctPOINTER Argument
+    )
 {
-	gctHANDLE result;
-	gcsTHREADINFO_PTR info;
+    gctHANDLE result;
+    gcsTHREADINFO_PTR info;
 
-	/* Allocate thread info structure. */
-	info = (gcsTHREADINFO_PTR) malloc(sizeof(struct _gcsTHREADINFO));
-	if (info == gcvNULL)
-	{
-		return gcvNULL;
-	}
+    /* Allocate thread info structure. */
+    info = (gcsTHREADINFO_PTR) malloc(sizeof(struct _gcsTHREADINFO));
+    if (info == gcvNULL)
+    {
+        return gcvNULL;
+    }
 
-	/* Set the info. */
-	info->routine = ThreadRoutine;
-	info->argument = Argument;
+    /* Set the info. */
+    info->routine = ThreadRoutine;
+    info->argument = Argument;
 
-	/* Start the thread. */
-	result = (gctHANDLE) CreateThread(
-		gcvNULL,			/* Default security. */
-		0,					/* Default stack. */
-		_ThreadStarter,
-		info,
-		0,					/* Default creation flags. */
-		gcvNULL				/* Don't care about the ID. */
-		);
+    /* Start the thread. */
+    result = (gctHANDLE) CreateThread(
+        gcvNULL,            /* Default security. */
+        0,                    /* Default stack. */
+        _ThreadStarter,
+        info,
+        0,                    /* Default creation flags. */
+        gcvNULL                /* Don't care about the ID. */
+        );
 
-	/* Return result. */
-	if (result != gcvNULL)
-	{
-		return result;
-	}
-	else
-	{
-		/* Cleanup. */
-		free(info);
+    /* Return result. */
+    if (result != gcvNULL)
+    {
+        return result;
+    }
+    else
+    {
+        /* Cleanup. */
+        free(info);
 
-		/* Failed. */
-		return gcvNULL;
-	}
+        /* Failed. */
+        return gcvNULL;
+    }
 }
 
 /*******************************************************************************
 **
-**	vdkCloseThread
+**    vdkCloseThread
 **
-**	Close existing thread.
+**    Close existing thread.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctHANDLE ThreadHandle
-**			Handle of the existing thread to be closed.
+**        gctHANDLE ThreadHandle
+**            Handle of the existing thread to be closed.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkCloseThread(
-	gctHANDLE ThreadHandle
-	)
+    gctHANDLE ThreadHandle
+    )
 {
-	/* Wait for the thread to terminate. */
-	WaitForSingleObject((HANDLE) ThreadHandle, INFINITE);
+    /* Wait for the thread to terminate. */
+    WaitForSingleObject((HANDLE) ThreadHandle, INFINITE);
 
-	/* Close the handle. */
-	CloseHandle((HANDLE) ThreadHandle);
+    /* Close the handle. */
+    CloseHandle((HANDLE) ThreadHandle);
 }
 
 /*******************************************************************************
 **
-**	vdkCreateEvent
+**    vdkCreateEvent
 **
-**	Create an event.
+**    Create an event.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctBOOL ManualReset
-**			If gcvTRUE, a manual reset is needed to reset the event to
-**			non-signaled state.
+**        gctBOOL ManualReset
+**            If gcvTRUE, a manual reset is needed to reset the event to
+**            non-signaled state.
 **
-**		gctBOOL InitialState
-**			Initial state of the event.
+**        gctBOOL InitialState
+**            Initial state of the event.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		gctHANDLE
-**			Handle to the new event.
+**        gctHANDLE
+**            Handle to the new event.
 */
 
 gctHANDLE
 vdkCreateEvent(
-	gctBOOL ManualReset,
-	gctBOOL InitialState
-	)
+    gctBOOL ManualReset,
+    gctBOOL InitialState
+    )
 {
-	return (gctHANDLE) CreateEvent(NULL, ManualReset, InitialState, NULL);
+    return (gctHANDLE) CreateEvent(NULL, ManualReset, InitialState, NULL);
 }
 
 /*******************************************************************************
 **
-**	vdkCloseEvent
+**    vdkCloseEvent
 **
-**	Destroy an event.
+**    Destroy an event.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctHANDLE EventHandle
-**			Handle of the event.
+**        gctHANDLE EventHandle
+**            Handle of the event.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkCloseEvent(
-	gctHANDLE EventHandle
-	)
+    gctHANDLE EventHandle
+    )
 {
-	/* Set the event before destroying it in case other threads
-	   are waiting for it. */
-	SetEvent((HANDLE) EventHandle);
-	CloseHandle((HANDLE) EventHandle);
+    /* Set the event before destroying it in case other threads
+       are waiting for it. */
+    SetEvent((HANDLE) EventHandle);
+    CloseHandle((HANDLE) EventHandle);
 }
 
 /*******************************************************************************
 **
-**	vdkSetEvent
+**    vdkSetEvent
 **
-**	Set event to signaled state.
+**    Set event to signaled state.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctHANDLE EventHandle
-**			Handle of the event.
+**        gctHANDLE EventHandle
+**            Handle of the event.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkSetEvent(
-	gctHANDLE EventHandle
-	)
+    gctHANDLE EventHandle
+    )
 {
-	SetEvent((HANDLE) EventHandle);
+    SetEvent((HANDLE) EventHandle);
 }
 
 /*******************************************************************************
 **
-**	vdkResetEvent
+**    vdkResetEvent
 **
-**	Set event to non-signaled state.
+**    Set event to non-signaled state.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctHANDLE EventHandle
-**			Handle of the event.
+**        gctHANDLE EventHandle
+**            Handle of the event.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkResetEvent(
-	gctHANDLE EventHandle
-	)
+    gctHANDLE EventHandle
+    )
 {
-	ResetEvent((HANDLE) EventHandle);
+    ResetEvent((HANDLE) EventHandle);
 }
 
 /*******************************************************************************
 **
-**	vdkWaitForEvent
+**    vdkWaitForEvent
 **
-**	Wait for the event to become signaled.
+**    Wait for the event to become signaled.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctHANDLE EventHandle
-**			Handle of the event.
+**        gctHANDLE EventHandle
+**            Handle of the event.
 **
-**		gctINT Timeout
-**			Timeout in milliseconds.
+**        gctINT Timeout
+**            Timeout in milliseconds.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkWaitForEvent(
-	gctHANDLE EventHandle,
-	gctUINT Timeout
-	)
+    gctHANDLE EventHandle,
+    gctUINT Timeout
+    )
 {
-	if (Timeout == gcvINFINITE)
-	{
-		Timeout = INFINITE;
-	}
+    if (Timeout == gcvINFINITE)
+    {
+        Timeout = INFINITE;
+    }
 
-	WaitForSingleObject((HANDLE) EventHandle, Timeout);
+    WaitForSingleObject((HANDLE) EventHandle, Timeout);
 }
 
 /*******************************************************************************
 **
-**	vdkCreateMutex
+**    vdkCreateMutex
 **
-**	Create a mutex.
+**    Create a mutex.
 **
-**	INPUT:
+**    INPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		gctHANDLE
-**			Handle to the new mutex.
+**        gctHANDLE
+**            Handle to the new mutex.
 */
 
 gctHANDLE
 vdkCreateMutex(
-	void
-	)
+    void
+    )
 {
-	return (gctHANDLE) CreateMutex(NULL, FALSE, NULL);
+    return (gctHANDLE) CreateMutex(NULL, FALSE, NULL);
 }
 
 /*******************************************************************************
 **
-**	vdkCloseMutex
+**    vdkCloseMutex
 **
-**	Destroy a mutex.
+**    Destroy a mutex.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctHANDLE MutexHandle
-**			Handle of the mutex.
+**        gctHANDLE MutexHandle
+**            Handle of the mutex.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkCloseMutex(
-	gctHANDLE MutexHandle
-	)
+    gctHANDLE MutexHandle
+    )
 {
-	CloseHandle((HANDLE) MutexHandle);
+    CloseHandle((HANDLE) MutexHandle);
 }
 
 /*******************************************************************************
 **
-**	vdkAcquireMutex
+**    vdkAcquireMutex
 **
-**	Acquire a mutex.
+**    Acquire a mutex.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctHANDLE MutexHandle
-**			Handle of the event.
+**        gctHANDLE MutexHandle
+**            Handle of the event.
 **
-**		gctINT Timeout
-**			Timeout in milliseconds.
+**        gctINT Timeout
+**            Timeout in milliseconds.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkAcquireMutex(
-	gctHANDLE MutexHandle,
-	gctUINT Timeout
-	)
+    gctHANDLE MutexHandle,
+    gctUINT Timeout
+    )
 {
-	if (Timeout == gcvINFINITE)
-	{
-		Timeout = INFINITE;
-	}
+    if (Timeout == gcvINFINITE)
+    {
+        Timeout = INFINITE;
+    }
 
-	WaitForSingleObject((HANDLE) MutexHandle, Timeout);
+    WaitForSingleObject((HANDLE) MutexHandle, Timeout);
 }
 
 /*******************************************************************************
 **
-**	vdkReleaseMutex
+**    vdkReleaseMutex
 **
-**	Release a mutex.
+**    Release a mutex.
 **
-**	INPUT:
+**    INPUT:
 **
-**		gctHANDLE MutexHandle
-**			Handle of the mutex.
+**        gctHANDLE MutexHandle
+**            Handle of the mutex.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkReleaseMutex(
-	gctHANDLE MutexHandle
-	)
+    gctHANDLE MutexHandle
+    )
 {
-	ReleaseMutex((HANDLE) MutexHandle);
+    ReleaseMutex((HANDLE) MutexHandle);
 }

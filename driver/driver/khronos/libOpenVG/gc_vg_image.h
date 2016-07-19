@@ -241,6 +241,11 @@ gceSTATUS vgfTesselateImage(
     IN vgsCONTEXT_PTR Context,
     IN vgsIMAGE_PTR Target,
     IN vgsIMAGE_PTR Image
+#if gcdMOVG
+    ,
+    IN gctINT Width,
+    IN gctINT Height
+#endif
     );
 
 gceSTATUS vgfDrawImage(

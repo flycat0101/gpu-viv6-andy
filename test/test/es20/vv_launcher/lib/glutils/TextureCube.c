@@ -37,32 +37,32 @@
 
 void TextureCubeBind(TextureCube* Tex)
 {
-	if (Tex->id > 0)
-	{
-		glBindTexture(GL_TEXTURE_CUBE_MAP, Tex->id);
-		CheckGL("TextureCube::bindTexture");
-	}
+    if (Tex->id > 0)
+    {
+        glBindTexture(GL_TEXTURE_CUBE_MAP, Tex->id);
+        CheckGL("TextureCube::bindTexture");
+    }
 }
 
 
 TextureCube* TextureCubeConstruct(unsigned int Id)
 {
-	TextureCube* tex = (TextureCube*)malloc(sizeof (TextureCube));
-	tex->id = Id;
+    TextureCube* tex = (TextureCube*)malloc(sizeof (TextureCube));
+    tex->id = Id;
 
-	return tex;
+    return tex;
 }
 
 
 void TextureCubeDestroy(TextureCube* Tex)
 {
-	assert(Tex != NULL);
+    assert(Tex != NULL);
 
-	if (Tex->id > 0)
-	{
-		glDeleteTextures(1, &Tex->id);
-	}
+    if (Tex->id > 0)
+    {
+        glDeleteTextures(1, &Tex->id);
+    }
 
-	free(Tex);
+    free(Tex);
 }
 

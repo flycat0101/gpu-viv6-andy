@@ -145,8 +145,8 @@ typedef struct __GLdevicePipelineRec
     GLvoid (*detachRenderbuffer)(__GLcontext*, __GLrenderbufferObject*);
     GLboolean (*renderbufferStorage)(__GLcontext*, __GLrenderbufferObject*);
     GLvoid (*blitFramebuffer)(__GLcontext*, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLboolean, GLboolean, GLenum);
-    GLboolean (*frameBufferTexture)(__GLcontext*, __GLframebufferObject*, GLint, __GLtextureObject*, GLint, GLint, GLsizei, GLint, GLboolean);
-    GLvoid (*framebufferRenderbuffer)(__GLcontext*, __GLframebufferObject*, GLint, __GLrenderbufferObject*);
+    GLboolean (*frameBufferTexture)(__GLcontext*, __GLframebufferObject*, GLint, __GLtextureObject*, GLint, GLint, GLsizei, GLint, GLboolean, __GLfboAttachPoint *);
+    GLvoid (*framebufferRenderbuffer)(__GLcontext*, __GLframebufferObject*, GLint, __GLrenderbufferObject*, __GLfboAttachPoint *);
     GLboolean (*isFramebufferComplete)(__GLcontext*, __GLframebufferObject*);
     GLvoid (*invalidateFramebuffer)(__GLcontext*, __GLframebufferObject*, __GLfboAttachPoint*, GLint, GLint, GLsizei, GLsizei);
     GLvoid (*invalidateDrawable)(__GLcontext*, GLint, GLint, GLsizei, GLsizei);

@@ -6911,8 +6911,7 @@ _CheckDataTypePrecision(
        }
     }
     else if ((slsDATA_TYPE_IsSampler(DataType) || slsDATA_TYPE_IsImage(DataType)) &&
-             DataType->qualifiers.precision == slvPRECISION_QUALIFIER_DEFAULT &&
-              !sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_GPU_SHADER5))
+             DataType->qualifiers.precision == slvPRECISION_QUALIFIER_DEFAULT )
     {
         gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                         Identifier->lineNo,

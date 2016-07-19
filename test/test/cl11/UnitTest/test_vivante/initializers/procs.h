@@ -36,7 +36,7 @@
 #include <string.h>
 
 #define uint unsigned int
-#define print_error(errCode,msg)	printf( "ERROR: %s! (%s from %s:%d)\n", msg, get_error_string( errCode ), __FILE__, __LINE__ );
+#define print_error(errCode,msg)    printf( "ERROR: %s! (%s from %s:%d)\n", msg, get_error_string( errCode ), __FILE__, __LINE__ );
 
 extern int      initializers_scalar(cl_device_id deviceID, cl_context context, cl_command_queue queue, int num_elements, int& fail, int& pass, int&total);
 extern int      initializers_vector2(cl_device_id deviceID, cl_context context, cl_command_queue queue, int num_elements, int& fail, int& pass, int&total);
@@ -80,7 +80,7 @@ extern int      initializers_struct_multiple_vector4(cl_device_id deviceID, cl_c
 extern int      initializers_struct_multiple_vector8(cl_device_id deviceID, cl_context context, cl_command_queue queue, int num_elements, int& fail, int& pass, int&total);
 extern int      initializers_struct_multiple_vector16(cl_device_id deviceID, cl_context context, cl_command_queue queue, int num_elements, int& fail, int& pass, int&total);
 
-const char	*get_error_string( int clErrorCode );
+const char    *get_error_string( int clErrorCode );
 int create_kernel( cl_context context, cl_program *outProgram, cl_kernel *outKernel, unsigned int numKernelLines, const char **kernelProgram, const char *kernelName );
 
 #endif

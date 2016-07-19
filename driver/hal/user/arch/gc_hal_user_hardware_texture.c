@@ -2619,14 +2619,32 @@ gcoHARDWARE_BindTexture(
     /* ASTC textures. */
     if (Hardware->features[gcvFEATURE_TEXTURE_ASTC])
     {
-        for (i = SamplerInfo->baseLod; i < SamplerInfo->lodNum; i += 1)
+        gctUINT baseLOD = SamplerInfo->baseLod;
+
+        for (i = baseLOD; i < SamplerInfo->lodNum; ++i)
         {
             if ((Hardware->TXStates->hwTxSamplerASTCSize[i][Sampler] != SamplerInfo->astcSize[i])
             ||  (Hardware->TXStates->hwTxSamplerASTCSRGB[i][Sampler] != SamplerInfo->astcSRGB[i]))
             {
                 Hardware->TXStates->hwTxSamplerASTCSize[i][Sampler] = SamplerInfo->astcSize[i];
                 Hardware->TXStates->hwTxSamplerASTCSRGB[i][Sampler] = SamplerInfo->astcSRGB[i];
-                Hardware->TXDirty->hwTxSamplerASTCDirty[i / 4]    |= 1 << Sampler;
+                Hardware->TXDirty->hwTxSamplerASTCDirty[i / 4]     |= 1 << Sampler;
+            }
+        }
+
+        if (!Hardware->features[gcvFEATURE_TEXTURE_ASTC_BASE_LOD_FIX] &&
+            SamplerInfo->formatInfo->fmtClass == gcvFORMAT_CLASS_ASTC &&
+            baseLOD > 0)
+        {
+            for (i = 0; i < baseLOD; ++i)
+            {
+                if ((Hardware->TXStates->hwTxSamplerASTCSize[i][Sampler] != SamplerInfo->astcSize[baseLOD])
+                ||  (Hardware->TXStates->hwTxSamplerASTCSRGB[i][Sampler] != SamplerInfo->astcSRGB[baseLOD]))
+                {
+                    Hardware->TXStates->hwTxSamplerASTCSize[i][Sampler] = SamplerInfo->astcSize[baseLOD];
+                    Hardware->TXStates->hwTxSamplerASTCSRGB[i][Sampler] = SamplerInfo->astcSRGB[baseLOD];
+                    Hardware->TXDirty->hwTxSamplerASTCDirty[i / 4]     |= 1 << Sampler;
+                }
             }
         }
     }
@@ -4722,7 +4740,7 @@ gcoHARDWARE_ProgramTexture(
                     if ((dirty & Hardware->TXDirty->hwTxSamplerASTCDirty[i])
 #if gcdENABLE_APPCTXT_BLITDRAW
                         && ((Hardware->TXStates->hwTxSamplerASTCSize[i * 4][sampler] != gcvINVALID_VALUE)
-                        || (Hardware->TXStates->hwTxSamplerASTCSRGB[i * 4][sampler] != gcvINVALID_VALUE))
+                        ||  (Hardware->TXStates->hwTxSamplerASTCSRGB[i * 4][sampler] != gcvINVALID_VALUE))
 #endif
                         )
                     {

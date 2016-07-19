@@ -59,9 +59,9 @@ static const char *sBitmapFile[] = {
     "resource/zero2_A1R5G5B5.bmp",
     "resource/zero2_ARGB4.bmp",
     "resource/zero2_ARGB8.bmp",
-	"resource/zero2_YUY2_640X480_Linear.vimg",
-	"resource/zero2_UYVY_640X480_Linear.vimg",
-	"resource/zero2_YUV420_640X480_Linear.vimg",
+    "resource/zero2_YUY2_640X480_Linear.vimg",
+    "resource/zero2_UYVY_640X480_Linear.vimg",
+    "resource/zero2_YUV420_640X480_Linear.vimg",
     "resource/Boston_YV12_640x480_Linear.vimg",
 };
 
@@ -69,29 +69,29 @@ typedef struct Test2D {
     GalTest     base;
     GalRuntime  *runtime;
 
-	// destination surface
-    gcoSURF			dstSurf;
-	gceSURF_FORMAT	dstFormat;
-	gctUINT			dstWidth;
-	gctUINT			dstHeight;
-	gctINT			dstStride;
-	gctUINT32		dstPhyAddr;
-	gctPOINTER		dstLgcAddr;
+    // destination surface
+    gcoSURF            dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT            dstWidth;
+    gctUINT            dstHeight;
+    gctINT            dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
 
-	//source surface
-    gcoSURF			srcSurf;
-	gceSURF_FORMAT	srcFormat;
-	gctUINT			srcWidth;
-	gctUINT			srcHeight;
-	gctINT			srcStride;
-	gctUINT32		srcPhyAddr;
-	gctPOINTER		srcLgcAddr;
-	gctPOINTER		srcULgcAddr;
-	gctUINT32		srcUPhyAddr;
-	gctINT			srcUStride;
-	gctPOINTER		srcVLgcAddr;
-	gctUINT32		srcVPhyAddr;
-	gctINT			srcVStride;
+    //source surface
+    gcoSURF            srcSurf;
+    gceSURF_FORMAT    srcFormat;
+    gctUINT            srcWidth;
+    gctUINT            srcHeight;
+    gctINT            srcStride;
+    gctUINT32        srcPhyAddr;
+    gctPOINTER        srcLgcAddr;
+    gctPOINTER        srcULgcAddr;
+    gctUINT32        srcUPhyAddr;
+    gctINT            srcUStride;
+    gctPOINTER        srcVLgcAddr;
+    gctUINT32        srcVPhyAddr;
+    gctINT            srcVStride;
 } Test2D;
 
 static gceSTATUS ReloadSourceSurface(Test2D *t2d, const char * sourcefile)
@@ -105,11 +105,11 @@ static gceSTATUS ReloadSourceSurface(Test2D *t2d, const char * sourcefile)
     // destroy source surface
     if (t2d->srcSurf != gcvNULL)
     {
-	    if (t2d->srcLgcAddr)
-	    {
-		    gcmONERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcLgcAddr));
-		    t2d->srcLgcAddr = 0;
-	    }
+        if (t2d->srcLgcAddr)
+        {
+            gcmONERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcLgcAddr));
+            t2d->srcLgcAddr = 0;
+        }
 
         gcmONERROR(gcoSURF_Destroy(t2d->srcSurf));
         t2d->srcSurf = gcvNULL;
@@ -133,14 +133,14 @@ static gceSTATUS ReloadSourceSurface(Test2D *t2d, const char * sourcefile)
     }
 
     gcmONERROR(gcoSURF_GetAlignedSize(t2d->srcSurf,
-									    gcvNULL,
-									    gcvNULL,
-									    &t2d->srcStride));
+                                        gcvNULL,
+                                        gcvNULL,
+                                        &t2d->srcStride));
 
     gcmONERROR(gcoSURF_GetSize(t2d->srcSurf,
-							    &t2d->srcWidth,
-							    &t2d->srcHeight,
-							    gcvNULL));
+                                &t2d->srcWidth,
+                                &t2d->srcHeight,
+                                gcvNULL));
 
     gcmONERROR(gcoSURF_GetFormat(t2d->srcSurf, gcvNULL, &t2d->srcFormat));
 
@@ -192,9 +192,9 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
     gcmONERROR(gco2D_FilterBlit(egn2D,
             t2d->srcPhyAddr, t2d->srcStride,
-		    t2d->srcUPhyAddr, t2d->srcUStride,
-		    t2d->srcVPhyAddr, t2d->srcVStride,
-		    t2d->srcFormat, gcvSURF_0_DEGREE, t2d->srcWidth, &srcRect,
+            t2d->srcUPhyAddr, t2d->srcUStride,
+            t2d->srcVPhyAddr, t2d->srcVStride,
+            t2d->srcFormat, gcvSURF_0_DEGREE, t2d->srcWidth, &srcRect,
             t2d->dstPhyAddr, t2d->dstStride, t2d->dstFormat, gcvSURF_0_DEGREE, t2d->dstWidth, &dstRect,
             &dstRect));
 
@@ -206,37 +206,37 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 OnError:
     GalOutput(GalOutputType_Error | GalOutputType_Console,
         "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
-	return gcvFALSE;
+    return gcvFALSE;
 }
 
 static void CDECL Destroy(Test2D *t2d)
 {
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
     if ((t2d->dstSurf != gcvNULL) && (t2d->dstLgcAddr != gcvNULL))
     {
-		if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
-		}
-		t2d->dstLgcAddr = gcvNULL;
+        if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
+        }
+        t2d->dstLgcAddr = gcvNULL;
     }
 
-	// destroy source surface
-	if (t2d->srcSurf != gcvNULL)
+    // destroy source surface
+    if (t2d->srcSurf != gcvNULL)
     {
-		if (t2d->srcLgcAddr)
-		{
-			if (gcmIS_ERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcLgcAddr)))
-			{
-				GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock srcSurf failed:%s\n", GalStatusString(status));
-			}
-			t2d->srcLgcAddr = 0;
-		}
+        if (t2d->srcLgcAddr)
+        {
+            if (gcmIS_ERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcLgcAddr)))
+            {
+                GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock srcSurf failed:%s\n", GalStatusString(status));
+            }
+            t2d->srcLgcAddr = 0;
+        }
 
         if (gcmIS_ERROR(gcoSURF_Destroy(t2d->srcSurf)))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
-		}
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
+        }
     }
 
     free(t2d);
@@ -303,9 +303,9 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     t2d->srcFormat = gcvSURF_UNKNOWN;
 
     gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
-									    &t2d->dstWidth,
-									    &t2d->dstHeight,
-									    &t2d->dstStride));
+                                        &t2d->dstWidth,
+                                        &t2d->dstHeight,
+                                        &t2d->dstStride));
 
     gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
 
@@ -320,7 +320,7 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     else
     {
         t2d->base.frameCount = sizeof(sBitmapFile)/sizeof(sBitmapFile[0]) - 2;
-	    GalOutput(GalOutputType_Result, "YUV420 scaler is not supported.\n");
+        GalOutput(GalOutputType_Result, "YUV420 scaler is not supported.\n");
     }
 
     return gcvTRUE;
@@ -329,7 +329,7 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 OnError:
     GalOutput(GalOutputType_Error | GalOutputType_Console,
         "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
-	return gcvFALSE;
+    return gcvFALSE;
 }
 
 GalTest * CDECL GalCreateTestObject(GalRuntime *runtime)

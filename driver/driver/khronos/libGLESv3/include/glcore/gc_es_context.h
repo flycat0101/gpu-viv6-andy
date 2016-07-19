@@ -752,6 +752,20 @@ __GL_INLINE __GLbufferObject* __glGetBoundBufObj(__GLcontext *gc, GLuint targetI
 #if (defined(DEBUG) || defined(_DEBUG) || gcdDUMP || gcdFRAMEINFO_STATISTIC)
 #define __GL_FRAME_INFO       1
 #define __GLES_PRINT(...)  gcmPRINT(__VA_ARGS__)
+
+enum
+{
+    __GL_PERDRAW_DUMP_DRAW_RT       = 1 << 0,
+    __GL_PERDRAW_DUMP_DRAW_DS       = 1 << 1,
+    __GL_PERDRAW_DUMP_CLEAR_RT      = 1 << 2,
+    __GL_PERDRAW_DUMP_CLEAR_DS      = 1 << 3,
+    __GL_PERDRAW_DUMP_TEXTURE       = 1 << 4,
+    __GL_PERDRAW_DUMP_BLITFBO_RT    = 1 << 5,
+    __GL_PERDRAW_DUMP_BLITFBO_DS    = 1 << 6,
+
+    __GL_PERDRAW_DUMP_NONE      = 0x0,
+    __GL_PERDRAW_DUMP_ALL       = 0xFFFFFFFF,
+};
 #else
 #define __GL_FRAME_INFO       0
 #define __GLES_PRINT(...)

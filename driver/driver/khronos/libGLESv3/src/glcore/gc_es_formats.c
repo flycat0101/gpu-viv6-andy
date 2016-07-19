@@ -34,6 +34,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_FALSE,                           /* renderable */
         8,                                  /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         0, 0, 0, 8, 0, 0,                   /* r/g/b/a/d/s size */
         GL_ALPHA,                           /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -54,6 +55,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_FALSE,                           /* renderable */
         8,                                  /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 0, 0, 0, 0, 0,                   /* r/g/b/a/d/s size */
         GL_LUMINANCE,                       /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -74,6 +76,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_FALSE,                           /* renderable */
         16,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 0, 0, 8, 0, 0,                   /* r/g/b/a/d/s size */
         GL_LUMINANCE_ALPHA,                 /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -94,6 +97,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_TRUE,                            /* renderable */
         8,                                  /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 0, 0, 0, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RED,                             /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -114,6 +118,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_FALSE,                           /* renderable */
         8,                                  /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 0, 0, 0, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RED,                             /* data format */
         GL_BYTE,                            /* data type */
@@ -134,6 +139,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_TRUE,                            /* renderable */
         16,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 8, 0, 0, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RG,                              /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -154,6 +160,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_FALSE,                           /* renderable */
         16,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 8, 0, 0, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RG,                              /* data format */
         GL_BYTE,                            /* data type */
@@ -174,6 +181,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_TRUE,                            /* renderable */
         24,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 8, 8, 0, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RGB,                             /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -194,6 +202,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_FALSE,                           /* renderable */
         24,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 8, 8, 0, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RGB,                             /* data format */
         GL_BYTE,                            /* data type */
@@ -214,6 +223,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_TRUE,                            /* renderable */
         16,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         5, 6, 5, 0, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RGB,                             /* data format */
         GL_UNSIGNED_SHORT_5_6_5,            /* data type */
@@ -234,6 +244,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_TRUE,                            /* renderable */
         16,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         4, 4, 4, 4, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RGBA,                            /* data format */
         GL_UNSIGNED_SHORT_4_4_4_4,          /* data type */
@@ -254,6 +265,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_TRUE,                            /* renderable */
         16,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         5, 5, 5, 1, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RGBA,                            /* data format */
         GL_UNSIGNED_SHORT_5_5_5_1,          /* data type */
@@ -274,6 +286,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_TRUE,                            /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 8, 8, 8, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RGBA,                            /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -294,6 +307,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_TRUE,                            /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 8, 8, 8, 0, 0,                   /* r/g/b/a/d/s size */
         GL_BGRA_EXT,                        /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -314,6 +328,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_FALSE,                           /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 8, 8, 8, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RGBA,                            /* data format */
         GL_BYTE,                            /* data type */
@@ -334,6 +349,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_TRUE,                            /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         10, 10, 10, 2, 0, 0,                /* r/g/b/a/d/s size */
         GL_RGBA,                            /* data format */
         GL_UNSIGNED_INT_2_10_10_10_REV,     /* data type */
@@ -354,6 +370,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_FALSE,                           /* renderable */
         24,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 8, 8, 0, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RGB,                             /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -374,6 +391,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_TRUE,                            /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 8, 8, 8, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RGBA,                            /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -394,6 +412,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_FALSE,                           /* renderable */
         16,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         16, 0, 0, 0, 0, 0,                  /* r/g/b/a/d/s size */
         GL_RED,                             /* data format */
         GL_HALF_FLOAT,                      /* data type */
@@ -414,6 +433,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_FALSE,                           /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         16, 16, 0, 0, 0, 0,                 /* r/g/b/a/d/s size */
         GL_RG,                              /* data format */
         GL_HALF_FLOAT,                      /* data type */
@@ -434,6 +454,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_FALSE,                           /* renderable */
         48,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         16, 16, 16, 0, 0, 0,                /* r/g/b/a/d/s size */
         GL_RGB,                             /* data format */
         GL_HALF_FLOAT,                      /* data type */
@@ -454,6 +475,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_FALSE,                           /* renderable */
         64,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         16, 16, 16, 16, 0, 0,               /* r/g/b/a/d/s size */
         GL_RGBA,                            /* data format */
         GL_HALF_FLOAT,                      /* data type */
@@ -474,6 +496,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_FALSE,                           /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         32, 0, 0, 0, 0, 0,                  /* r/g/b/a/d/s size */
         GL_RED,                             /* data format */
         GL_FLOAT,                           /* data type */
@@ -494,6 +517,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_FALSE,                           /* renderable */
         64,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         32, 32, 0, 0, 0, 0,                 /* r/g/b/a/d/s size */
         GL_RG,                              /* data format */
         GL_FLOAT,                           /* data type */
@@ -514,6 +538,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_FALSE,                           /* renderable */
         96,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         32, 32, 32, 0, 0, 0,                /* r/g/b/a/d/s size */
         GL_RGB,                             /* data format */
         GL_FLOAT,                           /* data type */
@@ -534,6 +559,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_FALSE,                           /* renderable */
         128,                                /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         32, 32, 32, 32, 0, 0,               /* r/g/b/a/d/s size */
         GL_RGBA,                            /* data format */
         GL_FLOAT,                           /* data type */
@@ -554,6 +580,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_FALSE,                           /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         11, 11, 10, 0, 0, 0,                /* r/g/b/a/d/s size */
         GL_RGB,                             /* data format */
         GL_UNSIGNED_INT_10F_11F_11F_REV,    /* data type */
@@ -574,6 +601,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_FALSE,                           /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         9, 9, 9, 5, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RGB,                             /* data format */
         GL_UNSIGNED_INT_5_9_9_9_REV,        /* data type */
@@ -594,6 +622,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         8,                                  /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 0, 0, 0, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RED_INTEGER,                     /* data format */
         GL_BYTE,                            /* data type */
@@ -614,6 +643,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         8,                                  /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 0, 0, 0, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RED_INTEGER,                     /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -634,6 +664,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         16,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         16, 0, 0, 0, 0, 0,                  /* r/g/b/a/d/s size */
         GL_RED_INTEGER,                     /* data format */
         GL_SHORT,                           /* data type */
@@ -654,6 +685,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         16,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         16, 0, 0, 0, 0, 0,                  /* r/g/b/a/d/s size */
         GL_RED_INTEGER,                     /* data format */
         GL_UNSIGNED_SHORT,                  /* data type */
@@ -674,6 +706,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         32, 0, 0, 0, 0, 0,                  /* r/g/b/a/d/s size */
         GL_RED_INTEGER,                     /* data format */
         GL_INT,                             /* data type */
@@ -694,6 +727,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         32, 0, 0, 0, 0, 0,                  /* r/g/b/a/d/s size */
         GL_RED_INTEGER,                     /* data format */
         GL_UNSIGNED_INT,                    /* data type */
@@ -714,6 +748,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         16,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 8, 0, 0, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RG_INTEGER,                      /* data format */
         GL_BYTE,                            /* data type */
@@ -734,6 +769,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         16,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 8, 0, 0, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RG_INTEGER,                      /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -754,6 +790,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         16, 16, 0, 0, 0, 0,                 /* r/g/b/a/d/s size */
         GL_RG_INTEGER,                      /* data format */
         GL_SHORT,                           /* data type */
@@ -774,6 +811,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         16, 16, 0, 0, 0, 0,                 /* r/g/b/a/d/s size */
         GL_RG_INTEGER,                      /* data format */
         GL_UNSIGNED_SHORT,                  /* data type */
@@ -794,6 +832,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         64,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         32, 32, 0, 0, 0, 0,                 /* r/g/b/a/d/s size */
         GL_RG_INTEGER,                      /* data format */
         GL_INT,                             /* data type */
@@ -814,6 +853,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         64,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         32, 32, 0, 0, 0, 0,                 /* r/g/b/a/d/s size */
         GL_RG_INTEGER,                      /* data format */
         GL_UNSIGNED_INT,                    /* data type */
@@ -834,6 +874,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_FALSE,                           /* renderable */
         24,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 8, 8, 0, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RGB_INTEGER,                     /* data format */
         GL_BYTE,                            /* data type */
@@ -854,6 +895,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_FALSE,                           /* renderable */
         24,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 8, 8, 0, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RGB_INTEGER,                     /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -874,6 +916,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_FALSE,                           /* renderable */
         48,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         16, 16, 16, 0, 0, 0,                /* r/g/b/a/d/s size */
         GL_RGB_INTEGER,                     /* data format */
         GL_SHORT,                           /* data type */
@@ -894,6 +937,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_FALSE,                           /* renderable */
         48,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         16, 16, 16, 0, 0, 0,                /* r/g/b/a/d/s size */
         GL_RGB_INTEGER,                     /* data format */
         GL_UNSIGNED_SHORT,                  /* data type */
@@ -914,6 +958,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_FALSE,                           /* renderable */
         96,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         32, 32, 32, 0, 0, 0,                /* r/g/b/a/d/s size */
         GL_RGB_INTEGER,                     /* data format */
         GL_INT,                             /* data type */
@@ -934,6 +979,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_FALSE,                           /* renderable */
         96,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         32, 32, 32, 0, 0, 0,                /* r/g/b/a/d/s size */
         GL_RGB_INTEGER,                     /* data format*/
         GL_UNSIGNED_INT,                    /* data type */
@@ -954,6 +1000,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 8, 8, 8, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RGBA_INTEGER,                    /* data format */
         GL_BYTE,                            /* data type */
@@ -974,6 +1021,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 8, 8, 8, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RGBA_INTEGER,                    /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -994,6 +1042,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         64,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         16, 16, 16, 16, 0, 0,               /* r/g/b/a/d/s size */
         GL_RGBA_INTEGER,                    /* data format */
         GL_SHORT,                           /* data type */
@@ -1014,6 +1063,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         64,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         16, 16, 16, 16, 0, 0,               /* r/g/b/a/d/s size */
         GL_RGBA_INTEGER,                    /* data format */
         GL_UNSIGNED_SHORT,                  /* data type */
@@ -1034,6 +1084,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         128,                                /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         32, 32, 32, 32, 0, 0,               /* r/g/b/a/d/s size */
         GL_RGBA_INTEGER,                    /* data format */
         GL_INT,                             /* data type */
@@ -1054,6 +1105,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         128,                                /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         32, 32, 32, 32, 0, 0,               /* r/g/b/a/d/s size */
         GL_RGBA_INTEGER,                    /* data format */
         GL_UNSIGNED_INT,                    /* data type */
@@ -1074,6 +1126,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_TRUE,                            /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         10, 10, 10, 2, 0, 0,                /* r/g/b/a/d/s size */
         GL_RGBA_INTEGER,                    /* data format */
         GL_UNSIGNED_INT_2_10_10_10_REV,     /* data type */
@@ -1098,6 +1151,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         64,                                             /* bitsPerPixel (4*4 texels) */
+        4, 4,                                           /* blockW/H */
         8, 8, 8, 0, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGB,                                         /* data format */
         __GL_ETC1_BLOCK,                                /* data type */
@@ -1119,6 +1173,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         64,                                             /* bitsPerPixel (4*4 texels) */
+        4, 4,                                           /* blockW/H */
         11, 0, 0, 0, 0, 0,                              /* r/g/b/a/d/s size */
         GL_RED,                                         /* data format */
         __GL_R11_EAC_BLOCK,                             /* data type */
@@ -1140,6 +1195,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         64,                                             /* bitsPerPixel (4*4 texels) */
+        4, 4,                                           /* blockW/H */
         11, 0, 0, 0, 0, 0,                              /* r/g/b/a/d/s size */
         GL_RED,                                         /* data format */
         __GL_SIGNED_R11_EAC_BLOCK,                      /* data type */
@@ -1162,6 +1218,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         128,                                            /* bitsPerPixel (4*4 texels) */
+        4, 4,                                           /* blockW/H */
         11, 11, 0, 0, 0, 0,                             /* r/g/b/a/d/s size */
         GL_RG,                                          /* data format */
         __GL_RG11_EAC_BLOCK,                            /* data type */
@@ -1182,7 +1239,8 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* compressed */
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
-        64,                                             /* bitsPerPixel (4*4 texels) */
+        128,                                            /* bitsPerPixel (4*4 texels) */
+        4, 4,                                           /* blockW/H */
         11, 11, 0, 0, 0, 0,                             /* r/g/b/a/d/s size */
         GL_RG,                                          /* data format */
         __GL_SIGNED_RG11_EAC_BLOCK,                     /* data type */
@@ -1205,6 +1263,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         64,                                             /* bitsPerPixel (4*4 texels) */
+        4, 4,                                           /* blockW/H */
         8, 8, 8, 0, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGB,                                         /* data format */
         __GL_RGB8_ETC2_BLOCK,                           /* data type */
@@ -1227,6 +1286,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         64,                                             /* bitsPerPixel (4*4 texels) */
+        4, 4,                                           /* blockW/H */
         8, 8, 8, 0, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGB,                                         /* data format */
         __GL_RGB8_ETC2_BLOCK,                           /* data type */
@@ -1249,6 +1309,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         64,                                             /* bitsPerPixel (4*4 texels) */
+        4, 4,                                           /* blockW/H */
         8, 8, 8, 8, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGBA,                                        /* data format */
         __GL_RGB8_PUNCHTHROUGH_ALPHA1_ETC2_BLOCK,       /* data type */
@@ -1270,6 +1331,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         64,                                             /* bitsPerPixel (4*4 texels) */
+        4, 4,                                           /* blockW/H */
         8, 8, 8, 8, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGBA,                                        /* data format */
         __GL_RGB8_PUNCHTHROUGH_ALPHA1_ETC2_BLOCK,       /* data type */
@@ -1292,6 +1354,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         128,                                            /* bitsPerPixel (4*4 texels) */
+        4, 4,                                           /* blockW/H */
         8, 8, 8, 8, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGBA,                                        /* data format */
         __GL_RGBA8_ETC2_EAC_BLOCK,                      /* data type */
@@ -1313,6 +1376,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         128,                                            /* bitsPerPixel (4*4 texels) */
+        4, 4,                                           /* blockW/H */
         8, 8, 8, 8, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGBA,                                        /* data format */
         __GL_RGBA8_ETC2_EAC_BLOCK,                      /* data type */
@@ -1335,6 +1399,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         64,                                             /* bitsPerPixel (4*4 texels) */
+        4, 4,                                           /* blockW/H */
         5, 5, 5, 0, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGB,                                         /* data format */
         __GL_DXT1_BLOCK,                                /* data type */
@@ -1355,6 +1420,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         64,                                             /* bitsPerPixel (4*4 texels) */
+        4, 4,                                           /* blockW/H */
         5, 5, 5, 1, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGBA,                                        /* data format */
         __GL_DXT1A_BLOCK,                               /* data type */
@@ -1375,6 +1441,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         128,                                            /* bitsPerPixel (4*4 texels) */
+        4, 4,                                           /* blockW/H */
         4, 4, 4, 8, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGBA,                                        /* data format */
         __GL_DXT3_BLOCK,                                /* data type */
@@ -1395,6 +1462,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         128,                                            /* bitsPerPixel (4*4 texels) */
+        4, 4,                                           /* blockW/H */
         4, 4, 4, 8, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGBA,                                        /* data format */
         __GL_DXT5_BLOCK,                                /* data type */
@@ -1415,6 +1483,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         0,                                              /* bitsPerPixel */
+        0, 0,                                           /* blockW/H */
         0, 0, 0, 0, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGBA,                                        /* data format */
         __GL_PALETTE4_RGBA4,                            /* data type */
@@ -1435,6 +1504,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         0,                                              /* bitsPerPixel */
+        0, 0,                                           /* blockW/H */
         0, 0, 0, 0, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGBA,                                        /* data format */
         __GL_PALETTE4_RGB5_A1,                          /* data type */
@@ -1455,6 +1525,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         0,                                              /* bitsPerPixel */
+        0, 0,                                           /* blockW/H */
         0, 0, 0, 0, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGB,                                         /* data format */
         __GL_PALETTE4_R5_G6_B5,                         /* data type */
@@ -1475,6 +1546,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         0,                                              /* bitsPerPixel */
+        0, 0,                                           /* blockW/H */
         0, 0, 0, 0, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGB,                                         /* data format */
         __GL_PALETTE4_RGB8,                             /* data type */
@@ -1495,6 +1567,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         0,                                              /* bitsPerPixel */
+        0, 0,                                           /* blockW/H */
         0, 0, 0, 0, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGBA,                                        /* data format */
         __GL_PALETTE4_RGBA8,                            /* data type */
@@ -1515,6 +1588,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         0,                                              /* bitsPerPixel */
+        0, 0,                                           /* blockW/H */
         0, 0, 0, 0, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGBA,                                        /* data format */
         __GL_PALETTE8_RGBA4,                            /* data type */
@@ -1535,6 +1609,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         0,                                              /* bitsPerPixel */
+        0, 0,                                           /* blockW/H */
         0, 0, 0, 0, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGBA,                                        /* data format */
         __GL_PALETTE8_RGB5_A1,                          /* data type */
@@ -1555,6 +1630,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         0,                                              /* bitsPerPixel */
+        0, 0,                                           /* blockW/H */
         0, 0, 0, 0, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGB,                                         /* data format */
         __GL_PALETTE8_R5_G6_B5,                         /* data type */
@@ -1575,6 +1651,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         0,                                              /* bitsPerPixel */
+        0, 0,                                           /* blockW/H */
         0, 0, 0, 0, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGB,                                         /* data format */
         __GL_PALETTE8_RGB8,                             /* data type */
@@ -1595,6 +1672,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                        /* filterable */
         GL_FALSE,                                       /* renderable */
         0,                                              /* bitsPerPixel */
+        0, 0,                                           /* blockW/H */
         0, 0, 0, 0, 0, 0,                               /* r/g/b/a/d/s size */
         GL_RGBA,                                        /* data format */
         __GL_PALETTE8_RGBA8,                            /* data type */
@@ -1619,6 +1697,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_TRUE,                            /* renderable */
         16,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         0, 0, 0, 0, 16, 0,                  /* r/g/b/a/d/s size */
         GL_DEPTH_COMPONENT,                 /* data format */
         GL_UNSIGNED_SHORT,                  /* data type */
@@ -1639,6 +1718,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_TRUE,                            /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         0, 0, 0, 0, 24, 0,                  /* r/g/b/a/d/s size */
         GL_DEPTH_COMPONENT,                 /* data format */
         GL_UNSIGNED_INT,                    /* data type */
@@ -1659,6 +1739,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         0, 0, 0, 0, 32, 0,                  /* r/g/b/a/d/s size */
         GL_DEPTH_COMPONENT,                 /* data format */
         GL_FLOAT,                           /* data type */
@@ -1679,6 +1760,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_TRUE,                            /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         0, 0, 0, 0, 24, 8,                  /* r/g/b/a/d/s size */
         GL_DEPTH_STENCIL,                   /* data format */
         GL_UNSIGNED_INT_24_8,               /* dat type */
@@ -1699,6 +1781,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         64,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         0, 0, 0, 0, 32, 8,                  /* r/g/b/a/d/s size */
         GL_DEPTH_STENCIL,                   /* data format */
         GL_FLOAT_32_UNSIGNED_INT_24_8_REV,  /* data type */
@@ -1719,6 +1802,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         1,                                  /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         0, 0, 0, 0, 0, 1,                   /* r/g/b/a/d/s size */
         GL_STENCIL,                         /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -1739,6 +1823,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         4,                                  /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         0, 0, 0, 0, 0, 4,                   /* r/g/b/a/d/s size */
         GL_STENCIL,                         /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -1759,6 +1844,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_TRUE,                            /* renderable */
         8,                                  /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         0, 0, 0, 0, 0, 8,                   /* r/g/b/a/d/s size */
         GL_STENCIL_INDEX,                   /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -1781,6 +1867,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (4*4 texels)*/
+        4, 4,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_4x4_BLOCK,                    /* data type */
@@ -1801,6 +1888,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (5*4 texels)*/
+        5, 4,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_5x4_BLOCK,                    /* data type */
@@ -1821,6 +1909,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (5*5 texels)*/
+        5, 5,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_5x5_BLOCK,                    /* data type */
@@ -1841,6 +1930,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (6*5 texels)*/
+        6, 5,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_6x5_BLOCK,                    /* data type */
@@ -1861,6 +1951,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (6*6 texels)*/
+        6, 6,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_6x6_BLOCK,                    /* data type */
@@ -1881,6 +1972,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (8*5 texels)*/
+        8, 5,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_8x5_BLOCK,                    /* data type */
@@ -1901,6 +1993,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (8*6 texels)*/
+        8, 6,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_8x6_BLOCK,                    /* data type */
@@ -1921,6 +2014,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (8*8 texels)*/
+        8, 8,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_8x8_BLOCK,                    /* data type */
@@ -1941,6 +2035,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (10*5 texels)*/
+        10, 5,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_10x5_BLOCK,                   /* data type */
@@ -1961,6 +2056,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (10*6 texels)*/
+        10, 6,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_10x6_BLOCK,                   /* data type */
@@ -1981,6 +2077,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (10*8 texels)*/
+        10, 8,                                  /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_10x8_BLOCK,                   /* data type */
@@ -2001,6 +2098,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (10*10 texels)*/
+        10, 10,                                 /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_10x10_BLOCK,                  /* data type */
@@ -2021,6 +2119,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (12*10 texels)*/
+        12, 10,                                 /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_12x10_BLOCK,                  /* data type */
@@ -2041,6 +2140,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (12*12 texels)*/
+        12, 12,                                 /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_12x12_BLOCK,                  /* data type */
@@ -2062,6 +2162,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (4*4 texels)*/
+        4, 4,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_4x4_BLOCK,                    /* data type */
@@ -2082,6 +2183,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (5*4 texels)*/
+        5, 4,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_5x4_BLOCK,                    /* data type */
@@ -2101,6 +2203,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (5*5 texels)*/
+        5, 5,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_5x5_BLOCK,                    /* data type */
@@ -2121,6 +2224,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (6*5 texels)*/
+        6, 5,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_6x5_BLOCK,                    /* data type */
@@ -2141,6 +2245,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (6*6 texels)*/
+        6, 6,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_6x6_BLOCK,                    /* data type */
@@ -2161,6 +2266,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (8*5 texels)*/
+        8, 5,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_8x5_BLOCK,                    /* data type */
@@ -2181,6 +2287,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (8*6 texels)*/
+        8, 6,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_8x6_BLOCK,                    /* data type */
@@ -2201,6 +2308,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (8*8 texels)*/
+        8, 8,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_8x8_BLOCK,                    /* data type */
@@ -2221,6 +2329,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (10*5 texels)*/
+        10, 5,                                   /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_10x5_BLOCK,                   /* data type */
@@ -2241,6 +2350,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (10*6 texels)*/
+        10, 6,                                  /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_10x6_BLOCK,                   /* data type */
@@ -2261,6 +2371,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (10*8 texels)*/
+        10, 8,                                  /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_10x8_BLOCK,                   /* data type */
@@ -2281,6 +2392,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (10*10 texels)*/
+        10, 10,                                  /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_10x10_BLOCK,                  /* data type */
@@ -2301,6 +2413,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                                /* filterable */
         GL_FALSE,                               /* renderable */
         128,                                    /* bitsPerPixel (12*10 texels)*/
+        12, 10,                                  /* blockW/H */
         8, 8, 8, 8, 0, 0,                       /* r/g/b/a/d/s size */
         GL_RGBA,                                /* data format */
         __GL_ASTC_12x10_BLOCK,                  /* data type */
@@ -2321,6 +2434,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_FALSE,                           /* renderable */
         128,                                /* bitsPerPixel (12*12 texels)*/
+        12, 12,                             /* blockW/H */
         8, 8, 8, 8, 0, 0,                   /* r/g/b/a/d/s size */
         GL_RGBA,                            /* data format */
         __GL_ASTC_12x12_BLOCK,              /* data type */
@@ -2344,6 +2458,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_TRUE,                            /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 8, 8, 0, 0, 0,                   /* r/g/b/a/d/s size */
         __GL_RGBX8,                         /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -2364,6 +2479,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_TRUE,                            /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         8, 8, 8, 0, 0, 0,                   /* r/g/b/a/d/s size */
         __GL_BGRX8,                         /* data format */
         GL_UNSIGNED_BYTE,                   /* data type */
@@ -2385,6 +2501,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_FALSE,                           /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         0, 0, 0, 8, 0, 0,                   /* r/g/b/a/d/s size */
         GL_ALPHA,                           /* data format */
         GL_FLOAT,                           /* data type */
@@ -2398,6 +2515,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_FALSE,                           /* renderable */
         32,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         32, 0, 0, 0, 0, 0,                  /* r/g/b/a/d/s size */
         GL_LUMINANCE,                       /* data format */
         GL_FLOAT,                           /* data type */
@@ -2411,6 +2529,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_TRUE,                            /* filterable */
         GL_FALSE,                           /* renderable */
         64,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
         32, 0, 0, 32, 0, 0,                 /* r/g/b/a/d/s size */
         GL_LUMINANCE_ALPHA,                 /* data format */
         GL_FLOAT,                           /* data type */
@@ -2426,6 +2545,7 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
         GL_FALSE,                           /* filterable */
         GL_FALSE,                           /* renderable */
         0,                                  /* bitsPerPixel */
+        0, 0,                               /* blockW/H */
         0, 0, 0, 0, 0, 0,                   /* r/g/b/a/d/s size */
         GL_NONE,                            /* data format */
         GL_NONE,                            /* data type */

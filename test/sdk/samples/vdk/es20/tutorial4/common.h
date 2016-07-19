@@ -39,13 +39,13 @@ int CompileShader(const char * FName, GLuint ShaderNum);
 
 struct CubeTexture
 {
-	unsigned int * posx;
-	unsigned int * negx;
-	unsigned int * posy;
-	unsigned int * negy;
-	unsigned int * posz;
-	unsigned int * negz;
-	int img_size;
+    unsigned int * posx;
+    unsigned int * negx;
+    unsigned int * posy;
+    unsigned int * negy;
+    unsigned int * posz;
+    unsigned int * negz;
+    int img_size;
 };
 
 // loads a 256x256 ARGB (32bit) format cube map texture dds file.

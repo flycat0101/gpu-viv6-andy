@@ -177,12 +177,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
                 newAddress[0] = t2d->surf[i]->address[0] + (460 * t2d->surf[i]->stride[0]) /*+ 100 * 4*/;
                 newAddress[1] = t2d->surf[i]->address[1];
                 newAddress[2] = t2d->surf[i]->address[2];
-#if 0
-                GalOutput(GalOutputType_Result | GalOutputType_Console,
-                    "%s:%d: layer[%d]: 0x%x->0x%x.delta=0x%0x\n",
-                    __FUNCTION__, __LINE__, i,
-                    t2d->surf[i]->address[0], newAddress[0], newAddress[0] - t2d->surf[i]->address[0]);
-#endif
                 gcmONERROR(gco2D_DisableAlphaBlend(egn2D));
 
                 gcmONERROR(gco2D_SetGenericSource(
@@ -200,12 +194,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
                 newAddress[0] = t2d->surf[i]->address[0] - ((1 * t2d->surf[i]->stride[0]) + (0 * 4));
                 newAddress[1] = t2d->surf[i]->address[1];
                 newAddress[2] = t2d->surf[i]->address[2];
-#if 0
-                GalOutput(GalOutputType_Result | GalOutputType_Console,
-                    "%s:%d: layer[%d]: 0x%x->0x%x.delta=0x%0x\n",
-                    __FUNCTION__, __LINE__, i,
-                    t2d->surf[i]->address[0], newAddress[0], t2d->surf[i]->address[0] - newAddress[0]);
-#endif
                 /* Cs + (1 - As) x Cd */
                 gcmONERROR(gco2D_EnableAlphaBlend(egn2D,
                             0, 0,
@@ -240,12 +228,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         newAddress[0] = result->address[0] + (100 * result->stride[0]) + 460 * 4;
         newAddress[1] = result->address[1];
         newAddress[2] = result->address[2];
-#if 0
-        GalOutput(GalOutputType_Result | GalOutputType_Console,
-            "%s:%d: target: 0x%x->0x%x.delta=0x%0x \n",
-            __FUNCTION__, __LINE__,
-            result->address[0], newAddress[0], newAddress[0] - result->address[0]);
-#endif
         /* Set the target surface. */
         gcmONERROR(gco2D_SetGenericTarget(
             egn2D,
@@ -270,16 +252,13 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         /*
          * Multi source blit.
          */
-    #if 1
         gcmONERROR(gco2D_SetClipping(egn2D, &rect));
 
         gcmONERROR(gco2D_MultiSourceBlit(egn2D, 0x3, &rect, 1));
-    #endif
 
         /*
          * Blit
          */
-    #if 1
         gcmONERROR(gco2D_SetCurrentSourceIndex(egn2D, 0));
 
         gcmONERROR(gco2D_SetGenericSource(
@@ -331,7 +310,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         rect.bottom = 1080;
         gcmONERROR(gco2D_SetSource(egn2D, &rect));
         gcmONERROR(gco2D_Blit(egn2D, 1, &rect, 0xCC, 0xCC, result->format));
-    #endif
 
         gcmONERROR(gco2D_Flush(egn2D));
 

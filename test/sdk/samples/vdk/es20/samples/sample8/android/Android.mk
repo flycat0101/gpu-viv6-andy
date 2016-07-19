@@ -53,7 +53,7 @@ LOCAL_PACKAGE_NAME := GL2Sample8
 LOCAL_JNI_SHARED_LIBRARIES := libgl2sample8_jni
 
 LOCAL_MULTILIB := $(VIV_MULTILIB)
-LOCAL_MODULE_PATH := $(AQROOT)/bin/$(VIV_TARGET_ABI)
+LOCAL_MODULE_PATH := $(AQROOT)/bin/$(VIV_TARGET_ABI)/vdk
 include $(BUILD_PACKAGE)
 
 #########################################################################

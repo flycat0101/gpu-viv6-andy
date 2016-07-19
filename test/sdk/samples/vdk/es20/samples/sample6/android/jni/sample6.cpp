@@ -53,20 +53,20 @@ int key;
 
 //vdkEGL VdkEgl;
 
-int VDKS_Val_WindowsWidth	= 0;
-int VDKS_Val_WindowsHeight	= 0;
+int VDKS_Val_WindowsWidth    = 0;
+int VDKS_Val_WindowsHeight    = 0;
 
 char* VDKS_ARG0 = NULL;
 extern "C" {
 
-	extern VDKS_BOOL   BallInit();
-	extern void        BallPass();
+    extern VDKS_BOOL   BallInit();
+    extern void        BallPass();
 
-	extern VDKS_BOOL   TerrainInit();
-	extern void        TerrainPass();
+    extern VDKS_BOOL   TerrainInit();
+    extern void        TerrainPass();
 
-	extern VDKS_BOOL Init();
-	extern void Run ();
+    extern VDKS_BOOL Init();
+    extern void Run ();
 }
 /***************************************************************************************
 ***************************************************************************************/
@@ -76,30 +76,30 @@ extern "C" {
 #endif
     JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_sample6_GL2JNILib_init(JNIEnv * env, jobject obj,  jint width, jint height);
     JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_sample6_GL2JNILib_repaint(JNIEnv * env, jobject obj);
-	JNIEXPORT void JNICALL Java_com_vivantecorp_graphics_sample6_GL2JNILib_key(JNIEnv * env, jobject obj, jint k, jboolean down);
+    JNIEXPORT void JNICALL Java_com_vivantecorp_graphics_sample6_GL2JNILib_key(JNIEnv * env, jobject obj, jint k, jboolean down);
 #ifdef __cplusplus
 };
 #endif
 
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_sample6_GL2JNILib_init(JNIEnv * env, jobject obj,  jint width, jint height)
 {
-	VDKS_Val_WindowsWidth = width;
-	VDKS_Val_WindowsHeight = height;
+    VDKS_Val_WindowsWidth = width;
+    VDKS_Val_WindowsHeight = height;
 
    glViewport(0, 0, VDKS_Val_WindowsWidth, VDKS_Val_WindowsHeight);
 
-   	if (VDKS_TRUE != Init())
-	{
-		LOGE("Failed to init case.");
-		return false;
-	}
+       if (VDKS_TRUE != Init())
+    {
+        LOGE("Failed to init case.");
+        return false;
+    }
    return true;
 }
 
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_sample6_GL2JNILib_repaint(JNIEnv * env, jobject obj)
 {
-	 Run();
-	 return true;
+     Run();
+     return true;
 }
 
 JNIEXPORT void JNICALL Java_com_vivantecorp_graphics_sample6_GL2JNILib_key(JNIEnv * env, jobject obj, jint k, jboolean down)

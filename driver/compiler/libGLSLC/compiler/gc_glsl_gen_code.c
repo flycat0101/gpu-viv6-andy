@@ -1961,7 +1961,7 @@ _AllocLogicalRegOrArray(
                                              Name->dataType->arrayLength != 0,
                                              logicalRegCount,
                                              tempRegIndex,
-                                             GetOutputDefaultLocation(binary),
+                                             (Name->isBuiltIn &&  gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "#Color"))) ? 0 : GetOutputDefaultLocation(binary),
                                              FieldIndex ? *FieldIndex : -1,
                                              isInvariant,
                                              isPrecise,
@@ -3223,7 +3223,7 @@ _GetIBLayout(
     )
 {
     sleLAYOUT_ID id = Layout.id;
-    gceINTERFACE_BLOCK_LAYOUT_ID layout = slvLAYOUT_NONE;
+    gceINTERFACE_BLOCK_LAYOUT_ID layout = gcvINTERFACE_BLOCK_NONE;
 
     if (id & slvLAYOUT_SHARED)
     {
@@ -17408,9 +17408,9 @@ _GenAtomicCounterBindingUniform(
         }
 
         {
-            gctINT16  matrixStride;
-            gctINT16  alignment;
-            gctINT32  arrayStride;
+            gctINT16  matrixStride = 0;
+            gctINT16  alignment = 0;
+            gctINT32  arrayStride = 0;
             gctBOOL   isArray = isUniformArray(uniform);
 
             uniform->offset =  _GetDataTypeByteOffset(uniform->offset,
@@ -22008,6 +22008,7 @@ _GetIOElementStride(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gctINT32 elementStride = 1;
+    slsDATA_TYPE *dataType = gcvNULL;
 
     if (slsDATA_TYPE_IsInheritFromUnsizedDataType(BinaryExpr->leftOperand->dataType))
     {
@@ -22050,6 +22051,7 @@ _GetIOElementStride(
     {
         gcmASSERT(LeftParameters->operandCount >= Parameters->operandCount);
 
+        dataType = BinaryExpr->leftOperand->dataType;
         if (Parameters->needROperand)
         {
             if (_IsROperandStorageBlockMember(Compiler, &LeftParameters->rOperands[0]))
@@ -22066,7 +22068,12 @@ _GetIOElementStride(
 
                     if (elementStride == 0)
                     {
+                        gctINT i;
                         elementStride = operand.u.reg.u.variable->arrayStride;
+                        for (i = 1; i < dataType->arrayLengthCount; i++)
+                        {
+                            elementStride *= dataType->arrayLengthList[i];
+                        }
                     }
                 }
             }
@@ -22084,7 +22091,12 @@ _GetIOElementStride(
 
                     if (elementStride == 0)
                     {
+                        gctINT i;
                         elementStride = operand.u.reg.u.uniform->arrayStride;
+                        for (i = 1; i < dataType->arrayLengthCount; i++)
+                        {
+                            elementStride *= dataType->arrayLengthList[i];
+                        }
                     }
                 }
             }
@@ -22106,7 +22118,12 @@ _GetIOElementStride(
 
                     if (elementStride == 0)
                     {
+                        gctINT i;
                         elementStride = operand.reg.u.variable->arrayStride;
+                        for (i = 1; i < dataType->arrayLengthCount; i++)
+                        {
+                            elementStride *= dataType->arrayLengthList[i];
+                        }
                     }
                 }
             }
@@ -22124,7 +22141,12 @@ _GetIOElementStride(
 
                     if (elementStride == 0)
                     {
+                        gctINT i;
                         elementStride = operand.reg.u.uniform->arrayStride;
+                        for (i = 1; i < dataType->arrayLengthCount; i++)
+                        {
+                            elementStride *= dataType->arrayLengthList[i];
+                        }
                     }
                 }
             }

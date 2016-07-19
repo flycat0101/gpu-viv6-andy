@@ -38,10 +38,10 @@ static const char *sBitmapFile[] = {
     "resource/zero2_A2R10G10B10.bmp",
     "resource/zero2_R10G10B10A2.bmp",
     "resource/zero2_B10G10R10A2.bmp",
-    "resource/Crew_NV12_10BIT_1280x720_Linear.vimg",
-    "resource/Crew_NV21_10BIT_1280x720_Linear.vimg",
-    "resource/Crew_NV16_10BIT_1280x720_Linear.vimg",
-    "resource/Crew_NV61_10BIT_1280x720_Linear.vimg",
+    "resource/zero2_NV12_10BIT.vimg",
+    "resource/zero2_NV21_10BIT.vimg",
+    "resource/zero2_NV16_10BIT.vimg",
+    "resource/zero2_NV61_10BIT.vimg",
 };
 
 static gctCONST_STRING s_CaseDescription = \
@@ -135,9 +135,6 @@ static gceSTATUS ReloadSourceSurface(Test2D *t2d, const char * sourcefile)
 
     gcmONERROR(gcoSURF_Lock(t2d->srcSurf, address, memory));
 
-    t2d->srcPhyAddr[0]  = address[0];
-    t2d->srcLgcAddr[0]  = memory[0];
-
     t2d->srcStrideNum = t2d->srcAddressNum = 1;
 
     if (GalIsYUVFormat(t2d->srcFormat))
@@ -145,11 +142,6 @@ static gceSTATUS ReloadSourceSurface(Test2D *t2d, const char * sourcefile)
         gcmONERROR(GalQueryUVStride(t2d->srcFormat, t2d->srcStride[0],
                 &t2d->srcStride[1], &t2d->srcStride[2]));
 
-        t2d->srcPhyAddr[1] = address[1];
-        t2d->srcLgcAddr[1] = memory[1];
-
-        t2d->srcPhyAddr[2] = address[2];
-        t2d->srcLgcAddr[2] = memory[2];
         switch (t2d->srcFormat)
         {
         case gcvSURF_YUY2:
@@ -166,17 +158,67 @@ static gceSTATUS ReloadSourceSurface(Test2D *t2d, const char * sourcefile)
         case gcvSURF_NV12:
         case gcvSURF_NV61:
         case gcvSURF_NV21:
+            t2d->srcStrideNum = t2d->srcAddressNum = 2;
+            break;
+
         case gcvSURF_NV16_10BIT:
         case gcvSURF_NV61_10BIT:
+            {
+                gctUINT32 addressT;
+
+                t2d->srcStrideNum = t2d->srcAddressNum = 2;
+
+                t2d->srcStride[0] = gcmALIGN_NP2(t2d->srcStride[0], 80);
+                t2d->srcStride[1] = gcmALIGN_NP2(t2d->srcStride[1], 80);
+
+                addressT = gcmALIGN_NP2(address[0], 80);
+                memory[0] = GAL_POINTER_OFFSET(memory[0], addressT - address[0]);
+                memory[1] = GAL_POINTER_OFFSET(memory[1], addressT - address[0]);
+                address[1] += addressT - address[0];
+                address[0] += addressT - address[0];
+            }
+            break;
+
         case gcvSURF_NV12_10BIT:
         case gcvSURF_NV21_10BIT:
-            t2d->srcStrideNum = t2d->srcAddressNum = 2;
+            {
+                gctUINT32 addressT, aligned;
+
+                if (gcoHAL_IsFeatureAvailable(t2d->runtime->hal, gcvFEATURE_TPCV11_COMPRESSION))
+                {
+                    aligned = 320;
+                }
+                else
+                {
+                    aligned = 80;
+                }
+
+                t2d->srcStrideNum = t2d->srcAddressNum = 2;
+
+                t2d->srcStride[0] = gcmALIGN_NP2(t2d->srcStride[0], aligned);
+                t2d->srcStride[1] = gcmALIGN_NP2(t2d->srcStride[1], aligned);
+
+                addressT = gcmALIGN_NP2(address[0], aligned);
+                memory[0] = GAL_POINTER_OFFSET(memory[0], addressT - address[0]);
+                memory[1] = GAL_POINTER_OFFSET(memory[1], addressT - address[0]);
+                address[1] += addressT - address[0];
+                address[0] += addressT - address[0];
+            }
             break;
 
         default:
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         }
+
+        t2d->srcPhyAddr[1] = address[1];
+        t2d->srcLgcAddr[1] = memory[1];
+
+        t2d->srcPhyAddr[2] = address[2];
+        t2d->srcLgcAddr[2] = memory[2];
     }
+
+    t2d->srcPhyAddr[0]  = address[0];
+    t2d->srcLgcAddr[0]  = memory[0];
 
     return gcvSTATUS_OK;
 
@@ -234,7 +276,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         rot,
         t2d->srcWidth,
         t2d->srcHeight));
-
 
     switch (frameNo % 4)
     {

@@ -62,13 +62,12 @@ else
 LIBS += -L $(VIVANTE_SDK_LIB) -l OpenCL
 LIBS += -L $(VIVANTE_SDK_LIB) -l CLC
 
-LIBS += -L $(VIVANTE_SDK_LIB) -l EGL -l GLESv2
 LIBS += -l m -l pthread -l dl -l stdc++ -l rt
 ifeq ($(EGL_API_DRI), 1)
-    LIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11
+    LIBS += -L$(X11_ARM_DIR)/lib -Wl,-rpath-link,$(X11_ARM_DIR)/lib -lX11
 endif
 ifeq ($(EGL_API_X), 1)
-    LIBS += -L$(X11_ARM_DIR)/lib -lXau -lXdmcp -lX11
+    LIBS += -L$(X11_ARM_DIR)/lib -Wl,-rpath-link,$(X11_ARM_DIR)/lib -lX11
 endif
 ifeq ($(EGL_API_DFB), 1)
     LIBS += -L$(DFB_DIR)/lib -ldirectfb -ldirect -lfusion

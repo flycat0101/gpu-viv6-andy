@@ -188,6 +188,8 @@ static gceSTATUS _AllocateRamp(
     vgmENTERSUBAPI(_AllocateRamp);
     do
     {
+        gctPOINTER mems[3];
+
         /* Destroy the current ramp surface if any. */
         gcmERR_BREAK(_FreeRamp(
             Context, Paint
@@ -207,8 +209,9 @@ static gceSTATUS _AllocateRamp(
         gcmERR_BREAK(gcoSURF_Lock(
             Paint->colorRampSurface,
             gcvNULL,
-            (gctPOINTER *) &Paint->colorRampBits
+            mems
             ));
+        Paint->colorRampBits = (gctUINT8_PTR)mems[0];
 
         /* Set premultiplied flag as necessary. */
         gcmERR_BREAK(gcoSURF_SetColorType(
@@ -2234,16 +2237,18 @@ VG_API_CALL void VG_API_ENTRY vgDestroyPaint(
             break;
         }
 
-        /* Is the paint object current? If so, switch to default paint. */
-        if (Context->strokePaint->object.name == ((vgsOBJECT_PTR) Paint)->name)
+        /*If the paint object is currently active in a drawing context,
+        the context continues to access it until it is replaced or the context is destroyed.*/
+        if ((Context->strokePaint->object.name == ((vgsOBJECT_PTR) Paint)->name)
+            && (((vgsOBJECT_PTR)Paint)->referenceCount == 1))
         {
-            Context->strokePaint = Context->defaultPaint;
-            Context->strokeDefaultPaint = VG_TRUE;
+            break;
         }
-        if (Context->fillPaint->object.name == ((vgsOBJECT_PTR) Paint)->name)
+
+        if ((Context->fillPaint->object.name == ((vgsOBJECT_PTR) Paint)->name)
+            && (((vgsOBJECT_PTR)Paint)->referenceCount == 1))
         {
-            Context->fillPaint = Context->defaultPaint;
-            Context->fillDefaultPaint = VG_TRUE;
+            break;
         }
 
         /* Invalidate the object. */

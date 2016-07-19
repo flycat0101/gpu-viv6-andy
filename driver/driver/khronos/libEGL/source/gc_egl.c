@@ -257,7 +257,9 @@ veglGetThreadData(
 #if gcdGC355_MEM_PRINT
         thread->fbMemSize         = 0;
 #endif
-        tls->currentType          = gcvHARDWARE_3D;
+
+        gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
+
 #if veglUSE_HAL_DUMP
         /* Get the gcoDUMP object. */
         gcmONERROR(gcoHAL_GetDump(thread->hal, &thread->dump));
@@ -1075,6 +1077,67 @@ EGLBoolean LOG_eglSignalSyncKHR(EGLDisplay dpy, EGLSyncKHR sync, EGLenum mode)
 
 }
 
+/* EGL_EXT_platform_base. */
+EGLDisplay LOG_eglGetPlatformDisplayEXT_pre(EGLenum platform, void *native_display, const EGLint *attrib_list)
+{
+    EGL_LOG_API("EGL(tid=0x%x): eglGetPlatformDisplayEXT 0x%08X 0x%08X (0x%08X)\n",
+                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
+                (EGLint)(gctUINTPTR_T)platform, (EGLint)(gctUINTPTR_T)native_display, (EGLint)(gctUINTPTR_T)attrib_list);
+
+    return EGL_NO_DISPLAY;
+}
+
+EGLDisplay LOG_eglGetPlatformDisplayEXT_post(EGLenum platform, void *native_display, const EGLint *attrib_list, EGLDisplay ret_dpy)
+{
+    EGL_LOG_API("EGL(tid=0x%x): eglGetPlatformDisplayEXT 0x%08X 0x%08X (0x%08X) => 0x%08X\n",
+                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
+                (EGLint)(gctUINTPTR_T)platform, (EGLint)(gctUINTPTR_T)native_display, (EGLint)(gctUINTPTR_T)attrib_list,
+                (EGLint)(gctUINTPTR_T)ret_dpy);
+
+    return EGL_NO_DISPLAY;
+}
+
+EGLSurface LOG_eglCreatePlatformWindowSurfaceEXT_pre(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLint *attrib_list)
+{
+    EGL_LOG_API("EGL(tid=0x%x): eglCreatePlatformWindowSurfaceEXT 0x%08X 0x%08X 0x%08X (0x%08X)\n",
+                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
+                (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config,
+                (EGLint)(gctUINTPTR_T)native_window, (EGLint)(gctUINTPTR_T)attrib_list);
+
+    return EGL_NO_SURFACE;
+}
+
+EGLSurface LOG_eglCreatePlatformWindowSurfaceEXT_post(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLint *attrib_list, EGLSurface ret_surface)
+{
+    EGL_LOG_API("EGL(tid=0x%x): eglCreatePlatformWindowSurfaceEXT 0x%08X 0x%08X 0x%08X (0x%08X) => 0x%08X\n",
+                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
+                (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config,
+                (EGLint)(gctUINTPTR_T)native_window, (EGLint)(gctUINTPTR_T)attrib_list,
+                (EGLint)(gctUINTPTR_T)ret_surface);
+
+    return EGL_NO_SURFACE;
+}
+
+EGLSurface LOG_eglCreatePlatformPixmapSurfaceEXT_pre(EGLDisplay dpy, EGLConfig config, void *native_pixmap, const EGLint *attrib_list)
+{
+    EGL_LOG_API("EGL(tid=0x%x): eglCreatePlatformPixmapSurfaceEXT 0x%08X 0x%08X 0x%08X 0x%08X\n",
+                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
+                (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config,
+                (EGLint)(gctUINTPTR_T)native_pixmap, (EGLint)(gctUINTPTR_T)attrib_list);
+
+    return EGL_NO_SURFACE;
+}
+
+EGLSurface LOG_eglCreatePlatformPixmapSurfaceEXT_post(EGLDisplay dpy, EGLConfig config, void *native_pixmap, const EGLint *attrib_list, EGLSurface ret_surface)
+{
+    EGL_LOG_API("EGL(tid=0x%x): eglCreatePlatformPixmapSurfaceEXT 0x%08X 0x%08X 0x%08X 0x%08X\n",
+                (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(),
+                (EGLint)(gctUINTPTR_T)dpy, (EGLint)(gctUINTPTR_T)config,
+                (EGLint)(gctUINTPTR_T)native_pixmap, (EGLint)(gctUINTPTR_T)attrib_list,
+                (EGLint)(gctUINTPTR_T)ret_surface);
+
+    return EGL_NO_SURFACE;
+}
 
 eglTracerDispatchTableStruct veglLogFunctionTable = {
     LOG_eglGetError_pre,
@@ -1137,6 +1200,10 @@ eglTracerDispatchTableStruct veglLogFunctionTable = {
     LOG_eglWaitSyncKHR,
     /* EGL_KHR_reusable_sync. */
     LOG_eglSignalSyncKHR,
+    /* EGL_EXT_platform_base. */
+    LOG_eglGetPlatformDisplayEXT_post,
+    LOG_eglCreatePlatformWindowSurfaceEXT_post,
+    LOG_eglCreatePlatformPixmapSurfaceEXT_post,
 
     /******  The above interfaces are used to link with external vTracer library libGLES_vlogger.so ******/
 
@@ -1171,6 +1238,10 @@ eglTracerDispatchTableStruct veglLogFunctionTable = {
     /* EGL_KHR_fence_sync. */
     LOG_eglCreateSyncKHR_pre,
     LOG_eglGetSyncAttribKHR_pre,
+    /* EGL_EXT_platform_base. */
+    LOG_eglGetPlatformDisplayEXT_pre,
+    LOG_eglCreatePlatformWindowSurfaceEXT_pre,
+    LOG_eglCreatePlatformPixmapSurfaceEXT_pre,
 };
 
 char *veglFunctionNames[] = {
@@ -1234,6 +1305,10 @@ char *veglFunctionNames[] = {
     "eglWaitSyncKHR",
     /* EGL_KHR_resuable_sync. */
     "eglSignalSyncKHR",
+    /* EGL_EXT_platform_base. */
+    "eglGetPlatformDisplayEXT",
+    "eglCreatePlatformWindowSurfaceEXT",
+    "eglCreatePlatformPixmapSurfaceEXT",
 };
 
 

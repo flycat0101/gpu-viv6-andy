@@ -18,22 +18,22 @@
 
 /***********************************************************************************/
 
-#define VX_512BITS_DISABLE		0
-#define VX_512BITS_ADD			0x1
-#define VX_512BITS_SUBTRACT		0x2
-#define VX_512BITS_ACCUMULATOR	0x3
+#define VX_512BITS_DISABLE        0
+#define VX_512BITS_ADD            0x1
+#define VX_512BITS_SUBTRACT        0x2
+#define VX_512BITS_ACCUMULATOR    0x3
 
-#define VX_512BITS_TYPE_FLOAT32		0x0
-#define VX_512BITS_TYPE_FLOAT16		0x1
-#define VX_512BITS_TYPE_SIGNED32	0x2
-#define VX_512BITS_TYPE_SIGNED16	0x3
-#define VX_512BITS_TYPE_SIGNED8		0x4
-#define VX_512BITS_TYPE_UNSIGNED32	0x5
-#define VX_512BITS_TYPE_UNSIGNED16	0x6
-#define VX_512BITS_TYPE_UNSIGNED8	0x7
+#define VX_512BITS_TYPE_FLOAT32        0x0
+#define VX_512BITS_TYPE_FLOAT16        0x1
+#define VX_512BITS_TYPE_SIGNED32    0x2
+#define VX_512BITS_TYPE_SIGNED16    0x3
+#define VX_512BITS_TYPE_SIGNED8        0x4
+#define VX_512BITS_TYPE_UNSIGNED32    0x5
+#define VX_512BITS_TYPE_UNSIGNED16    0x6
+#define VX_512BITS_TYPE_UNSIGNED8    0x7
 
-#define VX_512BITS_SELECT_SRC0		0
-#define VX_512BITS_SELECT_SRC1		1
+#define VX_512BITS_SELECT_SRC0        0
+#define VX_512BITS_SELECT_SRC1        1
 #define VX_512BITS_SELECT_CONSTANTS 2
 
 typedef union _vx_512bits_bin_t
@@ -46,50 +46,50 @@ vx_512bits_bin_t;
 
 typedef union _vx_512bits_config_t
 {
-	struct
-	{
-		vx_uint32 flag0 :2;
-		vx_uint32 flag1 :2;
-		vx_uint32 flag2 :2;
-		vx_uint32 flag3 :2;
-		vx_uint32 flag4 :2;
-		vx_uint32 flag5 :2;
-		vx_uint32 flag6 :2;
-		vx_uint32 flag7 :2;
-		vx_uint32 flag8 :2;
-		vx_uint32 flag9 :2;
-		vx_uint32 flag10:2;
-		vx_uint32 flag11:2;
-		vx_uint32 flag12:2;
-		vx_uint32 flag13:2;
-		vx_uint32 flag14:2;
-		vx_uint32 flag15:2;
-	}
+    struct
+    {
+        vx_uint32 flag0 :2;
+        vx_uint32 flag1 :2;
+        vx_uint32 flag2 :2;
+        vx_uint32 flag3 :2;
+        vx_uint32 flag4 :2;
+        vx_uint32 flag5 :2;
+        vx_uint32 flag6 :2;
+        vx_uint32 flag7 :2;
+        vx_uint32 flag8 :2;
+        vx_uint32 flag9 :2;
+        vx_uint32 flag10:2;
+        vx_uint32 flag11:2;
+        vx_uint32 flag12:2;
+        vx_uint32 flag13:2;
+        vx_uint32 flag14:2;
+        vx_uint32 flag15:2;
+    }
     bin2;
 
-	struct
-	{
-		vx_uint32 flag0 :4;
-		vx_uint32 flag1 :4;
-		vx_uint32 flag2 :4;
-		vx_uint32 flag3 :4;
-		vx_uint32 flag4 :4;
-		vx_uint32 flag5 :4;
-		vx_uint32 flag6 :4;
-		vx_uint32 flag7 :4;
-	}
+    struct
+    {
+        vx_uint32 flag0 :4;
+        vx_uint32 flag1 :4;
+        vx_uint32 flag2 :4;
+        vx_uint32 flag3 :4;
+        vx_uint32 flag4 :4;
+        vx_uint32 flag5 :4;
+        vx_uint32 flag6 :4;
+        vx_uint32 flag7 :4;
+    }
     bin4;
 }
 vx_512bits_config_t;
 
 typedef struct _vx_512bits_miscconfig_t
 {
-    vx_uint32 post_shift	:5; /*[0:4]*/
-    vx_uint32 resolve1		:3; /*[5:7]*/
+    vx_uint32 post_shift    :5; /*[0:4]*/
+    vx_uint32 resolve1        :3; /*[5:7]*/
     vx_uint32 constant_type :3; /*[8:10]*/
-    vx_uint32 resolve2		:1; /*[11:11]*/
-    vx_uint32 accu_type		:3; /*[12:14]*/
-    vx_uint32 resolve3		:17;/*[15:31]*/
+    vx_uint32 resolve2        :1; /*[11:11]*/
+    vx_uint32 accu_type        :3; /*[12:14]*/
+    vx_uint32 resolve3        :17;/*[15:31]*/
 }
 vx_512bits_miscconfig_t;
 

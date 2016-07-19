@@ -1,0 +1,610 @@
+diff --git a/test_vivante/structs_and_enums/const_constant.cpp b/test_vivante/structs_and_enums/const_constant.cpp
+index ec485f9..4733750 100644
+--- a/test_vivante/structs_and_enums/const_constant.cpp
++++ b/test_vivante/structs_and_enums/const_constant.cpp
+@@ -1,16 +1,17 @@
+ #include <iostream>
+ #define __CL_ENABLE_EXCEPTIONS
+ #include <CL/cl.hpp>
+ #include <math.h>
+ #include <stdlib.h>
+ 
+ #include "types1.h"
+ #include "tests.h"
++#include "rounding_mode.h"
+ #pragma warning( disable : 4290 )
+ 
+ const char *kernel_const_constant = 
+ "#ifndef _TYPES1_H_                                                                                                                 \n"
+ "#define _TYPES1_H_																												   \n"
+ "#																																   \n"
+ "#ifdef __OPENCL_VERSION__																										   \n"
+ "#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
+@@ -143,22 +144,26 @@ private:
+ 				_inputA[i].uniC.c = (float)rand();
+ 
+             
+         }
+     }
+ 
+     void _computeGoldStandard()
+     {
++        RoundingMode mode = set_round(kRoundTowardZero, kfloat);
++
+         for (int i = 0; i < _numElements; i++) {
+             _goldStandard[i].r[0] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[0] + 5;
+ 			_goldStandard[i].r[1] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[1] + 5;
+ 			_goldStandard[i].r[2] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[2] + 5;
+ 			_goldStandard[i].r[3] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[3] + 5;
+         }
++
++        set_round(mode, kfloat);
+     }
+ 
+     void _computeDeviceResult()
+     {
+         int err;
+         cl::CommandQueue queue(_context, _devices[0], 0, &err);
+ 
+         queue.enqueueWriteBuffer(_deviceInputA, false, 0, sizeof(InputA) * _globalWorkSize, _inputA);
+diff --git a/test_vivante/structs_and_enums/const_global.cpp b/test_vivante/structs_and_enums/const_global.cpp
+index 7249a87..8cae0f0 100644
+--- a/test_vivante/structs_and_enums/const_global.cpp
++++ b/test_vivante/structs_and_enums/const_global.cpp
+@@ -1,16 +1,17 @@
+ #include <iostream>
+ #define __CL_ENABLE_EXCEPTIONS
+ #include <CL/cl.hpp>
+ #include <math.h>
+ #include <stdlib.h>
+ 
+ #include "types1.h"
+ #include "tests.h"
++#include "rounding_mode.h"
+ #pragma warning( disable : 4290 )
+ 
+ const char *kernel_const_global = 
+ "#ifndef _TYPES1_H_                                                                                                                 \n"
+ "#define _TYPES1_H_																												   \n"
+ "#																																   \n"
+ "#ifdef __OPENCL_VERSION__																										   \n"
+ "#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
+@@ -143,22 +144,26 @@ private:
+ 				_inputA[i].uniC.c = (float)rand();
+ 
+             
+         }
+     }
+ 
+     void _computeGoldStandard()
+     {
++        RoundingMode mode = set_round(kRoundTowardZero, kfloat);
++
+         for (int i = 0; i < _numElements; i++) {
+             _goldStandard[i].r[0] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[0] + 5;
+ 			_goldStandard[i].r[1] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[1] + 5;
+ 			_goldStandard[i].r[2] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[2] + 5;
+ 			_goldStandard[i].r[3] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[3] + 5;
+         }
++
++        set_round(mode, kfloat);
+     }
+ 
+     void _computeDeviceResult()
+     {
+         int err;
+         cl::CommandQueue queue(_context, _devices[0], 0, &err);
+ 
+         queue.enqueueWriteBuffer(_deviceInputA, false, 0, sizeof(InputA) * _globalWorkSize, _inputA);
+diff --git a/test_vivante/structs_and_enums/const_local.cpp b/test_vivante/structs_and_enums/const_local.cpp
+index 8c91103..8092175 100644
+--- a/test_vivante/structs_and_enums/const_local.cpp
++++ b/test_vivante/structs_and_enums/const_local.cpp
+@@ -1,16 +1,17 @@
+ #include <iostream>
+ #define __CL_ENABLE_EXCEPTIONS
+ #include <CL/cl.hpp>
+ #include <math.h>
+ #include <stdlib.h>
+ 
+ #include "types1.h"
+ #include "tests.h"
++#include "rounding_mode.h"
+ #pragma warning( disable : 4290 )
+ 
+ const char *kernel_const_local = 
+ "#ifndef _TYPES1_H_                                                                                                                 \n"
+ "#define _TYPES1_H_																												   \n"
+ "#																																   \n"
+ "#ifdef __OPENCL_VERSION__																										   \n"
+ "#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
+@@ -145,22 +146,26 @@ private:
+ 				_inputA[i].uniC.c = (float)rand();
+ 
+             
+         }
+     }
+ 
+     void _computeGoldStandard()
+     {
++        RoundingMode mode = set_round(kRoundTowardZero, kfloat);
++
+         for (int i = 0; i < _numElements; i++) {
+             _goldStandard[i].r[0] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[0] + 5;
+ 			_goldStandard[i].r[1] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[1] + 5;
+ 			_goldStandard[i].r[2] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[2] + 5;
+ 			_goldStandard[i].r[3] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[3] + 5;
+         }
++
++        set_round(mode, kfloat);
+     }
+ 
+     void _computeDeviceResult()
+     {
+         int err;
+         cl::CommandQueue queue(_context, _devices[0], 0, &err);
+ 
+         queue.enqueueWriteBuffer(_deviceInputA, false, 0, sizeof(InputA) * _globalWorkSize, _inputA);
+diff --git a/test_vivante/structs_and_enums/const_private.cpp b/test_vivante/structs_and_enums/const_private.cpp
+index 5ebab1b..f9b610d 100644
+--- a/test_vivante/structs_and_enums/const_private.cpp
++++ b/test_vivante/structs_and_enums/const_private.cpp
+@@ -1,16 +1,17 @@
+ #include <iostream>
+ #define __CL_ENABLE_EXCEPTIONS
+ #include <CL/cl.hpp>
+ #include <math.h>
+ #include <stdlib.h>
+ 
+ #include "types1.h"
+ #include "tests.h"
++#include "rounding_mode.h"
+ #pragma warning( disable : 4290 )
+ 
+ const char *kernel_const_private = 
+ "#ifndef _TYPES1_H_                                                                                                                 \n"
+ "#define _TYPES1_H_																												   \n"
+ "#																																   \n"
+ "#ifdef __OPENCL_VERSION__																										   \n"
+ "#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
+@@ -142,22 +143,26 @@ private:
+ 				_inputA[i].uniC.c = (float)rand();
+ 
+             
+         }
+     }
+ 
+     void _computeGoldStandard()
+     {
++        RoundingMode mode = set_round(kRoundTowardZero, kfloat);
++
+         for (int i = 0; i < _numElements; i++) {
+             _goldStandard[i].r[0] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[0] + 5;
+ 			_goldStandard[i].r[1] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[1] + 5;
+ 			_goldStandard[i].r[2] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[2] + 5;
+ 			_goldStandard[i].r[3] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[3] + 5;
+         }
++
++        set_round(mode, kfloat);
+     }
+ 
+     void _computeDeviceResult()
+     {
+         int err;
+         cl::CommandQueue queue(_context, _devices[0], 0, &err);
+ 
+         queue.enqueueWriteBuffer(_deviceInputA, false, 0, sizeof(InputA) * _globalWorkSize, _inputA);
+diff --git a/test_vivante/structs_and_enums/main.cpp b/test_vivante/structs_and_enums/main.cpp
+index 74f157a..1ce426b 100644
+--- a/test_vivante/structs_and_enums/main.cpp
++++ b/test_vivante/structs_and_enums/main.cpp
+@@ -2,17 +2,16 @@
+ #include <CL/cl.h>
+ #include "tests.h"
+ 
+ #include "rounding_mode.h"
+ #pragma warning( disable : 4290 )
+ 
+ int main(int argc, const char *argv[]) {
+ 
+-        set_round(kRoundTowardZero, kfloat);
+         FlushToZero();
+ 
+ 	int cnt = 0;
+ 	cnt = cnt + const_global();
+ 	cnt = cnt + volatile_global();
+ 	cnt = cnt + restrict_global();
+ 
+ 	cnt = cnt + const_constant();
+diff --git a/test_vivante/structs_and_enums/restrict_constant.cpp b/test_vivante/structs_and_enums/restrict_constant.cpp
+index 0c3a76c..a15ee84 100644
+--- a/test_vivante/structs_and_enums/restrict_constant.cpp
++++ b/test_vivante/structs_and_enums/restrict_constant.cpp
+@@ -1,16 +1,17 @@
+ #include <iostream>
+ #define __CL_ENABLE_EXCEPTIONS
+ #include <CL/cl.hpp>
+ #include <math.h>
+ #include <stdlib.h>
+ 
+ #include "types1.h"
+ #include "tests.h"
++#include "rounding_mode.h"
+ #pragma warning( disable : 4290 )
+ 
+ const char *kernel_restrict_constant = 
+ "#ifndef _TYPES1_H_                                                                                                                 \n"
+ "#define _TYPES1_H_																												   \n"
+ "#																																   \n"
+ "#ifdef __OPENCL_VERSION__																										   \n"
+ "#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
+@@ -147,22 +148,26 @@ private:
+ 				_inputA[i].uniC.c = (float)rand();
+ 
+             
+         }
+     }
+ 
+     void _computeGoldStandard()
+     {
++        RoundingMode mode = set_round(kRoundTowardZero, kfloat);
++
+         for (int i = 0; i < _numElements; i++) {
+             _goldStandard[i].r[0] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[0] + 5;
+ 			_goldStandard[i].r[1] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[1] + 5;
+ 			_goldStandard[i].r[2] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[2] + 5;
+ 			_goldStandard[i].r[3] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[3] + 5;
+         }
++
++        set_round(mode, kfloat);
+     }
+ 
+     void _computeDeviceResult()
+     {
+         int err;
+         cl::CommandQueue queue(_context, _devices[0], 0, &err);
+ 
+         queue.enqueueWriteBuffer(_deviceInputA, false, 0, sizeof(InputA) * _globalWorkSize, _inputA);
+diff --git a/test_vivante/structs_and_enums/restrict_global.cpp b/test_vivante/structs_and_enums/restrict_global.cpp
+index 2e64318..c152fcc 100644
+--- a/test_vivante/structs_and_enums/restrict_global.cpp
++++ b/test_vivante/structs_and_enums/restrict_global.cpp
+@@ -1,16 +1,17 @@
+ #include <iostream>
+ #define __CL_ENABLE_EXCEPTIONS
+ #include <CL/cl.hpp>
+ #include <math.h>
+ #include <stdlib.h>
+ 
+ #include "types1.h"
+ #include "tests.h"
++#include "rounding_mode.h"
+ #pragma warning( disable : 4290 )
+ 
+ const char *kernel_restrict_global = 
+ "#ifndef _TYPES1_H_                                                                                                                 \n"
+ "#define _TYPES1_H_																												   \n"
+ "#																																   \n"
+ "#ifdef __OPENCL_VERSION__																										   \n"
+ "#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
+@@ -146,22 +147,26 @@ private:
+ 				_inputA[i].uniC.c = (float)rand();
+ 
+             
+         }
+     }
+ 
+     void _computeGoldStandard()
+     {
++        RoundingMode mode = set_round(kRoundTowardZero, kfloat);
++
+         for (int i = 0; i < _numElements; i++) {
+             _goldStandard[i].r[0] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[0] + 5;
+ 			_goldStandard[i].r[1] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[1] + 5;
+ 			_goldStandard[i].r[2] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[2] + 5;
+ 			_goldStandard[i].r[3] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[3] + 5;
+         }
++
++        set_round(mode, kfloat);
+     }
+ 
+     void _computeDeviceResult()
+     {
+         int err;
+         cl::CommandQueue queue(_context, _devices[0], 0, &err);
+ 
+         queue.enqueueWriteBuffer(_deviceInputA, false, 0, sizeof(InputA) * _globalWorkSize, _inputA);
+diff --git a/test_vivante/structs_and_enums/restrict_local.cpp b/test_vivante/structs_and_enums/restrict_local.cpp
+index 8fe0b97..39cd9d0 100644
+--- a/test_vivante/structs_and_enums/restrict_local.cpp
++++ b/test_vivante/structs_and_enums/restrict_local.cpp
+@@ -1,16 +1,17 @@
+ #include <iostream>
+ #define __CL_ENABLE_EXCEPTIONS
+ #include <CL/cl.hpp>
+ #include <math.h>
+ #include <stdlib.h>
+ 
+ #include "types1.h"
+ #include "tests.h"
++#include "rounding_mode.h"
+ #pragma warning( disable : 4290 )
+ 
+ const char *kernel_restrict_local = 
+ "#ifndef _TYPES1_H_                                                                                                                 \n"
+ "#define _TYPES1_H_																												   \n"
+ "#																																   \n"
+ "#ifdef __OPENCL_VERSION__																										   \n"
+ "#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
+@@ -150,22 +151,26 @@ private:
+ 				_inputA[i].uniC.c = (float)rand();
+ 
+             
+         }
+     }
+ 
+     void _computeGoldStandard()
+     {
++        RoundingMode mode = set_round(kRoundTowardZero, kfloat);
++
+         for (int i = 0; i < _numElements; i++) {
+             _goldStandard[i].r[0] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[0] + 5;
+ 			_goldStandard[i].r[1] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[1] + 5;
+ 			_goldStandard[i].r[2] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[2] + 5;
+ 			_goldStandard[i].r[3] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[3] + 5;
+         }
++
++        set_round(mode, kfloat);
+     }
+ 
+     void _computeDeviceResult()
+     {
+         int err;
+         cl::CommandQueue queue(_context, _devices[0], 0, &err);
+ 
+         queue.enqueueWriteBuffer(_deviceInputA, false, 0, sizeof(InputA) * _globalWorkSize, _inputA);
+diff --git a/test_vivante/structs_and_enums/restrict_private.cpp b/test_vivante/structs_and_enums/restrict_private.cpp
+index d03eb4f..04ff975 100644
+--- a/test_vivante/structs_and_enums/restrict_private.cpp
++++ b/test_vivante/structs_and_enums/restrict_private.cpp
+@@ -1,16 +1,17 @@
+ #include <iostream>
+ #define __CL_ENABLE_EXCEPTIONS
+ #include <CL/cl.hpp>
+ #include <math.h>
+ #include <stdlib.h>
+ 
+ #include "types1.h"
+ #include "tests.h"
++#include "rounding_mode.h"
+ #pragma warning( disable : 4290 )
+ 
+ const char *kernel_restrict_private = 
+ "#ifndef _TYPES1_H_                                                                                                                 \n"
+ "#define _TYPES1_H_																												   \n"
+ "#																																   \n"
+ "#ifdef __OPENCL_VERSION__																										   \n"
+ "#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
+@@ -145,22 +146,26 @@ private:
+ 				_inputA[i].uniC.c = (float)rand();
+ 
+             
+         }
+     }
+ 
+     void _computeGoldStandard()
+     {
++        RoundingMode mode = set_round(kRoundTowardZero, kfloat);
++
+         for (int i = 0; i < _numElements; i++) {
+             _goldStandard[i].r[0] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[0] + 5;
+ 			_goldStandard[i].r[1] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[1] + 5;
+ 			_goldStandard[i].r[2] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[2] + 5;
+ 			_goldStandard[i].r[3] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[3] + 5;
+         }
++
++        set_round(mode, kfloat);
+     }
+ 
+     void _computeDeviceResult()
+     {
+         int err;
+         cl::CommandQueue queue(_context, _devices[0], 0, &err);
+ 
+         queue.enqueueWriteBuffer(_deviceInputA, false, 0, sizeof(InputA) * _globalWorkSize, _inputA);
+diff --git a/test_vivante/structs_and_enums/volatile_constant.cpp b/test_vivante/structs_and_enums/volatile_constant.cpp
+index cba30f9..77361a1 100644
+--- a/test_vivante/structs_and_enums/volatile_constant.cpp
++++ b/test_vivante/structs_and_enums/volatile_constant.cpp
+@@ -1,16 +1,17 @@
+ #include <iostream>
+ #define __CL_ENABLE_EXCEPTIONS
+ #include <CL/cl.hpp>
+ #include <math.h>
+ #include <stdlib.h>
+ 
+ #include "types1.h"
+ #include "tests.h"
++#include "rounding_mode.h"
+ #pragma warning( disable : 4290 )
+ 
+ const char *kernel_volatile_constant = 
+ "#ifndef _TYPES1_H_                                                                                                                 \n"
+ "#define _TYPES1_H_																												   \n"
+ "#																																   \n"
+ "#ifdef __OPENCL_VERSION__																										   \n"
+ "#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
+@@ -143,22 +144,26 @@ private:
+ 				_inputA[i].uniC.c = (float)rand();
+ 
+             
+         }
+     }
+ 
+     void _computeGoldStandard()
+     {
++        RoundingMode mode = set_round(kRoundTowardZero, kfloat);
++
+         for (int i = 0; i < _numElements; i++) {
+             _goldStandard[i].r[0] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[0] + 5;
+ 			_goldStandard[i].r[1] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[1] + 5;
+ 			_goldStandard[i].r[2] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[2] + 5;
+ 			_goldStandard[i].r[3] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[3] + 5;
+         }
++
++        set_round(mode, kfloat);
+     }
+ 
+     void _computeDeviceResult()
+     {
+         int err;
+         cl::CommandQueue queue(_context, _devices[0], 0, &err);
+ 
+         queue.enqueueWriteBuffer(_deviceInputA, false, 0, sizeof(InputA) * _globalWorkSize, _inputA);
+diff --git a/test_vivante/structs_and_enums/volatile_global.cpp b/test_vivante/structs_and_enums/volatile_global.cpp
+index d6ee094..5abb51c 100644
+--- a/test_vivante/structs_and_enums/volatile_global.cpp
++++ b/test_vivante/structs_and_enums/volatile_global.cpp
+@@ -1,16 +1,17 @@
+ #include <iostream>
+ #define __CL_ENABLE_EXCEPTIONS
+ #include <CL/cl.hpp>
+ #include <math.h>
+ #include <stdlib.h>
+ 
+ #include "types1.h"
+ #include "tests.h"
++#include "rounding_mode.h"
+ #pragma warning( disable : 4290 )
+ 
+ const char *kernel_volatile_global = 
+ "#ifndef _TYPES1_H_                                                                                                                 \n"
+ "#define _TYPES1_H_																												   \n"
+ "#																																   \n"
+ "#ifdef __OPENCL_VERSION__																										   \n"
+ "#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
+@@ -142,22 +143,26 @@ private:
+ 				_inputA[i].uniC.c = (float)rand();
+ 
+             
+         }
+     }
+ 
+     void _computeGoldStandard()
+     {
++        RoundingMode mode = set_round(kRoundTowardZero, kfloat);
++
+         for (int i = 0; i < _numElements; i++) {
+             _goldStandard[i].r[0] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[0] + 5;
+ 			_goldStandard[i].r[1] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[1] + 5;
+ 			_goldStandard[i].r[2] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[2] + 5;
+ 			_goldStandard[i].r[3] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[3]+ 5;
+         }
++
++        set_round(mode, kfloat);
+     }
+ 
+     void _computeDeviceResult()
+     {
+         int err;
+         cl::CommandQueue queue(_context, _devices[0], 0, &err);
+ 
+         queue.enqueueWriteBuffer(_deviceInputA, false, 0, sizeof(InputA) * _globalWorkSize, _inputA);
+diff --git a/test_vivante/structs_and_enums/volatile_local.cpp b/test_vivante/structs_and_enums/volatile_local.cpp
+index 65b7934..548cc02 100644
+--- a/test_vivante/structs_and_enums/volatile_local.cpp
++++ b/test_vivante/structs_and_enums/volatile_local.cpp
+@@ -1,16 +1,17 @@
+ #include <iostream>
+ #define __CL_ENABLE_EXCEPTIONS
+ #include <CL/cl.hpp>
+ #include <math.h>
+ #include <stdlib.h>
+ 
+ #include "types1.h"
+ #include "tests.h"
++#include "rounding_mode.h"
+ #pragma warning( disable : 4290 )
+ 
+ const char *kernel_volatile_local = 
+ "#ifndef _TYPES1_H_                                                                                                                 \n"
+ "#define _TYPES1_H_																												   \n"
+ "#																																   \n"
+ "#ifdef __OPENCL_VERSION__																										   \n"
+ "#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
+@@ -145,22 +146,26 @@ private:
+ 				_inputA[i].uniC.c = (float)rand();
+ 
+             
+         }
+     }
+ 
+     void _computeGoldStandard()
+     {
++        RoundingMode mode = set_round(kRoundTowardZero, kfloat);
++
+         for (int i = 0; i < _numElements; i++) {
+             _goldStandard[i].r[0] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[0] + 5;
+ 			_goldStandard[i].r[1] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[1] + 5;
+ 			_goldStandard[i].r[2] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[2] + 5;
+ 			_goldStandard[i].r[3] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[3]+ 5;
+         }
++
++        set_round(mode, kfloat);
+     }
+ 
+     void _computeDeviceResult()
+     {
+         int err;
+         cl::CommandQueue queue(_context, _devices[0], 0, &err);
+ 
+         queue.enqueueWriteBuffer(_deviceInputA, false, 0, sizeof(InputA) * _globalWorkSize, _inputA);
+diff --git a/test_vivante/structs_and_enums/volatile_private.cpp b/test_vivante/structs_and_enums/volatile_private.cpp
+index e59b8da..2ef114c 100644
+--- a/test_vivante/structs_and_enums/volatile_private.cpp
++++ b/test_vivante/structs_and_enums/volatile_private.cpp
+@@ -1,16 +1,17 @@
+ #include <iostream>
+ #define __CL_ENABLE_EXCEPTIONS
+ #include <CL/cl.hpp>
+ #include <math.h>
+ #include <stdlib.h>
+ 
+ #include "types1.h"
+ #include "tests.h"
++#include "rounding_mode.h"
+ #pragma warning( disable : 4290 )
+ 
+ const char *kernel_volatile_private = 
+ "#ifndef _TYPES1_H_                                                                                                                 \n"
+ "#define _TYPES1_H_																												   \n"
+ "#																																   \n"
+ "#ifdef __OPENCL_VERSION__																										   \n"
+ "#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
+@@ -142,22 +143,26 @@ private:
+ 				_inputA[i].uniC.c = (float)rand();
+ 
+             
+         }
+     }
+ 
+     void _computeGoldStandard()
+     {
++        RoundingMode mode = set_round(kRoundTowardZero, kfloat);
++
+         for (int i = 0; i < _numElements; i++) {
+             _goldStandard[i].r[0] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[0] + 5;
+ 			_goldStandard[i].r[1] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[1] + 5;
+ 			_goldStandard[i].r[2] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[2] + 5;
+ 			_goldStandard[i].r[3] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[3] + 5;
+         }
++
++        set_round(mode, kfloat);
+     }
+ 
+     void _computeDeviceResult()
+     {
+         int err;
+         cl::CommandQueue queue(_context, _devices[0], 0, &err);
+ 
+         queue.enqueueWriteBuffer(_deviceInputA, false, 0, sizeof(InputA) * _globalWorkSize, _inputA);

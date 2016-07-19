@@ -25,7 +25,8 @@ CDEFINES = \
   -D__EGL_EXPORTS \
 
 SOURCES= \
-    gc_egl_platform.c \
+    gc_egl_nullws.c \
+    gc_egl_win32.c
 
 INCLUDES= \
   $(INCLUDES); \

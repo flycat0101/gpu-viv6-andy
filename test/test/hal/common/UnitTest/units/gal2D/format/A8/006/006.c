@@ -59,28 +59,28 @@ typedef struct Test2D {
     GalRuntime  *runtime;
 
     // destination surface
-    gcoSURF			dstSurf;
-    gceSURF_FORMAT	dstFormat;
-    gctUINT			dstWidth;
-    gctUINT			dstHeight;
-    gctINT			dstStride;
-    gctUINT32		dstPhyAddr;
-    gctPOINTER		dstLgcAddr;
+    gcoSURF            dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT            dstWidth;
+    gctUINT            dstHeight;
+    gctINT            dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
 
     //source surface
-    gcoSURF			srcSurf;
-    gceSURF_FORMAT	srcFormat;
-    gctUINT			srcWidth;
-    gctUINT			srcHeight;
-    gctINT			srcStride;
-    gctUINT32		srcPhyAddr;
-    gctPOINTER		srcLgcAddr;
-    gctPOINTER		srcULgcAddr;
-    gctUINT32		srcUPhyAddr;
-    gctINT			srcUStride;
-    gctPOINTER		srcVLgcAddr;
-    gctUINT32		srcVPhyAddr;
-    gctINT			srcVStride;
+    gcoSURF            srcSurf;
+    gceSURF_FORMAT    srcFormat;
+    gctUINT            srcWidth;
+    gctUINT            srcHeight;
+    gctINT            srcStride;
+    gctUINT32        srcPhyAddr;
+    gctPOINTER        srcLgcAddr;
+    gctPOINTER        srcULgcAddr;
+    gctUINT32        srcUPhyAddr;
+    gctINT            srcUStride;
+    gctPOINTER        srcVLgcAddr;
+    gctUINT32        srcVPhyAddr;
+    gctINT            srcVStride;
 } Test2D;
 
 static gceSTATUS ReloadSourceSurface(Test2D *t2d, const char * sourcefile)

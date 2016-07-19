@@ -50,6 +50,17 @@ endif
 endif
 
 ifeq ($(VIVANTE_ENABLE_3D), 1)
+ifeq ($(USE_OPENCL),1)
+VIVANTE_MAKEFILES += \
+    $(LOCAL_PATH)/compiler/libCLC/Android.mk \
+    $(LOCAL_PATH)/driver/khronos/libCL/Android.mk
+
+ifeq ($(BUILD_OPENCL_ICD),1)
+VIVANTE_MAKEFILES += \
+    $(LOCAL_PATH)/driver/khronos/libCL/icdloader12/Android.mk
+
+endif
+endif
 endif
 
 ifeq ($(USE_OPENVX),1)

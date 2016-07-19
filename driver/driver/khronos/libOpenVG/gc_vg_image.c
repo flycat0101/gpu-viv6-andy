@@ -293,8 +293,8 @@ static gceSTATUS _CreateIndexedImage(
     )
 {
     gceSTATUS status;
-    gcoSURF surface;
-    gctUINT8_PTR buffer;
+    gcoSURF surface = gcvNULL;
+    gctPOINTER buffer[3] = {gcvNULL};
     vgsIMAGE_PTR image;
     gctBOOL imageAllocated;
     vgmENTERSUBAPI(_CreateIndexedImage);
@@ -304,10 +304,6 @@ static gceSTATUS _CreateIndexedImage(
         gceSURF_COLOR_TYPE colorType;
         gceSURF_FORMAT  surfFormat;
         gctINT stride;
-
-        /* Reset surface pointers. */
-        surface = gcvNULL;
-        buffer  = gcvNULL;
 
         /* Assume image as locally allocated. */
         imageAllocated = gcvTRUE;
@@ -385,7 +381,7 @@ static gceSTATUS _CreateIndexedImage(
 
         /* Get the logical pointer to the surface. */
         status = gcoSURF_Lock(
-            surface, gcvNULL, (gctPOINTER *) &buffer
+            surface, gcvNULL, buffer
             );
 
         if (gcmIS_ERROR(status))
@@ -439,7 +435,7 @@ static gceSTATUS _CreateIndexedImage(
         image->parent        = image;
         image->childrenCount = 0;
         image->surface       = surface;
-        image->buffer        = buffer;
+        image->buffer        = (gctUINT8_PTR)(buffer[0]);
 
         image->imageAllocated   = imageAllocated;
         image->surfaceAllocated = gcvTRUE;
@@ -454,9 +450,9 @@ static gceSTATUS _CreateIndexedImage(
     while (gcvFALSE);
 
     /* Roll back. */
-    if (buffer != gcvNULL)
+    if (buffer[0] != gcvNULL)
     {
-        gcmVERIFY_OK(gcoSURF_Unlock(surface, buffer));
+        gcmVERIFY_OK(gcoSURF_Unlock(surface, buffer[0]));
     }
 
     if (surface != gcvNULL)
@@ -1152,8 +1148,8 @@ gceSTATUS vgfCreateImage(
     )
 {
     gceSTATUS status;
-    gcoSURF surface;
-    gctUINT8_PTR buffer;
+    gcoSURF surface = gcvNULL;
+    gctPOINTER buffer[3] = {gcvNULL};
     vgsIMAGE_PTR image;
     gctBOOL imageAllocated;
     vgmENTERSUBAPI(vgfCreateImage);
@@ -1165,10 +1161,6 @@ gceSTATUS vgfCreateImage(
         vgsFORMAT_PTR surfaceFormat;
         gceSURF_COLOR_TYPE colorType;
         gctINT stride;
-
-        /* Reset surface pointers. */
-        surface = gcvNULL;
-        buffer  = gcvNULL;
 
         /* Assume image as locally allocated. */
         imageAllocated = gcvTRUE;
@@ -1250,7 +1242,7 @@ gceSTATUS vgfCreateImage(
 
         /* Get the logical pointer to the surface. */
         status = gcoSURF_Lock(
-            surface, gcvNULL, (gctPOINTER *) &buffer
+            surface, gcvNULL, buffer
             );
 
         if (gcmIS_ERROR(status))
@@ -1314,7 +1306,7 @@ gceSTATUS vgfCreateImage(
         image->parent        = image;
         image->childrenCount = 0;
         image->surface       = surface;
-        image->buffer        = buffer;
+        image->buffer        = (gctUINT8_PTR)(buffer[0]);
 
         image->imageAllocated   = imageAllocated;
         image->surfaceAllocated = gcvTRUE;
@@ -1329,9 +1321,9 @@ gceSTATUS vgfCreateImage(
     while (gcvFALSE);
 
     /* Roll back. */
-    if (buffer != gcvNULL)
+    if (buffer[0] != gcvNULL)
     {
-        gcmVERIFY_OK(gcoSURF_Unlock(surface, buffer));
+        gcmVERIFY_OK(gcoSURF_Unlock(surface, buffer[0]));
     }
 
     if (surface != gcvNULL)
@@ -2273,6 +2265,11 @@ gceSTATUS vgfTesselateImage(
     IN vgsCONTEXT_PTR Context,
     IN vgsIMAGE_PTR Target,
     IN vgsIMAGE_PTR Image
+#if gcdMOVG
+    ,
+    IN gctINT   Width,
+    IN gctINT   Height
+#endif
     )
 {
     gceSTATUS status;
@@ -2390,7 +2387,9 @@ gceSTATUS vgfTesselateImage(
             halImageQuality,
             gcvFALSE,
             Context->useSoftwareTS,
-            Context->halBlendMode
+            Context->halBlendMode,
+            Width,
+            Height
             ));
 #endif
 #else
@@ -3364,13 +3363,13 @@ VG_API_CALL void VG_API_ENTRY vgImageSubData(
            )
         {
             /* Suppose bpp here is 8. */
-            gctPOINTER memory;
+            gctPOINTER memory[3];
             gctUINT8    *p, *pData;
             gctINT stride, y;
             gcoSURF surface = image->surface;
-            gcoSURF_Lock(surface, gcvNULL, &memory);
+            gcoSURF_Lock(surface, gcvNULL, memory);
             gcoSURF_GetAlignedSize(surface, gcvNULL, gcvNULL, &stride);
-            p = (gctUINT8*)memory;
+            p = (gctUINT8*)memory[0];
             pData = (gctUINT8*)Data;
 
             if (DataStride < 0)
@@ -3384,7 +3383,7 @@ VG_API_CALL void VG_API_ENTRY vgImageSubData(
                 pData += DataStride;
             }
 
-            gcoSURF_Unlock(surface, memory);
+            gcoSURF_Unlock(surface, memory[0]);
             gcoSURF_CPUCacheOperation(surface, gcvCACHE_FLUSH);
             return;
         }
@@ -4027,6 +4026,10 @@ VG_API_CALL void VG_API_ENTRY vgDrawImage(
             Context,
             &Context->targetImage,
             image
+#if gcdMOVG
+            ,
+            Context->tsWidth, Context->tsHeight
+#endif
             );
     }
     vgmLEAVEAPI(vgDrawImage);

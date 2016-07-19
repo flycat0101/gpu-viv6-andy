@@ -64,46 +64,46 @@ static int winHeight = 480;
 static int angle;
 void tigerRun()
 {
-	int frameCount;
-	int start;
-	int end;
-	float fps;
-	float pixelRate;
-	struct timeval tm;
+    int frameCount;
+    int start;
+    int end;
+    float fps;
+    float pixelRate;
+    struct timeval tm;
         int frames;
-	static int totalCount = 100;
+    static int totalCount = 100;
 
     winWidth = gWinSizeX;
     winHeight = gWinSizeY;
-	if(initVG() == 0)
-	{
-		LOGI("can't init VG\n");
+    if(initVG() == 0)
+    {
+        LOGI("can't init VG\n");
         return;
-	}
+    }
     else
     {
         LOGI("init VG ok\n");
     };
 
-	gettimeofday(&tm, NULL);
-	start = tm.tv_sec * 1000 + tm.tv_usec /1000; frames = 0;
+    gettimeofday(&tm, NULL);
+    start = tm.tv_sec * 1000 + tm.tv_usec /1000; frames = 0;
 
-	for(frameCount = 0 ;frameCount < totalCount; ++frameCount)
-	{
-		vfFRAME_Render();
+    for(frameCount = 0 ;frameCount < totalCount; ++frameCount)
+    {
+        vfFRAME_Render();
         eglSwapBuffers(gDisplay, gSurface);
-       		 frames++;
-		gettimeofday(&tm, NULL);
-		end = tm.tv_sec * 1000 + tm.tv_usec/1000;
-		if(end - start > 1000)
-		{
+                frames++;
+        gettimeofday(&tm, NULL);
+        end = tm.tv_sec * 1000 + tm.tv_usec/1000;
+        if(end - start > 1000)
+        {
 
              LOGI("%d frames in %d ticks -> %.3f fps\n", frames, end - start, frames/((end -start)*0.001f));
-        	 start = end;
-        	 frames =0;
-		}
-	}
-	deInitVG();
+             start = end;
+             frames =0;
+        }
+    }
+    deInitVG();
 
 }
 

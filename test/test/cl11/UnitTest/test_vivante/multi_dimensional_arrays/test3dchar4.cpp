@@ -35,42 +35,42 @@
 
 Test3DChar4::Test3DChar4(const size_t sizeX, const size_t sizeY, const size_t sizeZ):
 MultiDimensionalArraysTest3D("char4", sizeX, sizeY, sizeZ) {
-	inputAHost = new cl_char4[size];
-	inputBHost = new cl_char4[size];
-	resultHost = new cl_char4[size];
-	inputA = inputAHost;
-	inputB = inputBHost;
-	result = resultHost;
+    inputAHost = new cl_char4[size];
+    inputBHost = new cl_char4[size];
+    resultHost = new cl_char4[size];
+    inputA = inputAHost;
+    inputB = inputBHost;
+    result = resultHost;
 }
 
 Test3DChar4::~Test3DChar4() {
-	delete[] inputAHost;
-	delete[] inputBHost;
-	delete[] resultHost;
+    delete[] inputAHost;
+    delete[] inputBHost;
+    delete[] resultHost;
 }
 
 const int Test3DChar4::getMemSize() const {
-	return sizeof(cl_char4)*size;
+    return sizeof(cl_char4)*size;
 }
 
 void Test3DChar4::generateInput(const unsigned int &kernelIndex) {
-	for (unsigned int i=0; i<VECTOR_SIZE; i++) {
-		for (unsigned int k=0; k<size; k++) {
-			inputAHost[k].s[i] = randChar();
-			if (getKernelInputArgNum(kernelIndex) == 2)
-				inputBHost[k].s[i] = randChar();
-		}
-	}
+    for (unsigned int i=0; i<VECTOR_SIZE; i++) {
+        for (unsigned int k=0; k<size; k++) {
+            inputAHost[k].s[i] = randChar();
+            if (getKernelInputArgNum(kernelIndex) == 2)
+                inputBHost[k].s[i] = randChar();
+        }
+    }
 }
 
 void* Test3DChar4::getInputAElement(const unsigned int &index) const {
-	return inputAHost[index].s;
+    return inputAHost[index].s;
 }
 
 void* Test3DChar4::getInputBElement(const unsigned int &index) const {
-	return &inputBHost[index].s;
+    return &inputBHost[index].s;
 }
 
 void* Test3DChar4::getResultElement(const unsigned int &index) const {
-	return &resultHost[index].s;
+    return &resultHost[index].s;
 }

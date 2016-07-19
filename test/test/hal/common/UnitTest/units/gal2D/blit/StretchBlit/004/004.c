@@ -59,14 +59,14 @@ typedef struct Test2D {
     GalTest     base;
     GalRuntime  *runtime;
 
-	// destination surface
-    gcoSURF			dstSurf;
-	gceSURF_FORMAT	dstFormat;
-	gctUINT			dstWidth;
-	gctUINT			dstHeight;
-	gctINT			dstStride;
-	gctUINT32		dstPhyAddr;
-	gctPOINTER		dstLgcAddr;
+    // destination surface
+    gcoSURF            dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT            dstWidth;
+    gctUINT            dstHeight;
+    gctINT            dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
 } Test2D;
 
 static gctUINT32 sColorBuf[] = {
@@ -82,92 +82,92 @@ static gctUINT32 sColorBuf[] = {
 
 static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 {
-	gctUINT32 horFactor, verFactor;
-	gcsRECT srcRect = {0, 0, t2d->dstWidth, t2d->dstHeight};
-	gco2D egn2D = t2d->runtime->engine2d;
-	gceSTATUS status;
-	gcsRECT dstRect = {0, 0, t2d->dstWidth, t2d->dstHeight};
-	gctINT count = frameNo + 1;
-	gctINT32 DeltaWidth = count* t2d->dstWidth / 6;
-	gctINT32 DeltaHeight = count * t2d->dstHeight / 6;
-	gcoBRUSH		brush;
+    gctUINT32 horFactor, verFactor;
+    gcsRECT srcRect = {0, 0, t2d->dstWidth, t2d->dstHeight};
+    gco2D egn2D = t2d->runtime->engine2d;
+    gceSTATUS status;
+    gcsRECT dstRect = {0, 0, t2d->dstWidth, t2d->dstHeight};
+    gctINT count = frameNo + 1;
+    gctINT32 DeltaWidth = count* t2d->dstWidth / 6;
+    gctINT32 DeltaHeight = count * t2d->dstHeight / 6;
+    gcoBRUSH        brush;
 
-	switch (frameNo)
-	{
-	case 0:
-		// create grey brush
-		gcmONERROR(gco2D_ConstructSingleColorBrush(t2d->runtime->engine2d , (t2d->dstFormat!=gcvSURF_A8R8G8B8),
-					COLOR_ARGB8(0x00, 0x80, 0x80, 0x80), PATTERN_0, &brush));
-		break;
+    switch (frameNo)
+    {
+    case 0:
+        // create grey brush
+        gcmONERROR(gco2D_ConstructSingleColorBrush(t2d->runtime->engine2d , (t2d->dstFormat!=gcvSURF_A8R8G8B8),
+                    COLOR_ARGB8(0x00, 0x80, 0x80, 0x80), PATTERN_0, &brush));
+        break;
 
-	case 1:
-		// create monochrome brush
-		gcmONERROR(gco2D_ConstructMonochromeBrush(egn2D, 0, 0, gcvTRUE, COLOR_ARGB8(0x00, 0xFF, 0x00, 0x00),
-			COLOR_ARGB8(0x00, 0x00, 0x00, 0xFF), PATTERN_1, 0, &brush));
-		break;
+    case 1:
+        // create monochrome brush
+        gcmONERROR(gco2D_ConstructMonochromeBrush(egn2D, 0, 0, gcvTRUE, COLOR_ARGB8(0x00, 0xFF, 0x00, 0x00),
+            COLOR_ARGB8(0x00, 0x00, 0x00, 0xFF), PATTERN_1, 0, &brush));
+        break;
 
-	case 2:
-		// create color brush
-		gcmONERROR(gco2D_ConstructColorBrush(egn2D, 0, 0,
-			sColorBuf, gcvSURF_A8R8G8B8, PATTERN_2, &brush));
-		break;
+    case 2:
+        // create color brush
+        gcmONERROR(gco2D_ConstructColorBrush(egn2D, 0, 0,
+            sColorBuf, gcvSURF_A8R8G8B8, PATTERN_2, &brush));
+        break;
 
-	default:
-		return gcvFALSE;
-	}
+    default:
+        return gcvFALSE;
+    }
 
-	// set brush
-	gcmONERROR(gco2D_FlushBrush(egn2D, brush, t2d->dstFormat));
+    // set brush
+    gcmONERROR(gco2D_FlushBrush(egn2D, brush, t2d->dstFormat));
 
-	// set dst and clippint rect
-	gcmONERROR(gco2D_SetTarget(egn2D, t2d->dstPhyAddr, t2d->dstStride, gcvSURF_0_DEGREE, t2d->dstWidth));
+    // set dst and clippint rect
+    gcmONERROR(gco2D_SetTarget(egn2D, t2d->dstPhyAddr, t2d->dstStride, gcvSURF_0_DEGREE, t2d->dstWidth));
 
-	gcmONERROR(gco2D_SetClipping(egn2D, &dstRect));
+    gcmONERROR(gco2D_SetClipping(egn2D, &dstRect));
 
-	// dst rect
-	dstRect.left = t2d->dstWidth / 2 - DeltaWidth;
-	dstRect.right = t2d->dstWidth / 2 + DeltaWidth;
-	dstRect.top = t2d->dstHeight / 2 - DeltaHeight;
-	dstRect.bottom = t2d->dstHeight / 2 + DeltaHeight;
+    // dst rect
+    dstRect.left = t2d->dstWidth / 2 - DeltaWidth;
+    dstRect.right = t2d->dstWidth / 2 + DeltaWidth;
+    dstRect.top = t2d->dstHeight / 2 - DeltaHeight;
+    dstRect.bottom = t2d->dstHeight / 2 + DeltaHeight;
 
-	/* Calculate the stretch factors. */
-	gcmONERROR(gco2D_CalcStretchFactor(egn2D, srcRect.right - srcRect.left,
-		dstRect.right - dstRect.left, &horFactor));
+    /* Calculate the stretch factors. */
+    gcmONERROR(gco2D_CalcStretchFactor(egn2D, srcRect.right - srcRect.left,
+        dstRect.right - dstRect.left, &horFactor));
 
-	gcmONERROR(gco2D_CalcStretchFactor(egn2D, srcRect.bottom - srcRect.top,
-		dstRect.bottom - dstRect.top, &verFactor));
+    gcmONERROR(gco2D_CalcStretchFactor(egn2D, srcRect.bottom - srcRect.top,
+        dstRect.bottom - dstRect.top, &verFactor));
 
-	/* Program the stretch factors. */
-	gcmONERROR(gco2D_SetStretchFactors(egn2D, horFactor, verFactor));
+    /* Program the stretch factors. */
+    gcmONERROR(gco2D_SetStretchFactors(egn2D, horFactor, verFactor));
 
-	gcmONERROR(gco2D_StretchBlit(egn2D, 1, &dstRect, 0x55, 0xF0, t2d->dstFormat));
+    gcmONERROR(gco2D_StretchBlit(egn2D, 1, &dstRect, 0x55, 0xF0, t2d->dstFormat));
 
-	gcmONERROR(gco2D_Flush(egn2D));
+    gcmONERROR(gco2D_Flush(egn2D));
 
-	gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
+    gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
 
-	// destroy brush
-	if (brush != gcvNULL)
-		gcmONERROR(gcoBRUSH_Destroy(brush));
+    // destroy brush
+    if (brush != gcvNULL)
+        gcmONERROR(gcoBRUSH_Destroy(brush));
 
     return gcvTRUE;
 
 OnError:
     GalOutput(GalOutputType_Error | GalOutputType_Console,
         "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
-	return gcvFALSE;
+    return gcvFALSE;
 }
 
 static void CDECL Destroy(Test2D *t2d)
 {
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
     if ((t2d->dstSurf != gcvNULL) && (t2d->dstLgcAddr != gcvNULL))
     {
-		if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
-		}
-		t2d->dstLgcAddr = gcvNULL;
+        if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
+        }
+        t2d->dstLgcAddr = gcvNULL;
     }
 
     free(t2d);
@@ -181,7 +181,7 @@ const gceFEATURE FeatureList[]=
 
 static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 {
-	gceSTATUS status;
+    gceSTATUS status;
 
     gctUINT32 k, listLen = sizeof(FeatureList)/sizeof(gctINT);
     gctBOOL featureStatus;
@@ -212,32 +212,32 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 
     t2d->runtime = runtime;
 
-	t2d->dstSurf    = runtime->target;
-	t2d->dstFormat = runtime->format;
-	t2d->dstWidth = 0;
-	t2d->dstHeight = 0;
-	t2d->dstStride = 0;
-	t2d->dstPhyAddr = 0;
-	t2d->dstLgcAddr = 0;
+    t2d->dstSurf    = runtime->target;
+    t2d->dstFormat = runtime->format;
+    t2d->dstWidth = 0;
+    t2d->dstHeight = 0;
+    t2d->dstStride = 0;
+    t2d->dstPhyAddr = 0;
+    t2d->dstLgcAddr = 0;
 
-	gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
-										&t2d->dstWidth,
-										&t2d->dstHeight,
-										&t2d->dstStride));
+    gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
+                                        &t2d->dstWidth,
+                                        &t2d->dstHeight,
+                                        &t2d->dstStride));
 
-	gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
+    gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
 
     t2d->base.render     = (PGalRender)Render;
     t2d->base.destroy    = (PGalDestroy)Destroy;
     t2d->base.frameCount = 3;
-	t2d->base.description = s_CaseDescription;
+    t2d->base.description = s_CaseDescription;
 
     return gcvTRUE;
 
 OnError:
     GalOutput(GalOutputType_Error | GalOutputType_Console,
         "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
-	return gcvFALSE;
+    return gcvFALSE;
 }
 
 GalTest * CDECL GalCreateTestObject(GalRuntime *runtime)

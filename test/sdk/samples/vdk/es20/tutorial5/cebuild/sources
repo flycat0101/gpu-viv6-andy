@@ -39,7 +39,7 @@ SOURCES= \
 
 INCLUDES=$(INCLUDES);$(AQROOT)\sdk\samples\vdk\es20\tutorial5
 INCLUDES=$(INCLUDES);$(_SYSGENSDKROOT)\inc
-INCLUDES=$(INCLUDES);$(VIVANTE_SDK_INC);$(VIVANTE_SDK_INC)/HAL;
+INCLUDES=$(INCLUDES);$(VIVANTE_SDK_INC)
 
 CDEFINES = $(CDEFINES) -DHK_BINARY_FLAG -DGL_GLEXT_PROTOTYPES
 
@@ -54,7 +54,7 @@ TARGETLIBS= \
 
 INSTALL_PATH=$(VIVANTE_SDK_DIR)\samples\es20\tutorials
 EXTRA_COMMAND = ( copy /Y ..\ps_es20t5.frag $(INSTALL_PATH) \
-                & copy /Y ..\vs_es20t5.vert $(INSTALL_PATH)	\
+                & copy /Y ..\vs_es20t5.vert $(INSTALL_PATH) \
                 & copy /Y ..\background.tga $(INSTALL_PATH) \
                 & copy /Y ..\f430_160x120xNV21.yuv $(INSTALL_PATH))
 

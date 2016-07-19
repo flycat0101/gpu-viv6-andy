@@ -60,7 +60,7 @@ OBJECTS += $(OBJ_DIR)/gc_vgsh_profiler.o
 LIBS += -L$(SDK_DIR)/drivers
 LIBS += -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL
 LIBS += -L$(AQROOT)/compiler/libVSC/$(OBJ_DIR) -lVSC
-LIBS += -L$(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR) -lEGL
+LIBS += -L$(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)
 LIBS += -lm
 
 ################################################################################
@@ -82,17 +82,8 @@ INCOPVG = $(VG11_DIR)/driver \
           $(AQROOT)/hal/os/linux/user \
           $(AQROOT)/driver/khronos/libEGL/inc
 
-ifeq ($(EGL_API_DFB), 1)
-    INCOPVG += $(DFB_DIR)/usr/include
-    INCOPVG += $(DFB_DIR)/include
-    INCOPVG += $(DFB_DIR)/include/directfb-internal
-    INCOPVG += $(DFB_DIR)/include/directfb
-endif
-ifeq ($(EGL_API_DRI), 1)
-    INCOPVG += $(X11_ARM_DIR)/include
-endif
-ifeq ($(EGL_API_X), 1)
-    INCOPVG += $(X11_ARM_DIR)/include
+ifneq ($(filter 1,$(EGL_API_X) $(EGL_API_DRI)),)
+  INCOPVG += $(X11_ARM_DIR)/include
 endif
 
 CFLAGS += $(addprefix -I,$(INCOPVG))

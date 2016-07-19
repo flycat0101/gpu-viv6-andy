@@ -373,11 +373,46 @@ galAllocateBuffer( CoreSurfacePool       *pool,
                     "aligned_width: %u, aligned_height: %u, aligned_stride: %d\n",
                     aligned_width, aligned_height, aligned_stride );
 
-
         alloc->surf   = surf;
         alloc->pitch  = aligned_stride;
         alloc->size   = aligned_height * alloc->pitch;
         alloc->offset = 0;
+
+#if GAL_SURFACE_COMPRESSED
+        if (vdrv->vdev->hw_2d_compression &&
+            (format == gcvSURF_A8R8G8B8 ||
+            format == gcvSURF_X8R8G8B8))
+        {
+            alloc->tssize = alloc->size / 64;
+            gcmERR_BREAK(gcoHAL_AllocateVideoMemory(
+                256,
+                gcvSURF_BITMAP,
+                0,
+                gcvPOOL_DEFAULT,
+                &alloc->tssize,
+                &alloc->tsnode ));
+
+            gcmERR_BREAK(gcoHAL_LockVideoMemory(
+                alloc->tsnode,
+                gcvFALSE,
+                &alloc->tsphysical,
+                &alloc->tslogical));
+
+            if (format == gcvSURF_A8R8G8B8)
+            {
+                memset(alloc->tslogical, 0x88, alloc->tssize);
+            }
+            else
+            {
+                memset(alloc->tslogical, 0x66, alloc->tssize);
+            }
+        }
+        else
+        {
+            alloc->tsphysical = gcvINVALID_ADDRESS;
+            D_WARN( "2D Compression only supports ARGB8 and XRGB8\n" );
+        }
+#endif
 
         /* Add alloc->call and alloc->fid for fusion handler. */
         alloc->call = local->call;
@@ -417,7 +452,11 @@ galDeallocateBuffer( CoreSurfacePool       *pool,
 {
     int ret=0;
     GalAllocationData *alloc = alloc_data;
+#if GAL_SURFACE_COMPRESSED
+    GalDriverData     *vdrv   = dfb_gfxcard_get_driver_data();
+#endif
 
+    D_MAGIC_ASSERT( pool,  CoreSurfacePool );
     D_MAGIC_ASSERT( alloc, GalAllocationData );
 
     D_DEBUG_ENTER( Gal_Pool,
@@ -431,7 +470,7 @@ galDeallocateBuffer( CoreSurfacePool       *pool,
     */
 
     /* fusion_call_execute the DFB slave form the master through fusion_call_execute*/
-    if (alloc->surf) {
+    if (alloc->surf != NULL) {
         ret = fusion_call_execute( &alloc->call, FCEF_ONEWAY, 0, alloc->surf, NULL );
 
         if (ret)
@@ -441,6 +480,16 @@ galDeallocateBuffer( CoreSurfacePool       *pool,
     alloc->surf = NULL;
     alloc->prealloc_addr = gcvNULL;
     alloc->prealloc_phys = 0;
+
+#if GAL_SURFACE_COMPRESSED
+    if (vdrv->vdev->hw_2d_compression &&
+        alloc->tsphysical != gcvINVALID_ADDRESS)
+    {
+        gcoHAL_UnlockVideoMemory(alloc->tsnode, gcvSURF_BITMAP);
+        gcoHAL_ReleaseVideoMemory(alloc->tsnode);
+        alloc->tsphysical = gcvINVALID_ADDRESS;
+    }
+#endif
 
     D_MAGIC_CLEAR( alloc );
 

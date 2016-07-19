@@ -16,6 +16,20 @@
 #include "vir/lower/gc_vsc_vir_ml_2_ll.h"
 
 gctBOOL
+VIR_Lower_SetOpndNeg(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Modifier           modifier = VIR_Operand_GetModifier(Opnd);
+
+    VIR_Operand_SetModifier(Opnd, VIR_MOD_NEG | modifier);
+
+    return gcvTRUE;
+}
+
+gctBOOL
 VIR_Lower_SetZero(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -132,6 +146,22 @@ VIR_Lower_SetIntOne(
     return gcvTRUE;
 }
 
+gctBOOL
+VIR_Lower_SetUIntOne(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_ScalarConstVal imm0;
+
+    imm0.iValue = 1,
+
+    VIR_Operand_SetImmediate(Opnd,
+        VIR_TYPE_UINT32,
+        imm0);
+    return gcvTRUE;
+}
 
 gctBOOL
 VIR_Lower_SetIntMinusOne(
@@ -370,6 +400,73 @@ VIR_Lower_IsIntOpcode(
     return gcvFALSE;
 }
 
+gctBOOL
+VIR_Lower_IsDstFloat(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_TypeId   typeId   = VIR_Operand_GetType(Inst->dest);
+
+    gcmASSERT(typeId < VIR_TYPE_PRIMITIVETYPE_COUNT);
+
+    return VIR_TypeId_isFloat(typeId);
+}
+
+gctBOOL
+VIR_Lower_IsDstInt32(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_TypeId   ty   = VIR_Operand_GetType(Inst->dest);
+    gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
+
+    return VIR_GetTypeComponentType(ty) == VIR_TYPE_INT32
+        || VIR_GetTypeComponentType(ty) == VIR_TYPE_UINT32;
+}
+
+gctBOOL
+VIR_Lower_IsDstInt16(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_TypeId   ty   = VIR_Operand_GetType(Inst->dest);
+    gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
+
+    return VIR_GetTypeComponentType(ty) == VIR_TYPE_INT16
+        || VIR_GetTypeComponentType(ty) == VIR_TYPE_UINT16;
+}
+
+gctBOOL
+VIR_Lower_IsDstSigned(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_TypeId   ty   = VIR_Operand_GetType(Inst->dest);
+    gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
+
+    return VIR_GetTypeComponentType(ty) == VIR_TYPE_INT32
+        || VIR_GetTypeComponentType(ty) == VIR_TYPE_INT16
+        || VIR_GetTypeComponentType(ty) == VIR_TYPE_INT8;
+}
+
+gctBOOL
+VIR_Lower_IsDstUnsigned(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_TypeId   ty   = VIR_Operand_GetType(Inst->dest);
+    gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
+
+    return VIR_GetTypeComponentType(ty) == VIR_TYPE_UINT32
+        || VIR_GetTypeComponentType(ty) == VIR_TYPE_UINT16
+        || VIR_GetTypeComponentType(ty) == VIR_TYPE_UINT8
+        || VIR_GetTypeComponentType(ty) == VIR_TYPE_BOOLEAN;
+}
 
 gctBOOL
 VIR_Lower_IsFloatOpcode(
@@ -426,5 +523,171 @@ VIR_Lower_disableFullNewLinker(
     )
 {
     return !ENABLE_FULL_NEW_LINKER;
+}
+
+static gctBOOL
+_label_set_jmp_n(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd,
+    IN gctINT32           n
+    )
+{
+    VIR_Instruction* jmp_inst = Inst;
+    VIR_Operand* jmp_dest;
+    VIR_Label* label;
+    VIR_Link * link = gcvNULL;
+
+    gcmASSERT(Inst->_opcode == VIR_OP_LABEL && n != 0);
+
+    if(n > 0)
+    {
+        while(n != 0)
+        {
+            jmp_inst = VIR_Inst_GetNext(jmp_inst);
+            --n;
+        }
+    }
+    else
+    {
+        while(n != 0)
+        {
+            jmp_inst = VIR_Inst_GetPrev(jmp_inst);
+            ++n;
+        }
+    }
+
+    gcmASSERT(VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(jmp_inst)));
+
+    label = VIR_Operand_GetLabel(Opnd);
+    jmp_dest = VIR_Inst_GetDest(jmp_inst);
+    VIR_Operand_SetLabel(jmp_dest, label);
+    VIR_Function_NewLink(VIR_Inst_GetFunction(Inst), &link);
+    VIR_Link_SetReference(link, (gctUINTPTR_T)jmp_inst);
+    VIR_Link_AddLink(&(label->referenced), link);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_label_set_jmp_neg2(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    return _label_set_jmp_n(Context, Inst, Opnd, -2);
+}
+
+gctBOOL
+VIR_Lower_label_set_jmp_neg3(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    return _label_set_jmp_n(Context, Inst, Opnd, -3);
+}
+
+gctBOOL
+VIR_Lower_label_set_jmp_neg3_6(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    if (!_label_set_jmp_n(Context, Inst, Opnd, -3))
+    {
+        return gcvFALSE;
+    }
+
+    return _label_set_jmp_n(Context, Inst, Opnd, -6);
+}
+
+gctBOOL
+VIR_Lower_label_set_jmp_neg10(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    return _label_set_jmp_n(Context, Inst, Opnd, -10);
+}
+
+gctBOOL
+VIR_Lower_label_set_jmp_neg22(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    return _label_set_jmp_n(Context, Inst, Opnd, -22);
+}
+
+static gctBOOL
+_SetValueType0(
+    IN VIR_PatternContext  *Context,
+    IN VIR_Operand         *Opnd,
+    IN VIR_PrimitiveTypeId  Format
+    )
+{
+    VIR_Operand_SetType(Opnd, VIR_TypeId_ComposeNonOpaqueType(Format,
+        VIR_GetTypeComponents(VIR_Lower_GetBaseType(Context->shader, Opnd)), 1));
+
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetOpndUINT32(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    _SetValueType0(Context, Opnd, VIR_TYPE_UINT32);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetOpndINT32(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    _SetValueType0(Context, Opnd, VIR_TYPE_INT32);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetOpndUINT16(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    _SetValueType0(Context, Opnd, VIR_TYPE_UINT16);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetOpndINT16(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    _SetValueType0(Context, Opnd, VIR_TYPE_INT16);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetOpndFloat(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    _SetValueType0(Context, Opnd, VIR_TYPE_FLOAT32);
+    return gcvTRUE;
 }
 

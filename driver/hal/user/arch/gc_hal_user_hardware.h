@@ -1201,9 +1201,14 @@ struct _gcoHARDWARE
     gctPOINTER                  featureDatabase;
 
     /* Chip ID of multiple GPUs. */
-    gctUINT                      chipIDs[gcvCORE_COUNT];
+    gctUINT                     chipIDs[gcvCORE_COUNT];
+
+    /* Core Index of multiple GPUs. */
+    gctUINT                     coreIndexs[gcvCORE_COUNT];
 
     gceHARDWARE_TYPE            constructType;
+
+    gcsPROBEBUFFER              *probeBuffer;
 };
 
 #if gcdENABLE_3D
@@ -1969,6 +1974,14 @@ gceSTATUS gcoHARDWARE_UploadCSCTable(
 
 /* About Compression. */
 gceSTATUS
+gcoHARDWARE_CheckConstraint(
+    IN gcoHARDWARE Hardware,
+    IN gcs2D_State_PTR State,
+    IN gce2D_COMMAND Command,
+    IN gctBOOL AnyCompressed
+    );
+
+gceSTATUS
 gcoHARDWARE_GetCompressionCmdSize(
     IN gcoHARDWARE Hardware,
     IN gcs2D_State_PTR State,
@@ -1986,7 +1999,8 @@ gcoHARDWARE_SetCompression(
     IN gcoSURF SrcSurface,
     IN gcoSURF DstSurface,
     IN gce2D_COMMAND Command,
-    IN gctBOOL AnyCompress
+    IN gctUINT SrcCompress,
+    IN gctBOOL DstCompress
     );
 
 /* Update the state delta. */

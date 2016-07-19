@@ -254,32 +254,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     srect.right = len;
     srect.bottom = len;
 
-    drect.left = 0;
-    drect.top = 0;
-    if (rot == gcvSURF_90_DEGREE || rot == gcvSURF_270_DEGREE)
-    {
-        drect.right = tempSurf->height;
-        drect.bottom = tempSurf->width;
-    }
-    else
-    {
-        drect.right = tempSurf->width;
-        drect.bottom = tempSurf->height;
-    }
-
     gcmONERROR(gco2D_SetSource(egn2D, &srect));
-
-    gcmONERROR(gco2D_SetGenericTarget(
-        egn2D,
-        tempSurf->address,
-        tempSurf->validAddressNum,
-        tempSurf->stride,
-        tempSurf->validStrideNum,
-        tempSurf->tiling,
-        tempSurf->format,
-        rot,
-        tempSurf->aWidth,
-        tempSurf->aHeight));
 
     switch (frameNo % 4)
     {
@@ -302,9 +277,43 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
             break;
     }
 
+    if (tempSurf->format == gcvSURF_NV12_10BIT ||
+        tempSurf->format == gcvSURF_NV21_10BIT ||
+        tempSurf->format == gcvSURF_NV16_10BIT ||
+        tempSurf->format == gcvSURF_NV61_10BIT)
+    {
+        hMirror = vMirror = gcvFALSE;
+        rot = gcvSURF_0_DEGREE;
+    }
+
     gcmONERROR(gco2D_SetBitBlitMirror(egn2D, hMirror, vMirror));
 
+    drect.left = 0;
+    drect.top = 0;
+    if (rot == gcvSURF_90_DEGREE || rot == gcvSURF_270_DEGREE)
+    {
+        drect.right = tempSurf->height;
+        drect.bottom = tempSurf->width;
+    }
+    else
+    {
+        drect.right = tempSurf->width;
+        drect.bottom = tempSurf->height;
+    }
+
     gcmONERROR(gco2D_SetClipping(egn2D, &drect));
+
+    gcmONERROR(gco2D_SetGenericTarget(
+        egn2D,
+        tempSurf->address,
+        tempSurf->validAddressNum,
+        tempSurf->stride,
+        tempSurf->validStrideNum,
+        tempSurf->tiling,
+        tempSurf->format,
+        rot,
+        tempSurf->aWidth,
+        tempSurf->aHeight));
 
     /* Calculate the stretch factors. */
     gcmONERROR(gco2D_CalcStretchFactor(egn2D, srect.right - srect.left,
@@ -318,14 +327,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
     gcmONERROR(gco2D_StretchBlit(egn2D, 1, &drect, 0xCC, 0xCC, tempSurf->format));
 
-    if (!t2d->runtime->noSaveTargetNew)
-    {
-        char name[200];
-
-        gcmONERROR(gcoHAL_Commit(gcvNULL, gcvTRUE));
-        sprintf(name, "gal2DFormat10Bit002_intermediate_%03d.bmp", frameNo);
-        GalSaveTSurfToDIB(tempSurf, name);
-    }
 
     srect.left = 0;
     srect.top = 0;

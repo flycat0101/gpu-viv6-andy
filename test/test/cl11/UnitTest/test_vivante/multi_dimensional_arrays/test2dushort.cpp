@@ -33,40 +33,40 @@
 
 Test2DUShort::Test2DUShort(const size_t sizeX, const size_t sizeY):
 MultiDimensionalArraysTest2D("ushort", sizeX, sizeY) {
-	inputAHost = new cl_ushort[size];
-	inputBHost = new cl_ushort[size];
-	resultHost = new cl_ushort[size];
-	inputA = inputAHost;
-	inputB = inputBHost;
-	result = resultHost;
+    inputAHost = new cl_ushort[size];
+    inputBHost = new cl_ushort[size];
+    resultHost = new cl_ushort[size];
+    inputA = inputAHost;
+    inputB = inputBHost;
+    result = resultHost;
 }
 
 Test2DUShort::~Test2DUShort() {
-	delete[] inputAHost;
-	delete[] inputBHost;
-	delete[] result;
+    delete[] inputAHost;
+    delete[] inputBHost;
+    delete[] result;
 }
 
 const int Test2DUShort::getMemSize() const {
-	return sizeof(cl_ushort)*size;
+    return sizeof(cl_ushort)*size;
 }
 
 void Test2DUShort::generateInput(const unsigned int &kernelIndex) {
-	for (unsigned int k=0; k<size; k++) {
-		inputAHost[k] = randUShort();
-		if (getKernelInputArgNum(kernelIndex) == 2)
-			inputBHost[k] = randUShort();
-	}
+    for (unsigned int k=0; k<size; k++) {
+        inputAHost[k] = randUShort();
+        if (getKernelInputArgNum(kernelIndex) == 2)
+            inputBHost[k] = randUShort();
+    }
 }
 
 void* Test2DUShort::getInputAElement(const unsigned int &index) const {
-	return &inputAHost[index];
+    return &inputAHost[index];
 }
 
 void* Test2DUShort::getInputBElement(const unsigned int &index) const {
-	return &inputBHost[index];
+    return &inputBHost[index];
 }
 
 void* Test2DUShort::getResultElement(const unsigned int &index) const {
-	return &resultHost[index];
+    return &resultHost[index];
 }

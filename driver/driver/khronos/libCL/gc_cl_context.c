@@ -36,8 +36,10 @@ clCreateContext(
     gctPOINTER      pointer = gcvNULL;
     gctINT          status;
     gctUINT         i;
+#if !gcdFPGA_BUILD
     gceCHIPMODEL  chipModel;
     gctUINT32 chipRevision;
+#endif
 
     gcmHEADER_ARG("Properties=0x%x NumDevices=%u Devices=0x%x",
                   Properties, NumDevices, Devices);
@@ -223,11 +225,13 @@ clCreateContext(
     gcmFOOTER_ARG("0x%x *ErrcodeRet=%d",
                   context, gcmOPT_VALUE(ErrcodeRet));
 
+#if !gcdFPGA_BUILD
     gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
-    if((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008))
+    if((chipModel == gcv2500 && chipRevision == 0x5422) || (chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008))
     {
         gcoHAL_SetTimeOut(gcvNULL, 1200*gcdGPU_TIMEOUT);
     }
+#endif
 
     return context;
 
@@ -420,7 +424,7 @@ clReleaseContext(
     }
 
     gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
-    if((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008))
+    if((chipModel == gcv2500 && chipRevision == 0x5422) || (chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008))
     {
         gcoHAL_SetTimeOut(gcvNULL, gcdGPU_TIMEOUT);
     }

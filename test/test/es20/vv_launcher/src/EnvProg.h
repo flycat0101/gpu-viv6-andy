@@ -40,14 +40,14 @@ extern "C" {
 
 typedef struct _EnvProg
 {
-	int pos_attr;
+    int pos_attr;
 
-	int proj_unif;
-	int env_unif;
+    int proj_unif;
+    int env_unif;
 
-	int env_tex_unif;
+    int env_tex_unif;
 
-	ShaderProgram* prog;
+    ShaderProgram* prog;
 } EnvProg;
 
 EnvProg* EnvProgConstruct();

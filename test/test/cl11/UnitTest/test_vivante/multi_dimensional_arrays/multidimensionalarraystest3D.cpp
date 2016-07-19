@@ -30,9 +30,9 @@
 #include "kernelgenerator.h"
 
 MultiDimensionalArraysTest3D::MultiDimensionalArraysTest3D(const char *typeName,
-														   const size_t sizeX,
-														   const size_t sizeY,
-														   const size_t sizeZ):
+                                                           const size_t sizeX,
+                                                           const size_t sizeY,
+                                                           const size_t sizeZ):
 MultiDimensionalArraysTest(typeName, "3D", sizeX*sizeY*sizeZ),
 sizeX(sizeX),
 sizeY(sizeY),
@@ -40,12 +40,12 @@ sizeZ(sizeZ) {
 }
 
 cl_int MultiDimensionalArraysTest3D::enqueueKernel(cl_kernel kernel) {
-	const size_t globalWS[3] = {sizeX, sizeY, sizeZ};
-	const size_t localWS[3] = {sizeX, sizeY, sizeZ};
-	return clEnqueueNDRangeKernel(queue, kernel, 3, NULL, globalWS, localWS, 0, NULL, NULL);
+    const size_t globalWS[3] = {sizeX, sizeY, sizeZ};
+    const size_t localWS[3] = {sizeX, sizeY, sizeZ};
+    return clEnqueueNDRangeKernel(queue, kernel, 3, NULL, globalWS, localWS, 0, NULL, NULL);
 }
 
 void MultiDimensionalArraysTest3D::generateSource(char *source, unsigned int *sourceSize) {
-	const unsigned int dimensions[3] = {sizeX, sizeY, sizeZ};
-	generateKernels(typeName, source, sourceSize, 3, dimensions);
+    const unsigned int dimensions[3] = {sizeX, sizeY, sizeZ};
+    generateKernels(typeName, source, sourceSize, 3, dimensions);
 }

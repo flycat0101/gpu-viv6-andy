@@ -37,51 +37,51 @@
 
 void Texture2DBind(Texture2D* Tex)
 {
-	if (Tex->id > 0)
-	{
-		glBindTexture(GL_TEXTURE_2D, Tex->id);
-		CheckGL("Texture2D::bindTexture");
-	}
+    if (Tex->id > 0)
+    {
+        glBindTexture(GL_TEXTURE_2D, Tex->id);
+        CheckGL("Texture2D::bindTexture");
+    }
 }
 
 
 void Texture2DRepeat(const Texture2D* Tex, int Horizontal, int Vertical)
 {
-	if (Tex->id > 0)
+    if (Tex->id > 0)
 
-	{
+    {
 
-		glBindTexture(GL_TEXTURE_2D, Tex->id);
-		CheckGL("glBindTexture");
+        glBindTexture(GL_TEXTURE_2D, Tex->id);
+        CheckGL("glBindTexture");
 
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
-							 Horizontal?GL_REPEAT:GL_CLAMP_TO_EDGE);
-		CheckGL("glTexParameterf");
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
-							 Vertical?GL_REPEAT:GL_CLAMP_TO_EDGE);
-		CheckGL("glTexParameterf");
-	}
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
+                             Horizontal?GL_REPEAT:GL_CLAMP_TO_EDGE);
+        CheckGL("glTexParameterf");
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
+                             Vertical?GL_REPEAT:GL_CLAMP_TO_EDGE);
+        CheckGL("glTexParameterf");
+    }
 }
 
 
 Texture2D* Texture2DConstruct(unsigned int i, unsigned int w, unsigned int h)
 {
-	Texture2D* tex = (Texture2D*)malloc(sizeof (Texture2D));
-	tex->id = i;
-	tex->width = w;
-	tex->height = h;
-	return tex;
+    Texture2D* tex = (Texture2D*)malloc(sizeof (Texture2D));
+    tex->id = i;
+    tex->width = w;
+    tex->height = h;
+    return tex;
 }
 
 
 void Texture2DDestroy(Texture2D* Tex)
 {
-	assert(Tex != NULL);
+    assert(Tex != NULL);
 
-	if (Tex->id > 0)
-	{
-		glDeleteTextures(1, &Tex->id);
-	}
-	free(Tex);
+    if (Tex->id > 0)
+    {
+        glDeleteTextures(1, &Tex->id);
+    }
+    free(Tex);
 }
 

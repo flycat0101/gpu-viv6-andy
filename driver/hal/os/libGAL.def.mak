@@ -813,8 +813,8 @@ EXPORTS
     gcoPROFILER_Write
     gcoPROFILER_Flush
     gcoPROFILER_EndFrame
-    gcoPROFILER_BeginDraw
-    gcoPROFILER_EndDraw
+    gcoPROFILER_Begin
+    gcoPROFILER_End
     gcoPROFILER_ShaderFS
     gcoPROFILER_ShaderVS
 

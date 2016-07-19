@@ -38,7 +38,7 @@ extern "C" {
 
 typedef struct
 {
-	float m[4][4];
+    float m[4][4];
 }
 Matf;
 

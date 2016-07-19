@@ -1212,7 +1212,7 @@ VX_PRIVATE_API vx_status vxoEqualizeHist_Initializer(vx_node node, vx_reference 
     vx_graph    graph;
     vx_node     nodes[4] = {NULL};
     vx_uint32   minIndex = 0xff;
-	vx_uint32   i = 0, minValue = 0;
+    vx_uint32   i = 0, minValue = 0;
     vx_status   status = VX_SUCCESS;
 
     if (num != vxmLENGTH_OF(basekernel_equalize_hist_params)) return VX_ERROR_INVALID_PARAMETERS;
@@ -1250,7 +1250,7 @@ VX_PRIVATE_API vx_status vxoEqualizeHist_Initializer(vx_node node, vx_reference 
         status |= VX_ERROR_NO_MEMORY;
     }
 
-	minIndexScalar = vxCreateScalar(context, VX_TYPE_UINT32, &minIndex);
+    minIndexScalar = vxCreateScalar(context, VX_TYPE_UINT32, &minIndex);
     minValueScalar = vxCreateScalar(context, VX_TYPE_UINT32, &minValue);
 
     nodes[0] = vxEqualizeHistHistNode(graph, srcImage, histImage[0], minIndexScalar);
@@ -1570,7 +1570,7 @@ VX_PRIVATE_API vx_status vxoIntegral_Initializer(vx_node node, vx_reference *par
     tempImage = vxCreateImage(context, width, height, format);
     if (!vxoImage_AllocateMemory(tempImage))
     {
-		status |= VX_ERROR_NO_MEMORY;
+        status |= VX_ERROR_NO_MEMORY;
     }
 
     stepValue = 0;
@@ -2341,7 +2341,7 @@ VX_PRIVATE_API vx_status vxoMinMaxLoc_Initializer(vx_node node, vx_reference *pa
     vx_array    minLocArray, maxLocArray;
     vx_scalar   minCount, maxCount;
     vx_uint32   width = 0, height = 0, i = 0;
-	vx_int32    value[2];
+    vx_int32    value[2];
     vx_df_image format;
     vx_enum     itemType;
     vx_image    minImage, maxImage;
@@ -2379,7 +2379,7 @@ VX_PRIVATE_API vx_status vxoMinMaxLoc_Initializer(vx_node node, vx_reference *pa
     heightScalar = vxCreateScalar(context, VX_TYPE_UINT32, &height);
 
     value[0] = (format == VX_DF_IMAGE_S16)? 0x7fff: 0xff;
-	value[1] = (format == VX_DF_IMAGE_S16)? -0x7fff: 0;
+    value[1] = (format == VX_DF_IMAGE_S16)? -0x7fff: 0;
 
     if(minVal == NULL)
     {
@@ -2426,11 +2426,11 @@ VX_PRIVATE_API vx_status vxoMinMaxLoc_Initializer(vx_node node, vx_reference *pa
     }
 
     minImage    = vxCreateImage(context, 2, height, VX_DF_IMAGE_U16);
-	maxImage    = vxCreateImage(context, 2, height, VX_DF_IMAGE_U16);
+    maxImage    = vxCreateImage(context, 2, height, VX_DF_IMAGE_U16);
 
-	if (!vxoImage_AllocateMemory(minImage) || !vxoImage_AllocateMemory(maxImage))
+    if (!vxoImage_AllocateMemory(minImage) || !vxoImage_AllocateMemory(maxImage))
     {
-		status |= VX_ERROR_NO_MEMORY;
+        status |= VX_ERROR_NO_MEMORY;
     }
 
     if (minLocArray)
@@ -2451,7 +2451,7 @@ VX_PRIVATE_API vx_status vxoMinMaxLoc_Initializer(vx_node node, vx_reference *pa
 
         if ( !vxoArray_AllocateMemory(maxArray))
         {
-		    status |= VX_ERROR_NO_MEMORY;
+            status |= VX_ERROR_NO_MEMORY;
         }
     }
 
@@ -3644,9 +3644,9 @@ VX_PRIVATE_API vx_status vxoFast9_Initializer(vx_node node, vx_reference *parame
             output[1] = (vx_image)vxCreateImage(vxGetContext((vx_reference)src), rect.end_x, rect.end_y, VX_DF_IMAGE_U8);
 
             if (!vxoImage_AllocateMemory((vx_image)output[0])
-		        || !vxoImage_AllocateMemory((vx_image)output[1]))
+                || !vxoImage_AllocateMemory((vx_image)output[1]))
             {
-		        status |= VX_ERROR_NO_MEMORY;
+                status |= VX_ERROR_NO_MEMORY;
             }
 
 
@@ -4605,7 +4605,7 @@ VX_PRIVATE_API vx_status vxoEdgeTrace_Initializer(vx_node node, vx_reference *pa
     vx_status status = VX_SUCCESS;
     vx_rectangle_t rect;
     vx_image image = VX_NULL, normImage = VX_NULL;
-	vx_image outputImage = (vx_image)parameters[2];
+    vx_image outputImage = (vx_image)parameters[2];
     vx_node nodes[3] = {0};
     vx_uint32 count = 0;
     vx_scalar flag = VX_NULL;
@@ -4628,7 +4628,7 @@ VX_PRIVATE_API vx_status vxoEdgeTrace_Initializer(vx_node node, vx_reference *pa
     flag = vxCreateScalar(context, VX_TYPE_UINT32, &count);
 
     if (!vxoImage_AllocateMemory(image))
-		status |= VX_ERROR_NO_MEMORY;
+        status |= VX_ERROR_NO_MEMORY;
     vxCommitScalarValue(flag, &count);
 
     nodes[0] = vxEdgeTraceThresholdNode(graph, normImage, threshold, image);

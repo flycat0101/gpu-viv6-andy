@@ -164,6 +164,27 @@ typedef enum _VIR_PATN_FLAG
     VIR_PATN_FLAG_EXPAND_COMP_O2O_SRC_ONLY_INLINE   =  VIR_PATN_FLAG_EXPAND_COMPONENT_INLINE |
                                                        VIR_PATN_FLAG_EXPAND_MODE_COMPONENT_O2O |
                                                        VIR_PATN_FLAG_EXPAND_COMP_INLINE_NOT_BY_DST,
+    /*
+    ** After expand current instruction, move the index to the original previous instruction
+    ** and scan the expand instructions.
+    */
+    VIR_PATN_FLAG_RECURSIVE_SCAN                    = 0x200,
+
+   /*
+    ** After expand current instruction, move the index to the newly added instruction
+    ** and scan the expand instructions.
+    */
+    VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST            = 0x400,
+
+   /*
+    ** After expand current instruction, copy the rounding mode to the newly added instruction
+    */
+    VIR_PATN_FLAG_COPY_ROUNDING_MODE                = 0x800,
+
+   /*
+    ** Don't expand special node.
+    */
+    VIR_PATN_FLAG_NOT_EXPAND_SPECIAL_NODE           = 0x1000,
 
 } VIR_PatnFlag;
 

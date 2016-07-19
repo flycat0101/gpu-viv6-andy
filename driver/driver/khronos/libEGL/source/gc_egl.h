@@ -30,9 +30,6 @@
 #include "gc_hal_engine.h"
 #include "gc_egl_common.h"
 
-/* Always Disable 2xAA EGL configs by default. */
-#define VEGL_ENABLE_2xAA_CONFIG                 0
-
 /* Max SwapBuffersRegion rectangle count. */
 #define VEGL_MAX_SWAP_BUFFER_REGION_RECTS       10
 
@@ -79,6 +76,9 @@ typedef struct eglImageRef      *VEGLImageRef;
 typedef struct eglThreadData    *VEGLThreadData;
 typedef struct eglWorkerInfo    *VEGLWorkerInfo;
 typedef struct eglBackBuffer    *VEGLBackBuffer;
+
+/* Wraps up platform operations. */
+typedef struct eglPlatform        * VEGLPlatform;
 
 /* Wraps up native display/window/pixmap variables/operations. */
 
@@ -227,7 +227,7 @@ struct eglThreadData
 
 struct eglImageRef
 {
-    NativePixmapType            pixmap;
+    void *                      pixmap;
     VEGLPixmapInfo              pixInfo;
     gcoSURF                     surface;
 #ifdef EGL_API_DRI
@@ -241,18 +241,21 @@ struct eglDisplay
     /* Next EGLDisplay. */
     VEGLDisplay                 next;
 
-    /* Platform type, '0' for default (ie, by eglGetDisplay). */
-    EGLenum                     platform;
+    /* Platform operations. */
+    VEGLPlatform                platform;
 
     /* Native screen and native display. */
     void *                      nativeScreen;
     void *                      nativeDisplay;
 
     /* Handle to device context. */
-    NativeDisplayType           hdc;
+    void *                      hdc;
 
     /* Local info. */
     gctPOINTER                  localInfo;
+
+    /* wayland global. */
+    void *                      wl_global;
 
     gctBOOL                     releaseDpy;
 
@@ -359,6 +362,9 @@ struct eglSurface
     /* Should be the first member */
     struct eglResObj            resObj;
 
+    /* For buffer age. */
+    EGLBoolean                   initialFrame;
+
     /*
      * Set if VG pipe is present and this surface was created when the current
      * API was set to OpenVG
@@ -392,7 +398,6 @@ struct eglSurface
     gceSURF_COLOR_TYPE          colorType;
     EGLint                      swapBehavior;
     EGLint                      multisampleResolve;
-    EGLint                      bufferAge;
     EGLBoolean                  protectedContent;
 
     /* VG attribute */
@@ -401,7 +406,7 @@ struct eglSurface
 
 
     /* Window attributes. */
-    NativeWindowType            hwnd;
+    void *                      hwnd;
     EGLBoolean                  bound;
 
     struct eglBackBuffer        backBuffer;
@@ -414,7 +419,7 @@ struct eglSurface
 
 
     /* Pixmap attributes. */
-    NativePixmapType            pixmap;
+    void *                      pixmap;
     gcoSURF                     pixmapSurface;
 
     /* Wrap up native pixmap specific variables/operations. */
@@ -1093,6 +1098,11 @@ typedef struct
     /* EGL_KHR_reusable_sync. */
     EGLBoolean (*SignalSyncKHR)(EGLDisplay dpy, EGLSyncKHR sync, EGLenum mode);
 
+    /* EGL_EXT_platform_base. */
+    EGLDisplay (* GetPlatformDisplayEXT_post)(EGLenum platform, void *native_display, const EGLint *attrib_list, EGLDisplay ret_dpy);
+    EGLSurface (* CreatePlatformWindowSurfaceEXT_post)(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLint *attrib_list, EGLSurface ret_surface);
+    EGLSurface (* CreatePlatformPixmapSurfaceEXT_post)(EGLDisplay dpy, EGLConfig config, void *native_pixmap, const EGLint *attrib_list, EGLSurface ret_surface);
+
     /******  The above interfaces are used to link with external vTracer library libGLES_vlogger.so ******/
 
     EGLDisplay (*GetDisplay_pre)(EGLNativeDisplayType display_id);
@@ -1129,6 +1139,11 @@ typedef struct
     /* EGL_KHR_fence_sync*/
     EGLSyncKHR (*CreateSyncKHR_pre)(EGLDisplay dpy, EGLenum type, const EGLint *attrib_list);
     EGLBoolean (*GetSyncAttribKHR_pre)(EGLDisplay dpy, EGLSyncKHR sync, EGLint attribute, EGLint *value);
+
+    /* EGL_EXT_platform_base. */
+    EGLDisplay (* GetPlatformDisplayEXT_pre)(EGLenum platform, void *native_display, const EGLint *attrib_list);
+    EGLSurface (* CreatePlatformWindowSurfaceEXT_pre)(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLint *attrib_list);
+    EGLSurface (* CreatePlatformPixmapSurfaceEXT_pre)(EGLDisplay dpy, EGLConfig config, void *native_pixmap, const EGLint *attrib_list);
 }
 eglTracerDispatchTableStruct;
 

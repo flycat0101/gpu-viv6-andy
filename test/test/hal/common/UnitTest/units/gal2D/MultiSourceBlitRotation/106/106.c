@@ -73,40 +73,40 @@ static gctCONST_STRING s_CaseDescription =
 
 typedef struct _MultiSrc
 {
-    gcoSURF			srcSurf;
-	gceSURF_FORMAT	srcFormat;
-	gctUINT			srcWidth;
-	gctUINT			srcHeight;
-	gctINT			srcStride[3];
+    gcoSURF            srcSurf;
+    gceSURF_FORMAT    srcFormat;
+    gctUINT            srcWidth;
+    gctUINT            srcHeight;
+    gctINT            srcStride[3];
     gctINT          srcStrideNum;
     gctINT          srcAddressNum;
-	gctUINT32		srcPhyAddr[3];
-	gctPOINTER		srcLgcAddr[3];
+    gctUINT32        srcPhyAddr[3];
+    gctPOINTER        srcLgcAddr[3];
 } MultiSrc, *MultiSrcPTR;
 
 typedef struct Test2D {
     GalTest     base;
     GalRuntime  *runtime;
 
-	// destination surface
-    gcoSURF			dstSurf;
-	gceSURF_FORMAT	dstFormat;
-	gctUINT			dstWidth;
-	gctUINT			dstHeight;
-	gctINT			dstStride;
-	gctUINT32		dstPhyAddr;
-	gctPOINTER		dstLgcAddr;
+    // destination surface
+    gcoSURF            dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT            dstWidth;
+    gctUINT            dstHeight;
+    gctINT            dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
 
-	// destination temp surface
-    gcoSURF			dstTempSurf;
-	gceSURF_FORMAT	dstTempFormat;
-	gctUINT			dstTempWidth;
-	gctUINT			dstTempHeight;
-	gctINT			dstTempStride;
-	gctUINT32		dstTempPhyAddr;
-	gctPOINTER		dstTempLgcAddr;
+    // destination temp surface
+    gcoSURF            dstTempSurf;
+    gceSURF_FORMAT    dstTempFormat;
+    gctUINT            dstTempWidth;
+    gctUINT            dstTempHeight;
+    gctINT            dstTempStride;
+    gctUINT32        dstTempPhyAddr;
+    gctPOINTER        dstTempLgcAddr;
 
-	//source surface
+    //source surface
     MultiSrc multiSrc[4];
 
 } Test2D;
@@ -208,7 +208,7 @@ OnError:
 }
 static gceSURF_ROTATION rotationList [] =
 {
-	gcvSURF_0_DEGREE,
+    gcvSURF_0_DEGREE,
     gcvSURF_90_DEGREE,
     gcvSURF_180_DEGREE,
     gcvSURF_270_DEGREE,
@@ -223,10 +223,10 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     gcsRECT dstRect = {0, 0, t2d->dstWidth, t2d->dstHeight};
     gco2D egn2D = t2d->runtime->engine2d;
     gctINT i;
-	gceSURF_ROTATION srcRot,dstRot;
+    gceSURF_ROTATION srcRot,dstRot;
 
     // clear dest temp with grey color
-	gcmONERROR(Gal2DCleanSurface(t2d->runtime->hal, t2d->dstTempSurf, COLOR_ARGB8(0x00, 0x80, 0x80, 0x80)));
+    gcmONERROR(Gal2DCleanSurface(t2d->runtime->hal, t2d->dstTempSurf, COLOR_ARGB8(0x00, 0x80, 0x80, 0x80)));
 
     for (i = 0; i < 4; i++)
     {
@@ -236,7 +236,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
         gcmONERROR(gco2D_SetCurrentSourceIndex(egn2D, i));
 
-		srcRot = rotationList[(frameNo | i) / gcmCOUNTOF(rotationList)];
+        srcRot = rotationList[(frameNo | i) / gcmCOUNTOF(rotationList)];
 
         gcmONERROR(gco2D_SetGenericSource(
             egn2D,
@@ -251,24 +251,24 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         switch (i % 4)
         {
             case 0:
-				srcRect.left = 240;
-				srcRect.top  = 240;
+                srcRect.left = 240;
+                srcRect.top  = 240;
             break;
 
-			case 1:
-				srcRect.left = 0;
-				srcRect.top  = 240;
-				break;
+            case 1:
+                srcRect.left = 0;
+                srcRect.top  = 240;
+                break;
 
-			case 2:
-				srcRect.left = 0;
-				srcRect.top  = 0;
-				break;
+            case 2:
+                srcRect.left = 0;
+                srcRect.top  = 0;
+                break;
 
-			case 3:
-				srcRect.left = 240;
-				srcRect.top  = 0;
-				break;
+            case 3:
+                srcRect.left = 240;
+                srcRect.top  = 0;
+                break;
         }
 
         srcRect.right = srcRect.left + 240;
@@ -281,7 +281,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
     gcmONERROR(gco2D_SetClipping(egn2D, &Rect));
 
-	dstRot = rotationList[frameNo % gcmCOUNTOF(rotationList)];
+    dstRot = rotationList[frameNo % gcmCOUNTOF(rotationList)];
 
     gcmONERROR(gco2D_SetGenericTarget(
         egn2D,
@@ -379,7 +379,7 @@ static void CDECL Destroy(Test2D *t2d)
         }
     }
 
-	// destroy source surface
+    // destroy source surface
     for (i = 0; i < 4; i++)
     {
         MultiSrcPTR curSrc = &t2d->multiSrc[i];

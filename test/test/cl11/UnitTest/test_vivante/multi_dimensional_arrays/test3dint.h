@@ -33,19 +33,19 @@
 
 class Test3DInt: public MultiDimensionalArraysTest3D {
 public:
-	Test3DInt(const size_t sizeX, const size_t sizeY, const size_t sizeZ);
-	~Test3DInt();
+    Test3DInt(const size_t sizeX, const size_t sizeY, const size_t sizeZ);
+    ~Test3DInt();
 
 protected:
-	cl_int* inputAHost;
-	cl_int* inputBHost;
-	cl_int* resultHost;
+    cl_int* inputAHost;
+    cl_int* inputBHost;
+    cl_int* resultHost;
 
-	const int getMemSize() const;
-	void generateInput(const unsigned int &kernelIndex);
-	void* getInputAElement(const unsigned int &index) const;
-	void* getInputBElement(const unsigned int &index) const;
-	void* getResultElement(const unsigned int &index) const;
+    const int getMemSize() const;
+    void generateInput(const unsigned int &kernelIndex);
+    void* getInputAElement(const unsigned int &index) const;
+    void* getInputBElement(const unsigned int &index) const;
+    void* getResultElement(const unsigned int &index) const;
 };
 
 #endif /*_test2dint_h*/

@@ -50,7 +50,6 @@ arm-fsl)
     export KERNEL_DIR=/home/software/Linux/freescale/linux-3.0.35-c27cb385-20130116
     export CROSS_COMPILE=arm-fsl-linux-gnueabi-
     export TOOLCHAIN=/home/software/Linux/freescale/gcc-4.6.2-glibc-2.13-linaro-multilib-2011.12/fsl-linaro-toolchain
-    BUILD_OPTION_ENABLE_GPU_CLOCK_BY_DRIVER=1
 #    export LIB_DIR=$TOOLCHAIN/arm-fsl-linux-gnueabi/libc/usr/lib
 
 ;;
@@ -67,11 +66,11 @@ arm-yocto)
     export CROSS_COMPILE=arm-poky-linux-gnueabi-
     export ROOTFS=/home/software/Linux/YOCTO/x11-20130912221643
     export ROOTFS_USR=$ROOTFS/usr
-    export X11_ARM_DIR=$ROOTFS/usr
     export CFLAGS="-D__ARM_PCS_VFP --sysroot=$ROOTFS"
     export LFLAGS="--sysroot=$ROOTFS"
     export PFLAGS="--sysroot=$ROOTFS"
-    export BUILD_HARD_VFP=1
+    export FPU=vfp
+    export FLOAT_ABI=hard
     BUILD_YOCTO_DRI_BUILD=1
 ;;
 

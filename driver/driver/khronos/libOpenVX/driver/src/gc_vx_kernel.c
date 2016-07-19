@@ -1473,21 +1473,21 @@ OnError:
 
 VX_PRIVATE_API vx_string _getShaderName(vx_string orignal, vx_string name)
 {
-	vx_char* pointer = strrchr(orignal, '.');
+    vx_char* pointer = strrchr(orignal, '.');
 
-	if(pointer)
-	{
-		gctSTRING suffix = strchr(pointer, ':');
-		pointer = pointer + 1;
-		if(suffix)
-			gcoOS_StrCopySafe(name, suffix - pointer + 1, pointer);
-		else
-			gcoOS_StrCopySafe(name, strlen(pointer) + 1, pointer);
-	}
-	else
-		gcoOS_StrCopySafe(name, strlen(orignal)+1, orignal);
+    if(pointer)
+    {
+        gctSTRING suffix = strchr(pointer, ':');
+        pointer = pointer + 1;
+        if(suffix)
+            gcoOS_StrCopySafe(name, suffix - pointer + 1, pointer);
+        else
+            gcoOS_StrCopySafe(name, strlen(pointer) + 1, pointer);
+    }
+    else
+        gcoOS_StrCopySafe(name, strlen(orignal)+1, orignal);
 
-	return name;
+    return name;
 }
 
 VX_INTERNAL_API vx_status vxoKernel_Initialize(
@@ -1545,7 +1545,7 @@ VX_INTERNAL_API vx_status vxoKernel_Initialize(
 
     if (kernel->program != VX_NULL)
     {
-		vx_char shader_name[128] = {0};
+        vx_char shader_name[128] = {0};
          gceSTATUS status0 = gcfVX_CreateKernelShader(
                                 kernel->program,
                                 _getShaderName(kernel->name, shader_name),
@@ -2453,8 +2453,8 @@ VX_PRIVATE_API vx_status vxoProgramKernel_Function(vx_node node, vx_reference pa
 
             break;
         }
-		case VX_TYPE_REMAP:
-		{
+        case VX_TYPE_REMAP:
+        {
             vx_remap remap = (vx_remap)parameters[i];
 
             if (remap)
@@ -2649,7 +2649,7 @@ VX_PUBLIC_API vx_kernel vxAddKernelInProgram(
                                             program, vxoProgramKernel_Function, num_params,
                                             input, output,
                                             (initialize != VX_NULL)?initialize:vxoProgramKernel_Initialize,
-											(deinitialize != VX_NULL)?deinitialize:vxoProgramKernel_Deinitialize);
+                                            (deinitialize != VX_NULL)?deinitialize:vxoProgramKernel_Deinitialize);
         }
     }
 

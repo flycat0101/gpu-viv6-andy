@@ -35,9 +35,9 @@ extern "C" {
 
 typedef struct _Resource
 {
-	const char* name;
-	const unsigned char* data;
-	unsigned int size;
+    const char* name;
+    const unsigned char* data;
+    unsigned int size;
 } Resource;
 
 Resource* GetResource(const char* Name);

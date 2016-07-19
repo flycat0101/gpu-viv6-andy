@@ -56,25 +56,25 @@
 
 void LogError(const char* message, ...)
 {
-	va_list arguments;
-	char string[256];
+    va_list arguments;
+    char string[256];
 
-	va_start(arguments, message);
+    va_start(arguments, message);
 #ifdef UNDER_CE
-	_vsnprintf(string, sizeof(string), message, arguments);
+    _vsnprintf(string, sizeof(string), message, arguments);
 #else
-	vsnprintf(string, sizeof(string), message, arguments);
+    vsnprintf(string, sizeof(string), message, arguments);
 #endif
-	va_end(arguments);
+    va_end(arguments);
 
 #ifdef UNDER_CE
-	fprintf(stderr, string);
+    fprintf(stderr, string);
 #elif _WIN32
-	OutputDebugString(string);
+    OutputDebugString(string);
 #elif defined ANDROID
-	LOGE("%s",string);
+    LOGE("%s",string);
 #else
-	fprintf(stderr, string);
+    fprintf(stderr, string);
 #endif
 
 }

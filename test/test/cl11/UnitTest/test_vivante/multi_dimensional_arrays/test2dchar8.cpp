@@ -35,42 +35,42 @@
 
 Test2DChar8::Test2DChar8(const size_t sizeX, const size_t sizeY):
 MultiDimensionalArraysTest2D("char8", sizeX, sizeY) {
-	inputAHost = new cl_char8[size];
-	inputBHost = new cl_char8[size];
-	resultHost = new cl_char8[size];
-	inputA = inputAHost;
-	inputB = inputBHost;
-	result = resultHost;
+    inputAHost = new cl_char8[size];
+    inputBHost = new cl_char8[size];
+    resultHost = new cl_char8[size];
+    inputA = inputAHost;
+    inputB = inputBHost;
+    result = resultHost;
 }
 
 Test2DChar8::~Test2DChar8() {
-	delete[] inputAHost;
-	delete[] inputBHost;
-	delete[] resultHost;
+    delete[] inputAHost;
+    delete[] inputBHost;
+    delete[] resultHost;
 }
 
 const int Test2DChar8::getMemSize() const {
-	return sizeof(cl_char8)*size;
+    return sizeof(cl_char8)*size;
 }
 
 void Test2DChar8::generateInput(const unsigned int &kernelIndex) {
-	for (unsigned int i=0; i<VECTOR_SIZE; i++) {
-		for (unsigned int k=0; k<size; k++) {
-			inputAHost[k].s[i] = randChar();
-			if (getKernelInputArgNum(kernelIndex) == 2)
-				inputBHost[k].s[i] = randChar();
-		}
-	}
+    for (unsigned int i=0; i<VECTOR_SIZE; i++) {
+        for (unsigned int k=0; k<size; k++) {
+            inputAHost[k].s[i] = randChar();
+            if (getKernelInputArgNum(kernelIndex) == 2)
+                inputBHost[k].s[i] = randChar();
+        }
+    }
 }
 
 void* Test2DChar8::getInputAElement(const unsigned int &index) const {
-	return inputAHost[index].s;
+    return inputAHost[index].s;
 }
 
 void* Test2DChar8::getInputBElement(const unsigned int &index) const {
-	return &inputBHost[index].s;
+    return &inputBHost[index].s;
 }
 
 void* Test2DChar8::getResultElement(const unsigned int &index) const {
-	return &resultHost[index].s;
+    return &resultHost[index].s;
 }

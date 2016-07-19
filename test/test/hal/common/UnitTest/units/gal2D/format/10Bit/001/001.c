@@ -255,18 +255,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
     gcmONERROR(gco2D_SetSource(egn2D, &Rect));
 
-    gcmONERROR(gco2D_SetGenericTarget(
-        egn2D,
-        tempSurf->address,
-        tempSurf->validAddressNum,
-        tempSurf->stride,
-        tempSurf->validStrideNum,
-        tempSurf->tiling,
-        tempSurf->format,
-        rot,
-        tempSurf->aWidth,
-        tempSurf->aHeight));
-
     switch (frameNo % 4)
     {
         case 0:
@@ -288,25 +276,58 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
             break;
     }
 
+    if (tempSurf->format == gcvSURF_NV12_10BIT ||
+        tempSurf->format == gcvSURF_NV21_10BIT ||
+        tempSurf->format == gcvSURF_NV16_10BIT ||
+        tempSurf->format == gcvSURF_NV61_10BIT)
+    {
+        hMirror = vMirror = gcvFALSE;
+        rot = gcvSURF_0_DEGREE;
+    }
+
     gcmONERROR(gco2D_SetBitBlitMirror(egn2D, hMirror, vMirror));
+
+    gcmONERROR(gco2D_SetGenericTarget(
+        egn2D,
+        tempSurf->address,
+        tempSurf->validAddressNum,
+        tempSurf->stride,
+        tempSurf->validStrideNum,
+        tempSurf->tiling,
+        tempSurf->format,
+        rot,
+        tempSurf->aWidth,
+        tempSurf->aHeight));
 
     gcmONERROR(gco2D_SetClipping(egn2D, &Rect));
 
     gcmONERROR(gco2D_Blit(egn2D, 1, &Rect, 0xCC, 0xCC, tempSurf->format));
 
-    if (!t2d->runtime->noSaveTargetNew)
-    {
-        char name[200];
 
-        gcmONERROR(gcoHAL_Commit(gcvNULL, gcvTRUE));
-        sprintf(name, "gal2DFormat10Bit001_intermediate_%03d.bmp", frameNo);
-        GalSaveTSurfToDIB(tempSurf, name);
+    if (tempSurf->format == gcvSURF_NV12_10BIT ||
+        tempSurf->format == gcvSURF_NV21_10BIT ||
+        tempSurf->format == gcvSURF_NV16_10BIT ||
+        tempSurf->format == gcvSURF_NV61_10BIT)
+    {
+        rot = sRotList[frameNo % gcmCOUNTOF(sRotList)];
+    }
+    else
+    {
+        rot = gcvSURF_0_DEGREE;
     }
 
     Rect.left = 0;
     Rect.top = 0;
-    Rect.right = gcmMIN(tempSurf->width, t2d->dstWidth);
-    Rect.bottom = gcmMIN(tempSurf->height, t2d->dstHeight);
+    if (rot == gcvSURF_0_DEGREE || rot == gcvSURF_180_DEGREE)
+    {
+        Rect.right  = gcmMIN(tempSurf->width, t2d->dstWidth);
+        Rect.bottom = gcmMIN(tempSurf->height, t2d->dstHeight);
+    }
+    else
+    {
+        Rect.right  = gcmMIN(tempSurf->height, t2d->dstHeight);
+        Rect.bottom = gcmMIN(tempSurf->width, t2d->dstWidth);
+    }
 
     gcmONERROR(gco2D_SetSource(egn2D, &Rect));
 
@@ -318,7 +339,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         tempSurf->validStrideNum,
         tempSurf->tiling,
         tempSurf->format,
-        gcvSURF_0_DEGREE,
+        rot,
         tempSurf->aWidth,
         tempSurf->aHeight));
 

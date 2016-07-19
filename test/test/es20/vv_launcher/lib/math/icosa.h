@@ -62,8 +62,8 @@ extern "C" {
 
 typedef struct _icosa
 {
-	float vertices[12][3];
-	unsigned short indices[20][3];
+    float vertices[12][3];
+    unsigned short indices[20][3];
 }
 icosa_t;
 

@@ -38,7 +38,7 @@ EXTRA_INCVPATH += $(driver_root)/driver/khronos/libEGL/api
 EXTRA_INCVPATH += $(driver_root)/driver/khronos/libEGL/inc
 
 # from libeglapi (trunk/driver/khronos/libEGL/api/Makefile.linux)
-SOURCE_OBJECTS += $(driver_root)/driver/khronos/libEGL/api/gc_egl_platform.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libEGL/api/gc_egl_qnx.o
 
 ifeq ($(CUSTOM_PIXMAP), 1)
     CCFLAGS += -DCUSTOM_PIXMAP

@@ -1193,10 +1193,10 @@ static VSC_ErrCode _ProgramVS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
  5:0) - (0 ? 5:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
  5:0))) |
                 ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 18:12) - (0 ? 18:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:12) - (0 ? 18:12) + 1))))))) << (0 ?
- 18:12))) | (((gctUINT32) ((gctUINT32) (pShHwInfo->hwProgrammingHints.maxThreadsPerHwTG) & ((gctUINT32) ((((1 ?
- 18:12) - (0 ? 18:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:12) - (0 ? 18:12) + 1))))))) << (0 ?
- 18:12)))|
+ 19:12) - (0 ? 19:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:12) - (0 ? 19:12) + 1))))))) << (0 ?
+ 19:12))) | (((gctUINT32) ((gctUINT32) (pShHwInfo->hwProgrammingHints.maxThreadsPerHwTG) & ((gctUINT32) ((((1 ?
+ 19:12) - (0 ? 19:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:12) - (0 ? 19:12) + 1))))))) << (0 ?
+ 19:12)))|
                 ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:20) - (0 ? 28:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 28:20) - (0 ? 28:20) + 1))))))) << (0 ?
  28:20))) | (((gctUINT32) ((gctUINT32) (resultCacheWinSize) & ((gctUINT32) ((((1 ?
@@ -1604,6 +1604,7 @@ static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     pStatesPgmer->pHints->memoryAccessFlags[gcvPROGRAM_STAGE_TCS] = (gceMEMORY_ACCESS_FLAG)pHsSEP->exeHints.derivedHints.globalStates.memoryAccessHint;
     pStatesPgmer->pHints->samplerBaseOffset[gcvPROGRAM_STAGE_TCS] = pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
     pStatesPgmer->pHints->unifiedStatus.samplerGPipeStart -= pHsSEP->samplerMapping.hwSamplerRegCount;
+    pStatesPgmer->pHints->tcsPerVertexAttributeCount = hsPerCPInputCount;
 
     if (pShHwInfo->hwProgrammingHints.hwSamplerFetchMode == HW_SAMPLER_FETCH_MODE_UNIFIED_REG_FILE)
     {
@@ -1720,11 +1721,11 @@ static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
  5:0))) | (((gctUINT32) ((gctUINT32) (pShHwInfo->hwProgrammingHints.uscSizeInKbyte + 1) & ((gctUINT32) ((((1 ?
  5:0) - (0 ? 5:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
  5:0))) |
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 18:12) - (0 ?
- 18:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:12) - (0 ? 18:12) + 1))))))) << (0 ?
- 18:12))) | (((gctUINT32) ((gctUINT32) (maxPatchesPerHwTG) & ((gctUINT32) ((((1 ?
- 18:12) - (0 ? 18:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:12) - (0 ? 18:12) + 1))))))) << (0 ?
- 18:12)));
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 19:12) - (0 ?
+ 19:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:12) - (0 ? 19:12) + 1))))))) << (0 ?
+ 19:12))) | (((gctUINT32) ((gctUINT32) (maxPatchesPerHwTG) & ((gctUINT32) ((((1 ?
+ 19:12) - (0 ? 19:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:12) - (0 ? 19:12) + 1))))))) << (0 ?
+ 19:12)));
     VSC_LOAD_HW_STATE(0x5286, state);
 
     /* Program sampler-related. */
@@ -2063,11 +2064,11 @@ static VSC_ErrCode _ProgramDS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
  5:0))) | (((gctUINT32) ((gctUINT32) (pShHwInfo->hwProgrammingHints.uscSizeInKbyte + 1) & ((gctUINT32) ((((1 ?
  5:0) - (0 ? 5:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
  5:0))) |
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 18:12) - (0 ?
- 18:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:12) - (0 ? 18:12) + 1))))))) << (0 ?
- 18:12))) | (((gctUINT32) ((gctUINT32) (pShHwInfo->hwProgrammingHints.maxThreadsPerHwTG) & ((gctUINT32) ((((1 ?
- 18:12) - (0 ? 18:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:12) - (0 ? 18:12) + 1))))))) << (0 ?
- 18:12)))|
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 19:12) - (0 ?
+ 19:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:12) - (0 ? 19:12) + 1))))))) << (0 ?
+ 19:12))) | (((gctUINT32) ((gctUINT32) (pShHwInfo->hwProgrammingHints.maxThreadsPerHwTG) & ((gctUINT32) ((((1 ?
+ 19:12) - (0 ? 19:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:12) - (0 ? 19:12) + 1))))))) << (0 ?
+ 19:12)))|
             ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 28:20) - (0 ?
  28:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 28:20) - (0 ? 28:20) + 1))))))) << (0 ?
  28:20))) | (((gctUINT32) ((gctUINT32) (resultCacheWinSize) & ((gctUINT32) ((((1 ?
@@ -2076,11 +2077,11 @@ static VSC_ErrCode _ProgramDS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     VSC_LOAD_HW_STATE(0x52C7, state);
 
     /* Program USC extra registers */
-    state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 6:0) - (0 ?
- 6:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
- 6:0))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 6:0) - (0 ?
- 6:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
- 6:0)));
+    state = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 7:0) - (0 ?
+ 7:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:0) - (0 ? 7:0) + 1))))))) << (0 ?
+ 7:0))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 7:0) - (0 ?
+ 7:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:0) - (0 ? 7:0) + 1))))))) << (0 ?
+ 7:0)));
     VSC_LOAD_HW_STATE(0x52CD, state);
 
     /* Program SO */
@@ -2586,11 +2587,11 @@ static VSC_ErrCode _ProgramGS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
  5:0))) | (((gctUINT32) ((gctUINT32) (pShHwInfo->hwProgrammingHints.uscSizeInKbyte + 1) & ((gctUINT32) ((((1 ?
  5:0) - (0 ? 5:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
  5:0))) |
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 14:8) - (0 ?
- 14:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 14:8) - (0 ? 14:8) + 1))))))) << (0 ?
- 14:8))) | (((gctUINT32) ((gctUINT32) (maxThreadsPerHwTG) & ((gctUINT32) ((((1 ?
- 14:8) - (0 ? 14:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 14:8) - (0 ? 14:8) + 1))))))) << (0 ?
- 14:8)));
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 15:8) - (0 ?
+ 15:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:8) - (0 ? 15:8) + 1))))))) << (0 ?
+ 15:8))) | (((gctUINT32) ((gctUINT32) (maxThreadsPerHwTG) & ((gctUINT32) ((((1 ?
+ 15:8) - (0 ? 15:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:8) - (0 ? 15:8) + 1))))))) << (0 ?
+ 15:8)));
     VSC_LOAD_HW_STATE(0x0450, state);
 
     /* Program SO */

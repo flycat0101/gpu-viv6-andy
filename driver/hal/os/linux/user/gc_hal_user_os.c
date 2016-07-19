@@ -248,7 +248,7 @@ _SetDumpFileInfo(
         {
             gcoOS_StrToInt(dump, &level);
 
-            if (level != 0 && level < 3)
+            if (level != 0 && level < 4)
             {
                 tls->newDump2DFlag = level;
                 dumpNew2D = gcvTRUE;
@@ -257,7 +257,7 @@ _SetDumpFileInfo(
     }
     else
     {
-        tls->newDump2DFlag = 2;
+        tls->newDump2DFlag = 3;
     }
 #endif
 
@@ -389,6 +389,7 @@ _ConstructOs(
     gcoOS os = gcPLS.os;
     gceSTATUS status;
     gctUINT i;
+    gctUINT tryCount = 0;
 
     gcmPROFILE_DECLARE_ONLY(gctUINT64 freq);
 
@@ -419,6 +420,7 @@ _ConstructOs(
         gcmASSERT(gcPLS.os == gcvNULL);
         gcPLS.os = os;
 
+retry:
         /* Attempt to open the device. */
         for (i = 0; i < gcmCOUNTOF(GALDeviceName); i += 1)
         {
@@ -448,15 +450,22 @@ _ConstructOs(
                 );
         }
 
+        if (i == gcmCOUNTOF(GALDeviceName) && tryCount < 5)
+        {
+            tryCount++;
+            usleep(1000000);
+            gcmPRINT("Failed to open device: %s, Try again...", strerror(errno));
+            goto retry;
+        }
+
         if (i == gcmCOUNTOF(GALDeviceName))
         {
-            gcmTRACE(
-                gcvLEVEL_ERROR,
-                "%s(%d): Failed to open device, errno=%s.",
+            gcmPRINT(
+                "%s(%d): FATAL: Failed to open device, errno=%s.",
                 __FUNCTION__, __LINE__, strerror(errno)
                 );
 
-            gcmONERROR(gcvSTATUS_DEVICE);
+            exit(1);
         }
 
         /* Construct heap. */
@@ -3424,7 +3433,6 @@ gcoOS_GetEnv(
         gctINT found = -1 ;
         for(loopi = 0; loopi < MAX_ENV_ITEM;loopi++)
         {
-            if(!pt[loopi].name ) break;
             if(gcoOS_StrCmp(pt[loopi].name, VarName) == gcvSTATUS_OK) /*Found name*/
             {
                 if(gcoOS_StrCmp(pt[loopi].property, property) != gcvSTATUS_OK ) /*Value changed*/

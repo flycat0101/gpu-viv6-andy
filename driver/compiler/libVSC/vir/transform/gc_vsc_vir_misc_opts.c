@@ -1512,6 +1512,8 @@ VSC_ErrCode vscVIR_AdjustPrecision(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuI
     VSC_ErrCode                    errCode = VSC_ERR_NONE;
     VIR_FuncIterator               func_iter;
     VIR_FunctionNode*              func_node;
+    gctUINT                        dual16PrecisionRule = gcmOPT_DualFP16PrecisionRule();
+
 
     /* currently only PS is dual16-able */
     if (VIR_Shader_GetKind(pShader) == VIR_SHADER_FRAGMENT)
@@ -1680,8 +1682,8 @@ VSC_ErrCode vscVIR_AdjustPrecision(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuI
                     _Inst_ChangeOpnd2HP(inst, VIR_Inst_GetDest(inst), gcvTRUE, skipLowp, pDuInfo);
                 }
 
-                /* integer output should be high-precision,
-                   HW Cvt2OutColFmt has issue with 0x2*/
+                /* HW Cvt2OutColFmt has issue with 0x2,
+                   output should be high-precision, */
                 {
                     VIR_Operand* dest = VIR_Inst_GetDest(inst);
                     if(dest)
@@ -1694,7 +1696,8 @@ VSC_ErrCode vscVIR_AdjustPrecision(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuI
                                 VIR_Symbol* varSym = VIR_Symbol_GetVregVariable(sym);
                                 if(VIR_Symbol_isOutput(varSym))
                                 {
-                                    if(VIR_Type_isInteger(VIR_Symbol_GetType(varSym)))
+                                    if(VIR_Type_isInteger(VIR_Symbol_GetType(varSym)) ||
+                                       (dual16PrecisionRule & Dual16_PrecisionRule_OUTPUT_HP))
                                     {
                                         VIR_Symbol_SetPrecision(varSym, VIR_PRECISION_HIGH);
                                         VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
@@ -1706,7 +1709,8 @@ VSC_ErrCode vscVIR_AdjustPrecision(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuI
                             {
                                 if(VIR_Symbol_isOutput(sym))
                                 {
-                                    if(VIR_Type_isInteger(VIR_Symbol_GetType(sym)))
+                                    if(VIR_Type_isInteger(VIR_Symbol_GetType(sym)) ||
+                                       (dual16PrecisionRule & Dual16_PrecisionRule_OUTPUT_HP))
                                     {
                                         VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
                                         VIR_Operand_SetPrecision(dest, VIR_PRECISION_HIGH);

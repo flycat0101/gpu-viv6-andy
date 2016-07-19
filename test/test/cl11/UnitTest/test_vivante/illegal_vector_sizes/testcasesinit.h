@@ -31,10 +31,10 @@
 
 #include <CL/cl.h>
 
-#define MEM_TYPE_COUNT			14
-#define VECTOR_SIZE_COUNT		2
-#define ILLEGAL_SIZE_COUNT		10
-#define TYPE_COUNT				7
+#define MEM_TYPE_COUNT            14
+#define VECTOR_SIZE_COUNT        2
+#define ILLEGAL_SIZE_COUNT        10
+#define TYPE_COUNT                7
 
 extern int currentTest;
 extern size_t memSizes[MEM_TYPE_COUNT];

@@ -33,46 +33,46 @@
 
 /*******************************************************************************
 **
-**	vdkGetCurrentTime
+**    vdkGetCurrentTime
 **
-**	Query the current system time.
+**    Query the current system time.
 **
-**	INPUT:
+**    INPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		gcsTIME_PTR CurrTime
-**			Points to the current system time.
+**        gcsTIME_PTR CurrTime
+**            Points to the current system time.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkGetCurrentTime(
-	gcsTIME_PTR CurrTime
-	)
+    gcsTIME_PTR CurrTime
+    )
 {
-	time_t now;
-	struct tm * currentTime;
+    time_t now;
+    struct tm * currentTime;
 
-	/* Get current time. */
-	time(&now);
+    /* Get current time. */
+    time(&now);
 
-	/* Convert to tm structure. */
-	currentTime = localtime(&now);
+    /* Convert to tm structure. */
+    currentTime = localtime(&now);
 
-	/* Translate the structure. */
-	CurrTime->year    = currentTime->tm_year;
-	CurrTime->month   = currentTime->tm_mon;
-	CurrTime->day     = currentTime->tm_mday;
-	CurrTime->weekday = currentTime->tm_wday;
-	CurrTime->hour    = currentTime->tm_hour;
-	CurrTime->minute  = currentTime->tm_min;
-	CurrTime->second  = currentTime->tm_sec;
+    /* Translate the structure. */
+    CurrTime->year    = currentTime->tm_year;
+    CurrTime->month   = currentTime->tm_mon;
+    CurrTime->day     = currentTime->tm_mday;
+    CurrTime->weekday = currentTime->tm_wday;
+    CurrTime->hour    = currentTime->tm_hour;
+    CurrTime->minute  = currentTime->tm_min;
+    CurrTime->second  = currentTime->tm_sec;
 }
 
 /* if defined(LINUX) */

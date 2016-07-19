@@ -28,7 +28,7 @@
  *
  *//**
  * \file
- * \brief	VGU 1.1 API.
+ * \brief    VGU 1.1 API.
  *//*-------------------------------------------------------------------*/
 
 #ifndef _VGU_H
@@ -44,7 +44,7 @@ extern "C" {
 #define VGU_VERSION_1_1 2
 
 #ifndef VGU_API_CALL
-#	error VGU_API_CALL must be defined
+#    error VGU_API_CALL must be defined
 #endif
 
 #ifndef VGU_API_ENTRY

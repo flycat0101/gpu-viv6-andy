@@ -33,14 +33,14 @@
 
 class MultiDimensionalArraysTest2D: public MultiDimensionalArraysTest {
 public:
-	MultiDimensionalArraysTest2D(const char *typeName,
-		const size_t sizeX, const size_t sizeY);
+    MultiDimensionalArraysTest2D(const char *typeName,
+        const size_t sizeX, const size_t sizeY);
 protected:
-	const size_t sizeX;
-	const size_t sizeY;
+    const size_t sizeX;
+    const size_t sizeY;
 
-	cl_int enqueueKernel(cl_kernel kernel);
-	void generateSource(char *source, unsigned int *sourceSize);
+    cl_int enqueueKernel(cl_kernel kernel);
+    void generateSource(char *source, unsigned int *sourceSize);
 };
 
 #endif /*_multidimensionalarraystest2d_h*/

@@ -36,17 +36,17 @@
 
 const char *kernel_power_union_vector3_3 =
 "#ifndef _TYPES5_H_                                                                                                                 \n"
-"#define _TYPES5_H_																												   \n"
-"																																   \n"
-"#ifdef __OPENCL_VERSION__																										   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
-"#else // __OPENCL_VERSION__																									   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType									   \n"
-"#endif // __OPENCL_VERSION__																									   \n"
-"																																   \n"
-"ALIGNED_STRUCT(union, 32) InputA {																							       \n"
-"    short3 a;																													   \n"
-"    float3 h;																												   \n"
+"#define _TYPES5_H_                                                                                                                   \n"
+"                                                                                                                                   \n"
+"#ifdef __OPENCL_VERSION__                                                                                                           \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))                               \n"
+"#else // __OPENCL_VERSION__                                                                                                       \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType                                       \n"
+"#endif // __OPENCL_VERSION__                                                                                                       \n"
+"                                                                                                                                   \n"
+"ALIGNED_STRUCT(union, 32) InputA {                                                                                                   \n"
+"    short3 a;                                                                                                                       \n"
+"    float3 h;                                                                                                                   \n"
 "};                                                                                                                                \n"
 "                                                                                                                                  \n"
 "ALIGNED_STRUCT(union, 32) InputB {                                                                                                \n"
@@ -67,8 +67,8 @@ const char *kernel_power_union_vector3_3 =
 "                                                                                                                                  \n"
 "    // bound check (equivalent to the limit on a 'for' loop for standard/serial C code                                            \n"
 "                                                                                                                                  \n"
-"																																   \n"
-"		c[tid].r = pow(convert_float3(a[tid].a),convert_float3((float3)tid));                                                                                            \n"
+"                                                                                                                                   \n"
+"        c[tid].r = pow(convert_float3(a[tid].a),convert_float3((float3)tid));                                                                                            \n"
 "                                                                                                                                  \n"
 "}                                                                                                                                 \n";
 
@@ -119,8 +119,8 @@ public:
         _deviceResult = cl::Buffer(_context, CL_MEM_WRITE_ONLY, sizeof(Result) * _globalWorkSize);
 
         _kernel.setArg(0,sizeof (_deviceInputA), &_deviceInputA);
-		_kernel.setArg(1,sizeof (_deviceResult), &_deviceResult);
-		_kernel.setArg(2,sizeof (_numElements), &_numElements);
+        _kernel.setArg(1,sizeof (_deviceResult), &_deviceResult);
+        _kernel.setArg(2,sizeof (_numElements), &_numElements);
     }
 
     virtual bool Execute()
@@ -141,11 +141,11 @@ private:
     void _fillData()
     {
         for (int i = 0; i < _numElements; ++i) {
-			_inputA[i].a.s[0] = rand();
+            _inputA[i].a.s[0] = rand();
             _inputA[i].h.s[0] = (float)rand();
-			_inputA[i].a.s[1] = rand();
+            _inputA[i].a.s[1] = rand();
             _inputA[i].h.s[1] = (float)rand();
-			_inputA[i].a.s[2] = rand();
+            _inputA[i].a.s[2] = rand();
             _inputA[i].h.s[2] = (float)rand();
 
         }
@@ -154,9 +154,9 @@ private:
     void _computeGoldStandard()
     {
         for (int i = 0; i < _numElements; i++) {
-			_goldStandard[i].r.s[0] = powf(ISSUBNORM(float(_inputA[i].a.s[0])) ? 0: float(_inputA[i].a.s[0]), ISSUBNORM(float(i)) ? 0 : float(i)) ;;
-			_goldStandard[i].r.s[1] = powf(ISSUBNORM(float(_inputA[i].a.s[1])) ? 0: float(_inputA[i].a.s[1]), ISSUBNORM(float(i)) ? 0 : float(i)) ;;
-			_goldStandard[i].r.s[2] = powf(ISSUBNORM(float(_inputA[i].a.s[2])) ? 0: float(_inputA[i].a.s[2]), ISSUBNORM(float(i)) ? 0 : float(i)) ;;
+            _goldStandard[i].r.s[0] = powf(ISSUBNORM(float(_inputA[i].a.s[0])) ? 0: float(_inputA[i].a.s[0]), ISSUBNORM(float(i)) ? 0 : float(i)) ;;
+            _goldStandard[i].r.s[1] = powf(ISSUBNORM(float(_inputA[i].a.s[1])) ? 0: float(_inputA[i].a.s[1]), ISSUBNORM(float(i)) ? 0 : float(i)) ;;
+            _goldStandard[i].r.s[2] = powf(ISSUBNORM(float(_inputA[i].a.s[2])) ? 0: float(_inputA[i].a.s[2]), ISSUBNORM(float(i)) ? 0 : float(i)) ;;
 
         }
     }
@@ -178,17 +178,17 @@ private:
         float checkResult3;
         float checkResult4;
 
-		for (int i = 0; i < _numElements; ++i) {
-			for (int j = 0; j < 3; ++j) {
+        for (int i = 0; i < _numElements; ++i) {
+            for (int j = 0; j < 3; ++j) {
                 checkResult1 = (*(unsigned int *)&(_goldStandard[i].r.s[j]) + 4);
                 checkResult2 = (*(unsigned int *)&(_goldStandard[i].r.s[j]) - 4);
                 checkResult3 = fabsf(*( float *) &checkResult1);
                 checkResult4 = fabsf(*( float *) &checkResult2);
                 if ((fabsf(_result[i].r.s[j]) > checkResult3 || fabsf(_result[i].r.s[j]) < checkResult4) && !isnan(_goldStandard[i].r.s[j]) && !isinf(_goldStandard[i].r.s[j])){
-					std::cout << "  c:" << _goldStandard[i].r.s[j] << " ocl:" << _result[i].r.s[j] << std::endl;
+                    std::cout << "  c:" << _goldStandard[i].r.s[j] << " ocl:" << _result[i].r.s[j] << std::endl;
                     return false;
                 }
-			}
+            }
         }
         return true;
     }
@@ -213,7 +213,7 @@ private:
 int power_union_vector3_3(void)
 {
     cl_int err = CL_SUCCESS;
-	int cnt = 1;
+    int cnt = 1;
 
     try {
         std::vector<cl::Platform> platforms;
@@ -229,7 +229,7 @@ int power_union_vector3_3(void)
 
         std::vector<cl::Device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
 
-
+        
         const char* clProgramSource = kernel_power_union_vector3_3;//oclLoadProgSource("multiply.cl", "", &szKernelLength);
         if (clProgramSource == 0) {
             std::cerr << "OpenCL program not found." << std::endl;
@@ -253,13 +253,13 @@ int power_union_vector3_3(void)
         std::cout << "Running test power_union_vector3_3..." << std::endl;
         TestCase_power_union_vector3_3 power_union_vector3_3(10, program_, context, devices);
 
-		bool control = true;
+        bool control = true;
         power_union_vector3_3.SetUp();
         for (int i = 0; i < 10; ++i) {
-			if(!power_union_vector3_3.Execute()){
-				control = false;
-				cnt = 0;
-			}
+            if(!power_union_vector3_3.Execute()){
+                control = false;
+                cnt = 0;
+            }
             std::cout << "RUN " << i + 1<< ": " << (control ? "PASSED" : "FAILED!") << std::endl;
         }
         power_union_vector3_3.TearDown();

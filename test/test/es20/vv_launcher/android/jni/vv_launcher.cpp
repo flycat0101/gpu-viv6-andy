@@ -42,9 +42,9 @@
 
 #include "LauncherApp.h"
 
-int  appWidth	= 640;
-int  appHeight	= 480;
-int  flipY		= 0;
+int  appWidth    = 640;
+int  appHeight    = 480;
+int  flipY        = 0;
 LauncherApp * app;
 struct timeval tv;
 
@@ -69,80 +69,80 @@ extern "C" {
 #endif
     JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_vvlauncher_GL2JNILib_init(JNIEnv * env, jobject obj,  jint width, jint height);
     JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_vvlauncher_GL2JNILib_repaint(JNIEnv * env, jobject obj);
-	JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_vvlauncher_GL2JNILib_key(JNIEnv * env, jobject obj, jint k, jboolean down);
+    JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_vvlauncher_GL2JNILib_key(JNIEnv * env, jobject obj, jint k, jboolean down);
 #ifdef __cplusplus
 };
 #endif
 
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_vvlauncher_GL2JNILib_init(JNIEnv * env, jobject obj,  jint width, jint height)
 {
-	appWidth  = width;
-	appHeight = height;
+    appWidth  = width;
+    appHeight = height;
 
     glViewport(0, 0, appWidth, appHeight);
 
-	app = LauncherAppConstruct(appWidth, appHeight);
-	flipVertical(app, flipY);
+    app = LauncherAppConstruct(appWidth, appHeight);
+    flipVertical(app, flipY);
 
-	gettimeofday(&tv, 0);
-	lastTime = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+    gettimeofday(&tv, 0);
+    lastTime = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
 
-	running = true;
+    running = true;
 
    return true;
 }
 
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_vvlauncher_GL2JNILib_repaint(JNIEnv * env, jobject obj)
 {
-	char const * command;
-	float delta;
-	if(!running)
-		return false;
+    char const * command;
+    float delta;
+    if(!running)
+        return false;
 
-	gettimeofday(&tv, 0);
-	now = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+    gettimeofday(&tv, 0);
+    now = (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
 
-	delta = (float)(now - lastTime) / 1000.0f;
+    delta = (float)(now - lastTime) / 1000.0f;
 
-	if (delta > 1.0f / 20.0f) delta = 1.0f / 20.0f;
-	lastTime = now;
+    if (delta > 1.0f / 20.0f) delta = 1.0f / 20.0f;
+    lastTime = now;
 
-	command = LauncherAppTick(app, delta);
-	if (command != NULL)
-	{
-		LauncherAppSelect(app, -1);
+    command = LauncherAppTick(app, delta);
+    if (command != NULL)
+    {
+        LauncherAppSelect(app, -1);
 
-	}
+    }
 
-	LauncherAppDraw(app, appWidth, appHeight);
-	if(key)
-	{
-		switch(key)
-		{
-			case 11:
-				system("am start -n com.vivantecorp.graphics.cover_flow/.EntryActivity");
-			case 14:
-				system("am start -n com.glbenchmark.GLBenchmark11/.GLBenchmark11");
-				break;
-			case 15:
-				system("am start -n com.glbenchmark.GLBenchmark20/com.glbenchmark.Common.TestSelectActivity");
-				break;
-			case 16:
-				system("am start -n com.vivantecorp.graphics.sample3/.GL2Sample3Activity");
-				break;
-			case 4:
-				running = false;
-				break;
-			default:
-				break;
-		}
+    LauncherAppDraw(app, appWidth, appHeight);
+    if(key)
+    {
+        switch(key)
+        {
+            case 11:
+                system("am start -n com.vivantecorp.graphics.cover_flow/.EntryActivity");
+            case 14:
+                system("am start -n com.glbenchmark.GLBenchmark11/.GLBenchmark11");
+                break;
+            case 15:
+                system("am start -n com.glbenchmark.GLBenchmark20/com.glbenchmark.Common.TestSelectActivity");
+                break;
+            case 16:
+                system("am start -n com.vivantecorp.graphics.sample3/.GL2Sample3Activity");
+                break;
+            case 4:
+                running = false;
+                break;
+            default:
+                break;
+        }
 
-		key = 0;
-	}
+        key = 0;
+    }
 
 
 
-	return true;
+    return true;
 }
 
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_vvlauncher_GL2JNILib_key(JNIEnv * env, jobject obj, jint k, jboolean down)
@@ -151,5 +151,5 @@ JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_vvlauncher_GL2JNILib_ke
     {
         key = k;
     }
-	return true;
+    return true;
 }

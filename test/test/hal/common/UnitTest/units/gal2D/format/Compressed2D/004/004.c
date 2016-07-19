@@ -202,7 +202,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
         gcmONERROR(gco2D_Blit(egn2D, 1, &rect, 0xCC, 0xCC, surf->format));
     }
-#if 1
     if (!t2d->runtime->noSaveTargetNew)
     {
         char name[200];
@@ -211,7 +210,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         sprintf(name, "gal2DFormatCompressed2D004_intermediate_%03d.bmp", frameNo);
         GalSaveTSurfToDIB(surf, name);
     }
-#endif
     /* Uncompress surf to result. */
     rect.left = rect.top = 0;
     rect.right = surf->width;
@@ -304,7 +302,7 @@ OnError:
         GalOutput(GalOutputType_Error | GalOutputType_Console,
         "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
 
-	    return gcvFALSE;
+        return gcvFALSE;
     }
     else
     {

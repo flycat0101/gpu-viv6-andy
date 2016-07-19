@@ -28,7 +28,7 @@
  *
  *//**
  * \file
- * \brief	OpenVG 1.1 API.
+ * \brief    OpenVG 1.1 API.
  *//*-------------------------------------------------------------------*/
 
 #ifndef _OPENVG_H
@@ -40,9 +40,9 @@
 extern "C" {
 #endif
 
-#define OPENVG_VERSION_1_0		1
-#define OPENVG_VERSION_1_0_1	1
-#define OPENVG_VERSION_1_1		2
+#define OPENVG_VERSION_1_0        1
+#define OPENVG_VERSION_1_0_1    1
+#define OPENVG_VERSION_1_1        2
 
 #ifndef VG_MAXSHORT
 #define VG_MAXSHORT 0x7FFF
@@ -493,7 +493,7 @@ typedef enum {
 /* Function Prototypes */
 
 #ifndef VG_API_CALL
-#	error VG_API_CALL must be defined
+#    error VG_API_CALL must be defined
 #endif
 
 #ifndef VG_API_ENTRY

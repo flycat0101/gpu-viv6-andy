@@ -65,7 +65,7 @@ static TPC_Source_File sourcefiles[] =
         gcvSURF_NV12,
         gcvTRUE,
     },
-	{
+    {
         "resource/dec_tpc/VSMain8_4096x2304_10fxNV12_TILE_f5.raw",
         gcvNULL,
         gcvNULL,
@@ -477,7 +477,7 @@ static void CDECL Destroy(Test2D *t2d)
 
 const gceFEATURE FeatureList[]=
 {
-    gcvFEATURE_DEC_COMPRESSION,
+    gcvFEATURE_DEC300_COMPRESSION,
     gcvFEATURE_DEC_TPC_COMPRESSION,
 };
 

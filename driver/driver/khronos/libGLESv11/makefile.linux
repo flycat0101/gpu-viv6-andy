@@ -69,18 +69,7 @@ INCLUDE := -I$(AQROOT)/hal/inc \
            -I$(AQROOT)/compiler/libVSC/include \
            -I$(AQROOT)/driver/khronos/libEGL/inc
 
-ifeq ($(EGL_API_DFB), 1)
-  INCLUDE += -I$(DFB_DIR)/usr/include \
-             -I$(DFB_DIR)/include \
-             -I$(DFB_DIR)/include/directfb-internal \
-             -I$(DFB_DIR)/include/directfb
-endif
-
-ifeq ($(EGL_API_DRI), 1)
-  INCLUDE += -I$(X11_ARM_DIR)/include
-endif
-
-ifeq ($(EGL_API_X), 1)
+ifneq ($(filter 1,$(EGL_API_X) $(EGL_API_DRI)),)
   INCLUDE += -I$(X11_ARM_DIR)/include
 endif
 
@@ -90,15 +79,7 @@ CFLAGS += $(INCLUDE)
 # Add extra flags for object files.
 
 ifneq ($(USE_ARMCC), 1)
-  ifeq ($(EGL_API_DFB), 1)
-    CFLAGS  += -pipe -fPIC
-  else
-    CFLAGS += -fPIC -Werror -ansi
-  endif
-endif
-
-ifeq ($(EGL_API_DFB), 1)
-  CFLAGS  += -DPIC
+  CFLAGS  += -fPIC -Werror -ansi
 endif
 
 CFLAGS += -D__GL_EXPORTS

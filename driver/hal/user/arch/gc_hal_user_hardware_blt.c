@@ -562,6 +562,10 @@ _3DBlitExecute(
 {
     gceSTATUS   status;
     gctUINT32   data = 0;
+#if VIVANTE_PROFILER_PROBE_PERDRAW
+    gctUINT32 probeAddress;
+    gctINT32 module;
+#endif
 
     static gctUINT32 commands[] = {
         0x1,
@@ -599,6 +603,16 @@ _3DBlitExecute(
 
     /* Reserve space in the command buffer. */
     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
+
+#if VIVANTE_PROFILER_PROBE_PERDRAW
+    gcoBUFOBJ_Lock(Hardware->probeBuffer->newCounterBuf[Hardware->probeBuffer->curBufId], &probeAddress, gcvNULL);
+
+    for (module = 0; module < gcvCOUNTER_COUNT; module++)
+    {
+        gcoHARDWARE_ProbeCounter(Hardware, probeAddress, (gceCOUNTER)module, gcvTRUE, Memory);
+    }
+    Hardware->probeBuffer->opType[Hardware->probeBuffer->curBufId] = gcvCOUNTER_OP_BLT;
+#endif
 
     {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
@@ -709,6 +723,14 @@ _3DBlitExecute(
  _MultiGPUSync(Hardware, Engine, gcvFALSE, &memory);
  ;
 
+
+#if VIVANTE_PROFILER_PROBE_PERDRAW
+    for (module = 0; module < gcvCOUNTER_COUNT; module++)
+    {
+        gcoHARDWARE_ProbeCounter(Hardware, probeAddress, (gceCOUNTER)module, gcvFALSE, Memory);
+    }
+    Hardware->probeBuffer->curBufId++;
+#endif
 
     /* Validate the state buffer. */
     gcmENDSTATEBUFFER_NEW(Hardware, reserve, memory, Memory);

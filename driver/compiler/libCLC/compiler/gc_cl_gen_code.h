@@ -1019,11 +1019,11 @@ clGetVectorIOperandSlice(
     } \
     while (gcvFALSE)
 
-#define clsIOPERAND_InitializeWithComponentSelection(operand, _dataType, _tempRegIndex, _componentSelection) \
+#define clsIOPERAND_InitializeWithComponentSelection(operand, _dataType, _regDataType, _tempRegIndex, _componentSelection) \
     do { \
         (operand)->dataType    = (_dataType); \
         (operand)->tempRegIndex    = (_tempRegIndex); \
-        (operand)->regDataType    = (_dataType); \
+        (operand)->regDataType    = (_regDataType); \
         (operand)->componentSelection = (_componentSelection); \
     } \
     while (gcvFALSE)

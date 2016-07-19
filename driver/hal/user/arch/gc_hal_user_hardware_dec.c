@@ -16,8 +16,7 @@
 /* Zone used for header/footer. */
 #define _GC_OBJ_ZONE    gcvZONE_HARDWARE
 
-#if gcdENABLE_DEC_COMPRESSION
-
+#if gcdENABLE_2D
 typedef enum _gcePLANAR
 {
    gcvDEC_PLANAR_ONE,
@@ -135,11 +134,22 @@ gcoDECHARDWARE_SetFormatConfig(
         {
             switch (Format)
             {
+                case gcvSURF_A1R5G5B5:
+                    config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
+                    config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
+ 21:20))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 21:20) - (0 ? 21:20) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ? 21:20)));
+                    break;
+
                 case gcvSURF_A8R8G8B8:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x00 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
  21:20))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 21:20) - (0 ? 21:20) + 1) == 32) ?
@@ -148,9 +158,9 @@ gcoDECHARDWARE_SetFormatConfig(
 
                 case gcvSURF_R8G8B8A8:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x00 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
  21:20))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 21:20) - (0 ? 21:20) + 1) == 32) ?
@@ -159,9 +169,9 @@ gcoDECHARDWARE_SetFormatConfig(
 
                 case gcvSURF_A8B8G8R8:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x00 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
  21:20))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 21:20) - (0 ? 21:20) + 1) == 32) ?
@@ -170,9 +180,9 @@ gcoDECHARDWARE_SetFormatConfig(
 
                 case gcvSURF_B8G8R8A8:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x00 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
  21:20))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ? 21:20) - (0 ? 21:20) + 1) == 32) ?
@@ -181,9 +191,9 @@ gcoDECHARDWARE_SetFormatConfig(
 
                 case gcvSURF_X8R8G8B8:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
  21:20))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 21:20) - (0 ? 21:20) + 1) == 32) ?
@@ -192,9 +202,9 @@ gcoDECHARDWARE_SetFormatConfig(
 
                 case gcvSURF_R8G8B8X8:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
  21:20))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 21:20) - (0 ? 21:20) + 1) == 32) ?
@@ -203,9 +213,9 @@ gcoDECHARDWARE_SetFormatConfig(
 
                 case gcvSURF_X8B8G8R8:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
  21:20))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 21:20) - (0 ? 21:20) + 1) == 32) ?
@@ -214,9 +224,9 @@ gcoDECHARDWARE_SetFormatConfig(
 
                 case gcvSURF_B8G8R8X8:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
  21:20))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ? 21:20) - (0 ? 21:20) + 1) == 32) ?
@@ -226,55 +236,65 @@ gcoDECHARDWARE_SetFormatConfig(
                 case gcvSURF_A8:
                 case gcvSURF_R8:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x5 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x05 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     break;
 
                 case gcvSURF_RG16:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x6 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x06 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
+                    break;
+
+                case gcvSURF_A2R10G10B10:
+                    config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x0F & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     break;
 
                 case gcvSURF_UYVY:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x03 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     break;
 
                 case gcvSURF_YUY2:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x4 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x04 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     break;
 
                 case gcvSURF_I420:
                 case gcvSURF_YV12:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x5 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x05 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     break;
 
                 case gcvSURF_NV12:
                 case gcvSURF_NV16:
+                case gcvSURF_NV12_10BIT:
+                case gcvSURF_NV16_10BIT:
+                case gcvSURF_P010:
                     if (Plane == gcvDEC_PLANAR_ONE)
                     {
                         config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x5 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x05 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     }
                     else
                     {
                         config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x6 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x06 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     }
                     break;
 
@@ -286,11 +306,22 @@ gcoDECHARDWARE_SetFormatConfig(
         {
             switch (Format)
             {
+                case gcvSURF_A1R5G5B5:
+                    config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
+                    config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
+ 21:20))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 21:20) - (0 ? 21:20) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ? 21:20)));
+                    break;
+
                 case gcvSURF_A8R8G8B8:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x00 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
  21:20))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 21:20) - (0 ? 21:20) + 1) == 32) ?
@@ -299,9 +330,9 @@ gcoDECHARDWARE_SetFormatConfig(
 
                 case gcvSURF_R8G8B8A8:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x00 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
  21:20))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 21:20) - (0 ? 21:20) + 1) == 32) ?
@@ -310,9 +341,9 @@ gcoDECHARDWARE_SetFormatConfig(
 
                 case gcvSURF_A8B8G8R8:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x00 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
  21:20))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 21:20) - (0 ? 21:20) + 1) == 32) ?
@@ -321,9 +352,9 @@ gcoDECHARDWARE_SetFormatConfig(
 
                 case gcvSURF_B8G8R8A8:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x00 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
  21:20))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ? 21:20) - (0 ? 21:20) + 1) == 32) ?
@@ -332,9 +363,9 @@ gcoDECHARDWARE_SetFormatConfig(
 
                 case gcvSURF_X8R8G8B8:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
  21:20))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 21:20) - (0 ? 21:20) + 1) == 32) ?
@@ -343,9 +374,9 @@ gcoDECHARDWARE_SetFormatConfig(
 
                 case gcvSURF_R8G8B8X8:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
  21:20))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 21:20) - (0 ? 21:20) + 1) == 32) ?
@@ -354,9 +385,9 @@ gcoDECHARDWARE_SetFormatConfig(
 
                 case gcvSURF_X8B8G8R8:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
  21:20))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 21:20) - (0 ? 21:20) + 1) == 32) ?
@@ -365,9 +396,9 @@ gcoDECHARDWARE_SetFormatConfig(
 
                 case gcvSURF_B8G8R8X8:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  21:20) - (0 ? 21:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 21:20) - (0 ? 21:20) + 1))))))) << (0 ?
  21:20))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ? 21:20) - (0 ? 21:20) + 1) == 32) ?
@@ -377,55 +408,65 @@ gcoDECHARDWARE_SetFormatConfig(
                 case gcvSURF_A8:
                 case gcvSURF_R8:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x5 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x05 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     break;
 
                 case gcvSURF_RG16:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x6 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x06 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
+                    break;
+
+                case gcvSURF_A2R10G10B10:
+                    config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x0F & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     break;
 
                 case gcvSURF_UYVY:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x03 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     break;
 
                 case gcvSURF_YUY2:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x4 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x04 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     break;
 
                 case gcvSURF_I420:
                 case gcvSURF_YV12:
                     config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x5 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x05 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     break;
 
                 case gcvSURF_NV12:
                 case gcvSURF_NV16:
+                case gcvSURF_NV12_10BIT:
+                case gcvSURF_NV16_10BIT:
+                case gcvSURF_P010:
                     if (Plane == gcvDEC_PLANAR_ONE)
                     {
                         config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x5 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x05 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     }
                     else
                     {
                         config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 6:3) - (0 ? 6:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ?
- 6:3))) | (((gctUINT32) (0x6 & ((gctUINT32) ((((1 ? 6:3) - (0 ? 6:3) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 6:3) - (0 ? 6:3) + 1))))))) << (0 ? 6:3)));
+ 7:3) - (0 ? 7:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ?
+ 7:3))) | (((gctUINT32) (0x06 & ((gctUINT32) ((((1 ? 7:3) - (0 ? 7:3) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 7:3) - (0 ? 7:3) + 1))))))) << (0 ? 7:3)));
                     }
                     break;
 
@@ -636,6 +677,115 @@ OnError:
     return status;
 }
 
+static gceSTATUS
+gcoDECHARDWARE_SetTilingConfig(
+    IN gceTILING Tiling,
+    IN gcePLANAR Plane,
+    IN gctBOOL IsRead,
+    IN OUT gctUINT32* Config
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT32 config = 0;
+
+    if (Config == gcvNULL)
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+    else
+    {
+        switch (Tiling)
+        {
+            case gcvTILED:
+                config = IsRead ? ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:25) - (0 ? 29:25) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ?
+ 29:25))) | (((gctUINT32) (0x05 & ((gctUINT32) ((((1 ? 29:25) - (0 ? 29:25) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ? 29:25))) :
+                                  ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:25) - (0 ? 29:25) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ?
+ 29:25))) | (((gctUINT32) (0x05 & ((gctUINT32) ((((1 ? 29:25) - (0 ? 29:25) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ? 29:25)));
+                break;
+
+            case gcvTILED_4X8:
+                config = IsRead ? ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:25) - (0 ? 29:25) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ?
+ 29:25))) | (((gctUINT32) (0x04 & ((gctUINT32) ((((1 ? 29:25) - (0 ? 29:25) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ? 29:25))) :
+                                  ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:25) - (0 ? 29:25) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ?
+ 29:25))) | (((gctUINT32) (0x04 & ((gctUINT32) ((((1 ? 29:25) - (0 ? 29:25) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ? 29:25)));
+                break;
+
+            case gcvTILED_8X4:
+                config = IsRead ? ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:25) - (0 ? 29:25) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ?
+ 29:25))) | (((gctUINT32) (0x03 & ((gctUINT32) ((((1 ? 29:25) - (0 ? 29:25) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ? 29:25))) :
+                                  ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:25) - (0 ? 29:25) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ?
+ 29:25))) | (((gctUINT32) (0x03 & ((gctUINT32) ((((1 ? 29:25) - (0 ? 29:25) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ? 29:25)));
+                break;
+
+            case gcvTILED_32X4:
+                config = IsRead ? ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:25) - (0 ? 29:25) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ?
+ 29:25))) | (((gctUINT32) (0x08 & ((gctUINT32) ((((1 ? 29:25) - (0 ? 29:25) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ? 29:25))) :
+                                  ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:25) - (0 ? 29:25) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ?
+ 29:25))) | (((gctUINT32) (0x08 & ((gctUINT32) ((((1 ? 29:25) - (0 ? 29:25) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ? 29:25)));
+                break;
+
+            case gcvTILED_64X4:
+                config = IsRead ? ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:25) - (0 ? 29:25) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ?
+ 29:25))) | (((gctUINT32) (0x07 & ((gctUINT32) ((((1 ? 29:25) - (0 ? 29:25) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ? 29:25))) :
+                                  ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:25) - (0 ? 29:25) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ?
+ 29:25))) | (((gctUINT32) (0x07 & ((gctUINT32) ((((1 ? 29:25) - (0 ? 29:25) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ? 29:25)));
+                break;
+
+            case gcvSUPERTILED:
+            case gcvTILED_8X8_XMAJOR:
+                config = IsRead ? ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:25) - (0 ? 29:25) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ?
+ 29:25))) | (((gctUINT32) (0x00 & ((gctUINT32) ((((1 ? 29:25) - (0 ? 29:25) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ? 29:25))) :
+                                  ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:25) - (0 ? 29:25) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ?
+ 29:25))) | (((gctUINT32) (0x00 & ((gctUINT32) ((((1 ? 29:25) - (0 ? 29:25) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ? 29:25)));
+                break;
+
+            case gcvTILED_8X8_YMAJOR:
+                config = IsRead ? ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:25) - (0 ? 29:25) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ?
+ 29:25))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 29:25) - (0 ? 29:25) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ? 29:25))) :
+                                  ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:25) - (0 ? 29:25) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ?
+ 29:25))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 29:25) - (0 ? 29:25) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 29:25) - (0 ? 29:25) + 1))))))) << (0 ? 29:25)));
+                break;
+
+            default:
+                gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+        }
+
+        config = *Config;
+    }
+
+OnError:
+    *Config = config;
+    return status;
+}
+
 static gctUINT32
 gcoDECHARDWARE_YUVFormatPlanar(
     IN gceSURF_FORMAT Format
@@ -652,6 +802,11 @@ gcoDECHARDWARE_YUVFormatPlanar(
     case gcvSURF_NV12:
     case gcvSURF_NV61:
     case gcvSURF_NV21:
+    case gcvSURF_NV12_10BIT:
+    case gcvSURF_NV21_10BIT:
+    case gcvSURF_NV16_10BIT:
+    case gcvSURF_NV61_10BIT:
+    case gcvSURF_P010:
         return 2;
     case gcvSURF_I420:
     case gcvSURF_YV12:
@@ -661,7 +816,37 @@ gcoDECHARDWARE_YUVFormatPlanar(
         return 0;
     }
 }
+
 #endif
+
+static gctBOOL
+gcoDECHARDWARE_IsOnePlanar(
+    IN gceSURF_FORMAT Format
+    )
+{
+    switch (Format)
+    {
+    case gcvSURF_YUY2:
+    case gcvSURF_UYVY:
+    case gcvSURF_YVYU:
+    case gcvSURF_VYUY:
+    case gcvSURF_NV16:
+    case gcvSURF_NV12:
+    case gcvSURF_NV61:
+    case gcvSURF_NV21:
+    case gcvSURF_NV12_10BIT:
+    case gcvSURF_NV21_10BIT:
+    case gcvSURF_NV16_10BIT:
+    case gcvSURF_NV61_10BIT:
+    case gcvSURF_P010:
+    case gcvSURF_I420:
+    case gcvSURF_YV12:
+        return gcvFALSE;
+
+    default:
+        return gcvTRUE;
+    }
+}
 
 gceSTATUS
 gcoDECHARDWARE_CheckSurface(
@@ -669,44 +854,49 @@ gcoDECHARDWARE_CheckSurface(
     IN gcoSURF Surface
     )
 {
+    gceSTATUS status = gcvSTATUS_OK;
     gctINT res = gcvTRUE;
     gctUINT32 address;
     gcsSURF_FORMAT_INFO_PTR formatInfo;
 
-    if (Surface->tileStatusConfig & gcv2D_TSC_DEC_COMPRESSED)
+    if (Hardware->features[gcvFEATURE_DEC300_COMPRESSION])
     {
-        gcmGETHARDWAREADDRESS(Surface->node, address);
-        gcmONERROR(gcoHARDWARE_QueryFormat(Surface->format, &formatInfo));
+        if (Surface->tileStatusConfig & gcv2D_TSC_DEC_COMPRESSED)
+        {
+            gcmGETHARDWAREADDRESS(Surface->node, address);
+            gcmONERROR(gcoHARDWARE_QueryFormat(Surface->format, &formatInfo));
 
-        if (!Hardware->features[gcvFEATURE_DEC_COMPRESSION] ||
-            (Surface->tileStatusConfig & gcv2D_TSC_DEC_TPC
-             && !Hardware->features[gcvFEATURE_DEC_TPC_COMPRESSION]))
-        {
-            res = gcvFALSE;
+            if (!Hardware->features[gcvFEATURE_DEC_COMPRESSION] ||
+                (Surface->tileStatusConfig & gcv2D_TSC_DEC_TPC
+                 && !Hardware->features[gcvFEATURE_DEC_TPC_COMPRESSION]))
+            {
+                res = gcvFALSE;
+            }
+            else if (address & (formatInfo->bitsPerPixel * 2 - 1))
+            {
+                /* Physical address must be 16 pixels aligned. */
+                res = gcvFALSE;
+            }
+            else if (Surface->stride & 15)
+            {
+                /* Stride must be 16 pixels aligned. */
+                res = gcvFALSE;
+            }
+            else if (Surface->alignedH & 7)
+            {
+                /* Height must be 8 pixels aligned. */
+                res = gcvFALSE;
+            }
         }
-        else if (address & (formatInfo->bitsPerPixel * 2 - 1))
+
+        if (res == gcvFALSE)
         {
-            /* Physical address must be 16 pixels aligned. */
-            res = gcvFALSE;
-        }
-        else if (Surface->stride & 15)
-        {
-            /* Stride must be 16 pixels aligned. */
-            res = gcvFALSE;
-        }
-        else if (Surface->alignedH & 7)
-        {
-            /* Height must be 8 pixels aligned. */
-            res = gcvFALSE;
+            status = gcvSTATUS_NOT_SUPPORTED;
         }
     }
 
-    if (res == gcvFALSE)
-    {
-        return gcvSTATUS_NOT_SUPPORTED;
-    }
-
-    return gcvSTATUS_OK;
+OnError:
+        return status;
 }
 
 gceSTATUS
@@ -799,12 +989,12 @@ gcoDECHARDWARE_EnableDECCompression(
     gctUINT32 config;
 
 #if gcdDEC_ENABLE_AHB
-    config = ((((gctUINT32) (0x0000EE08)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    config = ((((gctUINT32) (0x0000EE0A)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:22) - (0 ? 22:22) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 22:22) - (0 ? 22:22) + 1))))))) << (0 ?
  22:22))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 22:22) - (0 ? 22:22) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 22:22) - (0 ? 22:22) + 1))))))) << (0 ? 22:22)));
 #else
-    config = ((((gctUINT32) (0x0000EE08)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    config = ((((gctUINT32) (0x0000EE0A)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:22) - (0 ? 22:22) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 22:22) - (0 ? 22:22) + 1))))))) << (0 ?
  22:22))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 22:22) - (0 ? 22:22) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 22:22) - (0 ? 22:22) + 1))))))) << (0 ? 22:22)));
@@ -853,7 +1043,7 @@ gcoDECHARDWARE_SetSrcDECCompression(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gctBOOL enable, data3D, msaa, tpcEnable, tpcComEnable;
-    gceSURF_FORMAT format;
+    gceSURF_FORMAT format = gcvSURF_UNKNOWN;
     gctUINT32 address;
 
     enable = TileStatusConfig & gcv2D_TSC_DEC_COMPRESSED;
@@ -862,9 +1052,17 @@ gcoDECHARDWARE_SetSrcDECCompression(
     tpcEnable = (TileStatusConfig & gcv2D_TSC_DEC_TPC);
     tpcComEnable = (TileStatusConfig & gcv2D_TSC_DEC_TPC_COMPRESSED);
 
-    if (ReadId > 15)
+    if (Hardware->features[gcvFEATURE_DEC300_COMPRESSION] && ReadId > 15)
     {
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+    else if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+    {
+        if ((gcoDECHARDWARE_IsOnePlanar(Surface->format) && ReadId > 7) ||
+            (!gcoDECHARDWARE_IsOnePlanar(Surface->format) && ReadId > 3))
+        {
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
     }
 
 #if !gcdDEC_ENABLE_AHB
@@ -878,10 +1076,22 @@ gcoDECHARDWARE_SetSrcDECCompression(
         /* Non-DEC_Compression or Only DEC TPC DeTile */
         if (!enable || (tpcEnable && !tpcComEnable))
         {
-            regOffset[0] = (ReadId + 8)  << 2;
-            /* For YUV format */
-            regOffset[1] = (ReadId + 9)  << 2;
-            regOffset[2] = (ReadId + 10) << 2;
+            if (Hardware->features[gcvFEATURE_DEC300_COMPRESSION])
+            {
+                regOffset[0] = (ReadId + 8)  << 2;
+                /* For YUV format */
+                regOffset[1] = (ReadId + 9)  << 2;
+                regOffset[2] = (ReadId + 10) << 2;
+            }
+            else if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+            {
+                regOffset[0] = (ReadId + 8)  << 2;
+                /* UV of DEC400 use 1 2 3 6 */
+                if (ReadId == 3)
+                    regOffset[1] = 6 << 2;
+                else
+                    regOffset[1] = (ReadId + 1) << 2;
+            }
 
             /* Disable DEC 2D & 3D compression. */
             config = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -900,7 +1110,7 @@ gcoDECHARDWARE_SetSrcDECCompression(
                 ));
 
             /* Disable DEC TPC compression. */
-            if (ReadId < 4)
+            if (Hardware->features[gcvFEATURE_DEC300_COMPRESSION] && ReadId < 4)
             {
                 /* Currently only support NV12 format. 0 is Y, 1 is UV */
                 /* Y of DEC TPC use 8 9 10 11 */
@@ -934,12 +1144,26 @@ gcoDECHARDWARE_SetSrcDECCompression(
         }
         else
         {
-            if (!tpcEnable)
+            if (!tpcEnable || Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
             {
-                regOffset[0] = (ReadId + 8)  << 2;
-                /* For YUV format */
-                regOffset[1] = (ReadId + 9)  << 2;
-                regOffset[2] = (ReadId + 10) << 2;
+                tpcEnable = gcvFALSE;
+
+                if (Hardware->features[gcvFEATURE_DEC300_COMPRESSION])
+                {
+                    regOffset[0] = (ReadId + 8)  << 2;
+                    /* For YUV format */
+                    regOffset[1] = (ReadId + 9)  << 2;
+                    regOffset[2] = (ReadId + 10) << 2;
+                }
+                else if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+                {
+                    regOffset[0] = (ReadId + 8)  << 2;
+                    /* UV of DEC400 use 1 2 3 6 */
+                    if (ReadId == 3)
+                        regOffset[1] = 6 << 2;
+                    else
+                        regOffset[1] = (ReadId + 1) << 2;
+                }
 
                 /* 2D or 3D compression */
                 if (!data3D)
@@ -960,8 +1184,13 @@ gcoDECHARDWARE_SetSrcDECCompression(
  ~0 : (~(~0 << ((1 ? 2:1) - (0 ? 2:1) + 1))))))) << (0 ? 2:1)));
 
                     gcmONERROR(gcoDECHARDWARE_SetFormatConfig(format, gcvDEC_PLANAR_ONE, gcvTRUE, gcvFALSE, &config));
+
+                    if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+                    {
+                        gcmONERROR(gcoDECHARDWARE_SetTilingConfig(Surface->tiling, gcvDEC_PLANAR_ONE, gcvTRUE, &config));
+                    }
                 }
-                else
+                else if (Hardware->features[gcvFEATURE_DEC300_COMPRESSION])
                 {
                     format = Surface->format;
 
@@ -1001,7 +1230,7 @@ gcoDECHARDWARE_SetSrcDECCompression(
                     config
                     ));
             }
-            else
+            else if (Hardware->features[gcvFEATURE_DEC300_COMPRESSION])
             {
                 /* TPC DEC compression */
                 if (ReadId > 3 || Surface->format != gcvSURF_NV12)
@@ -1044,10 +1273,10 @@ gcoDECHARDWARE_SetSrcDECCompression(
                     Hardware,
                     0x18240 + regOffsetEx[0],
                     ((((gctUINT32) (configEx)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 12:3) - (0 ? 12:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 12:3) - (0 ? 12:3) + 1))))))) << (0 ?
- 12:3))) | (((gctUINT32) ((gctUINT32) (width) & ((gctUINT32) ((((1 ? 12:3) - (0 ?
- 12:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 12:3) - (0 ? 12:3) + 1))))))) << (0 ?
- 12:3))) |
+ 15:3) - (0 ? 15:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:3) - (0 ? 15:3) + 1))))))) << (0 ?
+ 15:3))) | (((gctUINT32) ((gctUINT32) (width) & ((gctUINT32) ((((1 ? 15:3) - (0 ?
+ 15:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:3) - (0 ? 15:3) + 1))))))) << (0 ?
+ 15:3))) |
                     ((((gctUINT32) (configEx)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:2) - (0 ? 2:2) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ?
  2:2))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 2:2) - (0 ? 2:2) + 1) == 32) ?
@@ -1075,13 +1304,18 @@ gcoDECHARDWARE_SetSrcDECCompression(
                 {
                     gcmONERROR(gcoDECHARDWARE_SetFormatConfig(format, gcvDEC_PLANAR_TWO, gcvTRUE, gcvFALSE, &config));
 
+                    if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+                    {
+                        gcmONERROR(gcoDECHARDWARE_SetTilingConfig(Surface->tiling, gcvDEC_PLANAR_TWO, gcvTRUE, &config));
+                    }
+
                     gcmONERROR(gcoDECHARDWARE_UploadData(
                         Hardware,
                         0x18000 + regOffset[1],
                         config
                         ));
                 }
-                else
+                else if (Hardware->features[gcvFEATURE_DEC300_COMPRESSION])
                 {
                     if (!Surface->srcDECTPC10BitNV12)
                     {
@@ -1096,10 +1330,10 @@ gcoDECHARDWARE_SetSrcDECCompression(
                         Hardware,
                         0x18240 + regOffsetEx[1],
                         ((((gctUINT32) (configEx)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 12:3) - (0 ? 12:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 12:3) - (0 ? 12:3) + 1))))))) << (0 ?
- 12:3))) | (((gctUINT32) ((gctUINT32) (width) & ((gctUINT32) ((((1 ? 12:3) - (0 ?
- 12:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 12:3) - (0 ? 12:3) + 1))))))) << (0 ?
- 12:3))) |
+ 15:3) - (0 ? 15:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:3) - (0 ? 15:3) + 1))))))) << (0 ?
+ 15:3))) | (((gctUINT32) ((gctUINT32) (width) & ((gctUINT32) ((((1 ? 15:3) - (0 ?
+ 15:3) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:3) - (0 ? 15:3) + 1))))))) << (0 ?
+ 15:3))) |
                         ((((gctUINT32) (configEx)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:2) - (0 ? 2:2) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ?
  2:2))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 2:2) - (0 ? 2:2) + 1) == 32) ?
@@ -1121,7 +1355,8 @@ gcoDECHARDWARE_SetSrcDECCompression(
                     Surface->tileStatusGpuAddressEx[0]
                     ));
 
-                if (!tpcEnable && Surface->node.physical3 && Surface->tileStatusGpuAddressEx[1])
+                if (Hardware->features[gcvFEATURE_DEC300_COMPRESSION] &&
+                    !tpcEnable && Surface->node.physical3 && Surface->tileStatusGpuAddressEx[1])
                 {
                     gcmONERROR(gcoDECHARDWARE_SetFormatConfig(format, gcvDEC_PLANAR_THREE, gcvTRUE, gcvFALSE, &config));
 
@@ -1147,6 +1382,7 @@ gcoDECHARDWARE_SetSrcDECCompression(
         }
     }
 #else
+    if (Hardware->features[gcvFEATURE_DEC300_COMPRESSION])
     {
         gcsHAL_INTERFACE iface;
 
@@ -1187,6 +1423,7 @@ gcoDECHARDWARE_SetSrcDECCompression(
     }
 #endif
 
+    if (Hardware->features[gcvFEATURE_DEC300_COMPRESSION])
     {
         gctUINT32 configEx2 = 0;
 
@@ -1250,22 +1487,30 @@ gcoDECHARDWARE_SetDstDECCompression(
 #if !gcdDEC_ENABLE_AHB
     gctBOOL enable;
     gctUINT32 configR = 0, configW = 0;
-    gctUINT32 regOffsetR[3], regOffsetW[3];
+    gctUINT32 regOffsetR[3]={0}, regOffsetW[3]={0};
 
-    if (WriteId > 7)
+    if (Hardware->features[gcvFEATURE_DEC300_COMPRESSION])
     {
-        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        if (WriteId > 7 || ReadId > 7)
+        {
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+        else
+        {
+            regOffsetR[0] = 0 << 2;
+            regOffsetW[0] = 1 << 2;
+
+            /* For YUV format */
+            regOffsetR[1] = 1 << 2;
+            regOffsetW[1] = 2 << 2;
+            regOffsetR[2] = 2 << 2;
+            regOffsetW[2] = 3 << 2;
+        }
     }
-    else
+    else if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
     {
         regOffsetR[0] = 0 << 2;
         regOffsetW[0] = 1 << 2;
-
-        /* For YUV format */
-        regOffsetR[1] = 1 << 2;
-        regOffsetW[1] = 2 << 2;
-        regOffsetR[2] = 2 << 2;
-        regOffsetW[2] = 3 << 2;
     }
 
     gcmGETHARDWAREADDRESS(Surface->node, address);
@@ -1296,6 +1541,11 @@ gcoDECHARDWARE_SetDstDECCompression(
 
         gcmONERROR(gcoDECHARDWARE_SetFormatConfig(format, gcvDEC_PLANAR_ONE, gcvTRUE, gcvFALSE, &configR));
 
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        {
+            gcmONERROR(gcoDECHARDWARE_SetTilingConfig(Surface->tiling, gcvDEC_PLANAR_ONE, gcvTRUE, &configR));
+        }
+
         configR = ((((gctUINT32) (configR)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:1) - (0 ? 2:1) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:1) - (0 ? 2:1) + 1))))))) << (0 ?
  2:1))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 2:1) - (0 ? 2:1) + 1) == 32) ?
@@ -1323,6 +1573,11 @@ gcoDECHARDWARE_SetDstDECCompression(
     if (enable && Surface->node.physical2 && Surface->tileStatusGpuAddressEx[0])
     {
         gcmONERROR(gcoDECHARDWARE_SetFormatConfig(format, gcvDEC_PLANAR_TWO, gcvTRUE, gcvFALSE, &configR));
+
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        {
+            gcmONERROR(gcoDECHARDWARE_SetTilingConfig(Surface->tiling, gcvDEC_PLANAR_TWO, gcvTRUE, &configR));
+        }
 
         gcmONERROR(gcoDECHARDWARE_UploadData(
             Hardware,
@@ -1366,7 +1621,6 @@ gcoDECHARDWARE_SetDstDECCompression(
         }
     }
 
-
     /* Set DST write client. */
     if (!enable)
     {
@@ -1383,6 +1637,11 @@ gcoDECHARDWARE_SetDstDECCompression(
  ~0 : (~(~0 << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));
 
         gcmONERROR(gcoDECHARDWARE_SetFormatConfig(format, gcvDEC_PLANAR_ONE, gcvFALSE, gcvFALSE, &configW));
+
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        {
+            gcmONERROR(gcoDECHARDWARE_SetTilingConfig(Surface->tiling, gcvDEC_PLANAR_ONE, gcvFALSE, &configW));
+        }
 
         configW = ((((gctUINT32) (configW)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:1) - (0 ? 2:1) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:1) - (0 ? 2:1) + 1))))))) << (0 ?
@@ -1411,6 +1670,11 @@ gcoDECHARDWARE_SetDstDECCompression(
     if (enable && Surface->node.physical2 && Surface->tileStatusGpuAddressEx[0])
     {
         gcmONERROR(gcoDECHARDWARE_SetFormatConfig(format, gcvDEC_PLANAR_TWO, gcvTRUE, gcvFALSE, &configW));
+
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        {
+            gcmONERROR(gcoDECHARDWARE_SetTilingConfig(Surface->tiling, gcvDEC_PLANAR_TWO, gcvFALSE, &configW));
+        }
 
         gcmONERROR(gcoDECHARDWARE_UploadData(
             Hardware,
@@ -1461,28 +1725,31 @@ gcoDECHARDWARE_SetDstDECCompression(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    gcmGETHARDWAREADDRESS(Surface->node, address);
+    if (Hardware->features[gcvFEATURE_DEC300_COMPRESSION])
+    {
+        gcmGETHARDWAREADDRESS(Surface->node, address);
 
-    gcmONERROR(gcoHARDWARE_TranslateXRGBFormat(
-        Hardware,
-        Surface->format,
-        &format
-        ));
+        gcmONERROR(gcoHARDWARE_TranslateXRGBFormat(
+            Hardware,
+            Surface->format,
+            &format
+            ));
 
-    gcoOS_ZeroMemory(&iface, sizeof(iface));
+        gcoOS_ZeroMemory(&iface, sizeof(iface));
 
-    iface.command = gcvHAL_DEC300_WRITE;
-    iface.u.DEC300Write.enable = TileStatusConfig & gcv2D_TSC_DEC_COMPRESSED;
-    iface.u.DEC300Write.readId = 0;
-    iface.u.DEC300Write.writeId = 1;
-    iface.u.DEC300Write.format = gcoDECHARDWARE_TranslateAHBFormat(format);
-    iface.u.DEC300Write.surfAddr = address;
-    iface.u.DEC300Write.tileAddr = Surface->tileStatusGpuAddress;
+        iface.command = gcvHAL_DEC300_WRITE;
+        iface.u.DEC300Write.enable = TileStatusConfig & gcv2D_TSC_DEC_COMPRESSED;
+        iface.u.DEC300Write.readId = 0;
+        iface.u.DEC300Write.writeId = 1;
+        iface.u.DEC300Write.format = gcoDECHARDWARE_TranslateAHBFormat(format);
+        iface.u.DEC300Write.surfAddr = address;
+        iface.u.DEC300Write.tileAddr = Surface->tileStatusGpuAddress;
 
-    gcmONERROR(gcoOS_DeviceControl(gcvNULL,
-                                   IOCTL_GCHAL_INTERFACE,
-                                   &iface, gcmSIZEOF(iface),
-                                   &iface, gcmSIZEOF(iface)));
+        gcmONERROR(gcoOS_DeviceControl(gcvNULL,
+                                       IOCTL_GCHAL_INTERFACE,
+                                       &iface, gcmSIZEOF(iface),
+                                       &iface, gcmSIZEOF(iface)));
+    }
 #endif
 
 OnError:
@@ -1499,9 +1766,6 @@ gcoDECHARDWARE_FlushDECCompression(
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmGETHARDWARE(Hardware);
-
-    /* Verify the arguments. */
-    gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
 
     if (!Hardware->hw2DCurrentRenderCompressed)
     {
@@ -1548,11 +1812,11 @@ gcoDECHARDWARE_FlushDECCompression(
         gcmONERROR(gcoDECHARDWARE_UploadData(
             Hardware,
             0x18180,
-            ((((gctUINT32) (0x0000EE08)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            ((((gctUINT32) (0x0000EE0A)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ? 0:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
  0:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))) |
-            ((((gctUINT32) (0x0000EE08)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            ((((gctUINT32) (0x0000EE0A)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:1) - (0 ? 1:1) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ?
  1:1))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 1:1) - (0 ? 1:1) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1)))
@@ -1565,72 +1829,5 @@ gcoDECHARDWARE_FlushDECCompression(
 OnError:
     return status;
 }
-
-#else
-
-gceSTATUS
-gcoDECHARDWARE_CheckSurface(
-    IN gcoHARDWARE Hardware,
-    IN gcoSURF Surface
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-gcoDECHARDWARE_QueryStateCmdLen(
-    IN gcoHARDWARE Hardware,
-    IN gcs2D_State_PTR State,
-    IN gce2D_COMMAND Command,
-    OUT gctUINT32* Size
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-gcoDECHARDWARE_EnableDECCompression(
-    IN gcoHARDWARE Hardware,
-    IN gctBOOL Enable
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-gcoDECHARDWARE_SetSrcDECCompression(
-    IN gcoHARDWARE Hardware,
-    IN gcoSURF Surface,
-    IN gce2D_TILE_STATUS_CONFIG TileStatusConfig,
-    IN gctUINT32 ReadId,
-    IN gctBOOL FastClear,
-    IN gctUINT32 ClearValue
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-gcoDECHARDWARE_SetDstDECCompression(
-    IN gcoHARDWARE Hardware,
-    IN gcoSURF Surface,
-    IN gce2D_TILE_STATUS_CONFIG TileStatusConfig,
-    IN gctUINT32 ReadId,
-    IN gctUINT32 WriteId
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-gcoDECHARDWARE_FlushDECCompression(
-    IN gcoHARDWARE Hardware,
-    IN gctBOOL Flush,
-    IN gctBOOL Wait
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
 #endif
 

@@ -37,19 +37,19 @@ extern "C" {
 
 typedef struct _Face
 {
-	unsigned short f[3];
+    unsigned short f[3];
 } Face;
 
 typedef struct _Geodesic
 {
-	unsigned int vertex_count;
-	unsigned int face_count;
-	unsigned int edge_count;
+    unsigned int vertex_count;
+    unsigned int face_count;
+    unsigned int edge_count;
 
-	Vec3f* vertices;
-	Face* faces;
-	Vec3f* face_normals;
-	Vec3f* vertex_normals;
+    Vec3f* vertices;
+    Face* faces;
+    Vec3f* face_normals;
+    Vec3f* vertex_normals;
 } Geodesic;
 
 Geodesic* GeodesicConstruct(unsigned int Subdivide);

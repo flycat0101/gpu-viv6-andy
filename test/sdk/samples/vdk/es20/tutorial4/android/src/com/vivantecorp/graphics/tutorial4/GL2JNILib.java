@@ -1,5 +1,3 @@
-
-
 package com.vivantecorp.graphics.tutorial4;
 
 // Wrapper for native library

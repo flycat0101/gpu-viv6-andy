@@ -75,40 +75,40 @@ static gctCONST_STRING s_CaseDescription =
 
 typedef struct _MultiSrc
 {
-    gcoSURF			srcSurf;
-	gceSURF_FORMAT	srcFormat;
-	gctUINT			srcWidth;
-	gctUINT			srcHeight;
-	gctINT			srcStride[3];
+    gcoSURF            srcSurf;
+    gceSURF_FORMAT    srcFormat;
+    gctUINT            srcWidth;
+    gctUINT            srcHeight;
+    gctINT            srcStride[3];
     gctINT          srcStrideNum;
     gctINT          srcAddressNum;
-	gctUINT32		srcPhyAddr[3];
-	gctPOINTER		srcLgcAddr[3];
+    gctUINT32        srcPhyAddr[3];
+    gctPOINTER        srcLgcAddr[3];
 } MultiSrc, *MultiSrcPTR;
 
 typedef struct Test2D {
     GalTest     base;
     GalRuntime  *runtime;
 
-	// destination surface
-    gcoSURF			dstSurf;
-	gceSURF_FORMAT	dstFormat;
-	gctUINT			dstWidth;
-	gctUINT			dstHeight;
-	gctINT			dstStride;
-	gctUINT32		dstPhyAddr;
-	gctPOINTER		dstLgcAddr;
+    // destination surface
+    gcoSURF            dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT            dstWidth;
+    gctUINT            dstHeight;
+    gctINT            dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
 
-	// destination temp surface
-    gcoSURF			dstTempSurf;
-	gceSURF_FORMAT	dstTempFormat;
-	gctUINT			dstTempWidth;
-	gctUINT			dstTempHeight;
-	gctINT			dstTempStride;
-	gctUINT32		dstTempPhyAddr;
-	gctPOINTER		dstTempLgcAddr;
+    // destination temp surface
+    gcoSURF            dstTempSurf;
+    gceSURF_FORMAT    dstTempFormat;
+    gctUINT            dstTempWidth;
+    gctUINT            dstTempHeight;
+    gctINT            dstTempStride;
+    gctUINT32        dstTempPhyAddr;
+    gctPOINTER        dstTempLgcAddr;
 
-	//source surface
+    //source surface
     MultiSrc multiSrc[4];
 
 } Test2D;
@@ -226,7 +226,7 @@ static gce2D_PORTER_DUFF_RULE PorterDuffRule[] =
 
 static gceSURF_ROTATION rotationList [] =
 {
-	gcvSURF_0_DEGREE,
+    gcvSURF_0_DEGREE,
     gcvSURF_90_DEGREE,
     gcvSURF_180_DEGREE,
     gcvSURF_270_DEGREE,
@@ -237,18 +237,18 @@ static gceSURF_ROTATION rotationList [] =
 static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 {
     gceSTATUS status;
-	gcsRECT srcTempRect = {0, 0, t2d->dstWidth, t2d->dstWidth};
+    gcsRECT srcTempRect = {0, 0, t2d->dstWidth, t2d->dstWidth};
     gcsRECT Rect = {0, 0, t2d->dstTempWidth, t2d->dstTempHeight};
     gcsRECT dstRect = {0, 0, t2d->dstWidth, t2d->dstHeight};
     gco2D egn2D = t2d->runtime->engine2d;
     gctINT i, vOffset,hOffset;
-	gceSURF_ROTATION dstRot;
+    gceSURF_ROTATION dstRot;
 
     hOffset = 210;
-	vOffset = 210;
+    vOffset = 210;
 
-	srcTempRect = Rect;
-	/* draw result to display surface. */
+    srcTempRect = Rect;
+    /* draw result to display surface. */
     gcmONERROR(gco2D_SetGenericSource(
         egn2D,
         (gctUINT32_PTR)&t2d->multiSrc[0].srcPhyAddr, t2d->multiSrc[0].srcAddressNum,
@@ -259,10 +259,10 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         t2d->multiSrc[0].srcWidth,
         t2d->multiSrc[0].srcHeight));
 
-	srcTempRect.left = 0;
-	srcTempRect.top  = 0;
-	srcTempRect.right = srcTempRect.left + 640;
-	srcTempRect.bottom = srcTempRect.top + 480;
+    srcTempRect.left = 0;
+    srcTempRect.top  = 0;
+    srcTempRect.right = srcTempRect.left + 640;
+    srcTempRect.bottom = srcTempRect.top + 480;
 
     gcmONERROR(gco2D_SetSource(egn2D, &srcTempRect));
 
@@ -281,7 +281,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         &srcTempRect,
         &Rect
         ));
-	gcmONERROR(gco2D_SetClipping(egn2D, &Rect));
+    gcmONERROR(gco2D_SetClipping(egn2D, &Rect));
 
     gcmONERROR(gco2D_StretchBlit(
         egn2D,
@@ -312,7 +312,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         switch (i % 4)
         {
         case 0:
-			srcRect.left = srcRect.top  = srcRect.right = srcRect.bottom = 0;
+            srcRect.left = srcRect.top  = srcRect.right = srcRect.bottom = 0;
             break;
 
         case 1:
@@ -343,41 +343,41 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
             break;
         }
 
-		if(i != 0)
-		{
-			srcRect.right = srcRect.left + 240;
-			srcRect.bottom = srcRect.top + 240;
-		}
+        if(i != 0)
+        {
+            srcRect.right = srcRect.left + 240;
+            srcRect.bottom = srcRect.top + 240;
+        }
 
         gcmONERROR(gco2D_SetSource(egn2D, &srcRect));
 
         gcmONERROR(gco2D_SetROP(egn2D, 0xCC, 0xCC));
 
-	    switch(frameNo/gcmCOUNTOF(rotationList)){
-		    case 1:
-			    // disable mirror
-			    gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvFALSE, gcvFALSE));
-			    break;
-		    case 0:
-			    // enable horizontal mirror
-			    gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvTRUE, gcvFALSE));
-			    break;
-		    case 2:
-			    // enable vertical mirror
-			    gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvFALSE, gcvTRUE));
-			    break;
-		    case 3:
-			    // enable horizontal & vertical mirror
-			    gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvTRUE, gcvTRUE));
-			    break;
-		    default:
-			    return gcvFALSE;
-	    }
+        switch(frameNo/gcmCOUNTOF(rotationList)){
+            case 1:
+                // disable mirror
+                gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvFALSE, gcvFALSE));
+                break;
+            case 0:
+                // enable horizontal mirror
+                gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvTRUE, gcvFALSE));
+                break;
+            case 2:
+                // enable vertical mirror
+                gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvFALSE, gcvTRUE));
+                break;
+            case 3:
+                // enable horizontal & vertical mirror
+                gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvTRUE, gcvTRUE));
+                break;
+            default:
+                return gcvFALSE;
+        }
     }
 
     gcmONERROR(gco2D_SetClipping(egn2D, &Rect));
 
-	dstRot = rotationList[frameNo%gcmCOUNTOF(rotationList)];
+    dstRot = rotationList[frameNo%gcmCOUNTOF(rotationList)];
 
     gcmONERROR(gco2D_SetGenericTarget(
         egn2D,
@@ -391,8 +391,8 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
     gcmONERROR(gco2D_MultiSourceBlit(egn2D, 0xF, &Rect, 1));
 
-	// disable mirror
-	gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvFALSE, gcvFALSE));
+    // disable mirror
+    gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvFALSE, gcvFALSE));
 
     gcmONERROR(gco2D_Flush(egn2D));
 
@@ -482,7 +482,7 @@ static void CDECL Destroy(Test2D *t2d)
         }
     }
 
-	// destroy source surface
+    // destroy source surface
     for (i = 0; i < 4; i++)
     {
         MultiSrcPTR curSrc = &t2d->multiSrc[i];

@@ -81,7 +81,9 @@ BANK_CHANNEL_BIT    ?= 0
 USE_LOADTIME_OPT    ?= 1
 YOCTO_DRI_BUILD     ?= 0
 VSC_VIR_BUILD       ?= 1
+USE_EXA_G2D         ?= 0
 
+PLATFORM_CALLBACK   ?= platform/default/gc_hal_user_platform_default
 
 ################################################################
 # Option dependency.
@@ -89,13 +91,17 @@ VSC_VIR_BUILD       ?= 1
 ifeq ($(VIVANTE_ENABLE_3D),1)
   ifeq ($(USE_OPENCL),1)
     BUILD_OPENCL_ICD:= 1
-    BUILD_OPENCL_FP := 0
+    BUILD_OPENCL_FP := 1
+    ENABLE_CL_GL    := 0
   else
     BUILD_OPENCL_ICD:= 0
+    BUILD_OPENCL_FP := 0
+    ENABLE_CL_GL    := 0
   endif
 else
-  BUILD_OPENCL_ICD  := 1
+  BUILD_OPENCL_ICD  := 0
   BUILD_OPENCL_FP   := 0
+  ENABLE_CL_GL      := 0
 endif
 
 ifeq ($(VIVANTE_NO_VG),1)
@@ -115,14 +121,12 @@ endif
 ################################################################
 # Initialize build flags.
 
-ifeq ($(MAKELEVEL),0)
-  ORIG_CFLAGS       := $(CFLAGS)
-  ORIG_CXXFLAGS     := $(CXXFLAGS)
-  ORIG_LFLAGS       := $(LFLAGS)
-  ORIG_PFLAGS       := $(PFLAGS)
+ORIG_CFLAGS       ?= $(CFLAGS)
+ORIG_CXXFLAGS     ?= $(CXXFLAGS)
+ORIG_LFLAGS       ?= $(LFLAGS)
+ORIG_PFLAGS       ?= $(PFLAGS)
 
-  export ORIG_CFLAGS ORIG_CXXFLAGS ORIG_LFLAGS ORIG_PFLAGS
-endif
+export ORIG_CFLAGS ORIG_CXXFLAGS ORIG_LFLAGS ORIG_PFLAGS
 
 CFLAGS              := $(ORIG_CFLAGS)
 CXXFLAGS            := $(ORIG_CXXFLAGS)
@@ -153,6 +157,10 @@ else
   STRIP             := $(CROSS_COMPILE)strip
 endif
 
+ifeq ($(PKG_CONFIG),)
+  PKG_CONFIG        := $(CROSS_COMPILE)pkg-config
+endif
+
 ################################################################
 # Resource.
 
@@ -174,11 +182,6 @@ ifeq ($(DEBUG),1)
 else
   OBJ_DIR           ?= bin_r
 endif
-
-################################################################
-# switch to build halti driver instead of es2 driver
-
-BUILD_HALTI         ?= 1
 
 ################################################################
 # Release directory.
@@ -239,7 +242,7 @@ endif
 
 ifneq ($(FPU),)
   CFLAGS            += -mfpu=$(FPU)
-  CXXFLAGS          += -mfloat-abi=$(FLOAT_ABI)
+  CXXFLAGS          += -mfpu=$(FPU)
 endif
 
 ifneq ($(FLOAT_ABI),)
@@ -307,13 +310,21 @@ ifeq ($(USE_BANK_ALIGNMENT),1)
   endif
 endif
 
+ifeq ($(EGL_API_GBM),1)
+  CFLAGS            += -DEGL_API_GBM -D__GBM__=1
+endif
+
+ifeq ($(EGL_API_NULLWS), 1)
+  CFLAGS            += -DEGL_API_NULLWS
+endif
+
 ifeq ($(EGL_API_FB), 1)
   CFLAGS            += -DEGL_API_FB
 endif
 
 ifeq ($(EGL_API_WL), 1)
-  CFLAGS            += -DEGL_API_WL -Wno-deprecated-declarations
-  LFLAGS            += -L$(ROOTFS_USR)/lib
+  CFLAGS            += -DEGL_API_WL -DWL_EGL_PLATFORM -Wno-deprecated-declarations
+  LFLAGS             += -L$(VIVANTE_SDK_LIB) -L$(ROOTFS_USR)/lib
 endif
 
 ifeq ($(EGL_API_DRI),1)
@@ -323,6 +334,7 @@ ifeq ($(EGL_API_DRI),1)
   endif
 
   CFLAGS            += -DEGL_API_DRI
+  CFLAGS            += -I$(X11_ARM_DIR)/include
   CFLAGS            += -I$(X11_ARM_DIR)/include/arm-linux-gnueabi
 endif
 
@@ -332,6 +344,7 @@ endif
 
 ifeq ($(EGL_API_X), 1)
   CFLAGS            += -DEGL_API_X
+  CFLAGS            += -I$(X11_ARM_DIR)/include
   CFLAGS            += -I$(X11_ARM_DIR)/include/arm-linux-gnueabi
 endif
 
@@ -376,7 +389,7 @@ endif
 
 CFLAGS              += -DgcdREGISTER_ACCESS_FROM_USER=1
 
-ifeq ($(gcdFPGA_BUILD),1)
+ifeq ($(FPGA_BUILD),1)
   CFLAGS            += -DgcdFPGA_BUILD=1
 else
   CFLAGS            += -DgcdFPGA_BUILD=0
@@ -420,8 +433,8 @@ CFLAGS              += -DVIVANTE_PROFILER_CONTEXT=1
 GAL_DIR             := $(AQROOT)/hal
 EGL_DIR             := $(AQROOT)/driver/khronos/libEGL
 GLES11_DIR          := $(AQROOT)/driver/khronos/libGLESv11
+GLES2X_DIR          := $(AQROOT)/driver/khronos/libGLESv3
 
-  GLES2X_DIR        := $(AQROOT)/driver/khronos/libGLESv3
 
 GLSLC_DIR           := $(AQROOT)/compiler/libGLSLC
 VSC_DIR             := $(AQROOT)/compiler/libVSC
@@ -429,7 +442,12 @@ VSC_DIR             := $(AQROOT)/compiler/libVSC
 VG113D_DIR          := $(AQROOT)/driver/khronos/libOpenVG_3D/vg11/driver
 VG112D_DIR          := $(AQROOT)/driver/khronos/libOpenVG
 GFX_DIR             := $(AQROOT)/driver/dfb
+
+ifeq ($(USE_EXA_G2D),1)
+EXA_DIR             := $(AQROOT)/driver/X/EXA_G2D/src
+else
 EXA_DIR             := $(AQROOT)/driver/X/EXA/src
+endif
 
 GL21_DIR            := $(AQROOT)/driver/khronos/libGL2
 
@@ -508,9 +526,3 @@ VVLAUNCHER_DIR      := $(ES2X_TEST_DIR)/vv_launcher
 VIDEOCUBE_DIR       := $(AQROOT)/test/es11/extern/VideoCube
 VC_TESTCASE_DIR     := $(AQROOT)/test/es20/vCompiler_Testcase
 
-
-################################################################################
-# Platform specific configs.
-
-THIRDPARTY_CUSTOMER ?=
-THIRDPARTY_TYPE     ?=

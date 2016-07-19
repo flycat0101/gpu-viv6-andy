@@ -1420,7 +1420,7 @@ _AttributeSource(
         gctINT16            childIndex;
 
         if (Code == gcvNULL || !gcmATTRIBUTE_isIOBlockMember(attribute) ||
-            attribute->nameLength < 0 || !attribute->name)
+            attribute->nameLength < 0)
         {
             break;
         }
@@ -1470,8 +1470,7 @@ _AttributeSource(
                                              (gctUINT)childIndex,
                                              &childAttri));
 
-            if (childAttri->name &&
-                gcmIS_SUCCESS(gcoOS_StrNCmp(attribute->name,
+            if (gcmIS_SUCCESS(gcoOS_StrNCmp(attribute->name,
                                             childAttri->name,
                                             nameLength)))
             {
@@ -4411,10 +4410,13 @@ gcLINKTREE_AddDependencyForCode(
     )
 {
     gctINT index;
-    gctINT regIndex;
+    gctUINT regIndex;
+    gcSL_TYPE sourceType;
 
     /* handle source 0 and its indexed */
-    switch (gcmSL_SOURCE_GET(code->source0, Type))
+    sourceType = (gcSL_TYPE)gcmSL_SOURCE_GET(code->source0, Type);
+
+    switch (sourceType)
     {
     case gcSL_TEMP:
         index = gcmSL_INDEX_GET(code->source0Index, Index);
@@ -4446,6 +4448,7 @@ gcLINKTREE_AddDependencyForCode(
     {
         regIndex = gcmSL_INDEX_GET(code->source0Index, Index);
         index = code->source0Indexed;
+
         if (!Tree->tempArray[index].inUse)
         {
             /* Mark the temporary register as used. */
@@ -4456,7 +4459,9 @@ gcLINKTREE_AddDependencyForCode(
                                 Tree->tempArray[index].dependencies);
         }
 
-        if (Tree->tempArray[regIndex].variable != gcvNULL)
+        if (sourceType == gcSL_TEMP &&
+            regIndex < Tree->shader->variableCount &&
+            Tree->tempArray[regIndex].variable != gcvNULL)
         {
             gcVARIABLE variable = Tree->tempArray[regIndex].variable;
 
@@ -4479,7 +4484,9 @@ gcLINKTREE_AddDependencyForCode(
     }
 
     /* handle source 1 and its indexed */
-    switch (gcmSL_SOURCE_GET(code->source1, Type))
+    sourceType = (gcSL_TYPE)gcmSL_SOURCE_GET(code->source1, Type);
+
+    switch (sourceType)
     {
     case gcSL_TEMP:
         index = gcmSL_INDEX_GET(code->source1Index, Index);
@@ -4511,6 +4518,7 @@ gcLINKTREE_AddDependencyForCode(
     {
         regIndex = gcmSL_INDEX_GET(code->source1Index, Index);
         index = code->source1Indexed;
+
         if (!Tree->tempArray[index].inUse)
         {
             /* Mark the temporary register as used. */
@@ -4521,7 +4529,9 @@ gcLINKTREE_AddDependencyForCode(
                                 Tree->tempArray[index].dependencies);
         }
 
-        if (Tree->tempArray[regIndex].variable != gcvNULL)
+        if (sourceType == gcSL_TEMP &&
+            regIndex < Tree->shader->variableCount &&
+            Tree->tempArray[regIndex].variable != gcvNULL)
         {
             gcVARIABLE variable = Tree->tempArray[regIndex].variable;
 
@@ -9512,8 +9522,9 @@ gcLINKTREE_CheckAPILevelResource(
     }
 
     if (shader->clientApiVersion != gcvAPI_OPENGL_ES20 &&
-             shader->clientApiVersion != gcvAPI_OPENGL_ES30 &&
-             shader->clientApiVersion != gcvAPI_OPENGL_ES31)
+        shader->clientApiVersion != gcvAPI_OPENGL_ES30 &&
+        shader->clientApiVersion != gcvAPI_OPENGL_ES31 &&
+        shader->clientApiVersion != gcvAPI_OPENGL_ES32)
     {
         return status;
     }
@@ -10773,7 +10784,7 @@ gcLINKTREE_FindModelViewProjection(
         {
             positionOutput = VertexTree->shader->outputs[i];
             positionTempHolding = VertexTree->outputArray[i].tempHolding;
-			break;
+            break;
         }
     }
 
@@ -16714,6 +16725,11 @@ _ChangeAtomicCounterUniform2BaseAddrBindingUniform(
                 continue;
             }
 
+            if (Shader->code[i].opcode == gcSL_LOAD)
+            {
+                continue;
+            }
+
             gcmASSERT(uniform->baseBindingIdx >= 0 && uniform->baseBindingIdx < (gctINT16)Shader->uniformCount);
 
             SetUniformFlag(uniform, gcvUNIFORM_FLAG_USED_IN_SHADER);
@@ -19876,7 +19892,10 @@ _gcConvertSharedMemoryBaseAddr(
         break;
     }
     codeIndex = i;
-    gcmASSERT(codeIndex < Shader->codeCount && code);
+    if(!(codeIndex < Shader->codeCount && code))
+    {
+        return status;
+    }
 
     /* Find WorkGroupID, if not found, create it. */
     for (i = 0; i < Shader->attributeCount; i++)

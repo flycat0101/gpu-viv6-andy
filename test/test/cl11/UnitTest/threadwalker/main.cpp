@@ -95,7 +95,7 @@ __kernel void threadwalker( \
     __global int *pdst \
     ) \
 { \
-	int i = get_global_id(0); \
+    int i = get_global_id(0); \
     pdst[i] = get_global_id(0); \
 }",
 
@@ -105,7 +105,7 @@ __kernel void threadwalker( \
     __global int *pdst \
     ) \
 { \
-	int i = get_global_id(0); \
+    int i = get_global_id(0); \
     pdst[i] = get_global_id(0); \
 }",
 
@@ -115,7 +115,7 @@ __kernel void threadwalker( \
     __global int *pdst \
     ) \
 { \
-	int i = 2 * (2*get_global_id(1) + get_global_id(0)); \
+    int i = 2 * (2*get_global_id(1) + get_global_id(0)); \
     pdst[i] = get_global_id(0); \
     pdst[i+1] = get_global_id(1); \
 }",
@@ -126,7 +126,7 @@ __kernel void threadwalker( \
     __global int *pdst \
     ) \
 { \
-	int i = 2 * (2*get_global_id(1) + get_global_id(0)); \
+    int i = 2 * (2*get_global_id(1) + get_global_id(0)); \
     pdst[i] = get_global_id(0); \
     pdst[i+1] = get_global_id(1); \
 }",
@@ -151,7 +151,7 @@ int main(
     cl_kernel           kernel;             /* OpenCL kernel. */
 
     cl_int errNum;
-	cl_int i, workDim;
+    cl_int i, workDim;
 
     cl_int testCase = 3;
 
@@ -172,7 +172,7 @@ int main(
     /* set logfile name and start logs. */
     printf("%s Starting...\n\n", argv[0]);
 
-	printf("Initializing OpenCL...\n");
+    printf("Initializing OpenCL...\n");
 
     /* Get the available platform. */
     errNum = clGetPlatformIDs(1, &platform, NULL);
@@ -190,7 +190,7 @@ int main(
     commandQueue = clCreateCommandQueue(context, device, 0, &errNum);
     clmCHECKERROR(errNum, CL_SUCCESS);
 
-	printf("Initializing OpenCL ThreadWalker...\n");
+    printf("Initializing OpenCL ThreadWalker...\n");
 
     printf("Creating ThreadWalker program...\n");
     size_t sourceLength = strlen(programSources[testCase]);
@@ -202,7 +202,7 @@ int main(
     clmCHECKERROR(errNum, CL_SUCCESS);
 
     printf("Building ThreadWalker program...\n");
-	errNum = clBuildProgram(program, 0, NULL, "-cl-fast-relaxed-math", NULL, NULL);
+    errNum = clBuildProgram(program, 0, NULL, "-cl-fast-relaxed-math", NULL, NULL);
     clmCHECKERROR(errNum, CL_SUCCESS);
 
     printf("Creating ThreadWalker kernels...\n");
@@ -211,10 +211,10 @@ int main(
 
     printf("Creating OpenCL memory objects...\n");
     dstBuf = clCreateBuffer(context,
-						    CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR,
-						    8 * sizeof(cl_int),
-						    dst,
-						    &errNum);
+                            CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR,
+                            8 * sizeof(cl_int),
+                            dst,
+                            &errNum);
     clmCHECKERROR(errNum, CL_SUCCESS);
 
     printf("Performing ThreadWalker...\n\n");
@@ -236,14 +236,14 @@ int main(
     switch (testCase)
     {
     case 0:
-	    /* Just a single iteration. */
+        /* Just a single iteration. */
         localWorkSize[0]  = 1;
         localWorkSize[1]  = 1;
         globalWorkSize[0] = 1;
         globalWorkSize[1] = 1;
         globalWorkOffset[0] = 0x10;
         globalWorkOffset[1] = 0x20;
-		workDim = 2;
+        workDim = 2;
         break;
 
     case 1:
@@ -253,7 +253,7 @@ int main(
         globalWorkSize[1] = 2;
         globalWorkOffset[0] = 0x10;
         globalWorkOffset[1] = 0x20;
-		workDim = 2;
+        workDim = 2;
         break;
 
     case 2:
@@ -263,7 +263,7 @@ int main(
         globalWorkSize[1] = 0;
         globalWorkOffset[0] = 0;
         globalWorkOffset[1] = 0;
-		workDim = 1;
+        workDim = 1;
         break;
 
     case 3:
@@ -273,7 +273,7 @@ int main(
         globalWorkSize[1] = 0;
         globalWorkOffset[0] = 0;
         globalWorkOffset[1] = 0;
-		workDim = 1;
+        workDim = 1;
         break;
 
     case 4:
@@ -283,7 +283,7 @@ int main(
         globalWorkSize[1] = 2;
         globalWorkOffset[0] = 0;
         globalWorkOffset[1] = 0;
-		workDim = 2;
+        workDim = 2;
         break;
 
     case 5:
@@ -293,7 +293,7 @@ int main(
         globalWorkSize[1] = 2;
         globalWorkOffset[0] = 0;
         globalWorkOffset[1] = 0;
-		workDim = 2;
+        workDim = 2;
         break;
     }
 
@@ -310,39 +310,39 @@ int main(
 
     printf("Reading back OpenCL results...\n");
     errNum = clEnqueueReadBuffer(commandQueue,
-								 dstBuf,
-								 CL_TRUE,
-								 0,
-								 8 * sizeof(cl_int),
-								 dst,
-								 0,
-								 NULL,
-								 NULL);
+                                 dstBuf,
+                                 CL_TRUE,
+                                 0,
+                                 8 * sizeof(cl_int),
+                                 dst,
+                                 0,
+                                 NULL,
+                                 NULL);
     clmCHECKERROR(errNum, CL_SUCCESS);
 
     switch (testCase)
     {
     case 0:
-	    printf("global_id=%08x %08x\n", dst[0], dst[1]);
-	    printf("local_id =%08x %08x\n", dst[2], dst[3]);
-	    printf("group_id =%08x %08x\n", dst[4], dst[5]);
+        printf("global_id=%08x %08x\n", dst[0], dst[1]);
+        printf("local_id =%08x %08x\n", dst[2], dst[3]);
+        printf("group_id =%08x %08x\n", dst[4], dst[5]);
         break;
     case 1:
-	    printf("dst=%08x %08x %08x\n", dst[0], dst[1], dst[2]);
-	    printf("dst=%08x %08x %08x\n", dst[3], dst[4], dst[5]);
+        printf("dst=%08x %08x %08x\n", dst[0], dst[1], dst[2]);
+        printf("dst=%08x %08x %08x\n", dst[3], dst[4], dst[5]);
         break;
     case 2:
     case 3:
-		for (i=0; i<8; i++) {
-		    printf("[%d] %08x \n", i, dst[i]);
-		}
+        for (i=0; i<8; i++) {
+            printf("[%d] %08x \n", i, dst[i]);
+        }
         break;
     case 4:
     case 5:
-	    printf("[0,0] %08x %08x\n", dst[0], dst[1]);
-	    printf("[1,0] %08x %08x\n", dst[2], dst[3]);
-	    printf("[0,1] %08x %08x\n", dst[4], dst[5]);
-	    printf("[1,1] %08x %08x\n", dst[6], dst[7]);
+        printf("[0,0] %08x %08x\n", dst[0], dst[1]);
+        printf("[1,0] %08x %08x\n", dst[2], dst[3]);
+        printf("[0,1] %08x %08x\n", dst[4], dst[5]);
+        printf("[1,1] %08x %08x\n", dst[6], dst[7]);
         break;
     }
 

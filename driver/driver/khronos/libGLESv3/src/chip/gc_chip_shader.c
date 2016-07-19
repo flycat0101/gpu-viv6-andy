@@ -3216,11 +3216,6 @@ gcChipPgInstanceCleanBindingInfo(
             __GLSLStage stage;
             gctBOOL emptyUniform = gcvTRUE;
 
-            if (uniform == gcvNULL)
-            {
-                continue;
-            }
-
             for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
             {
                 if (uniform->halUniform[stage] != gcvNULL)
@@ -5069,6 +5064,17 @@ gcChipProgramBuildBindingInfo(
 
         program->aLocPosition = __glChipGetAttributeLocation(gc, programObject, "a_position");
         program->aLocTexCoord = __glChipGetAttributeLocation(gc, programObject, "a_texCoord");
+    }
+
+    if (program->progFlags.helperInvocationCheck)
+    {
+        program->pointXYUniform = gcChipGetUniformByName(gc, program, "u_pointXY", (gctSIZE_T)-1);
+        program->bXMajorUniform = gcChipGetUniformByName(gc, program, "u_bXMajor", (gctSIZE_T)-1);
+        program->bCheckHelperUniform = gcChipGetUniformByName(gc, program, "u_bCheckHelper", (gctSIZE_T)-1);
+        program->rtWHUniform = gcChipGetUniformByName(gc, program, "u_rtWH", (gctSIZE_T)-1);
+        program->halfLineWidthUniform = gcChipGetUniformByName(gc, program, "u_halfLineWidth", (gctSIZE_T)-1);
+
+        program->aLocPosition = __glChipGetAttributeLocation(gc, programObject, "a_position");
     }
 
     if (program->progFlags.CTSMaxUBOSize)
@@ -7570,17 +7576,13 @@ __glChipLinkProgram(
 
     gcmONERROR(gcChipProgramBuildBindingInfo(gc, programObject));
 
-    if (pgStateKey)
-    {
-        gcChipPgStateKeyFree(gc, &pgStateKey);
-    }
+    gcChipPgStateKeyFree(gc, &pgStateKey);
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     gcSHADER_AlignId();
     return GL_TRUE;
 
 OnError:
-
     if (pgStateKey)
     {
         gcChipPgStateKeyFree(gc, &pgStateKey);
@@ -7955,10 +7957,7 @@ gcChipProgramBinary_V0(
     gcChipProgramCleanBindingInfo(gc, programObject);
     gcmONERROR(gcChipProgramBuildBindingInfo(gc, programObject));
 
-    if (pgStateKey)
-    {
-        gcChipPgStateKeyFree(gc, &pgStateKey);
-    }
+    gcChipPgStateKeyFree(gc, &pgStateKey);
 
     gcmFOOTER();
     return gcvSTATUS_OK;
@@ -10936,7 +10935,8 @@ gceSTATUS
 gcChipDynamicPatchProgram(
     __GLcontext * gc,
     __GLprogramObject* programObject,
-    gcPatchDirective* recompilePatchDirectivePtr
+    gcPatchDirective* recompilePatchDirectivePtr,
+    gctUINT32 Options
     )
 {
     __GLchipContext            *chipCtx          = CHIP_CTXINFO(gc);
@@ -10951,36 +10951,37 @@ gcChipDynamicPatchProgram(
     gceSTATUS                  status            = gcvSTATUS_OK;
     __GLSLStage                transformFeedbackStage = __GLSL_STAGE_VS;
 
+    /* backup pre-link unpatched shaders*/
+    __GLSLStage stage;
+    gcSHADER_KIND shaderTypes[] =
+    {
+        gcSHADER_TYPE_VERTEX,
+        gcSHADER_TYPE_TCS,
+        gcSHADER_TYPE_TES,
+        gcSHADER_TYPE_GEOMETRY,
+        gcSHADER_TYPE_FRAGMENT,
+        gcSHADER_TYPE_COMPUTE,
+    };
+
     gcmHEADER_ARG("gc=0x%x programObject=0x%x recompilePatchDirectivePtr=0x%x kind=%d",
                    gc, programObject, recompilePatchDirectivePtr,
                    (recompilePatchDirectivePtr ? recompilePatchDirectivePtr->kind : 0));
 
-    /* backup pre-link unpatched shaders*/
-    if (dynamicPatchInfo)
+    gcSetGLSLCompiler(chipCtx->pfCompile);
+    for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
     {
-        __GLSLStage stage;
-        gcSHADER_KIND shaderTypes[] =
+        GL_ASSERT(pgInstance->binaries[stage] == gcvNULL);
+        if (masterPgInstance->binaries[stage])
         {
-            gcSHADER_TYPE_VERTEX,
-            gcSHADER_TYPE_TCS,
-            gcSHADER_TYPE_TES,
-            gcSHADER_TYPE_GEOMETRY,
-            gcSHADER_TYPE_FRAGMENT,
-            gcSHADER_TYPE_COMPUTE,
-        };
-        gcSetGLSLCompiler(chipCtx->pfCompile);
-        for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
-        {
-            GL_ASSERT(pgInstance->binaries[stage] == gcvNULL);
-            if (masterPgInstance->binaries[stage])
+            gcmONERROR(gcSHADER_Construct(chipCtx->hal, shaderTypes[stage], &pgInstance->binaries[stage]));
+            gcmONERROR(gcSHADER_Copy(pgInstance->binaries[stage], masterPgInstance->binaries[stage]));
+            if (stage == __GLSL_STAGE_FS &&
+                masterPgInstance->binaries[stage]->isDual16Shader)
             {
-                gcmONERROR(gcSHADER_Construct(chipCtx->hal, shaderTypes[stage], &pgInstance->binaries[stage]));
-                gcmONERROR(gcSHADER_Copy(pgInstance->binaries[stage], masterPgInstance->binaries[stage]));
-                if (stage == __GLSL_STAGE_FS &&
-                    masterPgInstance->binaries[stage]->isDual16Shader)
-                {
-                    pgInstance->binaries[stage]->isMasterDual16Shader = gcvTRUE;
-                }
+                pgInstance->binaries[stage]->isMasterDual16Shader = gcvTRUE;
+            }
+            if (dynamicPatchInfo)
+            {
                 gcmONERROR(gcSHADER_DynamicPatch(pgInstance->binaries[stage], dynamicPatchInfo, 0));
             }
         }
@@ -11057,6 +11058,11 @@ gcChipDynamicPatchProgram(
 
     /* determine the dual16 hp rule based on benchmark and shader detection */
     subFlags.dual16PrecisionRule = gcChipDetermineDual16PrecisionRule(chipCtx, program);
+
+    if (Options & __GL_CHIP_RO_OUTPUT_HIGHP_CONVERSION)
+    {
+        subFlags.dual16PrecisionRule |= Dual16_PrecisionRule_OUTPUT_HP;
+    }
 
     if (program->progFlags.robustEnabled)
     {

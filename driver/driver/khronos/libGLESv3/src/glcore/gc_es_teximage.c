@@ -398,10 +398,13 @@ GLboolean __glCheckTexDirectFmt(__GLcontext *gc,
     case GL_RGB:
     case GL_RGBA:
     case GL_BGRA_EXT:
+    case GL_RGB5_A1_OES:
     case GL_RG8_EXT:
+    case GL_R8_EXT:
     case GL_ALPHA:
     case GL_LUMINANCE_ALPHA:
     case GL_DEPTH_COMPONENT16:
+        tex->canonicalFormat = GL_TRUE;
         return GL_TRUE;
 
     default:
@@ -1520,7 +1523,7 @@ GLboolean __glCheckCompressedTexImgFmt(__GLcontext *gc, GLint internalFormat)
     return GL_TRUE;
 }
 
-GLsizei __glCompressedTexImageSize(GLint lods, GLint internalFormat, GLint width, GLint height, GLint depth)
+GLvoid __glCompressedTexBlockSize(GLint internalFormat, GLint *pBlockWidth, GLint *pBlockHeight, GLint *pBlockSize)
 {
     struct astcblocksize
     {
@@ -1546,15 +1549,9 @@ GLsizei __glCompressedTexImageSize(GLint lods, GLint internalFormat, GLint width
         { 12, 12 }
     };
 
-    GLsizei blockWidth = 0;
-    GLsizei blockHeight = 0;
-    GLsizei countX, countY;
-    GLsizei blockSize = 0;
-    GLsizei paletteSize = 0;
-    GLsizei bitsPerIndex = 0;
-#if defined(GL_KHR_texture_compression_astc_ldr)
-    GLsizei index;
-#endif
+    GLint blockWidth = 1;
+    GLint blockHeight = 1;
+    GLint blockSize = 0;
 
     switch (internalFormat)
     {
@@ -1585,6 +1582,82 @@ GLsizei __glCompressedTexImageSize(GLint lods, GLint internalFormat, GLint width
         blockSize = 16;
         break;
 
+#if defined(GL_KHR_texture_compression_astc_ldr)
+    case GL_COMPRESSED_RGBA_ASTC_4x4_KHR:
+    case GL_COMPRESSED_RGBA_ASTC_5x4_KHR:
+    case GL_COMPRESSED_RGBA_ASTC_5x5_KHR:
+    case GL_COMPRESSED_RGBA_ASTC_6x5_KHR:
+    case GL_COMPRESSED_RGBA_ASTC_6x6_KHR:
+    case GL_COMPRESSED_RGBA_ASTC_8x5_KHR:
+    case GL_COMPRESSED_RGBA_ASTC_8x6_KHR:
+    case GL_COMPRESSED_RGBA_ASTC_8x8_KHR:
+    case GL_COMPRESSED_RGBA_ASTC_10x5_KHR:
+    case GL_COMPRESSED_RGBA_ASTC_10x6_KHR:
+    case GL_COMPRESSED_RGBA_ASTC_10x8_KHR:
+    case GL_COMPRESSED_RGBA_ASTC_10x10_KHR:
+    case GL_COMPRESSED_RGBA_ASTC_12x10_KHR:
+    case GL_COMPRESSED_RGBA_ASTC_12x12_KHR:
+        {
+            GLint index = internalFormat - GL_COMPRESSED_RGBA_ASTC_4x4_KHR;
+            blockWidth  = astcblocksizearray[index].width;
+            blockHeight = astcblocksizearray[index].height;
+            blockSize = 16;
+            break;
+        }
+
+    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR:
+    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x4_KHR:
+    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5_KHR:
+    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x5_KHR:
+    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6_KHR:
+    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x5_KHR:
+    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x6_KHR:
+    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x8_KHR:
+    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x5_KHR:
+    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x6_KHR:
+    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x8_KHR:
+    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x10_KHR:
+    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR:
+    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR:
+        {
+            GLint index = internalFormat - GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR;
+            blockWidth  = astcblocksizearray[index].width;
+            blockHeight = astcblocksizearray[index].height;
+            blockSize = 16;
+            break;
+        }
+#endif
+
+    default:
+        GL_ASSERT(0);
+        return;
+    }
+
+    if (pBlockWidth)
+    {
+        *pBlockWidth = blockWidth;
+    }
+    if (pBlockHeight)
+    {
+        *pBlockHeight = blockHeight;
+    }
+    if (pBlockSize)
+    {
+        *pBlockSize = blockSize;
+    }
+}
+
+GLsizei __glCompressedTexImageSize(GLint lods, GLint internalFormat, GLint width, GLint height, GLint depth)
+{
+    GLsizei blockWidth = 1;
+    GLsizei blockHeight = 1;
+    GLsizei countX, countY;
+    GLsizei blockSize = 0;
+    GLsizei paletteSize = 0;
+    GLsizei bitsPerIndex = 0;
+
+    switch (internalFormat)
+    {
     case GL_PALETTE4_RGBA4_OES:
     case GL_PALETTE4_RGB5_A1_OES:
     case GL_PALETTE4_R5_G6_B5_OES:
@@ -1621,51 +1694,9 @@ GLsizei __glCompressedTexImageSize(GLint lods, GLint internalFormat, GLint width
     ** For PVRTC 2BPP formats the imageSize is calculated as: ( max(width, 16) * max(height, 8) * 2 + 7) / 8
     */
 
-#if defined(GL_KHR_texture_compression_astc_ldr)
-    case GL_COMPRESSED_RGBA_ASTC_4x4_KHR:
-    case GL_COMPRESSED_RGBA_ASTC_5x4_KHR:
-    case GL_COMPRESSED_RGBA_ASTC_5x5_KHR:
-    case GL_COMPRESSED_RGBA_ASTC_6x5_KHR:
-    case GL_COMPRESSED_RGBA_ASTC_6x6_KHR:
-    case GL_COMPRESSED_RGBA_ASTC_8x5_KHR:
-    case GL_COMPRESSED_RGBA_ASTC_8x6_KHR:
-    case GL_COMPRESSED_RGBA_ASTC_8x8_KHR:
-    case GL_COMPRESSED_RGBA_ASTC_10x5_KHR:
-    case GL_COMPRESSED_RGBA_ASTC_10x6_KHR:
-    case GL_COMPRESSED_RGBA_ASTC_10x8_KHR:
-    case GL_COMPRESSED_RGBA_ASTC_10x10_KHR:
-    case GL_COMPRESSED_RGBA_ASTC_12x10_KHR:
-    case GL_COMPRESSED_RGBA_ASTC_12x12_KHR:
-        index = internalFormat - GL_COMPRESSED_RGBA_ASTC_4x4_KHR;
-        blockWidth  = astcblocksizearray[index].width;
-        blockHeight = astcblocksizearray[index].height;
-        blockSize = 16;
-        break;
-
-    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR:
-    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x4_KHR:
-    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5_KHR:
-    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x5_KHR:
-    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6_KHR:
-    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x5_KHR:
-    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x6_KHR:
-    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x8_KHR:
-    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x5_KHR:
-    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x6_KHR:
-    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x8_KHR:
-    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x10_KHR:
-    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR:
-    case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR:
-        index = internalFormat - GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR;
-        blockWidth  = astcblocksizearray[index].width;
-        blockHeight = astcblocksizearray[index].height;
-        blockSize = 16;
-        break;
-#endif
-
     default:
-        GL_ASSERT(0);
-        return 0;
+        __glCompressedTexBlockSize(internalFormat, &blockWidth, &blockHeight, &blockSize);
+        break;
     }
 
     if (paletteSize)
@@ -4536,12 +4567,16 @@ OnExit:
 
 GLboolean __glCheckCopyImageSubDataArg(__GLcontext *gc, GLuint name, GLenum target, GLint level, GLint x, GLint y, GLint z,
                                        GLsizei width, GLsizei height, GLsizei depth, __GLformatInfo ** formatInfo,
-                                       GLvoid ** object, GLuint *targetIndex, GLint *samples)
+                                       GLvoid ** object, GLuint *targetIndex, GLint *samples, GLint *blockXCount, GLint * blockYCount)
 {
     __GLtextureObject * tex = NULL;
     __GLrenderbufferObject * rbo = NULL;
     GLint maxLevelUsed = 0;
     GLboolean isTex = GL_FALSE;
+    GLint rectWidth = 0;
+    GLint rectHeight = 0;
+    GLint blockWidth = 1;
+    GLint blockHeight = 1;
 
     switch (target)
     {
@@ -4638,20 +4673,32 @@ GLboolean __glCheckCopyImageSubDataArg(__GLcontext *gc, GLuint name, GLenum targ
             mipmapDepth = mipmap->depth;
         }
 
-        if (x < 0 || (x + width)  > mipmap->width ||
-            y < 0 || (y + height) > mipmap->height ||
+        if (mipmap->formatInfo->compressed)
+        {
+            __glCompressedTexBlockSize(mipmap->formatInfo->glFormat, &blockWidth, &blockHeight, gcvNULL);
+        }
+
+        if ((width > 0) && (height > 0))
+        {
+            rectWidth  = width;
+            rectHeight = height;
+        }
+        else
+        {
+            rectWidth = blockWidth * (*blockXCount);
+            rectHeight = blockHeight * (*blockYCount);
+        }
+
+        if (x < 0 || (x + rectWidth)  > mipmap->width ||
+            y < 0 || (y + rectHeight) > mipmap->height ||
             z < 0 || (z + depth)  > mipmapDepth)
         {
             __GL_ERROR_RET_VAL(GL_INVALID_VALUE, GL_FALSE);
         }
 
-        if (mipmap->requestedFormat >= GL_COMPRESSED_R11_EAC &&
-            mipmap->requestedFormat <= GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC)
+        if ((rectWidth  % blockWidth) || (x % blockWidth) || (rectHeight % blockHeight) || (y % blockHeight))
         {
-            if ((width  % 4) || (x % 4) || (height % 4) || (y % 4))
-            {
-                __GL_ERROR_RET_VAL(GL_INVALID_VALUE, GL_FALSE);
-            }
+            __GL_ERROR_RET_VAL(GL_INVALID_VALUE, GL_FALSE);
         }
 
         *formatInfo = mipmap->formatInfo;
@@ -4660,7 +4707,18 @@ GLboolean __glCheckCopyImageSubDataArg(__GLcontext *gc, GLuint name, GLenum targ
     }
     else if (rbo)
     {
-        if ((rbo->width < x + width) || (rbo->height < y + height))
+        if ((width > 0) && (height > 0))
+        {
+            rectWidth  = width;
+            rectHeight = height;
+        }
+        else
+        {
+            rectWidth = blockWidth * (*blockXCount);
+            rectHeight = blockHeight * (*blockYCount);
+        }
+
+        if ((rbo->width < x + rectWidth) || (rbo->height < y + rectHeight))
         {
             __GL_ERROR_RET_VAL(GL_INVALID_VALUE, GL_FALSE);
         }
@@ -4668,6 +4726,16 @@ GLboolean __glCheckCopyImageSubDataArg(__GLcontext *gc, GLuint name, GLenum targ
         *formatInfo = rbo->formatInfo;
         *object     = rbo;
         *samples    = rbo->samples;
+    }
+
+    if (blockXCount)
+    {
+        *blockXCount = rectWidth / blockWidth;
+    }
+
+    if (blockYCount)
+    {
+        *blockYCount = rectHeight / blockHeight;
     }
 
     return GL_TRUE;
@@ -4691,23 +4759,25 @@ GLboolean __glIsCopyImageSubDataCompatible(__GLcontext *gc, __GLformatInfo * src
     }
 
     /*2. the formats are both listed in the same entry of Table 4.X.2 */
-    if ((!srcFormatInfo->compressed && !dstFormatInfo->compressed) &&
-        (srcFormatInfo->bitsPerPixel == dstFormatInfo->bitsPerPixel))
-    {
-        return GL_TRUE;
-    }
-
-    if (srcFormatInfo->compressed && dstFormatInfo->compressed)
-    {
-        /* TODO, add view class for compress format */
-    }
-
     /*3. one format is compressed and the other is uncompressed and
       Table 4.X.1 lists the two formats in the same row.*/
-    if ((srcFormatInfo->compressed && !dstFormatInfo->compressed) ||
-        (!srcFormatInfo->compressed && dstFormatInfo->compressed))
+    if (srcFormatInfo->bitsPerPixel == dstFormatInfo->bitsPerPixel)
     {
-        if (srcFormatInfo->bitsPerPixel == dstFormatInfo->bitsPerPixel)
+        if (srcFormatInfo->compressed && dstFormatInfo->compressed )
+        {
+            GLint srcBlockWidth = 1;
+            GLint srcBlockHeight = 1;
+            GLint dstBlockWidth = 1;
+            GLint dstBlockHeight = 1;
+            __glCompressedTexBlockSize(srcFormatInfo->glFormat, &srcBlockWidth, &srcBlockHeight, gcvNULL);
+            __glCompressedTexBlockSize(dstFormatInfo->glFormat, &dstBlockWidth, &dstBlockHeight, gcvNULL);
+
+            if (srcBlockWidth == dstBlockWidth && srcBlockHeight == dstBlockHeight)
+            {
+                return GL_TRUE;
+            }
+        }
+        else
         {
             return GL_TRUE;
         }
@@ -4729,17 +4799,19 @@ GLvoid GL_APIENTRY __gles_CopyImageSubData(__GLcontext *gc,
      GLuint dstTargetIndex = 0;
      GLint srcSamples = 0;
      GLint dstSamples = 0;
+    GLint blockXCount = 0;
+    GLint blockYCount = 0;
 
      __GL_HEADER();
 
      if (!__glCheckCopyImageSubDataArg(gc, srcName, srcTarget, srcLevel, srcX, srcY, srcZ, srcWidth, srcHeight, srcDepth,
-                                       &srcFormatInfo, &srcObject, &srcTargetIndex, &srcSamples))
+         &srcFormatInfo, &srcObject, &srcTargetIndex, &srcSamples, &blockXCount, &blockYCount))
      {
          __GL_EXIT();
      }
 
-     if (!__glCheckCopyImageSubDataArg(gc, dstName, dstTarget, dstLevel, dstX, dstY, dstZ, srcWidth, srcHeight, srcDepth,
-                                       &dstFormatInfo, &dstObject, &dstTargetIndex, &dstSamples))
+     if (!__glCheckCopyImageSubDataArg(gc, dstName, dstTarget, dstLevel, dstX, dstY, dstZ, 0, 0, srcDepth,
+         &dstFormatInfo, &dstObject, &dstTargetIndex, &dstSamples, &blockXCount, &blockYCount))
      {
          __GL_EXIT();
      }

@@ -71,23 +71,23 @@ initExecution(
     const unsigned len
     )
 {
-	// Allocate host memory (and initialize input signal)
-	allocateHostMemory(len);
+    // Allocate host memory (and initialize input signal)
+    allocateHostMemory(len);
 
-	printf("Initializing device(s)...\n");
-	// create the OpenCL context on available GPU devices
-	init_cl_context(CL_DEVICE_TYPE_GPU);
+    printf("Initializing device(s)...\n");
+    // create the OpenCL context on available GPU devices
+    init_cl_context(CL_DEVICE_TYPE_GPU);
 
-	const cl_uint ciDeviceCount =  getDeviceCount();
+    const cl_uint ciDeviceCount =  getDeviceCount();
 
-	if (!ciDeviceCount)
+    if (!ciDeviceCount)
     {
-	  printf("No opencl specific devices!\n");
-	  return -1;
-	}
+        printf("No opencl specific devices!\n");
+        return -1;
+    }
 
-	const cl_uint ciComputeUnitsCount = getNumComputeUnits();
-	printf("# compute units = %d \n", ciComputeUnitsCount);
+    const cl_uint ciComputeUnitsCount = getNumComputeUnits();
+    printf("# compute units = %d\n", ciComputeUnitsCount);
 
     printf("Creating Command Queue...\n");
     // create a command queue on device 0
@@ -109,7 +109,7 @@ printGpuTime(
         printf("Kernel execution time on GPU (kernel %d) : %10.6f seconds\n", k, t);
         total += t;
     }
-    printf("Total Kernel execution time on GPU : %10.6f seconds \n",total);
+    printf("Total Kernel execution time on GPU : %10.6f seconds\n",total);
 }
 
 void
@@ -117,7 +117,7 @@ printResult(
     const unsigned size
     )
 {
-	FILE *fp;
+    FILE *fp;
 #ifdef UNDER_CE
     wchar_t moduleName[MAX_PATH];
     char path[MAX_PATH], * p;
@@ -132,9 +132,9 @@ printResult(
 
     if (fp == NULL) return;
 
-	for (unsigned i = 0; i < size; ++i)
+    for (unsigned i = 0; i < size; ++i)
     {
-	    fprintf(fp, "%f,%f\n", h_outfft[2*i], h_outfft[2*i+1]);
+        fprintf(fp, "%f,%f\n", h_outfft[2*i], h_outfft[2*i+1]);
     }
     fclose(fp);
 }
@@ -180,18 +180,18 @@ allocateHostMemory(
     h_outfft = (float *) malloc(sizeof(float) * len * 2);
     checkError((h_outfft != NULL), CL_TRUE, "Could not allocate memory");
 
-	const unsigned n = 16;
+    const unsigned n = 16;
     for (unsigned i = 0 ; i < len; ++i)
     {
-        h_Freal[i] = (i + 1)%n;
-        h_Fimag[i] = (i + 1)%n;
-		h_intime[2*i] = h_intime[2*i+1] = (i + 1)%n;
+        h_Freal[i] = (i + 1) % n;
+        h_Fimag[i] = (i + 1) % n;
+        h_intime[2*i] = h_intime[2*i+1] = (i + 1) % n;
         h_Rreal[i] = 0;
         h_Rimag[i] = 0;
-		h_outfft[2*i] = h_outfft[2*i+1] = 0;
+        h_outfft[2*i] = h_outfft[2*i+1] = 0;
     }
 
-	if (print)
+    if (print)
     {
         FILE *fp = NULL;
 #ifdef UNDER_CE
@@ -209,10 +209,10 @@ allocateHostMemory(
 
         for (unsigned int kk=0; kk<len; kk++)
         {
-		fprintf(fp, "%f,%f\n", h_intime[2*kk], h_intime[2*kk+1]);
+            fprintf(fp, "%f,%f\n", h_intime[2*kk], h_intime[2*kk+1]);
         }
-		fclose(fp);
-	}
+        fclose(fp);
+    }
 }
 
 void
@@ -222,14 +222,14 @@ allocateDeviceMemory(
     )
 {
     d_Freal = createDeviceBuffer(CL_MEM_READ_ONLY, sizeof(float) * size, h_Freal + copyOffset);
-	copyToDevice(d_Freal,  h_Freal + copyOffset, size);
+    copyToDevice(d_Freal,  h_Freal + copyOffset, size);
 
     d_Fimag = createDeviceBuffer(CL_MEM_READ_ONLY, sizeof(float) * size, h_Fimag + copyOffset);
     copyToDevice(d_Fimag,  h_Fimag + copyOffset, size);
 
     //  copy real/imag interleaved input data to device
     d_intime = createDeviceBuffer(CL_MEM_READ_WRITE, sizeof(float) * size * 2, h_intime + copyOffset * 2);
-	copyFromDevice(d_intime, h_outfft, size * 2); // debug
+    copyFromDevice(d_intime, h_outfft, size * 2); // debug
 
     d_Rreal = createDeviceBuffer(CL_MEM_WRITE_ONLY, sizeof(float) * size, h_Rreal + copyOffset);
     copyToDevice(d_Rreal,  h_Rreal + copyOffset, size);
@@ -247,24 +247,24 @@ cleanup(
     void
     )
 {
-	if (d_Freal)  clReleaseMemObject(d_Freal);
-	if (d_Fimag)  clReleaseMemObject(d_Fimag);
-	if (d_Rreal)  clReleaseMemObject(d_Rreal);
-	if (d_Rimag)  clReleaseMemObject(d_Rimag);
-	if (d_intime) clReleaseMemObject(d_intime);
-	if (d_outfft) clReleaseMemObject(d_outfft);
+    if (d_Freal)  clReleaseMemObject(d_Freal);
+    if (d_Fimag)  clReleaseMemObject(d_Fimag);
+    if (d_Rreal)  clReleaseMemObject(d_Rreal);
+    if (d_Rimag)  clReleaseMemObject(d_Rimag);
+    if (d_intime) clReleaseMemObject(d_intime);
+    if (d_outfft) clReleaseMemObject(d_outfft);
 
     if (gpuDone) clReleaseEvent(gpuDone);
 
-	for (unsigned kk=0; kk<ARRAY_SIZE(kernels); kk++) {
-		if (gpuExecution[kk]) clReleaseEvent(gpuExecution[kk]);
-	}
+    for (unsigned kk=0; kk<ARRAY_SIZE(kernels); kk++) {
+        if (gpuExecution[kk]) clReleaseEvent(gpuExecution[kk]);
+    }
 
     if (commandQueue) clReleaseCommandQueue(commandQueue);
     if (cpProgram) clReleaseProgram(cpProgram);
     if (cxContext) clReleaseContext(cxContext);
 
-	free(h_Freal);
+    free(h_Freal);
     h_Freal = 0;
     free(h_Fimag);
     h_Fimag = 0;
@@ -272,7 +272,7 @@ cleanup(
     h_Rreal = 0;
     free(h_Rimag);
     h_Rimag = 0;
-	free(h_intime);
+    free(h_intime);
     h_intime = 0;
     free(h_outfft);
     h_outfft = 0;
@@ -299,27 +299,27 @@ init_cl_context(
 {
     cl_int ciErrNum = CL_SUCCESS;
 
-	#ifndef WIN32
+#ifndef WIN32
     cxContext = clCreateContextFromType(0, /* cl_context_properties */
-  				        device_type,
-				        NULL, /* error function ptr */
-				        NULL, /* user data to be passed to err fn */
-				        &ciErrNum);
-	checkError(ciErrNum, CL_SUCCESS, "clCreateContextFromType");
-	#else
-	cl_platform_id cpPlatform;
-	ciErrNum = 	clGetPlatformIDs(1, &cpPlatform, NULL);
-	checkError(ciErrNum, CL_SUCCESS, "clGetPlatformIDs");
-	cl_uint uiNumDevices;
-	ciErrNum = clGetDeviceIDs(cpPlatform, device_type, 0, NULL, &uiNumDevices);
-	checkError(ciErrNum, CL_SUCCESS, "clGetDeviceIDs");
-	cl_device_id cdDevices[20];
-	ciErrNum = clGetDeviceIDs(cpPlatform, device_type, uiNumDevices, cdDevices, NULL);
-	checkError(ciErrNum, CL_SUCCESS, "clGetDeviceIDs");
-	cl_uint targetDevice=0, uiNumDevsUsed=1;
-	cxContext = clCreateContext(0, uiNumDevsUsed, &cdDevices[targetDevice], NULL, NULL, &ciErrNum);
-	checkError(ciErrNum, CL_SUCCESS, "clCreateContextFromType");
-	#endif
+                          device_type,
+                        NULL, /* error function ptr */
+                        NULL, /* user data to be passed to err fn */
+                        &ciErrNum);
+    checkError(ciErrNum, CL_SUCCESS, "clCreateContextFromType");
+#else
+    cl_platform_id cpPlatform;
+    ciErrNum =     clGetPlatformIDs(1, &cpPlatform, NULL);
+    checkError(ciErrNum, CL_SUCCESS, "clGetPlatformIDs");
+    cl_uint uiNumDevices;
+    ciErrNum = clGetDeviceIDs(cpPlatform, device_type, 0, NULL, &uiNumDevices);
+    checkError(ciErrNum, CL_SUCCESS, "clGetDeviceIDs");
+    cl_device_id cdDevices[20];
+    ciErrNum = clGetDeviceIDs(cpPlatform, device_type, uiNumDevices, cdDevices, NULL);
+    checkError(ciErrNum, CL_SUCCESS, "clGetDeviceIDs");
+    cl_uint targetDevice=0, uiNumDevsUsed=1;
+    cxContext = clCreateContext(0, uiNumDevsUsed, &cdDevices[targetDevice], NULL, NULL, &ciErrNum);
+    checkError(ciErrNum, CL_SUCCESS, "clCreateContextFromType");
+#endif
 }
 
 cl_uint
@@ -352,10 +352,10 @@ getNumComputeUnits(
     checkError(ciErrNum, CL_SUCCESS, "clGetDeviceIDs");
 
     // Set target device and Query number of compute units on targetDevice
-    printf("# of Devices Available = %d \n", uiNumDevices);
+    printf("# of Devices Available = %d\n", uiNumDevices);
     cl_uint num_compute_units;
     clGetDeviceInfo(cdDevices[0], CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(num_compute_units), &num_compute_units, NULL);
-    printf("# of Compute Units = %d \n", num_compute_units);
+    printf("# of Compute Units = %d\n", num_compute_units);
     free(cdDevices);
     return num_compute_units;
 }
@@ -366,7 +366,7 @@ createCommandQueue(
     )
 {
     cl_int ciErrNum = CL_SUCCESS;
-	ciErrNum = clGetContextInfo(cxContext, CL_CONTEXT_DEVICES, sizeof(cl_device_id), &cdDeviceID, NULL);
+    ciErrNum = clGetContextInfo(cxContext, CL_CONTEXT_DEVICES, sizeof(cl_device_id), &cdDeviceID, NULL);
     commandQueue = clCreateCommandQueue(cxContext, cdDeviceID, CL_QUEUE_PROFILING_ENABLE, &ciErrNum);
     checkError(ciErrNum, CL_SUCCESS, "clCreateCommandQueue");
 }
@@ -380,7 +380,7 @@ compileProgram(
     FILE* pFileStream = NULL;
     cl_int ciErrNum;
 
-    #ifdef _WIN32
+#ifdef _WIN32
 #ifdef UNDER_CE
     wchar_t moduleName[MAX_PATH];
     char path[MAX_PATH], * p;
@@ -391,21 +391,21 @@ compileProgram(
     pFileStream = fopen(path, "rb");
     if (pFileStream == NULL)
     {
-            checkError(CL_INVALID_VALUE, CL_SUCCESS, "compileProgram on open source");
-        }
-    #else
+        checkError(CL_INVALID_VALUE, CL_SUCCESS, "compileProgram on open source");
+    }
+#else
     if(fopen_s(&pFileStream, kernel_file, "rb") != 0)
     {
         checkError(CL_INVALID_VALUE, CL_SUCCESS, "compileProgram on open source");
     }
 #endif
 #else
-        pFileStream = fopen(kernel_file, "rb");
+    pFileStream = fopen(kernel_file, "rb");
     if(pFileStream == 0)
     {
-            checkError(CL_INVALID_VALUE, CL_SUCCESS, "compileProgram on open source");
-        }
-    #endif
+        checkError(CL_INVALID_VALUE, CL_SUCCESS, "compileProgram on open source");
+    }
+#endif
 
     // get the length of the source code
     fseek(pFileStream, 0, SEEK_END);
@@ -430,9 +430,9 @@ compileProgram(
     ciErrNum = clBuildProgram(cpProgram, 0, NULL, "", NULL, NULL);
     if (ciErrNum != CL_SUCCESS)
     {
-		char cBuildLog[10240];
-		clGetProgramBuildInfo(cpProgram, cdDeviceID, CL_PROGRAM_BUILD_LOG, sizeof(cBuildLog), cBuildLog, NULL );
-		printf("\nBuild Log : \n%s\n", cBuildLog);
+        char cBuildLog[10240];
+        clGetProgramBuildInfo(cpProgram, cdDeviceID, CL_PROGRAM_BUILD_LOG, sizeof(cBuildLog), cBuildLog, NULL );
+        printf("\nBuild Log : \n%s\n", cBuildLog);
         checkError(ciErrNum, CL_SUCCESS, "clBuildProgram");
     }
 }

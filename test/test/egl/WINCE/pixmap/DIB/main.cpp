@@ -34,7 +34,7 @@
 #include <GLES\glext.h>
 
 #define PRECISION 16
-#define ONE	(1 << PRECISION)
+#define ONE    (1 << PRECISION)
 #define ZERO 0
 inline GLfixed FixedFromInt(int value) {return value << PRECISION;};
 
@@ -49,16 +49,16 @@ int winWidth = 640;
 int winHeight = 480;
 
 EGLDisplay glesDisplay;  // EGL display
-EGLSurface glesSurface;	 // EGL rendering surface
-EGLContext glesContext;	 // EGL rendering context
+EGLSurface glesSurface;     // EGL rendering surface
+EGLContext glesContext;     // EGL rendering context
 
 TCHAR szAppName[] = TEXT("EGL DIB Pixmap"); /*The application name and the window caption*/
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine,	int nCmdShow)
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine,    int nCmdShow)
 {
     MSG msg;
     bool done = FALSE;
-	int ret = -1;
+    int ret = -1;
     WNDCLASS wc;
 
     if(hWnd = FindWindow(szAppName, szAppName))
@@ -73,9 +73,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
     wc.cbWndExtra     = 0;
     wc.hInstance      = hInstance;
     wc.hIcon          = LoadIcon(hInstance, NULL);
-    wc.hCursor	    = 0;
+    wc.hCursor        = 0;
     wc.hbrBackground  = 0;
-    wc.lpszMenuName	= NULL;
+    wc.lpszMenuName    = NULL;
     wc.lpszClassName  = szAppName;
 
     if(!RegisterClass(&wc))
@@ -84,14 +84,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
     }
 
     RECT rect;
-	SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, FALSE);
+    SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, FALSE);
 
-	rect.left = (rect.right - winWidth) / 2;
-	rect.top  = (rect.bottom - winHeight) / 2;
-	rect.right  = rect.left + winWidth;
-	rect.bottom = rect.top + winHeight;
+    rect.left = (rect.right - winWidth) / 2;
+    rect.top  = (rect.bottom - winHeight) / 2;
+    rect.right  = rect.left + winWidth;
+    rect.bottom = rect.top + winHeight;
 
-	UINT style = WS_VISIBLE | WS_CAPTION | WS_SYSMENU;
+    UINT style = WS_VISIBLE | WS_CAPTION | WS_SYSMENU;
 
     AdjustWindowRectEx(&rect, style, FALSE, 0);
 
@@ -101,12 +101,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
                       rect.left,
                       rect.top,
                       rect.right - rect.left,
-					  rect.bottom - rect.top,
+                      rect.bottom - rect.top,
                       NULL, NULL,
                       hInstance, NULL);
     if(!hWnd)
     {
-		UnregisterClass(szAppName, hInstance);
+        UnregisterClass(szAppName, hInstance);
         return FALSE;
     }
 
@@ -116,33 +116,33 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
 
     BITMAPINFO     bmi;
 
-	memset(&bmi, 0, sizeof(BITMAPINFO));
-	bmi.bmiHeader.biSize           = sizeof(BITMAPINFO);
-	bmi.bmiHeader.biWidth          = winWidth;
-	bmi.bmiHeader.biHeight         = winHeight;
-	bmi.bmiHeader.biPlanes         = (short)1;
-	bmi.bmiHeader.biCompression    = BI_RGB;
+    memset(&bmi, 0, sizeof(BITMAPINFO));
+    bmi.bmiHeader.biSize           = sizeof(BITMAPINFO);
+    bmi.bmiHeader.biWidth          = winWidth;
+    bmi.bmiHeader.biHeight         = winHeight;
+    bmi.bmiHeader.biPlanes         = (short)1;
+    bmi.bmiHeader.biCompression    = BI_RGB;
     bmi.bmiHeader.biBitCount       = 32;
-	bmi.bmiHeader.biSizeImage      = 0;
-	bmi.bmiHeader.biXPelsPerMeter  = 0;
-	bmi.bmiHeader.biYPelsPerMeter  = 0;
-	bmi.bmiHeader.biClrUsed        = 0;
-	bmi.bmiHeader.biClrImportant   = 0;
+    bmi.bmiHeader.biSizeImage      = 0;
+    bmi.bmiHeader.biXPelsPerMeter  = 0;
+    bmi.bmiHeader.biYPelsPerMeter  = 0;
+    bmi.bmiHeader.biClrUsed        = 0;
+    bmi.bmiHeader.biClrImportant   = 0;
 
     hDC = GetDC(hWnd);
 
-	// Create DIB
-	hBitmap = CreateDIBSection(hDC, &bmi, DIB_RGB_COLORS, NULL, NULL, 0);
+    // Create DIB
+    hBitmap = CreateDIBSection(hDC, &bmi, DIB_RGB_COLORS, NULL, NULL, 0);
     if(!hBitmap)
-	{
-		goto EXIT;
-	}
+    {
+        goto EXIT;
+    }
 
     //OpenGL ES Initialization
     if(!InitOGLES())
-	{
-		goto EXIT;
-	}
+    {
+        goto EXIT;
+    }
 
     //Message Loop
     while(!done)
@@ -151,19 +151,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
         {
           if(msg.message==WM_QUIT)
             done=TRUE;
-  	      else
+            else
           {
-  	        TranslateMessage(&msg);
-  	        DispatchMessage(&msg);
-  	      }
+              TranslateMessage(&msg);
+              DispatchMessage(&msg);
+            }
         }
         else
-  	    {
-  	        Render();
-  	    }
+          {
+              Render();
+          }
     }
 
-	ret = 0;
+    ret = 0;
 
 EXIT:
 
@@ -172,14 +172,14 @@ EXIT:
         eglMakeCurrent(glesDisplay, NULL, NULL, NULL);
 
         if(glesContext)
-		{
-			eglDestroyContext(glesDisplay, glesContext);
-		}
+        {
+            eglDestroyContext(glesDisplay, glesContext);
+        }
 
-		if(glesSurface)
-		{
-			eglDestroySurface(glesDisplay, glesSurface);
-		}
+        if(glesSurface)
+        {
+            eglDestroySurface(glesDisplay, glesSurface);
+        }
 
         eglTerminate(glesDisplay);
     }
@@ -189,15 +189,15 @@ EXIT:
       DeleteObject((HBITMAP)hBitmap);
     }
 
-	if (hDC)
-	{
-		ReleaseDC(hWnd, hDC);
-	}
+    if (hDC)
+    {
+        ReleaseDC(hWnd, hDC);
+    }
 
-	if (hWnd)
-	{
-		DestroyWindow(hWnd);
-	}
+    if (hWnd)
+    {
+        DestroyWindow(hWnd);
+    }
 
     UnregisterClass(szAppName, hInstance);
 
@@ -211,7 +211,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
     case WM_PAINT:
         ValidateRect(hWnd,NULL);
-	    break;
+        break;
 
     case WM_DESTROY:
         PostQuitMessage(0);
@@ -301,33 +301,33 @@ void Render()
     glDisableClientState(GL_COLOR_ARRAY);
 
     if (!eglCopyBuffers(glesDisplay, glesSurface, hBitmap))
-	{
-		return;
-	}
+    {
+        return;
+    }
 
     DIBSECTION dibs;
 
-	memset(&dibs, 0, sizeof(BITMAPINFO));
+    memset(&dibs, 0, sizeof(BITMAPINFO));
 
-	dibs.dsBmih.biSize = sizeof(dibs.dsBmih);
+    dibs.dsBmih.biSize = sizeof(dibs.dsBmih);
 
     if (GetObject(hBitmap,sizeof(dibs),&dibs))
     {
-		if (dibs.dsBm.bmBits)
-		{
-			RECT rect;
-			GetClientRect(hWnd, &rect);
+        if (dibs.dsBm.bmBits)
+        {
+            RECT rect;
+            GetClientRect(hWnd, &rect);
 
-			StretchDIBits(
-					hDC,
-					rect.left, rect.top,
-					rect.right - rect.left, rect.bottom - rect.top,
-					0, 0, dibs.dsBm.bmWidth, dibs.dsBm.bmHeight,
-					dibs.dsBm.bmBits,
-					(BITMAPINFO *) &dibs.dsBmih,
-					DIB_RGB_COLORS,
-					SRCCOPY
-					);
-		}
+            StretchDIBits(
+                    hDC,
+                    rect.left, rect.top,
+                    rect.right - rect.left, rect.bottom - rect.top,
+                    0, 0, dibs.dsBm.bmWidth, dibs.dsBm.bmHeight,
+                    dibs.dsBm.bmBits,
+                    (BITMAPINFO *) &dibs.dsBmih,
+                    DIB_RGB_COLORS,
+                    SRCCOPY
+                    );
+        }
     }
 }

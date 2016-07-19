@@ -52,9 +52,6 @@ endif
 ifeq ($(EGL_API_X), 1)
 	INCLUDE += -I$(X11_ARM_DIR)/include
 endif
-ifeq ($(EGL_API_DFB), 1)
-	INCLUDE += -I$(DFB_DIR)/include/directfb
-endif
 
 CFLAGS += $(INCLUDE)
 
@@ -69,7 +66,7 @@ else
   else
     LIBS += -L$(VIVANTE_SDK_LIB)
   endif
-  LIBS += -lVDK -lGAL -lEGL -lGLESv2
+  LIBS += -lVDK -lEGL -lGLESv2
 endif
 
 ifeq ($(QNX), 1)
@@ -80,7 +77,7 @@ else
     LIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11
   endif
   ifeq ($(EGL_API_X), 1)
-    LIBS += -L$(X11_ARM_DIR)/lib -lXau -lXdmcp -lX11
+    LIBS += -L$(X11_ARM_DIR)/lib -Wl,-rpath-link,$(X11_ARM_DIR)/lib -lX11
   endif
   ifeq ($(EGL_API_DFB), 1)
     LIBS += -L$(DFB_DIR)/lib -ldirectfb -ldirect -lfusion

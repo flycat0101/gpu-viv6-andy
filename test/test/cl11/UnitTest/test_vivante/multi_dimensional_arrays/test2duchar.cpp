@@ -33,40 +33,40 @@
 
 Test2DUChar::Test2DUChar(const size_t sizeX, const size_t sizeY):
 MultiDimensionalArraysTest2D("uchar", sizeX, sizeY) {
-	inputAHost = new cl_uchar[size];
-	inputBHost = new cl_uchar[size];
-	resultHost = new cl_uchar[size];
-	inputA = inputAHost;
-	inputB = inputBHost;
-	result = resultHost;
+    inputAHost = new cl_uchar[size];
+    inputBHost = new cl_uchar[size];
+    resultHost = new cl_uchar[size];
+    inputA = inputAHost;
+    inputB = inputBHost;
+    result = resultHost;
 }
 
 Test2DUChar::~Test2DUChar() {
-	delete[] inputAHost;
-	delete[] inputBHost;
-	delete[] resultHost;
+    delete[] inputAHost;
+    delete[] inputBHost;
+    delete[] resultHost;
 }
 
 const int Test2DUChar::getMemSize() const {
-	return sizeof(cl_uchar)*size;
+    return sizeof(cl_uchar)*size;
 }
 
 void Test2DUChar::generateInput(const unsigned int &kernelIndex) {
-	for (unsigned int k=0; k<size; k++) {
-		inputAHost[k] = randUChar();
-		if (getKernelInputArgNum(kernelIndex) == 2)
-			inputBHost[k] = randUChar();
-	}
+    for (unsigned int k=0; k<size; k++) {
+        inputAHost[k] = randUChar();
+        if (getKernelInputArgNum(kernelIndex) == 2)
+            inputBHost[k] = randUChar();
+    }
 }
 
 void* Test2DUChar::getInputAElement(const unsigned int &index) const {
-	return &inputAHost[index];
+    return &inputAHost[index];
 }
 
 void* Test2DUChar::getInputBElement(const unsigned int &index) const {
-	return &inputBHost[index];
+    return &inputBHost[index];
 }
 
 void* Test2DUChar::getResultElement(const unsigned int &index) const {
-	return &resultHost[index];
+    return &resultHost[index];
 }

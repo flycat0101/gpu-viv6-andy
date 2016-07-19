@@ -97,6 +97,7 @@ LOCAL_CFLAGS := \
 LOCAL_C_INCLUDES := \
 	bionic \
 	external/stlport/stlport \
+	$(AQROOT)/sdk/inc \
 	$(AQROOT)/hal/inc \
 	$(AQROOT)/hal/user \
 	$(AQROOT)/hal/os/linux/user \

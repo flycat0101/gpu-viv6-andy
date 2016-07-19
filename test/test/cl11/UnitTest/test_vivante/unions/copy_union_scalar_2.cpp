@@ -36,33 +36,33 @@
 
 const char *kernel_copy_union_scalar_2 =
 "#ifndef _TYPES4_H_                                                                                                                 \n"
-"#define _TYPES4_H_																												   \n"
-"#																																   \n"
-"#ifdef __OPENCL_VERSION__																										   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
-"#else // __OPENCL_VERSION__																									   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType									   \n"
-"#endif // __OPENCL_VERSION__																									   \n"
-"#																														   \n"
-"ALIGNED_STRUCT(union, 32) InputA {																							       \n"
-"    uint a;																													   \n"
-"    float h;																												   \n"
-"	 int z;				                                                          \n"
-"	 short q;				                                                          \n"
+"#define _TYPES4_H_                                                                                                                   \n"
+"#                                                                                                                                   \n"
+"#ifdef __OPENCL_VERSION__                                                                                                           \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))                               \n"
+"#else // __OPENCL_VERSION__                                                                                                       \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType                                       \n"
+"#endif // __OPENCL_VERSION__                                                                                                       \n"
+"#                                                                                                                           \n"
+"ALIGNED_STRUCT(union, 32) InputA {                                                                                                   \n"
+"    uint a;                                                                                                                       \n"
+"    float h;                                                                                                                   \n"
+"     int z;                                                                          \n"
+"     short q;                                                                          \n"
 "};                                                                                                                                \n"
 "                                                                                                                                  \n"
 "ALIGNED_STRUCT(union, 32) InputB {                                                                                                \n"
 "    uint k;                                                                                                                     \n"
 "    float b;                                                                                                                   \n"
-"	 int w;				                                                          \n"
-"	 short p;				                                                          \n"
+"     int w;                                                                          \n"
+"     short p;                                                                          \n"
 "};                                                                                                                                \n"
 "                                                                                                                                  \n"
 "ALIGNED_STRUCT(union, 32) Result {                                                                                                \n"
 "    uint z;                                                                                                                     \n"
 "    float r;                                                                                                                   \n"
-"	 int x;				                                                          \n"
-"	 short l;				                                                          \n"
+"     int x;                                                                          \n"
+"     short l;                                                                          \n"
 "};                                                                                                                                \n"
 "                                                                                                                                  \n"
 "#endif // _TYPES_H_                                                                                                               \n"
@@ -73,8 +73,8 @@ const char *kernel_copy_union_scalar_2 =
 "                                                                                                                                  \n"
 "    // bound check (equivalent to the limit on a 'for' loop for standard/serial C code                                            \n"
 "                                                                                                                                  \n"
-"										                                                           \n"
-"		c[tid].r = convert_float(a[tid].a);                                                                                   \n"
+"                                                                                                   \n"
+"        c[tid].r = convert_float(a[tid].a);                                                                                   \n"
 "                                                                                                                                  \n"
 "}                                                                                                                                 \n";
 
@@ -125,8 +125,8 @@ public:
         _deviceResult = cl::Buffer(_context, CL_MEM_WRITE_ONLY, sizeof(Result) * _globalWorkSize);
 
         _kernel.setArg(0,sizeof (_deviceInputA), &_deviceInputA);
-		_kernel.setArg(1,sizeof (_deviceResult), &_deviceResult);
-		_kernel.setArg(2,sizeof (_numElements), &_numElements);
+        _kernel.setArg(1,sizeof (_deviceResult), &_deviceResult);
+        _kernel.setArg(2,sizeof (_numElements), &_numElements);
     }
 
     virtual bool Execute()
@@ -174,9 +174,9 @@ private:
     bool _compare()
     {
         for (int i = 0; i < _numElements; ++i) {
-			if (_goldStandard[i].r != _result[i].r) {
-				std::cout << "c:" << _goldStandard[i].r << " ocl:" << _result[i].r << std::endl;
-	            return false;
+            if (_goldStandard[i].r != _result[i].r) {
+                std::cout << "c:" << _goldStandard[i].r << " ocl:" << _result[i].r << std::endl;
+                return false;
             }
         }
         return true;
@@ -202,7 +202,7 @@ private:
 int copy_union_scalar_2(void)
 {
     cl_int err = CL_SUCCESS;
-	int cnt = 1;
+    int cnt = 1;
 
     try {
         std::vector<cl::Platform> platforms;
@@ -218,7 +218,7 @@ int copy_union_scalar_2(void)
 
         std::vector<cl::Device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
 
-
+        
         const char* clProgramSource = kernel_copy_union_scalar_2;//oclLoadProgSource("multiply.cl", "", &szKernelLength);
         if (clProgramSource == 0) {
             std::cerr << "OpenCL program not found." << std::endl;
@@ -242,13 +242,13 @@ int copy_union_scalar_2(void)
         std::cout << "Running test copy_union_scalar_2..." << std::endl;
         TestCase_copy_union_scalar_2 copy_union_scalar_2(10, program_, context, devices);
 
-		bool control = true;
+        bool control = true;
         copy_union_scalar_2.SetUp();
         for (int i = 0; i < 10; ++i) {
-			if(!copy_union_scalar_2.Execute()){
-				control = false;
-				cnt = 0;
-			}
+            if(!copy_union_scalar_2.Execute()){
+                control = false;
+                cnt = 0;
+            }
             std::cout << "RUN " << i + 1<< ": " << (control ? "PASSED" : "FAILED!") << std::endl;
         }
         copy_union_scalar_2.TearDown();

@@ -301,10 +301,7 @@ static void _MergeDepthAndStencil(
     }
 
     /* Delete depth surface. */
-    if (depth->surface)
-    {
-        gcoSURF_Destroy(depth->surface);
-    }
+    gcoSURF_Destroy(depth->surface);
 
     /* Combine depth and stencil renderbuffers. */
     depth->surface                      = stencil->surface;
@@ -874,6 +871,7 @@ GL_API void GL_APIENTRY glDeleteFramebuffersOES(
         for (i = 0; i < Count; i++)
         {
             glsNAMEDOBJECT_PTR wrapper = glfFindNamedObject(shared->frameBufferList, FrameBuffers[i]);
+            glsFRAME_BUFFER_PTR object = gcvNULL;
 
             if (gcvNULL == wrapper)
             {
@@ -887,6 +885,26 @@ GL_API void GL_APIENTRY glDeleteFramebuffersOES(
                 context->curFrameBufferID    = 0;
                 context->frameBufferChanged  = gcvTRUE;
                 context->stencilStates.dirty = gcvTRUE;
+            }
+
+            /* dereference attached name object */
+            object = wrapper->object;
+            if (object)
+            {
+                if (object->color.texture == gcvFALSE)
+                {
+                    glfDereferenceNamedObject(context, object->color.object);
+                }
+
+                if (object->depth.texture == gcvFALSE)
+                {
+                    glfDereferenceNamedObject(context, object->depth.object);
+                }
+
+                if (object->stencil.texture == gcvFALSE)
+                {
+                    glfDereferenceNamedObject(context, object->stencil.object);
+                }
             }
 
             gcmVERIFY_OK(glfDeleteNamedObject(
@@ -1962,6 +1980,12 @@ GL_API void GL_APIENTRY glFramebufferRenderbufferOES(
             }
             context->frameBuffer->color.surface = surface;
 
+            if (context->frameBuffer->color.surface)
+            {
+                /* Reference the surface. */
+                gcoSURF_ReferenceSurface(context->frameBuffer->color.surface);
+            }
+
             if (context->frameBuffer->color.target != gcvNULL &&
                 context->frameBuffer->color.surface != gcvNULL)
             {
@@ -2014,6 +2038,12 @@ GL_API void GL_APIENTRY glFramebufferRenderbufferOES(
                 gcoSURF_Destroy(context->frameBuffer->depth.surface);
             }
             context->frameBuffer->depth.surface = surface;
+
+            if (context->frameBuffer->depth.surface)
+            {
+                /* Reference the surface. */
+                gcoSURF_ReferenceSurface(context->frameBuffer->depth.surface);
+            }
 
             /* Merge the depth and stencil buffers. */
             _MergeDepthAndStencil(context);

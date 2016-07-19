@@ -348,7 +348,7 @@ OnError:
 
 const gceFEATURE FeatureList[]=
 {
-    gcvFEATURE_DEC_COMPRESSION,
+    gcvFEATURE_DEC300_COMPRESSION,
     gcvFEATURE_2D_MULTI_SOURCE_BLT_EX2,
 };
 

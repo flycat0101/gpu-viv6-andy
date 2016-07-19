@@ -159,7 +159,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         surf->aWidth, surf->aHeight,
         &rect, gcvNULL));
 
-#if 1
     if (!t2d->runtime->noSaveTargetNew)
     {
         char name[200];
@@ -168,7 +167,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         sprintf(name, "gal2DFormatCompressedDEC009_intermediate_%03d.bmp", frameNo);
         GalSaveTSurfToDIB(surf, name);
     }
-#endif
 
     len = (gcmMIN(src->width, src->height)) >> 2;
 
@@ -275,7 +273,7 @@ static void CDECL Destroy(Test2D *t2d)
 
 const gceFEATURE FeatureList[]=
 {
-    gcvFEATURE_DEC_COMPRESSION,
+    gcvFEATURE_DEC300_COMPRESSION,
 };
 
 static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)

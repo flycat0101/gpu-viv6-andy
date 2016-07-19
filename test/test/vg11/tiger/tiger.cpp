@@ -26,6 +26,8 @@
 *****************************************************************************/
 
 
+
+
 #include "tiger.h" //We need the defines and prototypes of there
 #include "test_tiger_paths.h"
 #include <stdlib.h>
@@ -52,48 +54,48 @@ VGint         scaleCount = 0;
 
 void vfFRAME_AppInit(int* width, int* height, char *title)
 {
-	if (title != NULL)
-	{
-		*width = i32WindowWidth;
-		*height = i32WindowHeight;
-		strcpy(title, "OpenVG tiger");
-	}
-	else
-	{
-		i32WindowWidth = *width;
-		i32WindowHeight = *height;
-	}
+    if (title != NULL)
+    {
+        *width = i32WindowWidth;
+        *height = i32WindowHeight;
+        strcpy(title, "OpenVG tiger");
+    }
+    else
+    {
+        i32WindowWidth = *width;
+        i32WindowHeight = *height;
+    }
 }
 
 VGboolean vfFRAME_InitVG()
 {
-	int i;
+    int i;
 
-	tigerPaths = (VGPath*)malloc(pathCount * sizeof(VGPath));
-	if (!tigerPaths) return VG_FALSE;
+    tigerPaths = (VGPath*)malloc(pathCount * sizeof(VGPath));
+    if (!tigerPaths) return VG_FALSE;
 
-	for (i=0; i<pathCount; ++i)
-	{
-		tigerPaths[i] = vgCreatePath(VG_PATH_FORMAT_STANDARD, VG_PATH_DATATYPE_F,
-			1,0,0,0, VG_PATH_CAPABILITY_ALL);
-		vgAppendPathData(tigerPaths[i], commandCounts[i],
-			commandArrays[i], dataArrays[i]);
-	}
+    for (i=0; i<pathCount; ++i)
+    {
+        tigerPaths[i] = vgCreatePath(VG_PATH_FORMAT_STANDARD, VG_PATH_DATATYPE_F,
+            1,0,0,0, VG_PATH_CAPABILITY_ALL);
+        vgAppendPathData(tigerPaths[i], commandCounts[i],
+            commandArrays[i], dataArrays[i]);
+    }
 
-	tigerStroke = vgCreatePaint();
-	tigerFill = vgCreatePaint();
-	vgSetPaint(tigerStroke, VG_STROKE_PATH);
-	vgSetPaint(tigerFill, VG_FILL_PATH);
+    tigerStroke = vgCreatePaint();
+    tigerFill = vgCreatePaint();
+    vgSetPaint(tigerStroke, VG_STROKE_PATH);
+    vgSetPaint(tigerFill, VG_FILL_PATH);
 
-	vgSeti(VG_MATRIX_MODE, VG_MATRIX_PATH_USER_TO_SURFACE);
-	vgTranslate((VGfloat)(i32WindowWidth/2 -50.0), (VGfloat)(i32WindowHeight/2 + 100.0));
-	vgScale(1.0,-1.0);
-	//vgScale(0.5,0.5);
+    vgSeti(VG_MATRIX_MODE, VG_MATRIX_PATH_USER_TO_SURFACE);
+    vgTranslate((VGfloat)(i32WindowWidth/2 -50.0), (VGfloat)(i32WindowHeight/2 + 100.0));
+    vgScale(1.0,-1.0);
+    //vgScale(0.5,0.5);
 
-	VGfloat clearColor[] = {1,1,1,1};
-	vgSetfv(VG_CLEAR_COLOR, 4, clearColor);
+    VGfloat clearColor[] = {1,1,1,1};
+    vgSetfv(VG_CLEAR_COLOR, 4, clearColor);
 
-	return VG_TRUE;
+    return VG_TRUE;
 
 }
 
@@ -102,21 +104,21 @@ VGboolean vfFRAME_InitVG()
  */
 void vfFRAME_Render()
 {
-	int i;
-	const VGfloat *style;
+    int i;
+    const VGfloat *style;
 
-	vgClear(0,0,i32WindowWidth,i32WindowHeight);
+    vgClear(0,0,i32WindowWidth,i32WindowHeight);
 
-	for (i=0; i<pathCount; ++i)
-	{
-		style = styleArrays[i];
-		vgSetParameterfv(tigerStroke, VG_PAINT_COLOR, 4, &style[0]);
-		vgSetParameterfv(tigerFill, VG_PAINT_COLOR, 4, &style[4]);
-		vgSetf(VG_STROKE_LINE_WIDTH, style[8]);
-		vgDrawPath((VGPath)tigerPaths[i], (VGint)style[9]);
-	}
+    for (i=0; i<pathCount; ++i)
+    {
+        style = styleArrays[i];
+        vgSetParameterfv(tigerStroke, VG_PAINT_COLOR, 4, &style[0]);
+        vgSetParameterfv(tigerFill, VG_PAINT_COLOR, 4, &style[4]);
+        vgSetf(VG_STROKE_LINE_WIDTH, style[8]);
+        vgDrawPath((VGPath)tigerPaths[i], (VGint)style[9]);
+    }
 
-	animateTiger();
+    animateTiger();
 }
 
 void animateTiger()
@@ -141,22 +143,22 @@ void animateTiger()
 void vfFRAME_Clean()
 {
 
-	int i;
-	for (i=0; i<pathCount; ++i)
-	{
-		vgDestroyPath(tigerPaths[i]);
-	}
+    int i;
+    for (i=0; i<pathCount; ++i)
+    {
+        vgDestroyPath(tigerPaths[i]);
+    }
 
-	vgDestroyPaint(tigerStroke);
-	vgDestroyPaint(tigerFill);
+    vgDestroyPaint(tigerStroke);
+    vgDestroyPaint(tigerFill);
 
-	free(tigerPaths);
+    free(tigerPaths);
 
 }
 
 bool keyprocessor(unsigned char key)
 {
-	return false;
+    return false;
 }
 #if USE_VDK
 void mouseKeyProcessor(int mouseX, int mouseY, vdkEvent msg)

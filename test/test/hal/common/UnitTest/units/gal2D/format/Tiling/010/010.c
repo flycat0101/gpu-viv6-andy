@@ -220,6 +220,14 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
         strncat(runtime->wholeDescription, featureName, k==listLen-1 ? strlen(featureName)+1:strlen(featureName));
     }
 
+    if (runtime->ChipModel >= gcv600 ||
+        ((runtime->ChipModel == gcv300 || runtime->ChipModel == gcv200) &&
+         runtime->ChipRevision >= 0x4650 && runtime->ChipRevision < 0x5000))
+    {
+        GalOutput(GalOutputType_Result | GalOutputType_Console, "Multi super tile is not supported.\n");
+        runtime->notSupport = gcvTRUE;
+    }
+
     if (runtime->notSupport)
         return gcvFALSE;
 

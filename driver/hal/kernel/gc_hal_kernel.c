@@ -55,7 +55,7 @@
 
 #include "gc_hal_kernel_precomp.h"
 
-#if gcdENABLE_DEC_COMPRESSION && gcdDEC_ENABLE_AHB
+#if gcdDEC_ENABLE_AHB
 #include "viv_dec300_main.h"
 #endif
 
@@ -150,6 +150,9 @@ gctCONST_STRING _DispatchText[] =
     gcmDEFINE2TEXT(gcvHAL_WRAP_USER_MEMORY),
     gcmDEFINE2TEXT(gcvHAL_WAIT_FENCE),
     gcmDEFINE2TEXT(gcvHAL_GET_VIDEO_MEMORY_FD),
+#if gcdENABLE_VG
+    gcmDEFINE2TEXT(gcvHAL_BOTTOM_HALF_UNLOCK_VIDEO_MEMORY)
+#endif
 };
 #endif
 
@@ -576,7 +579,7 @@ gckKERNEL_Construct(
         kernel->virtualCommandBuffer = gcvTRUE;
 #endif
 
-#if gcdSECURITY
+#if gcdSECURITY || gcdDISABLE_GPU_VIRTUAL_ADDRESS
         kernel->virtualCommandBuffer = gcvFALSE;
 #endif
 
@@ -2905,7 +2908,7 @@ gckKERNEL_Dispatch(
             ));
         break;
 
-#if gcdENABLE_DEC_COMPRESSION && gcdDEC_ENABLE_AHB
+#if gcdDEC_ENABLE_AHB
     case gcvHAL_DEC300_READ:
         gcmkONERROR(viv_dec300_read(
             Interface->u.DEC300Read.enable,
@@ -4210,7 +4213,9 @@ gckKERNEL_AllocateVirtualMemory(
             pageCount,
             buffer->gpuAddress,
             buffer->pageTable,
-            gcvFALSE));
+            gcvFALSE,
+            gcvSURF_TYPE_UNKNOWN
+            ));
     }
 
     gcmkONERROR(gckMMU_Flush(mmu, gcvSURF_INDEX));

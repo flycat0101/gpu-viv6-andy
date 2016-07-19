@@ -29,8 +29,8 @@
 /*
  *  Feature:    ColorSource - relative
  *  API:        gco2D_SetSource gco2D_SetColorSource/gco2D_SetColorSourceAdvanced
- *				gco2D_SetColorSource is only working with old PE (<2.0) and
- *				gco2D_SetColorSourceAdvanced is only working with PE 2.0 and above.
+ *                gco2D_SetColorSource is only working with old PE (<2.0) and
+ *                gco2D_SetColorSourceAdvanced is only working with PE 2.0 and above.
  *  Check:      relative
 */
 #include <galUtil.h>
@@ -59,88 +59,88 @@ typedef struct Test2D {
     GalTest     base;
     GalRuntime  *runtime;
 
-	// destination surface
-    gcoSURF			dstSurf;
-	gceSURF_FORMAT	dstFormat;
-	gctUINT			dstWidth;
-	gctUINT			dstHeight;
-	gctINT			dstStride;
-	gctUINT32		dstPhyAddr;
-	gctPOINTER		dstLgcAddr;
+    // destination surface
+    gcoSURF            dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT            dstWidth;
+    gctUINT            dstHeight;
+    gctINT            dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
 } Test2D;
 
 static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 {
-	gcoSURF tmpSurf;
-	char * bmpfile = "resource/relative.bmp";
-	gcsRECT srcRect = {0, 0, t2d->dstWidth, t2d->dstHeight}, dstRect[2];
-	gcsRECT clipRect = {0, 0, t2d->dstWidth, t2d->dstHeight};
-	gco2D egn2D = t2d->runtime->engine2d;
-	gceSTATUS status;
-	gctBOOL relative;
+    gcoSURF tmpSurf;
+    char * bmpfile = "resource/relative.bmp";
+    gcsRECT srcRect = {0, 0, t2d->dstWidth, t2d->dstHeight}, dstRect[2];
+    gcsRECT clipRect = {0, 0, t2d->dstWidth, t2d->dstHeight};
+    gco2D egn2D = t2d->runtime->engine2d;
+    gceSTATUS status;
+    gctBOOL relative;
 
-	gcmONERROR(gco2D_SetClipping(egn2D, &clipRect));
+    gcmONERROR(gco2D_SetClipping(egn2D, &clipRect));
 
-	switch (frameNo)
-	{
-	case 0:
-		srcRect.left = 0; srcRect.top = 0;
-		dstRect[0].left = (gctINT32)(200 * t2d->dstWidth / 640); dstRect[0].top = (gctINT32)(150 * t2d->dstHeight / 480);
-		dstRect[0].right = (gctINT32)(264 * t2d->dstWidth / 640); dstRect[0].bottom = (gctINT32)(214 * t2d->dstHeight / 480);
-		dstRect[1].left = (gctINT32)(300 * t2d->dstWidth / 640); dstRect[1].top = (gctINT32)(160 * t2d->dstHeight / 480);
-		dstRect[1].right = (gctINT32)(364 * t2d->dstWidth / 640); dstRect[1].bottom = (gctINT32)(224 * t2d->dstHeight / 480);
-		relative = gcvFALSE;
-		break;
+    switch (frameNo)
+    {
+    case 0:
+        srcRect.left = 0; srcRect.top = 0;
+        dstRect[0].left = (gctINT32)(200 * t2d->dstWidth / 640); dstRect[0].top = (gctINT32)(150 * t2d->dstHeight / 480);
+        dstRect[0].right = (gctINT32)(264 * t2d->dstWidth / 640); dstRect[0].bottom = (gctINT32)(214 * t2d->dstHeight / 480);
+        dstRect[1].left = (gctINT32)(300 * t2d->dstWidth / 640); dstRect[1].top = (gctINT32)(160 * t2d->dstHeight / 480);
+        dstRect[1].right = (gctINT32)(364 * t2d->dstWidth / 640); dstRect[1].bottom = (gctINT32)(224 * t2d->dstHeight / 480);
+        relative = gcvFALSE;
+        break;
 
-	case 1:
-		srcRect.left = 0; srcRect.top = (gctINT32)(200 * t2d->dstHeight / 480);
-		dstRect[0].left = 0; dstRect[0].top = (gctINT32)(152 * t2d->dstHeight / 480);
-		dstRect[0].right = (gctINT32)(128 * t2d->dstWidth / 640); dstRect[0].bottom = (gctINT32)(280 * t2d->dstHeight / 480);
-		dstRect[1].left = (gctINT32)(512 * t2d->dstWidth / 640); dstRect[1].top = (gctINT32)(152 * t2d->dstHeight / 480);
-		dstRect[1].right = (gctINT32)(640 * t2d->dstWidth / 640); dstRect[1].bottom = (gctINT32)(280 * t2d->dstHeight / 480);
-		relative = gcvTRUE;
-		break;
+    case 1:
+        srcRect.left = 0; srcRect.top = (gctINT32)(200 * t2d->dstHeight / 480);
+        dstRect[0].left = 0; dstRect[0].top = (gctINT32)(152 * t2d->dstHeight / 480);
+        dstRect[0].right = (gctINT32)(128 * t2d->dstWidth / 640); dstRect[0].bottom = (gctINT32)(280 * t2d->dstHeight / 480);
+        dstRect[1].left = (gctINT32)(512 * t2d->dstWidth / 640); dstRect[1].top = (gctINT32)(152 * t2d->dstHeight / 480);
+        dstRect[1].right = (gctINT32)(640 * t2d->dstWidth / 640); dstRect[1].bottom = (gctINT32)(280 * t2d->dstHeight / 480);
+        relative = gcvTRUE;
+        break;
 
-	default:
-		return gcvFALSE;
-	}
+    default:
+        return gcvFALSE;
+    }
 
-	// init dst surface
-	tmpSurf = GalLoadDIB2Surface(t2d->runtime->hal, bmpfile);
-	if (tmpSurf == NULL)
-	{
-		GalOutput(GalOutputType_Error, "can not load %s\n", bmpfile);
-		gcmONERROR(gcvSTATUS_NOT_FOUND);
-	}
+    // init dst surface
+    tmpSurf = GalLoadDIB2Surface(t2d->runtime->hal, bmpfile);
+    if (tmpSurf == NULL)
+    {
+        GalOutput(GalOutputType_Error, "can not load %s\n", bmpfile);
+        gcmONERROR(gcvSTATUS_NOT_FOUND);
+    }
 
-	gcmONERROR(gcoSURF_Blit(tmpSurf, t2d->dstSurf, 1, gcvNULL, gcvNULL, gcvNULL, 0xCC, 0xCC, gcvSURF_OPAQUE, 0, gcvNULL, gcvSURF_UNPACKED));
+    gcmONERROR(gcoSURF_Blit(tmpSurf, t2d->dstSurf, 1, gcvNULL, gcvNULL, gcvNULL, 0xCC, 0xCC, gcvSURF_OPAQUE, 0, gcvNULL, gcvSURF_UNPACKED));
 
-	if (gcmIS_ERROR(gcoSURF_Destroy(tmpSurf)))
-	{
-		GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
-	}
+    if (gcmIS_ERROR(gcoSURF_Destroy(tmpSurf)))
+    {
+        GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
+    }
 
-	// set color source
-	if (t2d->runtime->pe20)
-	{
-		gcmONERROR(gco2D_SetColorSourceAdvanced(egn2D, t2d->dstPhyAddr, t2d->dstStride, t2d->dstFormat,
-						gcvSURF_0_DEGREE, t2d->dstWidth, t2d->dstHeight, relative));
-	}
-	else
-	{
-		gcmONERROR(gco2D_SetColorSource(egn2D, t2d->dstPhyAddr, t2d->dstStride, t2d->dstFormat,
-						gcvSURF_0_DEGREE, t2d->dstWidth, relative, gcvSURF_OPAQUE, 0));
-	}
+    // set color source
+    if (t2d->runtime->pe20)
+    {
+        gcmONERROR(gco2D_SetColorSourceAdvanced(egn2D, t2d->dstPhyAddr, t2d->dstStride, t2d->dstFormat,
+                        gcvSURF_0_DEGREE, t2d->dstWidth, t2d->dstHeight, relative));
+    }
+    else
+    {
+        gcmONERROR(gco2D_SetColorSource(egn2D, t2d->dstPhyAddr, t2d->dstStride, t2d->dstFormat,
+                        gcvSURF_0_DEGREE, t2d->dstWidth, relative, gcvSURF_OPAQUE, 0));
+    }
 
-	gcmONERROR(gco2D_SetSource(egn2D, &srcRect));
+    gcmONERROR(gco2D_SetSource(egn2D, &srcRect));
 
-	gcmONERROR(gco2D_SetTarget(egn2D, t2d->dstPhyAddr, t2d->dstStride, gcvSURF_0_DEGREE, t2d->dstWidth));
+    gcmONERROR(gco2D_SetTarget(egn2D, t2d->dstPhyAddr, t2d->dstStride, gcvSURF_0_DEGREE, t2d->dstWidth));
 
-	gcmONERROR(gco2D_Blit(egn2D, 2, dstRect, 0xCC, 0xCC, t2d->dstFormat));
+    gcmONERROR(gco2D_Blit(egn2D, 2, dstRect, 0xCC, 0xCC, t2d->dstFormat));
 
-	gcmONERROR(gco2D_Flush(egn2D));
+    gcmONERROR(gco2D_Flush(egn2D));
 
-	gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
+    gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
 
     return gcvTRUE;
 
@@ -154,14 +154,14 @@ OnError:
 
 static void CDECL Destroy(Test2D *t2d)
 {
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
     if ((t2d->dstSurf != gcvNULL) && (t2d->dstLgcAddr != gcvNULL))
     {
-		if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
-		}
-		t2d->dstLgcAddr = gcvNULL;
+        if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
+        }
+        t2d->dstLgcAddr = gcvNULL;
     }
 
     free(t2d);
@@ -175,7 +175,7 @@ const gceFEATURE FeatureCombineList[]=
 
 static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 {
-	gceSTATUS status;
+    gceSTATUS status;
 
     gctUINT32 k, listLen2 = sizeof(FeatureCombineList)/sizeof(gctINT);
     gctBOOL featureStatus, supported = gcvFALSE;
@@ -211,25 +211,25 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 
     t2d->runtime = runtime;
 
-	t2d->dstSurf    = runtime->target;
-	t2d->dstFormat = runtime->format;
-	t2d->dstWidth = 0;
-	t2d->dstHeight = 0;
-	t2d->dstStride = 0;
-	t2d->dstPhyAddr = 0;
-	t2d->dstLgcAddr = 0;
+    t2d->dstSurf    = runtime->target;
+    t2d->dstFormat = runtime->format;
+    t2d->dstWidth = 0;
+    t2d->dstHeight = 0;
+    t2d->dstStride = 0;
+    t2d->dstPhyAddr = 0;
+    t2d->dstLgcAddr = 0;
 
-   	gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
-										&t2d->dstWidth,
-										&t2d->dstHeight,
-										&t2d->dstStride));
+       gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
+                                        &t2d->dstWidth,
+                                        &t2d->dstHeight,
+                                        &t2d->dstStride));
 
-	gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
+    gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
 
     t2d->base.render     = (PGalRender)Render;
     t2d->base.destroy    = (PGalDestroy)Destroy;
     t2d->base.frameCount = 2;
-	t2d->base.description = s_CaseDescription;
+    t2d->base.description = s_CaseDescription;
 
     return gcvTRUE;
 

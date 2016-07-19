@@ -5296,6 +5296,16 @@ gcoOS_DestroyDrawable(
 }
 
 gceSTATUS
+gcoOS_RSForSwap(
+    IN gctPOINTER localDisplay,
+    IN HALNativeWindowType Drawable,
+    IN gctPOINTER resolve
+    )
+{
+    return gcvSTATUS_NOT_SUPPORTED;
+}
+
+gceSTATUS
 gcoOS_SwapBuffers(
     IN gctPOINTER Display,
     IN HALNativeWindowType Drawable,

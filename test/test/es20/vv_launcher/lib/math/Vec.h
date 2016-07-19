@@ -40,12 +40,12 @@ extern "C" {
 
 typedef struct _Vec2f
 {
-	float v[2];
+    float v[2];
 } Vec2f;
 
 typedef struct _Vec3f
 {
-	float v[3];
+    float v[3];
 } Vec3f;
 
 float Dot3f(Vec3f* V1, Vec3f* V2);

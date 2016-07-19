@@ -41,13 +41,14 @@ INCLUDE += \
 	-I$(AQROOT)/compiler/libVSC/include \
 	-I$(AQROOT)/sdk/inc/GL \
 	-I$(AQROOT)/sdk/inc \
-    -I$(ROOTDIR)/include -I$(ROOTDIR)/include/gl \
-    -I$(ROOTDIR)/include/dri -I$(ROOTDIR)/include/glcore \
+	-I$(ROOTDIR)/include -I$(ROOTDIR)/include/gl \
+	-I$(ROOTDIR)/include/dri -I$(ROOTDIR)/include/glcore \
 	-I$(ROOTDIR)/include/chip \
 	-I$(ROOTDIR)/include/dri \
 	-I$(ROOTFS_USR)/include/arm-linux-gnueabi \
 	-I$(ROOTFS_USR)/include/pixman-1 \
-    -I$(ROOTFS_USR)/include \
+	-I$(ROOTFS_USR)/include/libdrm \
+	-I$(ROOTFS_USR)/include \
 	$(OSINCLUDEDIR)
 
 CFLAGS += $(INCLUDE)

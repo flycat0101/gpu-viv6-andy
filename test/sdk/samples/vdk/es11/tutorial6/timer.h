@@ -33,34 +33,34 @@
 class Timer
 {
 public:
-	Timer();
+    Timer();
 
-	// This method updates the timer.  This must be called once per frame.
-	void UpdateTimer();
+    // This method updates the timer.  This must be called once per frame.
+    void UpdateTimer();
 
-	// Returns the elapsed time between the current frame and the last frame.
-	unsigned long GetTimeBetweenTwoFrames()
-	{
-		return m_DiffTime;
-	}
+    // Returns the elapsed time between the current frame and the last frame.
+    unsigned long GetTimeBetweenTwoFrames()
+    {
+        return m_DiffTime;
+    }
 
-	// Return the time elapsed since the creation of the timer.
-	unsigned long GetTotalTime()
-	{
-		return m_TotalTime;
-	}
+    // Return the time elapsed since the creation of the timer.
+    unsigned long GetTotalTime()
+    {
+        return m_TotalTime;
+    }
 
-	// Returns the frames per second.
-	float GetFPS()
-	{
-		return (1000.0f * m_FrameCount) / m_TotalTime;
-	}
+    // Returns the frames per second.
+    float GetFPS()
+    {
+        return (1000.0f * m_FrameCount) / m_TotalTime;
+    }
 
 private:
-	unsigned long m_LastTime;
-	unsigned long m_DiffTime;
-	unsigned long m_TotalTime;
-	int m_FrameCount;
+    unsigned long m_LastTime;
+    unsigned long m_DiffTime;
+    unsigned long m_TotalTime;
+    int m_FrameCount;
 };
 
 #endif // __timer_h_

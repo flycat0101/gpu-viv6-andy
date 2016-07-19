@@ -222,20 +222,20 @@ VX_INTERNAL_API vx_bool vxoKernel_IsUnique(vx_kernel kernel)
 
 VX_PRIVATE_API vx_string gcoVX_LoadSources(vx_char *filename, vx_size *programSize)
 {
-	FILE *pFile = NULL;
+    FILE *pFile = NULL;
     vx_string path, programSource = NULL;
-	vx_char fullname[1024] = "\0";
-	vx_char defname[1024] = VX_SHADER_SOURCE_PATH;
+    vx_char fullname[1024] = "\0";
+    vx_char defname[1024] = VX_SHADER_SOURCE_PATH;
 
-	gcoOS_GetEnv(gcvNULL, "VX_SHADER_SOURCE_PATH", &path);
-	strcat(fullname, (path != NULL)?path:defname);
+    gcoOS_GetEnv(gcvNULL, "VX_SHADER_SOURCE_PATH", &path);
+    strcat(fullname, (path != NULL)?path:defname);
 
-	strcat(fullname, filename);
+    strcat(fullname, filename);
 
     pFile = fopen(fullname, "rb");
     if (pFile != NULL && programSize)
     {
-		vx_int32 size = 0;
+        vx_int32 size = 0;
         /* obtain file size:*/
         fseek(pFile, 0, SEEK_END);
         *programSize = ftell(pFile);
@@ -939,48 +939,48 @@ VX_PRIVATE_API vx_status vxoProgrameKernel_MinMaxLoc(vx_node node, vx_reference 
     vx_array maxLoc     = (vx_array)parameters[4];
     vx_scalar minCount   = (vx_scalar)parameters[5];
     vx_scalar maxCount   = (vx_scalar)parameters[6];
-	vx_uint32 min_count = 0, max_count = 0;
-	vx_uint32 min_capacity = 0, max_capacity = 0;
+    vx_uint32 min_count = 0, max_count = 0;
+    vx_uint32 min_capacity = 0, max_capacity = 0;
 
-	if((minCount == NULL) && (minLoc != NULL))
-	{
-		vx_parameter params = vxGetGraphParameterByIndex(graph, 5);
-		minCount = (vx_scalar)(params->node->paramTable[5]);
-		vxReleaseParameter(&params);
-	}
+    if((minCount == NULL) && (minLoc != NULL))
+    {
+        vx_parameter params = vxGetGraphParameterByIndex(graph, 5);
+        minCount = (vx_scalar)(params->node->paramTable[5]);
+        vxReleaseParameter(&params);
+    }
 
-	if((maxCount == NULL) && (maxLoc != NULL))
-	{
-		vx_parameter params = vxGetGraphParameterByIndex(graph, 6);
-		maxCount = (vx_scalar)(params->node->paramTable[6]);
-		vxReleaseParameter(&params);
-	}
+    if((maxCount == NULL) && (maxLoc != NULL))
+    {
+        vx_parameter params = vxGetGraphParameterByIndex(graph, 6);
+        maxCount = (vx_scalar)(params->node->paramTable[6]);
+        vxReleaseParameter(&params);
+    }
 
-	vxAccessScalarValue(minCount, &min_count);
-	vxCommitScalarValue(minCount, &min_count);
+    vxAccessScalarValue(minCount, &min_count);
+    vxCommitScalarValue(minCount, &min_count);
 
-	vxAccessScalarValue(maxCount, &max_count);
-	vxCommitScalarValue(maxCount, &max_count);
+    vxAccessScalarValue(maxCount, &max_count);
+    vxCommitScalarValue(maxCount, &max_count);
 
-	vxQueryArray(minLoc, VX_ARRAY_ATTRIBUTE_CAPACITY, &min_capacity, sizeof(vx_uint32));
-	vxQueryArray(maxLoc, VX_ARRAY_ATTRIBUTE_CAPACITY, &max_capacity, sizeof(vx_uint32));
+    vxQueryArray(minLoc, VX_ARRAY_ATTRIBUTE_CAPACITY, &min_capacity, sizeof(vx_uint32));
+    vxQueryArray(maxLoc, VX_ARRAY_ATTRIBUTE_CAPACITY, &max_capacity, sizeof(vx_uint32));
 
-	if(min_count > min_capacity)min_count = min_capacity;
-	if(max_count > max_capacity)max_count = max_capacity;
+    if(min_count > min_capacity)min_count = min_capacity;
+    if(max_count > max_capacity)max_count = max_capacity;
 
-	vxSetArrayAttribute(minLoc, VX_ARRAY_ATTRIBUTE_NUMITEMS, &min_count, sizeof(vx_uint32));
-	vxSetArrayAttribute(maxLoc, VX_ARRAY_ATTRIBUTE_NUMITEMS, &max_count, sizeof(vx_uint32));
+    vxSetArrayAttribute(minLoc, VX_ARRAY_ATTRIBUTE_NUMITEMS, &min_count, sizeof(vx_uint32));
+    vxSetArrayAttribute(maxLoc, VX_ARRAY_ATTRIBUTE_NUMITEMS, &max_count, sizeof(vx_uint32));
 
-	if((parameters[5] == NULL) && (minLoc != NULL))
-	{
-		vxReleaseScalar(&minCount);
-	}
+    if((parameters[5] == NULL) && (minLoc != NULL))
+    {
+        vxReleaseScalar(&minCount);
+    }
 
-	if((parameters[6] == NULL) && (maxLoc != NULL))
-	{
-		vxReleaseScalar(&maxCount);
-	}
-	return status;
+    if((parameters[6] == NULL) && (maxLoc != NULL))
+    {
+        vxReleaseScalar(&maxCount);
+    }
+    return status;
 }
 
 VX_PRIVATE_API vx_status vxoProgrameMinMaxLoc_Initializer(vx_node node, vx_reference *parameters, vx_uint32 num)
@@ -994,16 +994,16 @@ VX_PRIVATE_API vx_status vxoProgrameMinMaxLoc_Initializer(vx_node node, vx_refer
     vx_array maxLoc;
     vx_scalar minCount;
     vx_scalar maxCount;
-	vx_kernel kernel_minmax, kernel_location;
-	vx_node node_minmax, node_location;
-	vx_border_mode_t border;
-	vx_context context = vxGetContext((vx_reference)node);
+    vx_kernel kernel_minmax, kernel_location;
+    vx_node node_minmax, node_location;
+    vx_border_mode_t border;
+    vx_context context = vxGetContext((vx_reference)node);
     vx_graph graph = vxCreateGraph(context);
-	vx_uint32 min = 0xff, max = 0;
-	vx_uint32 count = 0;
-	vx_df_image format;
-	vx_bool minc_opt = (vx_bool)(parameters[5] != NULL), maxc_opt = (vx_bool)(parameters[6] != NULL);
-	vx_bool minl_opt = (vx_bool)(parameters[3] != NULL), maxl_opt = (vx_bool)(parameters[4] != NULL);
+    vx_uint32 min = 0xff, max = 0;
+    vx_uint32 count = 0;
+    vx_df_image format;
+    vx_bool minc_opt = (vx_bool)(parameters[5] != NULL), maxc_opt = (vx_bool)(parameters[6] != NULL);
+    vx_bool minl_opt = (vx_bool)(parameters[3] != NULL), maxl_opt = (vx_bool)(parameters[4] != NULL);
 
     inputImage = (vx_image)parameters[0];
     minVal     = (vx_scalar)parameters[1];
@@ -1013,95 +1013,95 @@ VX_PRIVATE_API vx_status vxoProgrameMinMaxLoc_Initializer(vx_node node, vx_refer
     minCount   = (vx_scalar)parameters[5];
     maxCount   = (vx_scalar)parameters[6];
 
-	if(!minc_opt && minl_opt)
-	{
-		minCount = vxCreateScalar(context, VX_TYPE_UINT32, &count);
-	}
-	else
-	{
-		vxAccessScalarValue(minCount, &count);
-		count = 0;
-		vxCommitScalarValue(minCount, &count);
-	}
+    if(!minc_opt && minl_opt)
+    {
+        minCount = vxCreateScalar(context, VX_TYPE_UINT32, &count);
+    }
+    else
+    {
+        vxAccessScalarValue(minCount, &count);
+        count = 0;
+        vxCommitScalarValue(minCount, &count);
+    }
 
-	if(!maxc_opt && maxl_opt)
-	{
-		maxCount = vxCreateScalar(context, VX_TYPE_UINT32, &count);
-	}
-	else
-	{
-		vxAccessScalarValue(maxCount, &count);
-		count = 0;
-		vxCommitScalarValue(maxCount, &count);
-	}
+    if(!maxc_opt && maxl_opt)
+    {
+        maxCount = vxCreateScalar(context, VX_TYPE_UINT32, &count);
+    }
+    else
+    {
+        vxAccessScalarValue(maxCount, &count);
+        count = 0;
+        vxCommitScalarValue(maxCount, &count);
+    }
 
-	border.mode = VX_BORDER_MODE_REPLICATE;
+    border.mode = VX_BORDER_MODE_REPLICATE;
 
-	vxQueryImage(inputImage, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(vx_df_image));
+    vxQueryImage(inputImage, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(vx_df_image));
 
-	vxAccessScalarValue(minVal, &min);
-	vxAccessScalarValue(maxVal, &max);
+    vxAccessScalarValue(minVal, &min);
+    vxAccessScalarValue(maxVal, &max);
 
-	min = 0xff;
-	max = 0;
+    min = 0xff;
+    max = 0;
 
-	if(format == VX_DF_IMAGE_S16)min = 0x7fff;
-	else if(format == VX_DF_IMAGE_U16)min = 0xffff;
+    if(format == VX_DF_IMAGE_S16)min = 0x7fff;
+    else if(format == VX_DF_IMAGE_U16)min = 0xffff;
 
-	vxCommitScalarValue(minVal, &min);
-	vxCommitScalarValue(maxVal, &max);
+    vxCommitScalarValue(minVal, &min);
+    vxCommitScalarValue(maxVal, &max);
 
-	/* get min/max value */
-	kernel_minmax = vxGetKernelByEnum(context, VX_KERNEL_EXTENSION_MINMAX);
-	node_minmax = vxCreateGenericNode(graph, kernel_minmax);
-	status |= vxSetNodeAttribute(node_minmax, VX_NODE_ATTRIBUTE_BORDER_MODE, &border, sizeof(border));
+    /* get min/max value */
+    kernel_minmax = vxGetKernelByEnum(context, VX_KERNEL_EXTENSION_MINMAX);
+    node_minmax = vxCreateGenericNode(graph, kernel_minmax);
+    status |= vxSetNodeAttribute(node_minmax, VX_NODE_ATTRIBUTE_BORDER_MODE, &border, sizeof(border));
 
-	status |= vxSetParameterByIndex(node_minmax, 0, (vx_reference)inputImage);
-	status |= vxSetParameterByIndex(node_minmax, 1, (vx_reference)minVal);
-	status |= vxSetParameterByIndex(node_minmax, 2, (vx_reference)maxVal);
+    status |= vxSetParameterByIndex(node_minmax, 0, (vx_reference)inputImage);
+    status |= vxSetParameterByIndex(node_minmax, 1, (vx_reference)minVal);
+    status |= vxSetParameterByIndex(node_minmax, 2, (vx_reference)maxVal);
 
     status |= vxoAddParameterToGraphByIndex(graph, node_minmax, 0);
     status |= vxoAddParameterToGraphByIndex(graph, node_minmax, 1);
     status |= vxoAddParameterToGraphByIndex(graph, node_minmax, 2);
 
-	if(minc_opt || maxc_opt || minl_opt || maxl_opt)
-	{
-		kernel_location = vxGetKernelByEnum(context, VX_KERNEL_EXTENSION_MINMAXLOCATION);
-		node_location = vxCreateGenericNode(graph, kernel_location);
-
-		/* push parameters to nodes */
-		status |= vxSetParameterByIndex(node_location, 0, (vx_reference)inputImage);
-		status |= vxSetParameterByIndex(node_location, 1, (vx_reference)minVal);
-		status |= vxSetParameterByIndex(node_location, 2, (vx_reference)maxVal);
-		status |= vxSetParameterByIndex(node_location, 3, (vx_reference)minLoc);
-		status |= vxSetParameterByIndex(node_location, 4, (vx_reference)maxLoc);
-		status |= vxSetParameterByIndex(node_location, 5, (vx_reference)minCount);
-		status |= vxSetParameterByIndex(node_location, 6, (vx_reference)maxCount);
-
-		status |= vxoAddParameterToGraphByIndex(graph, node_location, 3);
-		status |= vxoAddParameterToGraphByIndex(graph, node_location, 4);
-		status |= vxoAddParameterToGraphByIndex(graph, node_location, 5);
-		status |= vxoAddParameterToGraphByIndex(graph, node_location, 6);
-	}
-
-	status |= vxSetChildGraphOfNode(node, graph);
-	if(status == VX_SUCCESS)
-	{
-		status |= vxVerifyGraph(graph);
-	}
-	else
+    if(minc_opt || maxc_opt || minl_opt || maxl_opt)
     {
-		status |= vxReleaseGraph(&graph);
-	}
+        kernel_location = vxGetKernelByEnum(context, VX_KERNEL_EXTENSION_MINMAXLOCATION);
+        node_location = vxCreateGenericNode(graph, kernel_location);
 
-	status |= vxReleaseKernel(&kernel_minmax);
+        /* push parameters to nodes */
+        status |= vxSetParameterByIndex(node_location, 0, (vx_reference)inputImage);
+        status |= vxSetParameterByIndex(node_location, 1, (vx_reference)minVal);
+        status |= vxSetParameterByIndex(node_location, 2, (vx_reference)maxVal);
+        status |= vxSetParameterByIndex(node_location, 3, (vx_reference)minLoc);
+        status |= vxSetParameterByIndex(node_location, 4, (vx_reference)maxLoc);
+        status |= vxSetParameterByIndex(node_location, 5, (vx_reference)minCount);
+        status |= vxSetParameterByIndex(node_location, 6, (vx_reference)maxCount);
+
+        status |= vxoAddParameterToGraphByIndex(graph, node_location, 3);
+        status |= vxoAddParameterToGraphByIndex(graph, node_location, 4);
+        status |= vxoAddParameterToGraphByIndex(graph, node_location, 5);
+        status |= vxoAddParameterToGraphByIndex(graph, node_location, 6);
+    }
+
+    status |= vxSetChildGraphOfNode(node, graph);
+    if(status == VX_SUCCESS)
+    {
+        status |= vxVerifyGraph(graph);
+    }
+    else
+    {
+        status |= vxReleaseGraph(&graph);
+    }
+
+    status |= vxReleaseKernel(&kernel_minmax);
     status |= vxReleaseNode(&node_minmax);
 
-	if(minc_opt || maxc_opt || minl_opt || maxl_opt)
-	{
-		status |= vxReleaseKernel(&kernel_location);
-		status |= vxReleaseNode(&node_location);
-	}
+    if(minc_opt || maxc_opt || minl_opt || maxl_opt)
+    {
+        status |= vxReleaseKernel(&kernel_location);
+        status |= vxReleaseNode(&node_location);
+    }
     return status;
 }
 
@@ -1120,61 +1120,61 @@ VX_PRIVATE_API vx_status vxoProgrameMinMaxLoc_Deinitializer(vx_node node, vx_ref
 
 VX_PRIVATE_API vx_status vxoAbsDiff_Initialize(vx_node node, vx_reference *parameters, vx_uint32 num)
 {
-												/*workdim,	globel offset,	globel scale	local size,	globel size,*/
-	vx_kernel_execution_parameters_t shaderParam = {2,	    {0, 0, 0},	    {16, 1, 0},		{0, 0, 0},	{0, 0, 0}};
-	vx_uint32 width = 0, height = 0;
-	vx_image src = (vx_image)parameters[0];
+                                                /*workdim,    globel offset,    globel scale    local size,    globel size,*/
+    vx_kernel_execution_parameters_t shaderParam = {2,        {0, 0, 0},        {16, 1, 0},        {0, 0, 0},    {0, 0, 0}};
+    vx_uint32 width = 0, height = 0;
+    vx_image src = (vx_image)parameters[0];
 
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
 
-	shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
-	shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
+    shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
+    shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
 
-	vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
+    vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
 
     return VX_SUCCESS;
 }
 
 VX_PRIVATE_API vx_status vxoMinMax_Initialize(vx_node node, vx_reference *parameters, vx_uint32 num)
 {
-									/*workdim,	globel offset,	globel scale	local size,	globel size,*/
-	vx_kernel_execution_parameters_t shaderParam = {2,	    {0, 0, 0},	    {1, 1, 0},		{1, 1, 0},		{0, 0, 0}};
-	vx_uint32 width = 0, height = 0;
-	vx_image src = (vx_image)parameters[0];
+                                    /*workdim,    globel offset,    globel scale    local size,    globel size,*/
+    vx_kernel_execution_parameters_t shaderParam = {2,        {0, 0, 0},        {1, 1, 0},        {1, 1, 0},        {0, 0, 0}};
+    vx_uint32 width = 0, height = 0;
+    vx_image src = (vx_image)parameters[0];
 
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
 
 
-	if(node->kernel->enumeration == VX_KERNEL_EXTENSION_MINMAX)shaderParam.globalWorkScale[0] = 8;
+    if(node->kernel->enumeration == VX_KERNEL_EXTENSION_MINMAX)shaderParam.globalWorkScale[0] = 8;
 
-	shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
-	shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
+    shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
+    shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
 
-	vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
+    vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
 
-	return VX_SUCCESS;
+    return VX_SUCCESS;
 }
 
 VX_PRIVATE_API vx_status vxoLUT_Initialize(vx_node node, vx_reference *parameters, vx_uint32 num)
 {
-									/*workdim,	globel offset,	globel scale	local size,	globel size,*/
-	vx_kernel_execution_parameters_t shaderParam = {2,	    {0, 0, 0},	    {1, 1, 0},		{1, 1, 0},		{0, 0, 0}};
-	vx_uint32 width = 0, height = 0;
-	vx_image src = (vx_image)parameters[0];
+                                    /*workdim,    globel offset,    globel scale    local size,    globel size,*/
+    vx_kernel_execution_parameters_t shaderParam = {2,        {0, 0, 0},        {1, 1, 0},        {1, 1, 0},        {0, 0, 0}};
+    vx_uint32 width = 0, height = 0;
+    vx_image src = (vx_image)parameters[0];
 
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
 
-	shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
-	shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
+    shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
+    shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
 
-	if(node->kernel->enumeration == VX_KERNEL_EXTENSION_MINMAX)shaderParam.globalWorkScale[0] = 4;
+    if(node->kernel->enumeration == VX_KERNEL_EXTENSION_MINMAX)shaderParam.globalWorkScale[0] = 4;
 
-	vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
+    vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
 
-	return VX_SUCCESS;
+    return VX_SUCCESS;
 }
 
 VX_PRIVATE_API vx_status vxoMinMax_ValidateInput(vx_node node, vx_uint32 index)
@@ -1245,20 +1245,20 @@ VX_PRIVATE_API vx_status vxoMinMaxLocation_ValidateInput(vx_node node, vx_uint32
 
     if ((index != 0) && (index != 1)  && (index != 2) ) return VX_ERROR_INVALID_PARAMETERS;
 
-	if(index == 0)
-	{
-		if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
-			return VX_ERROR_INVALID_PARAMETERS;
+    if(index == 0)
+    {
+        if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
+            return VX_ERROR_INVALID_PARAMETERS;
 
-		if ((objData.u.imageInfo.format != VX_DF_IMAGE_U8) &&
-			(objData.u.imageInfo.format != VX_DF_IMAGE_U16) &&
-			(objData.u.imageInfo.format != VX_DF_IMAGE_S16) &&
-			(objData.u.imageInfo.format != VX_DF_IMAGE_U32) &&
-			(objData.u.imageInfo.format != VX_DF_IMAGE_S32))
-		{
-			return VX_ERROR_INVALID_FORMAT;
-		}
-	}
+        if ((objData.u.imageInfo.format != VX_DF_IMAGE_U8) &&
+            (objData.u.imageInfo.format != VX_DF_IMAGE_U16) &&
+            (objData.u.imageInfo.format != VX_DF_IMAGE_S16) &&
+            (objData.u.imageInfo.format != VX_DF_IMAGE_U32) &&
+            (objData.u.imageInfo.format != VX_DF_IMAGE_S32))
+        {
+            return VX_ERROR_INVALID_FORMAT;
+        }
+    }
     return VX_SUCCESS;
 }
 
@@ -1285,119 +1285,119 @@ VX_PRIVATE_API vx_status vxoMinMaxLocation_ValidateOutput(vx_node node, vx_uint3
 
 VX_PRIVATE_API vx_status vxoMorphology_Initilize(vx_node node, vx_reference *parameters, vx_uint32 num)
 {
-									/*workdim,	globel offset,	globel scale	local size,	globel size,*/
-	vx_kernel_execution_parameters_t shaderParam = {0};
-	vx_uint32 width = 0, height = 0;
-	vx_image src = (vx_image)parameters[0];
+                                    /*workdim,    globel offset,    globel scale    local size,    globel size,*/
+    vx_kernel_execution_parameters_t shaderParam = {0};
+    vx_uint32 width = 0, height = 0;
+    vx_image src = (vx_image)parameters[0];
 
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
 
-	shaderParam.workDim = 2;
-	shaderParam.globalWorkScale[0] = 14;
-	shaderParam.globalWorkScale[1] = height;
+    shaderParam.workDim = 2;
+    shaderParam.globalWorkScale[0] = 14;
+    shaderParam.globalWorkScale[1] = height;
 
-	shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
-	shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
+    shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
+    shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
 
-	vxSetNodeUniform(node, "height", 1, &height);
+    vxSetNodeUniform(node, "height", 1, &height);
 
-	vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
+    vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
 
     return VX_SUCCESS;
 }
 
 VX_PRIVATE_API vx_status vxoSobel3x3_Initilize(vx_node node, vx_reference *parameters, vx_uint32 num)
 {
-									/*workdim,	globel offset,	globel scale	local size,	globel size,*/
-	vx_kernel_execution_parameters_t shaderParam = {2,     {0, 0, 0},      {1, 1, 0},      {1, 1, 0},  {0, 0, 0},  };
-	vx_uint32 width = 0, height = 0;
-	vx_image src = (vx_image)parameters[0];
+                                    /*workdim,    globel offset,    globel scale    local size,    globel size,*/
+    vx_kernel_execution_parameters_t shaderParam = {2,     {0, 0, 0},      {1, 1, 0},      {1, 1, 0},  {0, 0, 0},  };
+    vx_uint32 width = 0, height = 0;
+    vx_image src = (vx_image)parameters[0];
 
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
 
-	shaderParam.workDim = 2;
-	shaderParam.globalWorkScale[0] = 6;
-	shaderParam.globalWorkScale[1] = height;
+    shaderParam.workDim = 2;
+    shaderParam.globalWorkScale[0] = 6;
+    shaderParam.globalWorkScale[1] = height;
 
-	shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
-	shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
+    shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
+    shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
 
-	vxSetNodeUniform(node, "height", 1, &height);
+    vxSetNodeUniform(node, "height", 1, &height);
 
-	vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
+    vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
 
     return VX_SUCCESS;
 }
 
 VX_PRIVATE_API vx_status vxoBox3x3_Initilize(vx_node node, vx_reference *parameters, vx_uint32 num)
 {
-									/*workdim,	globel offset,	globel scale	local size,	globel size,*/
-	vx_kernel_execution_parameters_t shaderParam = {0};
-	vx_uint32 width = 0, height = 0;
-	vx_image src = (vx_image)parameters[0];
+                                    /*workdim,    globel offset,    globel scale    local size,    globel size,*/
+    vx_kernel_execution_parameters_t shaderParam = {0};
+    vx_uint32 width = 0, height = 0;
+    vx_image src = (vx_image)parameters[0];
 
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
 
-	shaderParam.workDim = 2;
-	shaderParam.globalWorkScale[0] = 4;
-	shaderParam.globalWorkScale[1] = height;
+    shaderParam.workDim = 2;
+    shaderParam.globalWorkScale[0] = 4;
+    shaderParam.globalWorkScale[1] = height;
 
-	shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
-	shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
+    shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
+    shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
 
-	vxSetNodeUniform(node, "height", 1, &height);
+    vxSetNodeUniform(node, "height", 1, &height);
 
-	vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
+    vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
 
     return VX_SUCCESS;
 }
 
 VX_PRIVATE_API vx_status vxoMultiply_Initilize(vx_node node, vx_reference *parameters, vx_uint32 num)
 {
-									/*workdim,	globel offset,	globel scale	local size,	globel size,*/
-	vx_kernel_execution_parameters_t shaderParam = {0};
-	vx_uint32 width = 0, height = 0;
-	vx_image src = (vx_image)parameters[0];
+                                    /*workdim,    globel offset,    globel scale    local size,    globel size,*/
+    vx_kernel_execution_parameters_t shaderParam = {0};
+    vx_uint32 width = 0, height = 0;
+    vx_image src = (vx_image)parameters[0];
 
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
 
-	shaderParam.workDim = 2;
-	shaderParam.globalWorkScale[0] = 8;
-	shaderParam.globalWorkScale[1] = height;
+    shaderParam.workDim = 2;
+    shaderParam.globalWorkScale[0] = 8;
+    shaderParam.globalWorkScale[1] = height;
 
-	shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
-	shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
+    shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
+    shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
 
-	vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
+    vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
 
     return VX_SUCCESS;
 }
 
 VX_PRIVATE_API vx_status vxoRemap_Initilize(vx_node node, vx_reference *parameters, vx_uint32 num)
 {
-									/*workdim,	globel offset,	globel scale	local size,	globel size,*/
-	vx_kernel_execution_parameters_t shaderParam = {2,		{0, 0, 0},		{1, 1, 0},		{1, 1, 0},	{0, 0, 0},};
-	vx_uint32 width = 0, height = 0;
-	vx_image src = (vx_image)parameters[0];
+                                    /*workdim,    globel offset,    globel scale    local size,    globel size,*/
+    vx_kernel_execution_parameters_t shaderParam = {2,        {0, 0, 0},        {1, 1, 0},        {1, 1, 0},    {0, 0, 0},};
+    vx_uint32 width = 0, height = 0;
+    vx_image src = (vx_image)parameters[0];
 
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
 
-	shaderParam.workDim = 2;
-	shaderParam.globalWorkScale[0] = 1;
-	shaderParam.globalWorkScale[1] = 1;
+    shaderParam.workDim = 2;
+    shaderParam.globalWorkScale[0] = 1;
+    shaderParam.globalWorkScale[1] = 1;
 
-	shaderParam.localWorkSize[0] = 1;
-	shaderParam.localWorkSize[1] = 1;
+    shaderParam.localWorkSize[0] = 1;
+    shaderParam.localWorkSize[1] = 1;
 
-	shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
-	shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
+    shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
+    shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
 
-	vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
+    vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
 
     return VX_SUCCESS;
 }
@@ -1405,33 +1405,33 @@ VX_PRIVATE_API vx_status vxoRemap_Initilize(vx_node node, vx_reference *paramete
 VX_PRIVATE_API vx_status vxoHistogram_Initilize(vx_node node, vx_reference *parameters, vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
-									/*workdim,	globel offset,	globel scale	local size,	globel size,*/
-	vx_kernel_execution_parameters_t shaderParam = {2,		{0, 0, 0},		{1, 1, 0},		{1, 1, 0},	{0, 0, 0},};
-	vx_uint32 width = 0, height = 0;
-	vx_image src = (vx_image)parameters[0];
-	vx_distribution distribution = (vx_distribution)parameters[1];
+                                    /*workdim,    globel offset,    globel scale    local size,    globel size,*/
+    vx_kernel_execution_parameters_t shaderParam = {2,        {0, 0, 0},        {1, 1, 0},        {1, 1, 0},    {0, 0, 0},};
+    vx_uint32 width = 0, height = 0;
+    vx_image src = (vx_image)parameters[0];
+    vx_distribution distribution = (vx_distribution)parameters[1];
     vx_uint32* dist_src = NULL;
     vx_size size = 0;
 
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
 
-	shaderParam.workDim = 2;
-	shaderParam.globalWorkScale[0] = 1;
-	shaderParam.globalWorkScale[1] = 1;
+    shaderParam.workDim = 2;
+    shaderParam.globalWorkScale[0] = 1;
+    shaderParam.globalWorkScale[1] = 1;
 
-	shaderParam.localWorkSize[0] = 1;
-	shaderParam.localWorkSize[1] = 1;
+    shaderParam.localWorkSize[0] = 1;
+    shaderParam.localWorkSize[1] = 1;
 
-	shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
-	shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
+    shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
+    shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
 
-	status |= vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
+    status |= vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
 
 
     status |= vxAccessDistribution(distribution, (void **)&dist_src, VX_WRITE_ONLY);
     status |= vxQueryDistribution(distribution, VX_DISTRIBUTION_ATTRIBUTE_SIZE, &size, sizeof(size));
-	gcoOS_ZeroMemory(dist_src, size);
+    gcoOS_ZeroMemory(dist_src, size);
     status |= vxCommitDistribution(distribution, dist_src);
 
     return VX_SUCCESS;
@@ -1440,176 +1440,176 @@ VX_PRIVATE_API vx_status vxoHistogram_Initilize(vx_node node, vx_reference *para
 VX_PRIVATE_API vx_status _getUniformForConvolve(vx_convolution convolution, vx_512bits_t *uniforms)
 {
     vx_status status = VX_SUCCESS;
-	vx_512bits_t *uniform;
-	vx_int16 matrix[C_MAX_CONVOLUTION_DIM * C_MAX_CONVOLUTION_DIM] = {0};
-	vx_uint32 i = 0;
-	vx_size conv_width, conv_height;
-	vx_size scale = 1;
+    vx_512bits_t *uniform;
+    vx_int16 matrix[C_MAX_CONVOLUTION_DIM * C_MAX_CONVOLUTION_DIM] = {0};
+    vx_uint32 i = 0;
+    vx_size conv_width, conv_height;
+    vx_size scale = 1;
 
-	status |= vxQueryConvolution(convolution, VX_CONVOLUTION_ATTRIBUTE_COLUMNS, &conv_width, sizeof(conv_width));
-	status |= vxQueryConvolution(convolution, VX_CONVOLUTION_ATTRIBUTE_ROWS, &conv_height, sizeof(conv_height));
-	status |= vxQueryConvolution(convolution, VX_CONVOLUTION_ATTRIBUTE_SCALE, &scale, sizeof(scale));
+    status |= vxQueryConvolution(convolution, VX_CONVOLUTION_ATTRIBUTE_COLUMNS, &conv_width, sizeof(conv_width));
+    status |= vxQueryConvolution(convolution, VX_CONVOLUTION_ATTRIBUTE_ROWS, &conv_height, sizeof(conv_height));
+    status |= vxQueryConvolution(convolution, VX_CONVOLUTION_ATTRIBUTE_SCALE, &scale, sizeof(scale));
 
-	status |= vxAccessConvolutionCoefficients(convolution, matrix);
+    status |= vxAccessConvolutionCoefficients(convolution, matrix);
 
-	/* Uniform512 for the first DP */
-	uniform = &uniforms[0];
+    /* Uniform512 for the first DP */
+    uniform = &uniforms[0];
 
-	uniform->termConfig.bin2.flag0 = VX_512BITS_ADD;
-	uniform->termConfig.bin2.flag1 = VX_512BITS_ADD;
-	uniform->termConfig.bin2.flag2 = VX_512BITS_ADD;
-	uniform->termConfig.bin2.flag3 = VX_512BITS_ADD;
-	uniform->termConfig.bin2.flag4 = VX_512BITS_ADD;
-	uniform->termConfig.bin2.flag5 = VX_512BITS_ADD;
+    uniform->termConfig.bin2.flag0 = VX_512BITS_ADD;
+    uniform->termConfig.bin2.flag1 = VX_512BITS_ADD;
+    uniform->termConfig.bin2.flag2 = VX_512BITS_ADD;
+    uniform->termConfig.bin2.flag3 = VX_512BITS_ADD;
+    uniform->termConfig.bin2.flag4 = VX_512BITS_ADD;
+    uniform->termConfig.bin2.flag5 = VX_512BITS_ADD;
 
-	uniform->termConfig.bin2.flag8  = VX_512BITS_ADD;
-	uniform->termConfig.bin2.flag9  = VX_512BITS_ADD;
-	uniform->termConfig.bin2.flag10 = VX_512BITS_ADD;
-	uniform->termConfig.bin2.flag11 = VX_512BITS_ADD;
-	uniform->termConfig.bin2.flag12 = VX_512BITS_ADD;
-	uniform->termConfig.bin2.flag13 = VX_512BITS_ADD;
+    uniform->termConfig.bin2.flag8  = VX_512BITS_ADD;
+    uniform->termConfig.bin2.flag9  = VX_512BITS_ADD;
+    uniform->termConfig.bin2.flag10 = VX_512BITS_ADD;
+    uniform->termConfig.bin2.flag11 = VX_512BITS_ADD;
+    uniform->termConfig.bin2.flag12 = VX_512BITS_ADD;
+    uniform->termConfig.bin2.flag13 = VX_512BITS_ADD;
 
-	uniform->aSelect.bin2.flag0 = VX_512BITS_SELECT_SRC0;
-	uniform->aSelect.bin2.flag1 = VX_512BITS_SELECT_SRC0;
-	uniform->aSelect.bin2.flag2 = VX_512BITS_SELECT_SRC0;
-	uniform->aSelect.bin2.flag3 = VX_512BITS_SELECT_SRC1;
-	uniform->aSelect.bin2.flag4 = VX_512BITS_SELECT_SRC1;
-	uniform->aSelect.bin2.flag5 = VX_512BITS_SELECT_SRC1;
+    uniform->aSelect.bin2.flag0 = VX_512BITS_SELECT_SRC0;
+    uniform->aSelect.bin2.flag1 = VX_512BITS_SELECT_SRC0;
+    uniform->aSelect.bin2.flag2 = VX_512BITS_SELECT_SRC0;
+    uniform->aSelect.bin2.flag3 = VX_512BITS_SELECT_SRC1;
+    uniform->aSelect.bin2.flag4 = VX_512BITS_SELECT_SRC1;
+    uniform->aSelect.bin2.flag5 = VX_512BITS_SELECT_SRC1;
 
-	uniform->aSelect.bin2.flag8  = VX_512BITS_SELECT_SRC0;
-	uniform->aSelect.bin2.flag9  = VX_512BITS_SELECT_SRC0;
-	uniform->aSelect.bin2.flag10 = VX_512BITS_SELECT_SRC0;
-	uniform->aSelect.bin2.flag11 = VX_512BITS_SELECT_SRC1;
-	uniform->aSelect.bin2.flag12 = VX_512BITS_SELECT_SRC1;
-	uniform->aSelect.bin2.flag13 = VX_512BITS_SELECT_SRC1;
+    uniform->aSelect.bin2.flag8  = VX_512BITS_SELECT_SRC0;
+    uniform->aSelect.bin2.flag9  = VX_512BITS_SELECT_SRC0;
+    uniform->aSelect.bin2.flag10 = VX_512BITS_SELECT_SRC0;
+    uniform->aSelect.bin2.flag11 = VX_512BITS_SELECT_SRC1;
+    uniform->aSelect.bin2.flag12 = VX_512BITS_SELECT_SRC1;
+    uniform->aSelect.bin2.flag13 = VX_512BITS_SELECT_SRC1;
 
-	uniform->aBin[0].bin4.flag0 = 0;
-	uniform->aBin[0].bin4.flag1 = 1;
-	uniform->aBin[0].bin4.flag2 = 2;
-	uniform->aBin[0].bin4.flag3 = 0;
-	uniform->aBin[0].bin4.flag4 = 1;
-	uniform->aBin[0].bin4.flag5 = 2;
+    uniform->aBin[0].bin4.flag0 = 0;
+    uniform->aBin[0].bin4.flag1 = 1;
+    uniform->aBin[0].bin4.flag2 = 2;
+    uniform->aBin[0].bin4.flag3 = 0;
+    uniform->aBin[0].bin4.flag4 = 1;
+    uniform->aBin[0].bin4.flag5 = 2;
 
-	uniform->aBin[1].bin4.flag0 = 0 + 1;
-	uniform->aBin[1].bin4.flag1 = 1 + 1;
-	uniform->aBin[1].bin4.flag2 = 2 + 1;
-	uniform->aBin[1].bin4.flag3 = 0 + 1;
-	uniform->aBin[1].bin4.flag4 = 1 + 1;
-	uniform->aBin[1].bin4.flag5 = 2 + 1;
+    uniform->aBin[1].bin4.flag0 = 0 + 1;
+    uniform->aBin[1].bin4.flag1 = 1 + 1;
+    uniform->aBin[1].bin4.flag2 = 2 + 1;
+    uniform->aBin[1].bin4.flag3 = 0 + 1;
+    uniform->aBin[1].bin4.flag4 = 1 + 1;
+    uniform->aBin[1].bin4.flag5 = 2 + 1;
 
-	uniform->bSelect.bin2.flag0 = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag1 = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag2 = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag3 = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag4 = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag5 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag0 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag1 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag2 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag3 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag4 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag5 = VX_512BITS_SELECT_CONSTANTS;
 
-	uniform->bSelect.bin2.flag8  = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag9  = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag10 = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag11 = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag12 = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag13 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag8  = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag9  = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag10 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag11 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag12 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag13 = VX_512BITS_SELECT_CONSTANTS;
 
-	uniform->miscConfig.post_shift		= (gctUINT32)gcoMATH_Log2((vx_float32)scale);
-	uniform->miscConfig.constant_type	= VX_512BITS_TYPE_SIGNED16;
-	uniform->miscConfig.accu_type		= VX_512BITS_TYPE_UNSIGNED32;
+    uniform->miscConfig.post_shift        = (gctUINT32)gcoMATH_Log2((vx_float32)scale);
+    uniform->miscConfig.constant_type    = VX_512BITS_TYPE_SIGNED16;
+    uniform->miscConfig.accu_type        = VX_512BITS_TYPE_UNSIGNED32;
 
-	for(i = 0; i < 16; i ++)
-	{
-		uniform->bins[0].bin16[i] = matrix[i];
-	}
+    for(i = 0; i < 16; i ++)
+    {
+        uniform->bins[0].bin16[i] = matrix[i];
+    }
 
-	/* Uniform512 for the second DP */
-	uniform = &uniforms[1];
+    /* Uniform512 for the second DP */
+    uniform = &uniforms[1];
 
-	uniform->termConfig.bin2.flag0 = VX_512BITS_ADD;
-	uniform->termConfig.bin2.flag1 = VX_512BITS_ADD;
-	uniform->termConfig.bin2.flag2 = VX_512BITS_ADD;
-	uniform->termConfig.bin2.flag3 = VX_512BITS_ACCUMULATOR;
+    uniform->termConfig.bin2.flag0 = VX_512BITS_ADD;
+    uniform->termConfig.bin2.flag1 = VX_512BITS_ADD;
+    uniform->termConfig.bin2.flag2 = VX_512BITS_ADD;
+    uniform->termConfig.bin2.flag3 = VX_512BITS_ACCUMULATOR;
 
-	uniform->termConfig.bin2.flag8  = VX_512BITS_ADD;
-	uniform->termConfig.bin2.flag9  = VX_512BITS_ADD;
-	uniform->termConfig.bin2.flag10 = VX_512BITS_ADD;
-	uniform->termConfig.bin2.flag11 = VX_512BITS_ACCUMULATOR;
+    uniform->termConfig.bin2.flag8  = VX_512BITS_ADD;
+    uniform->termConfig.bin2.flag9  = VX_512BITS_ADD;
+    uniform->termConfig.bin2.flag10 = VX_512BITS_ADD;
+    uniform->termConfig.bin2.flag11 = VX_512BITS_ACCUMULATOR;
 
-	uniform->aSelect.bin2.flag0 = VX_512BITS_SELECT_SRC0;
-	uniform->aSelect.bin2.flag1 = VX_512BITS_SELECT_SRC0;
-	uniform->aSelect.bin2.flag2 = VX_512BITS_SELECT_SRC0;
-	uniform->aSelect.bin2.flag3 = VX_512BITS_SELECT_SRC1;
+    uniform->aSelect.bin2.flag0 = VX_512BITS_SELECT_SRC0;
+    uniform->aSelect.bin2.flag1 = VX_512BITS_SELECT_SRC0;
+    uniform->aSelect.bin2.flag2 = VX_512BITS_SELECT_SRC0;
+    uniform->aSelect.bin2.flag3 = VX_512BITS_SELECT_SRC1;
 
-	uniform->aSelect.bin2.flag8  = VX_512BITS_SELECT_SRC0;
-	uniform->aSelect.bin2.flag9  = VX_512BITS_SELECT_SRC0;
-	uniform->aSelect.bin2.flag10 = VX_512BITS_SELECT_SRC0;
-	uniform->aSelect.bin2.flag11 = VX_512BITS_SELECT_SRC1;
+    uniform->aSelect.bin2.flag8  = VX_512BITS_SELECT_SRC0;
+    uniform->aSelect.bin2.flag9  = VX_512BITS_SELECT_SRC0;
+    uniform->aSelect.bin2.flag10 = VX_512BITS_SELECT_SRC0;
+    uniform->aSelect.bin2.flag11 = VX_512BITS_SELECT_SRC1;
 
-	uniform->aBin[0].bin4.flag0 = 0;
-	uniform->aBin[0].bin4.flag1 = 1;
-	uniform->aBin[0].bin4.flag2 = 2;
-	uniform->aBin[0].bin4.flag3 = 2;
+    uniform->aBin[0].bin4.flag0 = 0;
+    uniform->aBin[0].bin4.flag1 = 1;
+    uniform->aBin[0].bin4.flag2 = 2;
+    uniform->aBin[0].bin4.flag3 = 2;
 
-	uniform->aBin[1].bin4.flag0 = 0 + 1;
-	uniform->aBin[1].bin4.flag1 = 1 + 1;
-	uniform->aBin[1].bin4.flag2 = 2 + 1;
-	uniform->aBin[1].bin4.flag3 = 2 + 1;
+    uniform->aBin[1].bin4.flag0 = 0 + 1;
+    uniform->aBin[1].bin4.flag1 = 1 + 1;
+    uniform->aBin[1].bin4.flag2 = 2 + 1;
+    uniform->aBin[1].bin4.flag3 = 2 + 1;
 
-	uniform->bSelect.bin2.flag0 = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag1 = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag2 = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag3 = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag4 = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag5 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag0 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag1 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag2 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag3 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag4 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag5 = VX_512BITS_SELECT_CONSTANTS;
 
-	uniform->bSelect.bin2.flag8  = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag9  = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag10 = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag11 = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag12 = VX_512BITS_SELECT_CONSTANTS;
-	uniform->bSelect.bin2.flag13 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag8  = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag9  = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag10 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag11 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag12 = VX_512BITS_SELECT_CONSTANTS;
+    uniform->bSelect.bin2.flag13 = VX_512BITS_SELECT_CONSTANTS;
 
-	uniform->miscConfig.post_shift		= (gctUINT32)gcoMATH_Log2((vx_float32)scale);
-	uniform->miscConfig.constant_type	= VX_512BITS_TYPE_SIGNED16;
-	uniform->miscConfig.accu_type		= VX_512BITS_TYPE_SIGNED32;
+    uniform->miscConfig.post_shift        = (gctUINT32)gcoMATH_Log2((vx_float32)scale);
+    uniform->miscConfig.constant_type    = VX_512BITS_TYPE_SIGNED16;
+    uniform->miscConfig.accu_type        = VX_512BITS_TYPE_SIGNED32;
 
-	for(i = 0; i < 16; i ++)
-	{
-		uniform->bins[0].bin16[i] = matrix[i];
-	}
+    for(i = 0; i < 16; i ++)
+    {
+        uniform->bins[0].bin16[i] = matrix[i];
+    }
 
-	status |= vxCommitConvolutionCoefficients(convolution, matrix);
+    status |= vxCommitConvolutionCoefficients(convolution, matrix);
 
-	return status;
+    return status;
 }
 
 VX_PRIVATE_API vx_status vxoConvolve_Initilize(vx_node node, vx_reference *parameters, vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
-									/*workdim,	globel offset,	globel scale	local size,	globel size,*/
-	vx_kernel_execution_parameters_t shaderParam = {2,		{0, 0, 0},		{1, 1, 0},		{1, 1, 0},	{0, 0, 0},};
-	vx_uint32 width = 0, height = 0;
-	vx_image src = (vx_image)parameters[0];
+                                    /*workdim,    globel offset,    globel scale    local size,    globel size,*/
+    vx_kernel_execution_parameters_t shaderParam = {2,        {0, 0, 0},        {1, 1, 0},        {1, 1, 0},    {0, 0, 0},};
+    vx_uint32 width = 0, height = 0;
+    vx_image src = (vx_image)parameters[0];
 
-	vx_convolution convolution = (vx_convolution)parameters[1];
-	vx_512bits_t uniforms[2];
+    vx_convolution convolution = (vx_convolution)parameters[1];
+    vx_512bits_t uniforms[2];
 
-	gcoOS_ZeroMemory(uniforms, sizeof(vx_512bits_t)*2);
+    gcoOS_ZeroMemory(uniforms, sizeof(vx_512bits_t)*2);
 
-	_getUniformForConvolve(convolution, uniforms);
+    _getUniformForConvolve(convolution, uniforms);
 
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
-	vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
 
-	shaderParam.workDim = 2;
-	shaderParam.globalWorkScale[0] = 1;
-	shaderParam.globalWorkScale[1] = 1;
+    shaderParam.workDim = 2;
+    shaderParam.globalWorkScale[0] = 1;
+    shaderParam.globalWorkScale[1] = 1;
 
-	shaderParam.localWorkSize[0] = 1;
-	shaderParam.localWorkSize[1] = 1;
+    shaderParam.localWorkSize[0] = 1;
+    shaderParam.localWorkSize[1] = 1;
 
-	shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
-	shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
+    shaderParam.globalWorkSize[0] = gcmALIGN_NP2(width, shaderParam.globalWorkScale[0])/shaderParam.globalWorkScale[0];
+    shaderParam.globalWorkSize[1] = gcmALIGN_NP2(height, shaderParam.globalWorkScale[1])/shaderParam.globalWorkScale[1];
 
-	status |= vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
+    status |= vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
 
     status |= vxSetNodeUniform(node, "u512_0", 1, &uniforms[0]);
     status |= vxSetNodeUniform(node, "u512_1", 1, &uniforms[1]);
@@ -1626,74 +1626,74 @@ VX_PRIVATE_API vx_status vxInitializeTarget(
     vxmASSERT(kernelDescTable);
     vxmASSERT(kernelCount > 0);
 
-	gcoOS_StrCopySafe(context->targetTable[0].name, VX_MAX_TARGET_NAME, VX_DEFAULT_TARGET_NAME);
+    gcoOS_StrCopySafe(context->targetTable[0].name, VX_MAX_TARGET_NAME, VX_DEFAULT_TARGET_NAME);
 
     for (index = 0; index < kernelCount; index++)
     {
-		vx_status status = VX_SUCCESS;
-		vx_kernel kernel = vxGetKernelByEnum(context, kernelDescTable[index]->enumeration);
+        vx_status status = VX_SUCCESS;
+        vx_kernel kernel = vxGetKernelByEnum(context, kernelDescTable[index]->enumeration);
 
-		if (kernel != NULL && kernel->base.type != VX_TYPE_ERROR)
-		{
-			kernel->enabled = vx_false_e;
-			vxRemoveKernel(kernel);
-		}
+        if (kernel != NULL && kernel->base.type != VX_TYPE_ERROR)
+        {
+            kernel->enabled = vx_false_e;
+            vxRemoveKernel(kernel);
+        }
 
-		if(kernelDescTable[index]->extension.source != NULL)
-		{
-			vx_program program = 0;
-			vx_char** source = &kernelDescTable[index]->extension.source;
-			vx_size programLength = strlen(*source);
+        if(kernelDescTable[index]->extension.source != NULL)
+        {
+            vx_program program = 0;
+            vx_char** source = &kernelDescTable[index]->extension.source;
+            vx_size programLength = strlen(*source);
 
-			/* Load the souce from file, if source is path */
-			if(!strchr(*source, '#'))
-				*source = gcoVX_LoadSources(*source, &programLength);
+            /* Load the souce from file, if source is path */
+            if(!strchr(*source, '#'))
+                *source = gcoVX_LoadSources(*source, &programLength);
 
-			program = vxCreateProgramWithSource(context, 1, (const vx_char**)source, &programLength);
+            program = vxCreateProgramWithSource(context, 1, (const vx_char**)source, &programLength);
 
-			vxBuildProgram(program, "-cl-viv-vx-extension");
+            vxBuildProgram(program, "-cl-viv-vx-extension");
 
-			kernel = vxAddKernelInProgram(
-									program,
-									kernelDescTable[index]->name,
-									kernelDescTable[index]->enumeration,
-									kernelDescTable[index]->numParams,
-									kernelDescTable[index]->inputValidate,
-									kernelDescTable[index]->outputValidate,
-									kernelDescTable[index]->initialize,
-									kernelDescTable[index]->deinitialize
-									);
+            kernel = vxAddKernelInProgram(
+                                    program,
+                                    kernelDescTable[index]->name,
+                                    kernelDescTable[index]->enumeration,
+                                    kernelDescTable[index]->numParams,
+                                    kernelDescTable[index]->inputValidate,
+                                    kernelDescTable[index]->outputValidate,
+                                    kernelDescTable[index]->initialize,
+                                    kernelDescTable[index]->deinitialize
+                                    );
 
-		}
-		else
-		{
-			kernel = vxAddKernel(context,
-								kernelDescTable[index]->name,
-								kernelDescTable[index]->enumeration,
-								kernelDescTable[index]->function,
-								kernelDescTable[index]->numParams,
-								kernelDescTable[index]->inputValidate,
-								kernelDescTable[index]->outputValidate,
-								kernelDescTable[index]->initialize,
-								kernelDescTable[index]->deinitialize
-								);
-		}
+        }
+        else
+        {
+            kernel = vxAddKernel(context,
+                                kernelDescTable[index]->name,
+                                kernelDescTable[index]->enumeration,
+                                kernelDescTable[index]->function,
+                                kernelDescTable[index]->numParams,
+                                kernelDescTable[index]->inputValidate,
+                                kernelDescTable[index]->outputValidate,
+                                kernelDescTable[index]->initialize,
+                                kernelDescTable[index]->deinitialize
+                                );
+        }
 
-		if (status != VX_SUCCESS) return status;
+        if (status != VX_SUCCESS) return status;
 
-		for(i = 0; i < kernelDescTable[index]->numParams; i++)
-		{
-			vx_param_description_s * parameters = &(kernelDescTable[index]->parameters[i]);
-			vxAddParameterToKernel(kernel, i, parameters->direction, parameters->dataType, parameters->state);
-		}
+        for(i = 0; i < kernelDescTable[index]->numParams; i++)
+        {
+            vx_param_description_s * parameters = &(kernelDescTable[index]->parameters[i]);
+            vxAddParameterToKernel(kernel, i, parameters->direction, parameters->dataType, parameters->state);
+        }
 
-		vxFinalizeKernel(kernel);
+        vxFinalizeKernel(kernel);
 
         if (vxoKernel_IsUnique(&context->targetTable[0].kernelTable[context->kernelCount - 1])) context->uniqueKernelCount++;
     }
 
     /* ToDo : Add more specific return status check */
-	if (gcoVX_Initialize(&context->evisNoInst) != gcvSTATUS_OK)
+    if (gcoVX_Initialize(&context->evisNoInst) != gcvSTATUS_OK)
     {
         return VX_FAILURE;
     }
@@ -1702,26 +1702,26 @@ VX_PRIVATE_API vx_status vxInitializeTarget(
 }
 
 vx_kernel_description_s *target_program_kernels[] = {
-	&programkernel_absdiff,
-	&programkernel_multiply,
-	&programkernel_remap,
-	&programkernel_warp_affine,
-	&programkernel_histogram,
-	&programkernel_threshold,
+    &programkernel_absdiff,
+    &programkernel_multiply,
+    &programkernel_remap,
+    &programkernel_warp_affine,
+    &programkernel_histogram,
+    &programkernel_threshold,
 
-	&programkernel_dilate3x3,
-	&programkernel_erode3x3,
-	&programkernel_median3x3,
+    &programkernel_dilate3x3,
+    &programkernel_erode3x3,
+    &programkernel_median3x3,
     &programkernel_sobel3x3,
-	&programkernel_gaussian3x3,
-	&programkernel_box3x3,
-	&programkernel_box3x3_2,
+    &programkernel_gaussian3x3,
+    &programkernel_box3x3,
+    &programkernel_box3x3_2,
 
-	&programkernel_minmaxloc,
-	&programkernel_minmax,
-	&programkernel_minmaxlocation,
-	&programkernel_lut,
-	&programkernel_convolution,
+    &programkernel_minmaxloc,
+    &programkernel_minmax,
+    &programkernel_minmaxlocation,
+    &programkernel_lut,
+    &programkernel_convolution,
 };
 
 vx_uint32 num_target_program_kernels = vxmLENGTH_OF(target_program_kernels);
@@ -1729,9 +1729,9 @@ vx_uint32 num_target_program_kernels = vxmLENGTH_OF(target_program_kernels);
 VX_PUBLIC_API vx_status vxPublishKernels(vx_context context)
 {
     vx_status status = vxInitializeTarget(context,
-										target_program_kernels,
-										num_target_program_kernels
-										);
+                                        target_program_kernels,
+                                        num_target_program_kernels
+                                        );
 
-	return status;
+    return status;
 }

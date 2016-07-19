@@ -39,16 +39,16 @@ SOURCES= \
 
 INCLUDES=$(INCLUDES);$(AQROOT)\sdk\samples\vdk\es20\tutorial6
 INCLUDES=$(INCLUDES);$(_SYSGENSDKROOT)\inc
-INCLUDES=$(INCLUDES);$(VIVANTE_SDK_DIR)\inc
-INCLUDES=$(INCLUDES);$(VIVANTE_SDK_DIR)\inc\HAL
+INCLUDES=$(INCLUDES);$(VIVANTE_SDK_INC)
+INCLUDES=$(INCLUDES);$(VIVANTE_SDK_INC)\HAL
 
 CDEFINES = $(CDEFINES) -DHK_BINARY_FLAG -DGL_GLEXT_PROTOTYPES
 
 TARGETLIBS= \
   $(_SYSGENSDKROOT)\lib\$(_CPUINDPATH)\coredll.lib \
-  $(GCLIB_PATH)\libEGL.lib \
-  $(GCLIB_PATH)\libVDK.lib \
-  $(GCLIB_PATH)\libGLESv2.lib
+  $(VIVANTE_SDK_LIB)\libEGL.lib \
+  $(VIVANTE_SDK_LIB)\libVDK.lib \
+  $(VIVANTE_SDK_LIB)\libGLESv2.lib
 
 ##########################################################
 # Install results

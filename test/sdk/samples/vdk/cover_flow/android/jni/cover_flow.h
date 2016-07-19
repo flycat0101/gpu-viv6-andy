@@ -36,7 +36,7 @@
 #endif
 #include <GLES/gl.h>
 
-#define NUM_IMAGES			9
+#define NUM_IMAGES            9
 
 /*******************************************************************************
 ** Initialization code.
@@ -45,12 +45,12 @@
 int
 InitGLES(
 #ifndef ANDROID
-	vdkEGL * Egl,
+    vdkEGL * Egl,
 #endif
-	int Width,
-	int Height,
-	int Samples
-	);
+    int Width,
+    int Height,
+    int Samples
+    );
 
 /*******************************************************************************
 ** Render code.
@@ -58,53 +58,53 @@ InitGLES(
 
 typedef struct _CoverMatrix
 {
-	GLfloat x, y, z;
-	GLfloat sizeX, sizeY;
-	GLfloat rotation;
-	GLfloat color;
+    GLfloat x, y, z;
+    GLfloat sizeX, sizeY;
+    GLfloat rotation;
+    GLfloat color;
 }
 CoverMatrix;
 
 typedef enum _MatrixType
 {
-	CURRENT_MATRIX,
-	TARGET_MATRIX,
-	STEP_MATRIX,
-	MATRIX_TYPE_COUNT,
+    CURRENT_MATRIX,
+    TARGET_MATRIX,
+    STEP_MATRIX,
+    MATRIX_TYPE_COUNT,
 }
 MatrixType;
 
 typedef struct _CoverFlow
 {
-	int			animation;
-	int			redraw;
-	float		angle;
-	int			currentImage;
-	int			automatic;
-	CoverMatrix	matrix[NUM_IMAGES][MATRIX_TYPE_COUNT];
-	GLint		textures[NUM_IMAGES];
+    int            animation;
+    int            redraw;
+    float        angle;
+    int            currentImage;
+    int            automatic;
+    CoverMatrix    matrix[NUM_IMAGES][MATRIX_TYPE_COUNT];
+    GLint        textures[NUM_IMAGES];
 }
 CoverFlow;
 
 void
 Render(
 #ifndef ANDROID
-	vdkEGL * Egl,
+    vdkEGL * Egl,
 #endif
-	CoverFlow * App
-	);
+    CoverFlow * App
+    );
 
 void
 AdjustMatrix(
-	int Steps,
-	CoverFlow * App
-	);
+    int Steps,
+    CoverFlow * App
+    );
 
 void
 DrawImage(
-	int Image,
-	GLint Texture,
-	CoverMatrix * Matrix
-	);
+    int Image,
+    GLint Texture,
+    CoverMatrix * Matrix
+    );
 
 #endif /* __cover_flow_h_ */

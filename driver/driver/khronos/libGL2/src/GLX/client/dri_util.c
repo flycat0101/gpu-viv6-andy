@@ -647,9 +647,9 @@ static Bool DoBindContext(Display *dpy,
     ** initialize the drawable information if has not been done before.
     */
     if (!pdp->pStamp || *pdp->pStamp != pdp->lastStamp) {
-        DRM_SPINLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);
+        DRMGL_SPINLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);
         __driUtilUpdateExtraDrawableInfo(pdp);
-        DRM_SPINUNLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);
+        DRMGL_SPINUNLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);
     }
 
     /* Call device-specific MakeCurrent */
@@ -688,17 +688,7 @@ static Bool driBindContext3(Display *dpy, int scrn,
                             (__DRIscreenPrivate *)pDRIScreen->private );
 }
 
-#if defined(DRI_PIXMAPRENDER_GL)
 
-typedef struct _wrapPixData{
-    Pixmap backPixmap;
-    GC xgc;
-    gcoSURF pixWrapSurf;
-    gceSURF_TYPE surftype;
-    gceSURF_FORMAT surfformat;
-    gctUINT32 backPixmapNode;
-    gctUINT32 directPix;
-}wPixData;
 
 static gceSTATUS _LockVideoNode(
         IN gcoHAL Hal,
@@ -777,6 +767,19 @@ static gceSTATUS _FreeVideoNode(
     /* Call kernel API. */
     return gcoHAL_Call(Hal, &iface);
 }
+
+
+#if defined(DRI_PIXMAPRENDER_GL)
+
+typedef struct _wrapPixData{
+    Pixmap backPixmap;
+    GC xgc;
+    gcoSURF pixWrapSurf;
+    gceSURF_TYPE surftype;
+    gceSURF_FORMAT surfformat;
+    gctUINT32 backPixmapNode;
+    gctUINT32 directPix;
+}wPixData;
 
 static void _createPixmapInfo(
         __DRIdrawablePrivate *dridrawable,
@@ -986,7 +989,7 @@ __driUtilUpdateDrawableInfo(__DRIdrawablePrivate *pdp)
         Xfree(pdp->pBackClipRects);
     }
 
-    DRM_SPINUNLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);
+    DRMGL_SPINUNLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);
 
     if (!__driFindDrawable(psp->drawHash, pdp->draw) ||
         !XF86DRIGetDrawableInfo(pdp->display, pdp->screen, pdp->draw,
@@ -1010,7 +1013,7 @@ __driUtilUpdateDrawableInfo(__DRIdrawablePrivate *pdp)
     else
        pdp->pStamp = &(psp->pSAREA->drawableTable[pdp->index].stamp);
 
-    DRM_SPINLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);
+    DRMGL_SPINLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);
 }
 
  /*
@@ -1046,7 +1049,7 @@ GLvoid __driUtilUpdateExtraDrawableInfo(__DRIdrawablePrivate *pdp)
         return;
     }
 
-    DRM_SPINUNLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);
+    DRMGL_SPINUNLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);
     if ( __drawableIsPixmap(pdp->draw) == GL_FALSE )
     {
        /* Assign __DRIdrawablePrivate first */
@@ -1134,7 +1137,7 @@ GLvoid __driUtilUpdateExtraDrawableInfo(__DRIdrawablePrivate *pdp)
 #endif
 
 ENDFLAG:
-    DRM_SPINLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);
+    DRMGL_SPINLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);
 }
 
 extern GLboolean
@@ -1149,10 +1152,10 @@ __driUtilFullScreenCovered(__DRIdrawablePrivate *pdp)
         return 0;
     }
     pdp->fullscreenCovered = 0;
-    DRM_SPINUNLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);
+    DRMGL_SPINUNLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);
     ret = (GLboolean)VIVEXTFULLScreenInfo(pdp->display, pdp->screen, pdp->draw);
     pdp->fullscreenCovered = (int)ret;
-    DRM_SPINLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);
+    DRMGL_SPINLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);
     return ret;
 
 }

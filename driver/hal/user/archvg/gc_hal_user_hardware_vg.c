@@ -1906,15 +1906,23 @@ gcoVGHARDWARE_TesselateImage(
     IN gcsVG_RECT_PTR Rectangle,
     IN gceIMAGE_FILTER Filter,
     IN gctBOOL Mask,
+#if gcdMOVG
+    IN gctFLOAT *StepX,
+    IN gctFLOAT *StepY,
+    IN gctFLOAT *Const,
+    IN gctFLOAT point0[2],
+    IN gctFLOAT point1[2],
+    IN gctFLOAT point2[2],
+    IN gctFLOAT point3[2],
+    IN gctBOOL  FirstTess,
+#else
     IN gctFLOAT UserToSurface[9],
     IN gctFLOAT SurfaceToImage[9],
+#endif
     IN gcsTESSELATION_PTR TessellationBuffer
     )
 {
     gceSTATUS status;
-#if gcdMOVG
-    gctBOOL     needTS = gcvTRUE;
-#endif
 
     gcmHEADER_ARG("Hardware=0x%x",
                   Hardware);
@@ -1982,6 +1990,10 @@ gcoVGHARDWARE_TesselateImage(
         gctUINT8_PTR path;
         gctUINT32 dataCommandSize;
 
+        gctUINT8 pathDataBuffer[gcvPATH_DATA_BUFFER_SIZE];
+        gcsPATH_DATA_PTR pathData = (gcsPATH_DATA_PTR) pathDataBuffer;
+
+#if !gcdMOVG
         gctFLOAT widthProduct[3];
         gctFLOAT heightProduct[3];
 
@@ -1993,10 +2005,6 @@ gcoVGHARDWARE_TesselateImage(
         gctFLOAT imageStepX[3];
         gctFLOAT imageStepY[3];
         gctFLOAT imageConst[3];
-
-        gctUINT8 pathDataBuffer[gcvPATH_DATA_BUFFER_SIZE];
-        gcsPATH_DATA_PTR pathData = (gcsPATH_DATA_PTR) pathDataBuffer;
-
 
         /***********************************************************************
         ** Get shortcuts to the size of the image.
@@ -2125,7 +2133,7 @@ gcoVGHARDWARE_TesselateImage(
                     * (gcmMAT(SurfaceToImage, 2, 0) + gcmMAT(SurfaceToImage, 2, 1) )
                     +   gcmMAT(SurfaceToImage, 2, 2)
             );
-
+#endif
 
         /***********************************************************************
         ** Determine whether the pattern is linear.
@@ -2134,28 +2142,28 @@ gcoVGHARDWARE_TesselateImage(
         Hardware->vg.imageLinear
             = (Image->colorType & gcvSURF_COLOR_LINEAR) != 0;
 
-#if gcdMOVG
-        /* Check whether we need a TS to do the image drawing. */
-        if ((Hardware->vg.blendMode != gcvVG_BLEND_SRC_OVER)
-            || Hardware->vg.scissorEnable
-            || SoftwareTesselation)
-        {
-            needTS = gcvTRUE;
-        }
-        else
-        {
-            needTS = gcvFALSE;
-        }
-#endif
-
         /***********************************************************************
         ** Set image parameters.
         */
-
 #if gcdMOVG
-        if (needTS)
-        {
-#endif
+        gcmERR_BREAK(gcoVGHARDWARE_SetStates(
+            Hardware,
+            0x02870 >> 2,
+            3, StepX
+            ));
+
+        gcmERR_BREAK(gcoVGHARDWARE_SetStates(
+            Hardware,
+            0x02880 >> 2,
+            3, StepY
+            ));
+
+        gcmERR_BREAK(gcoVGHARDWARE_SetStates(
+            Hardware,
+            0x02860 >> 2,
+            3, Const
+            ));
+#else
         gcmERR_BREAK(gcoVGHARDWARE_SetStates(
             Hardware,
             0x02870 >> 2,
@@ -2173,12 +2181,14 @@ gcoVGHARDWARE_TesselateImage(
             0x02860 >> 2,
             gcmCOUNTOF(imageConst), imageConst
             ));
-
+#endif
 
         /***********************************************************************
         ** Setup image sampler.
         */
-
+#if gcdMOVG
+        if (FirstTess)
+#endif
         gcmERR_BREAK(_SetSampler(
             Hardware,
             1, /* Use the second sampler for images. */
@@ -2307,100 +2317,6 @@ gcoVGHARDWARE_TesselateImage(
                 boundingBox.bottom
                 ));
         }
-
-#if gcdMOVG
-        }
-
-        else        /* Go without TS. */
-        {
-            gctUINT16 rect[4];
-            gctFLOAT minx, miny, maxx, maxy;
-
-            if (Hardware->vg.peFlushNeeded)
-            {
-                gcmERR_BREAK(gcoVGHARDWARE_FlushPipe(
-                    Hardware
-                    ));
-
-                Hardware->vg.peFlushNeeded = gcvFALSE;
-            }
-            gcmERR_BREAK(gcoVGHARDWARE_EnableTessellation(
-                Hardware, gcvFALSE
-                ));     /* Don't use tessellation. */
-
-            /* Set target control. */
-            gcmERR_BREAK(gcoVGHARDWARE_ProgramControl(
-                Hardware, gcvNULL, gcvNULL
-                ));
-            gcmERR_BREAK(gcoVGHARDWARE_SetState(
-                Hardware,
-                0x0A00,
-                  0x00000001 /* Rasterize rectangle */
-                | 0x00001000 /*imageMode*/
-                | 0x00000100/*blend_mode*/
-                | 0x8000/*rotation*/,
-                gcvFALSE
-                ));
-
-            gcmERR_BREAK(gcoVGHARDWARE_SetStates(
-                Hardware,
-                0x0A18,
-                gcmCOUNTOF(imageConst), imageConst
-                ));
-
-            gcmERR_BREAK(gcoVGHARDWARE_SetStates(
-                Hardware,
-                0x0A1C,
-                gcmCOUNTOF(imageStepX), imageStepX
-                ));
-
-            gcmERR_BREAK(gcoVGHARDWARE_SetStates(
-                Hardware,
-                0x0A20,
-                gcmCOUNTOF(imageStepY),
-                imageStepY
-                ));
-            /* Set states for sampler 1, so you see here the address are odd numbers. */
-            gcmERR_BREAK(gcoVGHARDWARE_SetState(
-                Hardware,
-                0x0A27,
-                0, gcvFALSE));    /* Set border color to (0, 0, 0, 0) for killing. */
-           gcmERR_BREAK(_SetSampler(
-                Hardware,
-                1, /* Use the second sampler for images. */
-                Image,
-                gcvTILE_FILL, /* Tile mode: Clamp to border            */
-                gcvFALSE, /* Mask vs. image selection.          */
-                Filter, /* Image quailty filter mode.         */
-                gcvFALSE, /* Not in image filter mode.          */
-                Rectangle->x,
-                Rectangle->y,
-                Rectangle->width,
-                Rectangle->height,
-                gcvTRUE
-                ));
-            minx = miny = maxx = maxy = 0.0f;
-            minx = gcmMIN(point0[0], gcmMIN(point1[0], gcmMIN(point2[0], point3[0])));
-            miny = gcmMIN(point0[1], gcmMIN(point1[1], gcmMIN(point2[1], point3[1])));
-            maxx = gcmMAX(point0[0], gcmMAX(point1[0], gcmMAX(point2[0], point3[0])));
-            maxy = gcmMAX(point0[1], gcmMAX(point1[1], gcmMAX(point2[1], point3[1])));
-            minx = gcmMAX(0.0f, minx);
-            miny = gcmMAX(0.0f, miny);
-            maxx = gcmMIN(Hardware->vg.targetWidth, maxx);
-            maxy = gcmMIN(Hardware->vg.targetHeight, maxy);
-            rect[0] = (gctUINT16)minx;
-            rect[1] = (gctUINT16)miny;
-            rect[2] = (gctUINT16)(maxx - minx);
-            rect[3] = (gctUINT16)(maxy - miny);
-            gcmERR_BREAK(gcoVGHARDWARE_SetData(
-                Hardware,
-                8,
-                (gctPOINTER)rect
-                ));
-
-            gcoVGHARDWARE_FlushPipe(Hardware);
-        }
-#endif
     }
     while (gcvFALSE);
 
@@ -6585,7 +6501,7 @@ gcoVGHARDWARE_Construct(
         gcmCHECK_STATUS(gcoOS_Free(os, hardware));
     }
 
-	*Hardware = gcvNULL;
+    *Hardware = gcvNULL;
     gcmFOOTER();
     /* Return the status. */
     return status;
@@ -7687,8 +7603,8 @@ gcoVGHARDWARE_Lock(
                 /*
                 ** Some software access only surface has no kernel video node.
                 */
+                /* TODO: Remove this risky usage, physical may be not flat mapped. */
                 gcmASSERT(Node->logical != gcvNULL);
-                gcmASSERT(physical == gcvINVALID_ADDRESS);
                 gcsSURF_NODE_SetHardwareAddress(Node, physical);
             }
             else
@@ -8288,7 +8204,8 @@ gcoVGHARDWARE_AllocateLinearVideoMemory(
 gceSTATUS
 gcoVGHARDWARE_FreeVideoMemory(
     IN gcoVGHARDWARE Hardware,
-    IN gctUINT32 Node
+    IN gctUINT32 Node,
+    IN gctBOOL asynchroneous
     )
 {
     gceSTATUS status;
@@ -8317,6 +8234,45 @@ gcoVGHARDWARE_FreeVideoMemory(
 
         /* Validate the return value. */
         gcmERR_BREAK(halInterface.status);
+
+        if (asynchroneous)
+        {
+            halInterface.u.UnlockVideoMemory.asynchroneous = gcvTRUE;
+            /* Do we need to schedule an event for the unlock? */
+            if (halInterface.u.UnlockVideoMemory.asynchroneous)
+            {
+                gcsTASK_UNLOCK_VIDEO_MEMORY_PTR unlockMemory;
+
+                /* Allocate a cluster event. */
+                gcmERR_BREAK(gcoVGHARDWARE_ReserveTask(
+                    Hardware,
+                    gcvBLOCK_PIXEL,
+                    1,
+                    gcmSIZEOF(gcsTASK_UNLOCK_VIDEO_MEMORY),
+                    (gctPOINTER *) &unlockMemory
+                    ));
+
+                /* Fill in event info. */
+                unlockMemory->id   = gcvTASK_UNLOCK_VIDEO_MEMORY;
+                unlockMemory->node = Node;
+            }
+        }
+        else
+        {
+            halInterface.command = gcvHAL_BOTTOM_HALF_UNLOCK_VIDEO_MEMORY;
+            halInterface.u.BottomHalfUnlockVideoMemory.node = Node;
+            halInterface.u.BottomHalfUnlockVideoMemory.type = gcvSURF_TYPE_UNKNOWN;
+
+            /* Call kernel service. */
+            gcmERR_BREAK(gcoOS_DeviceControl(
+                Hardware->os, IOCTL_GCHAL_INTERFACE,
+                &halInterface, sizeof(gcsHAL_INTERFACE),
+                &halInterface, sizeof(gcsHAL_INTERFACE)
+                ));
+
+            /* Validate the return value. */
+            gcmERR_BREAK(halInterface.status);
+        }
 
         /* Release the buffer. */
         halInterface.command = gcvHAL_RELEASE_VIDEO_MEMORY;

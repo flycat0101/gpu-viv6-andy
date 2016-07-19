@@ -42,22 +42,22 @@
 ALIGNED_STRUCT(union, 32) InputA {
     cl_uint a;
     float h;
-	int z;
-	short q;
+    int z;
+    short q;
 };
 
 ALIGNED_STRUCT(union, 32) InputB {
     cl_uint k;
     float b;
-	int w;
-	short p;
+    int w;
+    short p;
 };
 
 ALIGNED_STRUCT(union, 32) Result {
     cl_uint z;
     float r;
-	int x;
-	short l;
+    int x;
+    short l;
 };
 
 #endif // _TYPES2_H_

@@ -1,4 +1,3 @@
-
 package com.vivantecorp.graphics.sample6;
 
 import android.content.Context;

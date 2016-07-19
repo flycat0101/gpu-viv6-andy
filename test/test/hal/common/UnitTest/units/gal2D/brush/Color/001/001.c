@@ -54,84 +54,84 @@ typedef struct Test2D {
     GalTest     base;
     GalRuntime  *runtime;
 
-	// dst
-    gcoSURF			dstSurf;
-	gceSURF_FORMAT	dstFormat;
-	gctUINT			dstWidth;
-	gctUINT			dstHeight;
-	gctINT			dstStride;
-	gctUINT32		dstPhyAddr;
-	gctPOINTER		dstLgcAddr;
+    // dst
+    gcoSURF            dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT            dstWidth;
+    gctUINT            dstHeight;
+    gctINT            dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
 
-	//brush
-	gctUINT8 brushAlpha;
-	gctUINT8 brushRed;
-	gctUINT8 brushGreen;
-	gctUINT8 brushBlue;
+    //brush
+    gctUINT8 brushAlpha;
+    gctUINT8 brushRed;
+    gctUINT8 brushGreen;
+    gctUINT8 brushBlue;
 } Test2D;
 
 static void CDECL FillColor(Test2D *t2d, gctUINT32 *ColorBuf)
 {
-	int i, j;
+    int i, j;
 
-	for (i = 0; i < 8; ++i)
-	{
-		if (i < 4)
-		{
-			for (j = 0; j < 8; ++j)
-			{
-				if (j < 4)
-					ColorBuf[j*8+i] =
-					COLOR_ARGB8(t2d->brushAlpha, t2d->brushRed, t2d->brushGreen, t2d->brushBlue);
-				else
-					ColorBuf[j*8+i] =
-					COLOR_ARGB8(t2d->brushAlpha, t2d->brushRed, t2d->brushGreen, ~t2d->brushBlue);
-			}
-		}
-		else
-		{
-			for (j = 0; j < 8; ++j)
-			{
-				if (j < 4)
-					ColorBuf[j*8+i] =
-					COLOR_ARGB8(t2d->brushAlpha, t2d->brushRed, ~t2d->brushGreen, t2d->brushBlue);
-				else
-					ColorBuf[j*8+i] =
-					COLOR_ARGB8(t2d->brushAlpha, ~t2d->brushRed, t2d->brushGreen, t2d->brushBlue);
-			}
-		}
-	}
+    for (i = 0; i < 8; ++i)
+    {
+        if (i < 4)
+        {
+            for (j = 0; j < 8; ++j)
+            {
+                if (j < 4)
+                    ColorBuf[j*8+i] =
+                    COLOR_ARGB8(t2d->brushAlpha, t2d->brushRed, t2d->brushGreen, t2d->brushBlue);
+                else
+                    ColorBuf[j*8+i] =
+                    COLOR_ARGB8(t2d->brushAlpha, t2d->brushRed, t2d->brushGreen, ~t2d->brushBlue);
+            }
+        }
+        else
+        {
+            for (j = 0; j < 8; ++j)
+            {
+                if (j < 4)
+                    ColorBuf[j*8+i] =
+                    COLOR_ARGB8(t2d->brushAlpha, t2d->brushRed, ~t2d->brushGreen, t2d->brushBlue);
+                else
+                    ColorBuf[j*8+i] =
+                    COLOR_ARGB8(t2d->brushAlpha, ~t2d->brushRed, t2d->brushGreen, t2d->brushBlue);
+            }
+        }
+    }
 }
 
 static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 {
-	gcsRECT dstRect = {0, 0, t2d->dstWidth, t2d->dstHeight};
-	gco2D egn2D = t2d->runtime->engine2d;
-	gcoBRUSH brush;
-	gceSTATUS status = gcvSTATUS_OK;
-	gctUINT32 color[64];
+    gcsRECT dstRect = {0, 0, t2d->dstWidth, t2d->dstHeight};
+    gco2D egn2D = t2d->runtime->engine2d;
+    gcoBRUSH brush;
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT32 color[64];
 
-	gcmONERROR(gco2D_SetClipping(egn2D, &dstRect));
+    gcmONERROR(gco2D_SetClipping(egn2D, &dstRect));
 
-	FillColor(t2d, color);
+    FillColor(t2d, color);
 
-	gcmONERROR(gco2D_ConstructColorBrush(egn2D, 0, 0,
-				color, gcvSURF_A8R8G8B8, 0, &brush));
+    gcmONERROR(gco2D_ConstructColorBrush(egn2D, 0, 0,
+                color, gcvSURF_A8R8G8B8, 0, &brush));
 
-	gcmONERROR(gco2D_FlushBrush(egn2D, brush, t2d->dstFormat));
+    gcmONERROR(gco2D_FlushBrush(egn2D, brush, t2d->dstFormat));
 
-	gcmONERROR(gco2D_SetTarget(egn2D, t2d->dstPhyAddr, t2d->dstStride, gcvSURF_0_DEGREE, t2d->dstWidth));
+    gcmONERROR(gco2D_SetTarget(egn2D, t2d->dstPhyAddr, t2d->dstStride, gcvSURF_0_DEGREE, t2d->dstWidth));
 
-	gcmONERROR(gco2D_Blit(egn2D, 1, &dstRect, 0xF0, 0xF0, t2d->dstFormat));
+    gcmONERROR(gco2D_Blit(egn2D, 1, &dstRect, 0xF0, 0xF0, t2d->dstFormat));
 
-	gcmONERROR(gco2D_Flush(egn2D));
+    gcmONERROR(gco2D_Flush(egn2D));
 
-	gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
+    gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
 
-	gcmONERROR(gcoBRUSH_Destroy(brush));
+    gcmONERROR(gcoBRUSH_Destroy(brush));
 
-	/* Cycle to the next color. */
-	if (t2d->brushBlue == 0)
+    /* Cycle to the next color. */
+    if (t2d->brushBlue == 0)
     {
         t2d->brushBlue = ~0;
     }
@@ -139,7 +139,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     {
         t2d->brushBlue = 0;
 
-		if (t2d->brushGreen == 0)
+        if (t2d->brushGreen == 0)
         {
             t2d->brushGreen = ~0;
         }
@@ -163,19 +163,19 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 OnError:
     GalOutput(GalOutputType_Error | GalOutputType_Console,
         "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
-	return gcvFALSE;
+    return gcvFALSE;
 }
 
 static void CDECL Destroy(Test2D *t2d)
 {
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
     if ((t2d->dstSurf != gcvNULL) && (t2d->dstLgcAddr != gcvNULL))
     {
-		if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock dstSurf failed:%s\n", GalStatusString(status));
-		}
-		t2d->dstLgcAddr = gcvNULL;
+        if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock dstSurf failed:%s\n", GalStatusString(status));
+        }
+        t2d->dstLgcAddr = gcvNULL;
     }
 
     free(t2d);
@@ -188,10 +188,10 @@ const gceFEATURE FeatureList[]=
 
 static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 {
-	gceSTATUS status = gcvSTATUS_OK;
-	int i;
-	gctINT argc = runtime->argc;
-	gctSTRING *argv = runtime->argv;
+    gceSTATUS status = gcvSTATUS_OK;
+    int i;
+    gctINT argc = runtime->argc;
+    gctSTRING *argv = runtime->argv;
 
     gctUINT32 k, listLen = sizeof(FeatureList)/sizeof(gctINT);
     gctBOOL featureStatus;
@@ -222,43 +222,43 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 
     t2d->runtime = runtime;
 
-	t2d->dstSurf    = runtime->target;
-	t2d->dstFormat = runtime->format;
-	t2d->dstWidth = 0;
-	t2d->dstHeight = 0;
-	t2d->dstStride = 0;
-	t2d->dstPhyAddr = 0;
-	t2d->dstLgcAddr = 0;
+    t2d->dstSurf    = runtime->target;
+    t2d->dstFormat = runtime->format;
+    t2d->dstWidth = 0;
+    t2d->dstHeight = 0;
+    t2d->dstStride = 0;
+    t2d->dstPhyAddr = 0;
+    t2d->dstLgcAddr = 0;
 
-	t2d->brushAlpha = 0;
-	t2d->brushRed = 0;
-	t2d->brushGreen = 0;
-	t2d->brushBlue = 0xff;
+    t2d->brushAlpha = 0;
+    t2d->brushRed = 0;
+    t2d->brushGreen = 0;
+    t2d->brushBlue = 0xff;
 
-	gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
-										&t2d->dstWidth,
-										&t2d->dstHeight,
-										&t2d->dstStride));
+    gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
+                                        &t2d->dstWidth,
+                                        &t2d->dstHeight,
+                                        &t2d->dstStride));
 
-	gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
+    gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
 
-	t2d->base.render     = (PGalRender)Render;
+    t2d->base.render     = (PGalRender)Render;
     t2d->base.destroy    = (PGalDestroy)Destroy;
     t2d->base.frameCount = 8;
-	t2d->base.description = s_CaseDescription;
+    t2d->base.description = s_CaseDescription;
 
-	for (i = 0; i < argc; ++i)
-	{
-		if (!strcmp(argv[i], "-n"))
-			t2d->base.frameCount = atoi(argv[++i]);
-	}
+    for (i = 0; i < argc; ++i)
+    {
+        if (!strcmp(argv[i], "-n"))
+            t2d->base.frameCount = atoi(argv[++i]);
+    }
 
     return gcvTRUE;
 
 OnError:
     GalOutput(GalOutputType_Error | GalOutputType_Console,
         "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
-	return gcvFALSE;
+    return gcvFALSE;
 }
 
 GalTest * CDECL GalCreateTestObject(GalRuntime *runtime)

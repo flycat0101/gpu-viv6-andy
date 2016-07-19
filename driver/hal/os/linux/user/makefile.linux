@@ -41,56 +41,13 @@ INCLUDE := -I$(AQROOT)/hal/inc \
            -I$(AQROOT)/hal/os/linux/user \
            -I$(AQROOT)/compiler/libVSC/include
 
-ifeq ($(EGL_API_WL), 1)
-  INCLUDE += -I$(WAYLAND_DIR)/include \
-             -I$(WAYLAND_DIR)/include/wayland-viv
-endif
-
-ifeq ($(EGL_API_DFB), 1)
-  INCLUDE += -I$(DFB_DIR)/usr/include \
-             -I$(DFB_DIR)/include \
-             -I$(DFB_DIR)/include/directfb-internal \
-             -I$(DFB_DIR)/include/directfb
-endif
-
-ifeq ($(EGL_API_DRI), 1)
-  INCLUDE += -I$(X11_ARM_DIR)/include \
-             -I$(X11_ARM_DIR)/include/X11/extensions \
-             -I$(AQROOT)/driver/X/DRI/src
-endif
-
-ifeq ($(EGL_API_X), 1)
-  INCLUDE += -I$(X11_ARM_DIR)/include
-endif
-
-ifeq ($(EGL_API_GBM), 1)
-  INCLUDE += $(shell $(PKG_CONFIG) --cflags libdrm gbm)
-endif
-
 CFLAGS += $(INCLUDE)
 
 ################################################################################
 # Add extra flags for object files.
 
-ifneq ($(USE_ARMCC), 1)
-  ifeq ($(EGL_API_WL), 1)
-    CFLAGS += -fPIC
-  endif
-
-  ifeq ($(EGL_API_DRI), 1)
-    CFLAGS += -fPIC -Werror -march=armv7-a
-  endif
-
-  ifeq ($(EGL_API_DFB),1)
-    CFLAGS += -pipe -fPIC -DPIC
-    CFLAGS += -DDIRECTFB_MAJOR_VERSION=$(DIRECTFB_MAJOR_VERSION) \
-              -DDIRECTFB_MINOR_VERSION=$(DIRECTFB_MINOR_VERSION) \
-              -DDIRECTFB_MICRO_VERSION=$(DIRECTFB_MICRO_VERSION)
-  endif
-
-  ifneq ($(filter 1,$(EGL_API_FB) $(EGL_API_X) $(EGL_API_GBM)),)
-      CFLAGS += -fPIC -Werror -ansi
-  endif
+ifneq ($(USE_ARMCC),1)
+  CFLAGS += -fPIC -Werror -ansi
 endif
 
 ################################################################################
@@ -102,36 +59,6 @@ OBJECTS := $(OBJ_DIR)/gc_hal_user_debug.o \
            $(OBJ_DIR)/gc_hal_user_os.o \
            $(OBJ_DIR)/gc_hal_user_math.o \
            $(OBJ_DIR)/$(PLATFORM_CALLBACK_OBJ) \
-
-ifneq ($(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_VG), 0_0)
-  ifeq ($(EGL_API_FB)_$(EGL_API_WL),1_0)
-      OBJECTS += $(OBJ_DIR)/gc_hal_user_fbdev.o
-  endif
-
-  ifeq ($(EGL_API_FB)_$(EGL_API_WL),1_1)
-      OBJECTS += $(OBJ_DIR)/gc_hal_user_wayland.o
-  endif
-
-  ifeq ($(EGL_API_DFB),1)
-    OBJECTS += $(OBJ_DIR)/gc_hal_user_dfb.o
-  endif
-
-  ifeq ($(EGL_API_DRI),1)
-    OBJECTS += $(OBJ_DIR)/gc_hal_user_dri.o \
-               $(OBJ_DIR)/XF86dri.o \
-               $(OBJ_DIR)/xf86drm.o \
-               $(OBJ_DIR)/xf86drmHash.o \
-               $(OBJ_DIR)/xf86drmRandom.o
-  endif
-
-  ifeq ($(EGL_API_X),1)
-    OBJECTS += $(OBJ_DIR)/gc_hal_user_x.o
-  endif
-
-  ifeq ($(EGL_API_GBM),1)
-    OBJECTS += $(OBJ_DIR)/gc_hal_user_gbm.o
-  endif
-endif
 
 ################################################################################
 # Define targets.
@@ -162,12 +89,6 @@ endif
 
 ################################################################################
 # Object rules.
-
-ifeq ($(EGL_API_DRI),1)
-$(OBJ_DIR)/%.o: ../../../../driver/X/DRI/src/%.c
-	@mkdir -p $(OBJ_DIR)
-	$(CC) -c $(CFLAGS) -MMD -o $@ $<
-endif
 
 $(OBJ_DIR)/%.o: %.c
 	@mkdir -p $(OBJ_DIR)

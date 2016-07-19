@@ -85,7 +85,7 @@ INCLUDES = \
   $(_PUBLICROOT)\common\oak\inc; \
   $(_PUBLICROOT)\common\ddk\inc; \
   $(_SDKROOT)\CE\inc; \
-  $(VIVANTE_SDK_INC);$(AQROOT)/sdk/inc; \
+  $(VIVANTE_SDK_INC); \
   $(ROOT_DIR)\lib; \
   $(ROOT_DIR)\src; \
 

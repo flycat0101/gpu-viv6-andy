@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2015 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -90,8 +90,8 @@ int main(int argc, char* argv[])
     vx_uint32 imgHei = 0;
     vx_rectangle_t imgRect = { 0, 0, 0, 0 };
 
-	FILE* srcFile = NULL;
-	FILE* destFile = NULL;
+    FILE* srcFile = NULL;
+    FILE* destFile = NULL;
     u08* tmpBuf = NULL;
     u08* tmpBuf2 = NULL;
     u08* imgBuf = NULL;

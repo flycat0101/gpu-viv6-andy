@@ -111,7 +111,7 @@ typedef struct _StreamPipe
     _VGVector2      *stream;
     gctINT32        currStreamPts;
     gctINT32        numStreamPts;
-    _VGuint16       *indices;
+    _VGuint32       *indices;
     gctINT32        currIndex;
     gctINT32        numIndices;
 }_StreamPipe;

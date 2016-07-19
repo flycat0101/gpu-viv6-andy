@@ -33,40 +33,40 @@
 
 Test2DChar::Test2DChar(const size_t sizeX, const size_t sizeY):
 MultiDimensionalArraysTest2D("char", sizeX, sizeY) {
-	inputAHost = new cl_char[size];
-	inputBHost = new cl_char[size];
-	resultHost = new cl_char[size];
-	inputA = inputAHost;
-	inputB = inputBHost;
-	result = resultHost;
+    inputAHost = new cl_char[size];
+    inputBHost = new cl_char[size];
+    resultHost = new cl_char[size];
+    inputA = inputAHost;
+    inputB = inputBHost;
+    result = resultHost;
 }
 
 Test2DChar::~Test2DChar() {
-	delete[] inputAHost;
-	delete[] inputBHost;
-	delete[] resultHost;
+    delete[] inputAHost;
+    delete[] inputBHost;
+    delete[] resultHost;
 }
 
 const int Test2DChar::getMemSize() const {
-	return sizeof(cl_char)*size;
+    return sizeof(cl_char)*size;
 }
 
 void Test2DChar::generateInput(const unsigned int &kernelIndex) {
-	for (unsigned int k=0; k<size; k++) {
-		inputAHost[k] = randChar();
-		if (getKernelInputArgNum(kernelIndex) == 2)
-			inputBHost[k] = randChar();
-	}
+    for (unsigned int k=0; k<size; k++) {
+        inputAHost[k] = randChar();
+        if (getKernelInputArgNum(kernelIndex) == 2)
+            inputBHost[k] = randChar();
+    }
 }
 
 void* Test2DChar::getInputAElement(const unsigned int &index) const {
-	return &inputAHost[index];
+    return &inputAHost[index];
 }
 
 void* Test2DChar::getInputBElement(const unsigned int &index) const {
-	return &inputBHost[index];
+    return &inputBHost[index];
 }
 
 void* Test2DChar::getResultElement(const unsigned int &index) const {
-	return &resultHost[index];
+    return &resultHost[index];
 }

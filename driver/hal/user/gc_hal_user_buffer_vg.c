@@ -1715,11 +1715,11 @@ gcoVGBUFFER_Construct(
         {
 #if gcdGC355_PROFILER
             gcmCHECK_STATUS(gcoHAL_FreeVideoMemory(
-                Hal, gcvNULL, 0, 0, 0, buffer->containerNode
+                Hal, gcvNULL, 0, 0, 0, buffer->containerNode, gcvFALSE
                 ));
 #else
             gcmCHECK_STATUS(gcoHAL_FreeVideoMemory(
-                Hal, buffer->containerNode
+                Hal, buffer->containerNode, gcvFALSE
                 ));
 #endif
         }
@@ -1853,11 +1853,11 @@ gcoVGBUFFER_Destroy(
         {
 #if gcdGC355_PROFILER
             gcmERR_BREAK(gcoHAL_FreeVideoMemory(
-                Buffer->hal, gcvNULL, 0, 0, 0, Buffer->containerNode
+                Buffer->hal, gcvNULL, 0, 0, 0, Buffer->containerNode, gcvFALSE
                 ));
 #else
              gcmERR_BREAK(gcoHAL_FreeVideoMemory(
-                Buffer->hal, Buffer->containerNode
+                Buffer->hal, Buffer->containerNode, gcvFALSE
                 ));
 #endif
             /* Reset the node. */

@@ -103,7 +103,8 @@ __glChipFramebufferRenderbuffer(
     __GLcontext *gc,
     __GLframebufferObject *framebufferObj,
     GLint attachIndex,
-    __GLrenderbufferObject *renderbufferObj
+    __GLrenderbufferObject *renderbufferObj,
+     __GLfboAttachPoint *preAttach
     );
 
 GLboolean
@@ -116,7 +117,8 @@ __glChipFramebufferTexture(
     GLint face,
     GLsizei samples,
     GLint zoffset,
-    GLboolean layered
+    GLboolean layered,
+    __GLfboAttachPoint *preAttach
     );
 
 GLvoid

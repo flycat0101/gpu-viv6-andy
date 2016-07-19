@@ -3913,17 +3913,15 @@ _NewDynamicCache(
             if (cache->bytes < gcdSTREAM_CACHE_SIZE)
             {
                 /* Destroy the old one */
-                gcmVERIFY_OK(gcoHARDWARE_Unlock(cache->dynamicNode,
-                                                gcvSURF_VERTEX));
-
-                gcmONERROR(gcsSURF_NODE_Destroy(cache->dynamicNode));
-
-                                /* Destroy the signal. */
-                gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL,
-                                                 cache->signal));
-
                 if (cache->dynamicNode != gcvNULL)
                 {
+                    gcmVERIFY_OK(gcoHARDWARE_Unlock(cache->dynamicNode, gcvSURF_VERTEX));
+
+                    gcmONERROR(gcsSURF_NODE_Destroy(cache->dynamicNode));
+
+                    /* Destroy the signal. */
+                    gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL, cache->signal));
+
                     gcmOS_SAFE_FREE(gcvNULL,cache->dynamicNode);
                 }
 
@@ -4152,7 +4150,8 @@ _copyBuffersEx(
     gctSIZE_T copiedBytes;
     gctSIZE_T copySize;
     gctSIZE_T count;
-    gctUINT32 base, copiedBytes32;
+    gctSIZE_T base;
+    gctUINT32 copiedBytes32;
 
     gcmHEADER_ARG("StreamCount=%u Streams=0x%x First=%u "
                   "Logical=0x%x Physical=0x%x CopiedBytes=0x%x",
@@ -4585,8 +4584,8 @@ gcoSTREAM_CacheAttributesEx(
         if (streamPtr->stream == gcvNULL)
         {
             gctBOOL hasGeneric  = gcvFALSE;
-            gctUINT32 minOffset = (gctUINT32)-1;
-            gctUINT32 maxOffset = 0;
+            gctSIZE_T minOffset = (gctSIZE_T)-1;
+            gctSIZE_T maxOffset = 0;
 
             /* Assume that stream can be copied with one memcopy */
             streamPtr->copyAll = gcvTRUE;

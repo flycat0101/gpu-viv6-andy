@@ -47,10 +47,6 @@ CLIENT_GLX_SOURCE_FILES = \
 	dri_glx.c \
 	dri_util.c \
 	XF86dri.c \
-	xf86drm.c \
-	xf86drmHash.c \
-	xf86drmRandom.c \
-	xf86drmSL.c \
 	g_api_entry.c \
 	g_pri_api_entry.c
 
@@ -58,12 +54,12 @@ CLIENT_GLX_SOURCE_FILES = \
 GCC=$(CC)
 
 LIBDIR=-L$(SDK_DIR)/drivers -L$(ROOTFS_USR)/lib
-LLDLIBS = -lXdamage -lXfixes -lXext -lX11 -lpthread -lGAL -lm -ldl
+LLDLIBS = -lXdamage -lXfixes -lXext -lX11 -lpthread -lGAL -lglapi -lm  -ldl -ldrm
 
 ifeq ($(DEBUG),1)
 CFLAGS +=-g -O0 -DDEBUG -fPIC
 else
-CFLAGS +=-O3 -fPIC
+CFLAGS +=-O3 -fPIC -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast
 endif
 
 CFLAGS += -D_LINUX_ -DPTHREADS -D_POSIX_SOURCE -D_POSIX_C_SOURCE=199309L -D_GNU_SOURCE -DUSE_DRM_MAP
@@ -74,12 +70,12 @@ INCLUDE += \
 	-I$(AQROOT)/hal/os/linux/user \
 	-I$(AQROOT)/sdk/inc/GL \
 	-I$(AQROOT)/sdk/inc \
-    -I$(TOPDIR)/include -I$(TOPDIR)/include/dri -I$(TOPDIR)/include/gl \
-    -I$(ROOTFS_USR)/include/X11/extensions \
-    -I$(ROOTFS_USR)/include \
-    -I$(ROOTFS_USR)/include/arm-linux-gnueabi \
-    -I$(ROOTFS_USR)/include/pixman-1 \
-    -I$(ROOTFS_USR)/include/drm
+	-I$(TOPDIR)/include -I$(TOPDIR)/include/dri -I$(TOPDIR)/include/gl \
+	-I$(ROOTFS_USR)/include/X11/extensions \
+	-I$(ROOTFS_USR)/include \
+	-I$(ROOTFS_USR)/include/arm-linux-gnueabi \
+	-I$(ROOTFS_USR)/include/pixman-1 \
+	-I$(ROOTFS_USR)/include/libdrm
 
 CFLAGS += $(INCLUDE)
 
@@ -111,10 +107,6 @@ OBJECTS = \
 	$(OBJ_DIR)/dri_glx.o \
 	$(OBJ_DIR)/dri_util.o \
 	$(OBJ_DIR)/XF86dri.o \
-	$(OBJ_DIR)/xf86drm.o \
-	$(OBJ_DIR)/xf86drmHash.o \
-	$(OBJ_DIR)/xf86drmRandom.o \
-	$(OBJ_DIR)/xf86drmSL.o \
 	$(OBJ_DIR)/g_api_entry.o \
 	$(OBJ_DIR)/g_pri_api_entry.o
 

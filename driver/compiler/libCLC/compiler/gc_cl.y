@@ -596,7 +596,9 @@ function_header_with_parameters :
 	;
 
 function_header :
-	T_KERNEL attribute_specifier_opt fully_specified_type direct_declarator '('
+	attribute_specifier T_KERNEL fully_specified_type direct_declarator '('
+		{ $$ = clParseKernelFuncHeader(Compiler, $1, &$3, &$4); }
+	| T_KERNEL attribute_specifier_opt fully_specified_type direct_declarator '('
 		{ $$ = clParseKernelFuncHeader(Compiler, $2, &$3, &$4); }
 	| T_EXTERN T_KERNEL attribute_specifier_opt fully_specified_type direct_declarator '('
 		{ $$ = clParseExternKernelFuncHeader(Compiler, $3, &$4, &$5); }
@@ -606,6 +608,10 @@ function_header :
 		{ $$ = clParseFuncHeaderWithAttr(Compiler, $1, &$2, &$3); }
 	| T_INLINE fully_specified_type direct_declarator '('
 		{ $$ = clParseFuncHeader(Compiler, &$2, &$3);
+		  if($$) $$->u.funcInfo.isInline = gcvTRUE;
+		}
+	| T_STATIC T_INLINE fully_specified_type direct_declarator '('
+		{ $$ = clParseFuncHeader(Compiler, &$3, &$4);
 		  if($$) $$->u.funcInfo.isInline = gcvTRUE;
 		}
 	;

@@ -597,7 +597,7 @@ _FillFlatMapping(
 
     /************************ Setup flat mapping in dynamic range. ****************/
 
-    if (area->dynamicMappingStart != gcvINVALID_ADDRESS && mtlb >= area->dynamicMappingStart)
+    if (area->dynamicMappingStart != gcvINVALID_ADDRESS && mtlb >= area->dynamicMappingStart && mtlb < area->dynamicMappingEnd)
     {
         gctUINT32_PTR stlbEntry;
         gctUINT i;
@@ -956,14 +956,18 @@ _SetupDynamicSpace(
         if (nodeArray[i].entries > numEntries)
         {
             area->dynamicMappingStart = nodeArray[i].start;
-            numEntries               = nodeArray[i].entries;
+            numEntries                = nodeArray[i].entries;
+            area->dynamicMappingEnd   = area->dynamicMappingStart + numEntries;
         }
     }
 
     gckOS_Free(Mmu->os, (gctPOINTER)nodeArray);
 
 #if gcdENABLE_TRUST_APPLICATION
-    secureAreaSize = gcdMMU_SECURE_AREA_SIZE;
+    if (gckHARDWARE_IsFeatureAvailable(Mmu->hardware, gcvFEATURE_SECURITY) == gcvSTATUS_TRUE)
+    {
+        secureAreaSize = gcdMMU_SECURE_AREA_SIZE;
+    }
 #endif
 
     /* Setup secure address area if need. */
@@ -1816,7 +1820,7 @@ _AllocatePages(
     case gcvMMU_SINGLE:
         /* Unlink single node from free list. */
         gcmkONERROR(
-            _Link(area, previous, map[index]) >> 8);
+            _Link(area, previous, map[index] >> 8));
         break;
 
     case gcvMMU_FREE:
@@ -2073,7 +2077,12 @@ gckMMU_AllocatePagesEx(
     OUT gctUINT32 * Address
     )
 {
+#if gcdDISABLE_GPU_VIRTUAL_ADDRESS
+    gcmkPRINT("GPU virtual address is disabled.");
+    return gcvSTATUS_NOT_SUPPORTED;
+#else
     return _AllocatePages(Mmu, PageCount, Type, Secure, PageTable, Address);
+#endif
 }
 
 gceSTATUS

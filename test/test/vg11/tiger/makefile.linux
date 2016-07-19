@@ -60,7 +60,7 @@ CFLAGS += $(INCLUDE)
 
 ################################################################################
 # Supply necessary libraries.
-
+LIBS += -L $(VIVANTE_SDK_LIB)
 ifeq ($(gcdSTATIC_LINK), 1)
 LIBS += $(VIVANTE_SDK_LIB)/libVIVANTE.a
 LIBS +=  $(LIB_DIR)/libm.a
@@ -70,10 +70,10 @@ LIBS +=  $(LIB_DIR)/libdl.a
 LIBS +=  $(LIB_DIR)/librt.a
 else
 ifeq ($(EGL_API_DRI), 1)
-LIBS += -L $(X11_ARM_DIR)/lib -l X11 -l Xau -l Xdmcp
+LIBS += -L $(X11_ARM_DIR)/lib -Wl,-rpath-link,$(X11_ARM_DIR)/lib -lX11
 endif
 ifeq ($(EGL_API_X), 1)
-LIBS += -L$(X11_ARM_DIR)/lib -lXau -lXdmcp -lX11
+LIBS += -L$(X11_ARM_DIR)/lib -Wl,-rpath-link,$(X11_ARM_DIR)/lib -lX11
 endif
 ifeq ($(EGL_API_DFB), 1)
 LIBS += -L$(DFB_DIR)/lib -ldirectfb -ldirect -lfusion

@@ -32,7 +32,7 @@
  * Draws a simple triangle with basic vertex and pixel shaders.
  */
 #ifndef GL_GLEXT_PROTOTYPES
-#define GL_GLEXT_PROTOTYPES	1
+#define GL_GLEXT_PROTOTYPES    1
 #endif
 
 #include <nativehelper/jni.h>
@@ -69,19 +69,19 @@
 #endif
 
 extern bool     bUseYUVTex;
-extern int frames, width, height;
-extern GLuint programHandle;
-static int start;
-static int end;
-static int frameCount;
-int first;
-bool done = false, paused = false;
-struct timeval tm;
-int key;
+extern int      frames, width, height;
+extern GLuint   programHandle;
+static int      start;
+static int      end;
+static int      frameCount;
+int             first;
+bool            done = false, paused = false;
+struct timeval  tm;
+int             key;
 enum
 {
-	KEYPAD_SPACE = 18,
-	KEYPAD_BACK = 4,
+    KEYPAD_SPACE = 18,
+    KEYPAD_BACK = 4,
 };
 extern void RenderInit();
 extern void Render();
@@ -98,7 +98,7 @@ extern "C" {
 
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_tutorial5_GL2JNILib_init(JNIEnv * env, jobject obj,  jint w, jint h)
 {
-	width = w;
+    width = w;
     height = h;
 
     LoadShaders("/sdcard/tutorial/tutorial5/vs_es20t5.vert", "/sdcard/tutorial/tutorial5/ps_es20t5.frag");
@@ -107,65 +107,65 @@ JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_tutorial5_GL2JNILib_ini
         return false;
     }
 
-	RenderInit();
+    RenderInit();
 
     LoadFrame();
 
-	gettimeofday(&tm, NULL);
-	first = start = tm.tv_sec * 1000 + tm.tv_usec / 1000;
+    gettimeofday(&tm, NULL);
+    first = start = tm.tv_sec * 1000 + tm.tv_usec / 1000;
 
-	return true;
+    return true;
 
 }
 
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_tutorial5_GL2JNILib_repaint(JNIEnv * env, jobject obj)
 {
-	if(!done)
-	{
-		if(key != 0)
-		{
-			switch(key)
-			{
-				case 18 :
-					paused = !paused;
-					LOGI("Render paused, press # to continue...");
-					break;
-				case KEYPAD_BACK :
-					done = true;
-					break;
-				default:
-					break;
+    if(!done)
+    {
+        if(key != 0)
+        {
+            switch(key)
+            {
+                case 18 :
+                    paused = !paused;
+                    LOGI("Render paused, press # to continue...");
+                    break;
+                case KEYPAD_BACK :
+                    done = true;
+                    break;
+                default:
+                    break;
 
-			}
-			key = 0;
-		}
-	    if(!paused)
-    	{
+            }
+            key = 0;
+        }
+        if(!paused)
+        {
             if (!(frameCount % 60))
             {
                 bUseYUVTex  = !bUseYUVTex;
             }
 
-        	Render();
-        	++frameCount;
-   	    	++frames;
-		}
-	}
+            Render();
+            ++frameCount;
+               ++frames;
+        }
+    }
 
-	gettimeofday(&tm, NULL);
-	end = tm.tv_sec * 1000 + tm.tv_usec / 1000;
+    gettimeofday(&tm, NULL);
+    end = tm.tv_sec * 1000 + tm.tv_usec / 1000;
 
-	if ((end - start) > 1000 && !paused)
-	{
-		unsigned long duration = end - start;
-		float fps = 1000.0f * float(frameCount) / float(duration);
-		float afps = 1000.0f * float(frames) / float(end - first);
+    if ((end - start) > 1000 && !paused)
+    {
+        unsigned long duration = end - start;
+        float fps = 1000.0f * float(frameCount) / float(duration);
+        float afps = 1000.0f * float(frames) / float(end - first);
 
-		LOGI("Rendered %d frames in %lu milliseconds: %.2f fps,average: %.2f fps\n",frameCount, duration, fps, afps);
+        LOGI("Rendered %d frames in %lu milliseconds: %.2f fps,average: %.2f fps\n",frameCount, duration, fps, afps);
 
-		start = end;
-		frameCount = 0;
-	}
+        start = end;
+        frameCount = 0;
+    }
 
     if (done)
     {
@@ -173,15 +173,15 @@ JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_tutorial5_GL2JNILib_rep
         RenderCleanup();
     }
 
-	return true;
+    return true;
 }
 
 JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_tutorial5_GL2JNILib_key(JNIEnv * env, jobject obj, jint k, jboolean d)
 {
-	if(d == 1)
-	{
-		key = k;
-	}
-	return true;
+    if(d == 1)
+    {
+        key = k;
+    }
+    return true;
 
 }

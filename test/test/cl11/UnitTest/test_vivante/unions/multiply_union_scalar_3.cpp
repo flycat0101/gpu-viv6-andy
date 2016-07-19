@@ -36,17 +36,17 @@
 
 const char *kernel_multiply_union_scalar_3 =
 "#ifndef _TYPES2_H_                                                                                                                 \n"
-"#define _TYPES2_H_																												   \n"
-"																																   \n"
-"#ifdef __OPENCL_VERSION__																										   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
-"#else // __OPENCL_VERSION__																									   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType									   \n"
-"#endif // __OPENCL_VERSION__																									   \n"
-"																																   \n"
-"ALIGNED_STRUCT(union, 32) InputA {																							       \n"
-"    short a;																													   \n"
-"    float h;																												   \n"
+"#define _TYPES2_H_                                                                                                                   \n"
+"                                                                                                                                   \n"
+"#ifdef __OPENCL_VERSION__                                                                                                           \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))                               \n"
+"#else // __OPENCL_VERSION__                                                                                                       \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType                                       \n"
+"#endif // __OPENCL_VERSION__                                                                                                       \n"
+"                                                                                                                                   \n"
+"ALIGNED_STRUCT(union, 32) InputA {                                                                                                   \n"
+"    short a;                                                                                                                       \n"
+"    float h;                                                                                                                   \n"
 "};                                                                                                                                \n"
 "                                                                                                                                  \n"
 "ALIGNED_STRUCT(union, 32) InputB {                                                                                                \n"
@@ -67,8 +67,8 @@ const char *kernel_multiply_union_scalar_3 =
 "                                                                                                                                  \n"
 "    // bound check (equivalent to the limit on a 'for' loop for standard/serial C code                                            \n"
 "                                                                                                                                  \n"
-"																																   \n"
-"		c[tid].r = a[tid].a * b[tid].b;                                                                                            \n"
+"                                                                                                                                   \n"
+"        c[tid].r = a[tid].a * b[tid].b;                                                                                            \n"
 "                                                                                                                                  \n"
 "}                                                                                                                                 \n";
 
@@ -121,9 +121,9 @@ public:
         _deviceResult = cl::Buffer(_context, CL_MEM_WRITE_ONLY, sizeof(Result) * _globalWorkSize);
 
         _kernel.setArg(0,sizeof (_deviceInputA), &_deviceInputA);
-		_kernel.setArg(1,sizeof (_deviceInputB), &_deviceInputB);
-		_kernel.setArg(2,sizeof (_deviceResult), &_deviceResult);
-		_kernel.setArg(3,sizeof (_numElements), &_numElements);
+        _kernel.setArg(1,sizeof (_deviceInputB), &_deviceInputB);
+        _kernel.setArg(2,sizeof (_deviceResult), &_deviceResult);
+        _kernel.setArg(3,sizeof (_numElements), &_numElements);
     }
 
     virtual bool Execute()
@@ -145,7 +145,7 @@ private:
     void _fillData()
     {
         for (int i = 0; i < _numElements; ++i) {
-			_inputA[i].a = rand();
+            _inputA[i].a = rand();
             _inputA[i].h = (float)rand();
             _inputB[i].k = rand();
             _inputB[i].b = (float)rand();
@@ -156,7 +156,7 @@ private:
     void _computeGoldStandard()
     {
         for (int i = 0; i < _numElements; i++) {
-			_goldStandard[i].r = _inputA[i].a * _inputB[i].b;
+            _goldStandard[i].r = _inputA[i].a * _inputB[i].b;
 
         }
     }
@@ -185,7 +185,7 @@ private:
                 checkResult3 = fabsf(*( float *) &checkResult1);
                 checkResult4 = fabsf(*( float *) &checkResult2);
                 if ((fabsf(_result[i].r) > checkResult3 || fabsf(_result[i].r) < checkResult4) && !isnan(_goldStandard[i].r) && !isinf(_goldStandard[i].r)){
-					std::cout << "  c:" << _goldStandard[i].r << " ocl:" << _result[i].r << std::endl;
+                    std::cout << "  c:" << _goldStandard[i].r << " ocl:" << _result[i].r << std::endl;
                     return false;
                 }
         }
@@ -214,7 +214,7 @@ private:
 int multiply_union_scalar_3(void)
 {
     cl_int err = CL_SUCCESS;
-	int cnt = 1;
+    int cnt = 1;
 
     try {
         std::vector<cl::Platform> platforms;
@@ -230,7 +230,7 @@ int multiply_union_scalar_3(void)
 
         std::vector<cl::Device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
 
-
+        
         const char* clProgramSource = kernel_multiply_union_scalar_3;//oclLoadProgSource("multiply.cl", "", &szKernelLength);
         if (clProgramSource == 0) {
             std::cerr << "OpenCL program not found." << std::endl;
@@ -254,13 +254,13 @@ int multiply_union_scalar_3(void)
         std::cout << "Running test multiply_union_scalar_3..." << std::endl;
         TestCase_multiply_union_scalar_3 multiply_union_scalar_3(10, program_, context, devices);
 
-		bool control = true;
+        bool control = true;
         multiply_union_scalar_3.SetUp();
         for (int i = 0; i < 10; ++i) {
-			if(!multiply_union_scalar_3.Execute()){
-				control = false;
-				cnt = 0;
-			}
+            if(!multiply_union_scalar_3.Execute()){
+                control = false;
+                cnt = 0;
+            }
             std::cout << "RUN " << i + 1<< ": " << (control ? "PASSED" : "FAILED!") << std::endl;
         }
         multiply_union_scalar_3.TearDown();

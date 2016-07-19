@@ -2661,9 +2661,9 @@ _MultiSourceBlit(
     gctINT dy = ClipRect->top  - EigenRect->top;
 
     /* Move target physical to dest initial point. */
-    dstAddress = target->physical
-               + Display->stride * dy
-               + Display->bytesPerPixel * dx;
+    dstAddress = int64_t(target->physical)
+               + int64_t(Display->stride) * dy
+               + int64_t(Display->bytesPerPixel) * dx;
 
     /* Disable dest mirror. */
     gcmONERROR(
@@ -2812,46 +2812,46 @@ _MultiSourceBlit(
                 {
                 case gcvSURF_YUY2:
                 case gcvSURF_UYVY:
-                    addresses[0] = layer->addresses[0]
-                                 + layer->strides[0] * dy
+                    addresses[0] = int64_t(layer->addresses[0])
+                                 + int64_t(layer->strides[0]) * dy
                                  + 2 * dx;
                     break;
 
                 case gcvSURF_NV12:
                 case gcvSURF_NV21:
-                    addresses[0] = layer->addresses[0]
-                                 + layer->strides[0] * dy
+                    addresses[0] = int64_t(layer->addresses[0])
+                                 + int64_t(layer->strides[0]) * dy
                                  + 1 * dx;
 
-                    addresses[1] = layer->addresses[1]
-                                 + layer->strides[1] * dy / 2
+                    addresses[1] = int64_t(layer->addresses[1])
+                                 + int64_t(layer->strides[1]) * dy / 2
                                  + 1 * dx;
                     break;
 
                 case gcvSURF_NV16:
                 case gcvSURF_NV61:
-                    addresses[0] = layer->addresses[0]
-                                 + layer->strides[0] * dy
+                    addresses[0] = int64_t(layer->addresses[0])
+                                 + int64_t(layer->strides[0]) * dy
                                  + 1 * dx;
 
-                    addresses[1] = layer->addresses[1]
-                                 + layer->strides[1] * dy
+                    addresses[1] = int64_t(layer->addresses[1])
+                                 + int64_t(layer->strides[1]) * dy
                                  + 1 * dx;
                     break;
 
                 case gcvSURF_YV12:
                 case gcvSURF_I420:
                 default:
-                    addresses[0] = layer->addresses[0]
-                                 + layer->strides[0] * dy
+                    addresses[0] = int64_t(layer->addresses[0])
+                                 + int64_t(layer->strides[0]) * dy
                                  + 1 * dx;
 
-                    addresses[1] = layer->addresses[1]
-                                 + layer->strides[1] * dy / 2
+                    addresses[1] = int64_t(layer->addresses[1])
+                                 + int64_t(layer->strides[1]) * dy / 2
                                  + 1 * dx / 2;
 
-                    addresses[2] = layer->addresses[2]
-                                 + layer->strides[2] * dy / 2
+                    addresses[2] = int64_t(layer->addresses[2])
+                                 + int64_t(layer->strides[2]) * dy / 2
                                  + 1 * dx / 2;
                     break;
                 }
@@ -2863,43 +2863,43 @@ _MultiSourceBlit(
                 {
                 case gcvMULTI_SUPERTILED:
                     /* Multi-supertiled source has two addresses. */
-                    addresses[0] = layer->addresses[0]
-                                 + layer->strides[0] * dy / 2
-                                 + layer->bytesPerPixel * (dx << 6);
+                    addresses[0] = int64_t(layer->addresses[0])
+                                 + int64_t(layer->strides[0]) * dy / 2
+                                 + int64_t(layer->bytesPerPixel) * (dx * 64);
 
-                    addresses[1] = layer->addresses[1]
-                                 + layer->strides[1] * dy / 2
-                                 + layer->bytesPerPixel * (dx << 6);
+                    addresses[1] = int64_t(layer->addresses[1])
+                                 + int64_t(layer->strides[1]) * dy / 2
+                                 + int64_t(layer->bytesPerPixel) * (dx * 64);
                     break;
 
                 case gcvSUPERTILED:
-                    addresses[0] = layer->addresses[0]
-                                 + layer->strides[0] * dy
-                                 + layer->bytesPerPixel * (dx << 6);
+                    addresses[0] = int64_t(layer->addresses[0])
+                                 + int64_t(layer->strides[0]) * dy
+                                 + int64_t(layer->bytesPerPixel) * (dx * 64);
                     break;
 
                 case gcvMULTI_TILED:
                     /* Multi-tiled source has two addresses. */
-                    addresses[0] = layer->addresses[0]
-                                 + layer->strides[0] * dy / 2
-                                 + layer->bytesPerPixel * (dx << 2);
+                    addresses[0] = int64_t(layer->addresses[0])
+                                 + int64_t(layer->strides[0]) * dy / 2
+                                 + int64_t(layer->bytesPerPixel) * (dx * 4);
 
-                    addresses[1] = layer->addresses[1]
-                                 + layer->strides[1] * dy / 2
-                                 + layer->bytesPerPixel * (dx << 2);
+                    addresses[1] = int64_t(layer->addresses[1])
+                                 + int64_t(layer->strides[1]) * dy / 2
+                                 + int64_t(layer->bytesPerPixel) * (dx * 4);
                     break;
 
                 case gcvTILED:
-                    addresses[0] = layer->addresses[0]
-                                 + layer->strides[0] * dy
-                                 + layer->bytesPerPixel * (dx << 2);
+                    addresses[0] = int64_t(layer->addresses[0])
+                                 + int64_t(layer->strides[0]) * dy
+                                 + int64_t(layer->bytesPerPixel) * (dx * 4);
                     break;
 
                 default:
                     /* RGB surfaces will have only one plane. */
-                    addresses[0] = layer->addresses[0]
-                                 + layer->strides[0] * dy
-                                 + layer->bytesPerPixel * dx;
+                    addresses[0] = int64_t(layer->addresses[0])
+                                 + int64_t(layer->strides[0]) * dy
+                                 + int64_t(layer->bytesPerPixel) * dx;
                     break;
                 }
             }

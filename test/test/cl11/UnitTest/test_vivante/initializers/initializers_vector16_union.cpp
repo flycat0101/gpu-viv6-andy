@@ -30,7 +30,7 @@
 //
 //  OpenCL Conformance Tests
 //
-//  Copyright:	(c) 2008-2009 by Apple Inc. All Rights Reserved.
+//  Copyright:    (c) 2008-2009 by Apple Inc. All Rights Reserved.
 //
 ******************************************************************/
 
@@ -60,117 +60,117 @@ const char *kernel_code_initializers_vector16_union = "__kernel void initializer
 int
 verify_initializers_vector16_union(cl_uchar16 *outptr, int n, const char *type)
 {
-	int i;
-	for(i=0 ; i<n; i++){
-		cl_uchar var = 1;
+    int i;
+    for(i=0 ; i<n; i++){
+        cl_uchar var = 1;
 
-		if( outptr[i].s[0] != var || outptr[i].s[1] != var || outptr[i].s[2] != var || outptr[i].s[3] != var ||
-			outptr[i].s[4] != var || outptr[i].s[5] != var || outptr[i].s[6] != var || outptr[i].s[7] != var ||
-			outptr[i].s[8] != var || outptr[i].s[9] != var || outptr[i].s[10] != var || outptr[i].s[11] != var ||
-			outptr[i].s[12] != var || outptr[i].s[13] != var || outptr[i].s[14] != var || outptr[i].s[15] != var)
-			return -1;
-	}
-	printf("initializers test - union %s16 passed\n", type);
-	return 0;
+        if( outptr[i].s[0] != var || outptr[i].s[1] != var || outptr[i].s[2] != var || outptr[i].s[3] != var ||
+            outptr[i].s[4] != var || outptr[i].s[5] != var || outptr[i].s[6] != var || outptr[i].s[7] != var ||
+            outptr[i].s[8] != var || outptr[i].s[9] != var || outptr[i].s[10] != var || outptr[i].s[11] != var ||
+            outptr[i].s[12] != var || outptr[i].s[13] != var || outptr[i].s[14] != var || outptr[i].s[15] != var)
+            return -1;
+    }
+    printf("initializers test - union %s16 passed\n", type);
+    return 0;
 }
 
 int initializers_vector16_union(cl_device_id device, cl_context context, cl_command_queue queue, int num_elements, int& fail, int& pass, int&total)
 {
-	cl_mem streams;
-	cl_uchar16 *output_h;
-	cl_program program;
-	cl_kernel kernel;
-	size_t threads[1];
-	char kernel_code_int[512];
-	const char *constkernelint;
+    cl_mem streams;
+    cl_uchar16 *output_h;
+    cl_program program;
+    cl_kernel kernel;
+    size_t threads[1];
+    char kernel_code_int[512];
+    const char *constkernelint;
 
-	int err;
+    int err;
 
-	const char    *types[] = {
-		"int", "uint", "char", "uchar", "short", "ushort", "float"
-	};
-
-
-
-	size_t length = sizeof(cl_uchar16) * num_elements;
-	output_h = (cl_uchar16*)malloc(length);
-
-	streams = clCreateBuffer(context, CL_MEM_READ_WRITE, length, NULL, NULL);
-	if (!streams)
-	{
-		printf("clCreateBuffer failed\n");
-		clReleaseMemObject(streams);
-		clReleaseKernel(kernel);
-		clReleaseProgram(program);
-		free(output_h);
-		fail++;
-		return -1;
-	}
-
-
-	for(int t=0; t<7; t++)
-	{
-
-		sprintf(kernel_code_int, kernel_code_initializers_vector16_union, types[t], types[t]);
-		constkernelint = kernel_code_int;
-		err = create_kernel(context, &program, &kernel, 1, &constkernelint, "initializers_vector16_union" );
-		if (err){
-			clReleaseMemObject(streams);
-			clReleaseKernel(kernel);
-			clReleaseProgram(program);
-			free(output_h);
-		fail++;
-			return -1;
-		}
-		err  = clSetKernelArg(kernel, 0, sizeof streams, &streams);
-		if (err != CL_SUCCESS)
-		{
-			printf("clSetKernelArgs failed\n");
-			clReleaseMemObject(streams);
-			clReleaseKernel(kernel);
-			clReleaseProgram(program);
-			free(output_h);
-		fail++;
-			return -1;
-		}
-		threads[0] = (unsigned int)num_elements;
-		err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, threads, NULL, 0, NULL, NULL);
-		if (err != CL_SUCCESS)
-		{
-			printf("clEnqueueNDRangeKernel failed\n");
-			clReleaseMemObject(streams);
-			clReleaseKernel(kernel);
-			clReleaseProgram(program);
-			free(output_h);
-		fail++;
-			return -1;
-		}
-		err = clEnqueueReadBuffer(queue, streams, CL_TRUE, 0, length, output_h, 0, NULL, NULL);
-		if (err != CL_SUCCESS)
-		{
-			printf("clReadArray failed\n");
-			clReleaseMemObject(streams);
-			clReleaseKernel(kernel);
-			clReleaseProgram(program);
-			free(output_h);
-		fail++;
-			return -1;
-		}
-		err = verify_initializers_vector16_union(output_h, num_elements, types[t]);
-		if(!err)
-			pass++;
-		else fail++;
-	}
+    const char    *types[] = {
+        "int", "uint", "char", "uchar", "short", "ushort", "float"
+    };
 
 
 
-	clReleaseMemObject(streams);
-	clReleaseKernel(kernel);
-	clReleaseProgram(program);
-	free(output_h);
+    size_t length = sizeof(cl_uchar16) * num_elements;
+    output_h = (cl_uchar16*)malloc(length);
 
-	memset((void*)&kernel_code_int, 0, sizeof(char)*512);
-	return err;
+    streams = clCreateBuffer(context, CL_MEM_READ_WRITE, length, NULL, NULL);
+    if (!streams)
+    {
+        printf("clCreateBuffer failed\n");
+        clReleaseMemObject(streams);
+        clReleaseKernel(kernel);
+        clReleaseProgram(program);
+        free(output_h);
+        fail++;
+        return -1;
+    }
+
+
+    for(int t=0; t<7; t++)
+    {
+
+        sprintf(kernel_code_int, kernel_code_initializers_vector16_union, types[t], types[t]);
+        constkernelint = kernel_code_int;
+        err = create_kernel(context, &program, &kernel, 1, &constkernelint, "initializers_vector16_union" );
+        if (err){
+            clReleaseMemObject(streams);
+            clReleaseKernel(kernel);
+            clReleaseProgram(program);
+            free(output_h);
+        fail++;
+            return -1;
+        }
+        err  = clSetKernelArg(kernel, 0, sizeof streams, &streams);
+        if (err != CL_SUCCESS)
+        {
+            printf("clSetKernelArgs failed\n");
+            clReleaseMemObject(streams);
+            clReleaseKernel(kernel);
+            clReleaseProgram(program);
+            free(output_h);
+        fail++;
+            return -1;
+        }
+        threads[0] = (unsigned int)num_elements;
+        err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, threads, NULL, 0, NULL, NULL);
+        if (err != CL_SUCCESS)
+        {
+            printf("clEnqueueNDRangeKernel failed\n");
+            clReleaseMemObject(streams);
+            clReleaseKernel(kernel);
+            clReleaseProgram(program);
+            free(output_h);
+        fail++;
+            return -1;
+        }
+        err = clEnqueueReadBuffer(queue, streams, CL_TRUE, 0, length, output_h, 0, NULL, NULL);
+        if (err != CL_SUCCESS)
+        {
+            printf("clReadArray failed\n");
+            clReleaseMemObject(streams);
+            clReleaseKernel(kernel);
+            clReleaseProgram(program);
+            free(output_h);
+        fail++;
+            return -1;
+        }
+        err = verify_initializers_vector16_union(output_h, num_elements, types[t]);
+        if(!err)
+            pass++;
+        else fail++;
+    }
+
+
+
+    clReleaseMemObject(streams);
+    clReleaseKernel(kernel);
+    clReleaseProgram(program);
+    free(output_h);
+
+    memset((void*)&kernel_code_int, 0, sizeof(char)*512);
+    return err;
 }
 
 

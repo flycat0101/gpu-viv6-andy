@@ -41,7 +41,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <stdarg.h>
 #include <drm.h>
 #include <drm_sarea.h>
-#include "xf86drm.h"
+#include "drmgl.h"
 #include "dri_interface.h"
 #include "gl/gl_core.h"
 
@@ -90,24 +90,24 @@ typedef struct _vvtDeviceInfoRec {
 #define DRI_VALIDATE_DRAWABLE_INFO(psp, pdp)                            \
  do {                                                                   \
     while (*(pdp->pStamp) != pdp->lastStamp) {                          \
-        DRM_UNLOCK(psp->fd, &psp->pSAREA->lock,                         \
+        DRMGL_UNLOCK(psp->fd, &psp->pSAREA->lock,                         \
                pdp->driContextPriv->hHWContext);                        \
-        DRM_SPINLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);     \
+        DRMGL_SPINLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);     \
         DRI_VALIDATE_EXTRADRAWABLE_INFO_ONCE(pdp);                           \
-        DRM_SPINUNLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);   \
-        DRM_LIGHT_LOCK(psp->fd, &psp->pSAREA->lock,                     \
+        DRMGL_SPINUNLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);   \
+        DRMGL_LIGHT_LOCK(psp->fd, &psp->pSAREA->lock,                     \
               pdp->driContextPriv->hHWContext);                         \
     }                                                                   \
 } while (0)
 
 #define DRI_FULLSCREENINFO(psp, pdp)     \
  do {                                                                   \
-        DRM_UNLOCK(psp->fd, &psp->pSAREA->lock,                         \
+        DRMGL_UNLOCK(psp->fd, &psp->pSAREA->lock,                         \
                pdp->driContextPriv->hHWContext);                        \
-        DRM_SPINLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);     \
+        DRMGL_SPINLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);     \
         __driUtilFullScreenCovered(pdp);                        \
-        DRM_SPINUNLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);   \
-        DRM_LIGHT_LOCK(psp->fd, &psp->pSAREA->lock,                     \
+        DRMGL_SPINUNLOCK(&psp->pSAREA->drawable_lock, psp->drawLockID);   \
+        DRMGL_LIGHT_LOCK(psp->fd, &psp->pSAREA->lock,                     \
               pdp->driContextPriv->hHWContext);                         \
 } while (0)
 

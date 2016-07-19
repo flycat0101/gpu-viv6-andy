@@ -783,11 +783,11 @@ veglSwapWorker(
             gcmDUMP_FRAMERATE();
 
             /* Post window back buffer. */
-            veglPostWindowBackBuffer(display,
-                                     displayWorker->draw,
-                                     &displayWorker->backBuffer,
-                                     displayWorker->numRects,
-                                     displayWorker->rects);
+            display->platform->postWindowBackBuffer(display,
+                                                    displayWorker->draw,
+                                                    &displayWorker->backBuffer,
+                                                    displayWorker->numRects,
+                                                    displayWorker->rects);
 
             /* Acquire synchronization mutex. */
             veglSuspendSwapWorker(display);
@@ -867,6 +867,25 @@ OnError:
  * NumRects = 0 signifies fullscreen swap.
  */
 #ifdef EGL_API_DRI
+
+#if gcdENABLE_VG
+gceSTATUS gcoSURF_ResolveRectVG(gcoSURF SrcSurface, gcoSURF DestSurface, gcsPOINT_PTR SrcOrigin, gcsPOINT_PTR DestOrigin, gcsPOINT_PTR RectSize)
+{
+    VEGLThreadData  Thread = veglGetThreadData();
+    veglDISPATCH   *dispatch;
+    if (Thread == gcvNULL)
+        return gcvSTATUS_OUT_OF_RESOURCES;
+
+    dispatch = _GetDispatch(Thread, gcvNULL);
+    if ((dispatch != gcvNULL) &&  (dispatch->resolveVG != gcvNULL))
+    {
+        (*dispatch->resolveVG)(Thread->context->context, DestSurface);
+        return gcvSTATUS_OK;
+    }
+    return gcvSTATUS_GENERIC_IO;
+}
+#endif
+
 EGLBoolean
 _eglSwapBuffersRegion(
     EGLDisplay Dpy,
@@ -879,6 +898,7 @@ _eglSwapBuffersRegion(
     VEGLThreadData  thread;
     VEGLDisplay dpy;
     VEGLSurface draw;
+    VEGLPlatform platform;
     gctUINT width, height;
     gcoSURF resolveTarget = gcvNULL;
     gctPOINTER resolveBits[3] = {gcvNULL};
@@ -911,6 +931,8 @@ _eglSwapBuffersRegion(
         gcmFOOTER_ARG("%d", EGL_FALSE);
         return EGL_FALSE;
     }
+
+    platform = dpy->platform;
 
     do
     {
@@ -981,7 +1003,7 @@ _eglSwapBuffersRegion(
         }
 
         /* Borrow window back buffer. */
-        if (!veglGetWindowBackBuffer(dpy, draw, &backBuffer))
+        if (!platform->getWindowBackBuffer(dpy, draw, &backBuffer))
         {
             veglSetEGLerror(thread,  EGL_BAD_ACCESS);
             result = EGL_FALSE;
@@ -1023,13 +1045,28 @@ _eglSwapBuffersRegion(
         }
 #endif
 
-        if (gcmIS_ERROR(gcoOS_SwapBuffers(dpy->localInfo,
-                                          draw->hwnd,
-                                          draw->renderTarget,
-                                          resolveTarget,
-                                          resolveBits[0],
-                                          &width,
-                                          &height)))
+#if gcdENABLE_VG
+        if ( thread->openVGpipe && (thread->api == EGL_OPENVG_API) )
+        {
+            if (!dpy->platform->rsForSwap(dpy->localInfo, draw->hwnd, (gctPOINTER)gcoSURF_ResolveRectVG))
+            {
+                veglSetEGLerror(thread, EGL_BAD_PARAMETER);
+                break;
+            }
+        } else {
+            dpy->platform->rsForSwap(dpy->localInfo, draw->hwnd, (gctPOINTER)gcvNULL);
+        }
+#else
+        dpy->platform->rsForSwap(dpy->localInfo, draw->hwnd, (gctPOINTER)gcvNULL);
+#endif
+
+        if (!dpy->platform->swapBuffers(dpy->localInfo,
+                                        draw->hwnd,
+                                        draw->renderTarget,
+                                        resolveTarget,
+                                        resolveBits[0],
+                                        &width,
+                                        &height))
         {
             veglSetEGLerror(thread, EGL_BAD_SURFACE);
             break;
@@ -1066,7 +1103,7 @@ _eglSwapBuffersRegion(
         }
 
         /* Cancel the back buffer, actually does nothing for DRI. */
-        veglCancelWindowBackBuffer(dpy, draw, &backBuffer);
+        platform->cancelWindowBackBuffer(dpy, draw, &backBuffer);
     }
 
 #if VIVANTE_PROFILER
@@ -1251,17 +1288,19 @@ _SwapBuffersRegionNew(
     VEGLThreadData thread;
     VEGLDisplay dpy;
     VEGLSurface draw;
+    VEGLPlatform platform;
 
     do
     {
         VEGLContext context;
         EGLint i;
 
-        thread = Thread;
-        context = thread->context;
+        thread   = Thread;
+        context  = thread->context;
 
-        dpy    = VEGL_DISPLAY(Dpy);
-        draw   = VEGL_SURFACE(Draw);
+        dpy      = VEGL_DISPLAY(Dpy);
+        draw     = VEGL_SURFACE(Draw);
+        platform = dpy->platform;
 
         if (draw->backBuffer.surface == gcvNULL)
         {
@@ -1275,10 +1314,10 @@ _SwapBuffersRegionNew(
         if (draw->skipResolve)
         {
             /* EGL_ANDROID_get_render_buffer. */
-            if (!veglPostWindowBackBuffer(dpy, draw,
-                                          &draw->backBuffer,
-                                          NumRects,
-                                          (EGLint *) Rects))
+            if (!platform->postWindowBackBuffer(dpy, draw,
+                                                &draw->backBuffer,
+                                                NumRects,
+                                                (EGLint *) Rects))
             {
                 veglSetEGLerror(thread,  EGL_BAD_NATIVE_WINDOW);
                 result = EGL_FALSE;
@@ -1291,7 +1330,7 @@ _SwapBuffersRegionNew(
             draw->skipResolve = EGL_FALSE;
 
             /* Get native window back buffer for next frame. */
-            if (!veglGetWindowBackBuffer(dpy, draw, &draw->backBuffer))
+            if (!platform->getWindowBackBuffer(dpy, draw, &draw->backBuffer))
             {
                 /* Cannot get window back buffer. */
                 veglSetEGLerror(thread,  EGL_BAD_NATIVE_WINDOW);
@@ -1305,7 +1344,7 @@ _SwapBuffersRegionNew(
         }
 #endif
 
-        veglUpdateBufferAge(dpy, draw, &draw->backBuffer);
+        platform->updateBufferAge(dpy, draw, &draw->backBuffer);
 
         for (i = 0; i < NumRects; ++i)
         {
@@ -1700,7 +1739,7 @@ _SwapBuffersRegionNew(
         if (!draw->backBuffer.flip)
         {
             /* Check if need stall. */
-            EGLBoolean stall = veglSynchronousPost(dpy, draw);
+            EGLBoolean stall = platform->synchronousPost(dpy, draw);
 
             /* No flip, commit accumulated commands. */
             gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, stall));
@@ -1711,13 +1750,13 @@ _SwapBuffersRegionNew(
 
 #if gcdANDROID_NATIVE_FENCE_SYNC >= 2
         /* Sumit swap worker / Wait until done. */
-        if (veglSynchronousPost(dpy, draw))
+        if (platform->synchronousPost(dpy, draw))
         {
             /* Commit-stall. */
             gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
 
             /* Post back buffer. */
-            if (!veglPostWindowBackBuffer(dpy, draw,
+            if (!platform->postWindowBackBuffer(dpy, draw,
                                           &draw->backBuffer,
                                           NumRects,
                                           draw->clipRects))
@@ -1730,7 +1769,7 @@ _SwapBuffersRegionNew(
         else
         {
             /* Using android native fence sync. */
-            if (!veglPostWindowBackBufferFence(dpy, draw, &draw->backBuffer))
+            if (!platform->postWindowBackBufferFence(dpy, draw, &draw->backBuffer))
             {
                 veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
                 result = EGL_FALSE;
@@ -1741,13 +1780,13 @@ _SwapBuffersRegionNew(
 #else
         /* Sumit swap worker / Wait until done. */
         if ((dpy->workerThread == gcvNULL) ||
-            veglSynchronousPost(dpy, draw))
+            platform->synchronousPost(dpy, draw))
         {
             /* Commit-stall. */
             gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
 
             /* Post back buffer. */
-            if (!veglPostWindowBackBuffer(dpy, draw,
+            if (!platform->postWindowBackBuffer(dpy, draw,
                                           &draw->backBuffer,
                                           NumRects,
                                           draw->clipRects))
@@ -1801,13 +1840,13 @@ _SwapBuffersRegionNew(
         draw->backBuffer.surface = gcvNULL;
 
         /* Get native window back buffer for next frame. */
-        if (!veglGetWindowBackBuffer(dpy, draw, &draw->backBuffer))
+        if (!platform->getWindowBackBuffer(dpy, draw, &draw->backBuffer))
         {
             draw->backBuffer.surface = gcvNULL;
             draw->backBuffer.context = gcvNULL;
 
             /* Cannot get window back buffer. */
-            veglSetEGLerror(thread,  EGL_BAD_NATIVE_WINDOW);
+            veglSetEGLerror(thread,  EGL_BAD_SURFACE);
             result = EGL_FALSE;
 
             /*
@@ -1912,6 +1951,7 @@ _SwapBuffersRegion(
     EGLBoolean result;
     VEGLThreadData thread;
     VEGLDisplay dpy;
+    VEGLPlatform platform;
 
     do
     {
@@ -1920,18 +1960,19 @@ _SwapBuffersRegion(
         EGLint i;
 
         /* Create shortcuts to objects. */
-        thread = Thread;
-        dpy    = VEGL_DISPLAY(Dpy);
-        draw   = VEGL_SURFACE(Draw);
+        thread   = Thread;
+        dpy      = VEGL_DISPLAY(Dpy);
+        draw     = VEGL_SURFACE(Draw);
+        platform = dpy->platform;
 
 #if defined(ANDROID) && (ANDROID_SDK_VERSION < 17)
         if (draw->skipResolve)
         {
             /* EGL_ANDROID_get_render_buffer. */
-            if (!veglPostWindowBackBuffer(dpy, draw,
-                                          &draw->backBuffer,
-                                          NumRects,
-                                          (EGLint *) Rects))
+            if (!platform->postWindowBackBuffer(dpy, draw,
+                                                &draw->backBuffer,
+                                                NumRects,
+                                                (EGLint *) Rects))
             {
                 veglSetEGLerror(thread,  EGL_BAD_NATIVE_WINDOW);
                 result = EGL_FALSE;
@@ -1968,7 +2009,7 @@ _SwapBuffersRegion(
         _Flush(thread);
 
         /* Get window back buffer. */
-        result = veglGetWindowBackBuffer(dpy, draw, &backBuffer);
+        result = platform->getWindowBackBuffer(dpy, draw, &backBuffer);
 
         if (!result)
         {
@@ -2065,13 +2106,13 @@ _SwapBuffersRegion(
 
 #if gcdANDROID_NATIVE_FENCE_SYNC >= 2
         /* Sumit swap worker / Wait until done. */
-        if (veglSynchronousPost(dpy, draw))
+        if (platform->synchronousPost(dpy, draw))
         {
             /* Commit-stall. */
             gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
 
             /* Post back buffer. */
-            if (!veglPostWindowBackBuffer(dpy, draw,
+            if (!platform->postWindowBackBuffer(dpy, draw,
                                           &backBuffer,
                                           NumRects,
                                           draw->clipRects))
@@ -2085,7 +2126,7 @@ _SwapBuffersRegion(
         else
         {
             /* Using android native fence sync. */
-            if (!veglPostWindowBackBufferFence(dpy, draw, &backBuffer))
+            if (!platform->postWindowBackBufferFence(dpy, draw, &backBuffer))
             {
                 veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
                 result = EGL_FALSE;
@@ -2100,13 +2141,13 @@ _SwapBuffersRegion(
             gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
         }
         else if ((dpy->workerThread == gcvNULL) ||
-            veglSynchronousPost(dpy, draw))
+            platform->synchronousPost(dpy, draw))
         {
             /* Commit-stall. */
             gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
 
             /* Post back buffer. */
-            if (!veglPostWindowBackBuffer(dpy, draw,
+            if (!platform->postWindowBackBuffer(dpy, draw,
                                           &backBuffer,
                                           NumRects,
                                           draw->clipRects))
@@ -2354,13 +2395,16 @@ _eglSwapBuffersRegion(
             result = _SwapBuffersRegion(thread, Dpy, Draw, NumRects, Rects);
         }
 
+        /* Buffer swapped. */
+        draw->initialFrame = EGL_FALSE;
+
         if (draw->winInfo == gcvNULL)
         {
             break;
         }
 
         /* Query window parameters. */
-        result = veglGetWindowSize(dpy, draw, &width, &height);
+        result = dpy->platform->getWindowSize(dpy, draw, &width, &height);
 
         if (!result)
         {
@@ -2729,6 +2773,7 @@ eglCopyBuffers(
 {
     VEGLThreadData thread;
     VEGLDisplay dpy;
+    VEGLPlatform platform;
     EGLBoolean result = EGL_FALSE;
     VEGLPixmapInfo info = gcvNULL;
     gcoSURF pixmapSurface = gcvNULL;
@@ -2737,6 +2782,7 @@ eglCopyBuffers(
     gcmDUMP_API("${EGL eglCopyBuffers 0x%08X 0x%08X 0x%08X}",
                 Dpy, Surface, target);
     VEGL_TRACE_API(CopyBuffers)(Dpy, Surface, target);
+
     /* Get thread data. */
     thread = veglGetThreadData();
     if (thread == gcvNULL)
@@ -2760,6 +2806,8 @@ eglCopyBuffers(
         gcmFOOTER_ARG("%d", EGL_FALSE);
         return EGL_FALSE;
     }
+
+    platform = dpy->platform;
 
     do
     {
@@ -2808,7 +2856,7 @@ eglCopyBuffers(
         /* Flush the API. */
         _Flush(thread);
 
-        if (!veglConnectPixmap(dpy, target, &info, &pixmapSurface))
+        if (!platform->connectPixmap(dpy, (void *) target, &info, &pixmapSurface))
         {
             veglSetEGLerror(thread, EGL_BAD_NATIVE_PIXMAP);
             result = EGL_FALSE;
@@ -2854,7 +2902,7 @@ eglCopyBuffers(
         }
 
         /* Wait native operations to write pixmap. */
-        veglSyncToPixmap(target, info);
+        platform->syncToPixmap((void *) target, info);
 
         /* Success. */
         result = EGL_TRUE;
@@ -2863,7 +2911,7 @@ eglCopyBuffers(
 
     if (info != gcvNULL)
     {
-        veglDisconnectPixmap(dpy, target, info);
+        platform->disconnectPixmap(dpy, (void *) target, info);
         info = gcvNULL;
     }
 
@@ -2980,7 +3028,7 @@ eglGetRenderBufferv0VIV(
              */
             EGLBoolean result;
 
-            result = veglGetWindowBackBuffer(dpy, draw, &draw->backBuffer);
+            result = dpy->platform->getWindowBackBuffer(dpy, draw, &draw->backBuffer);
 
             if (!result)
             {
@@ -3073,7 +3121,7 @@ eglGetRenderBufferVIV(
                     continue;
                 }
 
-                if (veglHasWindowBuffer(surface, Handle))
+                if (dpy->platform->hasWindowBuffer(surface, Handle))
                 {
                     /* Found. */
                     draw = surface;
@@ -3106,7 +3154,7 @@ eglGetRenderBufferVIV(
              */
             EGLBoolean result;
 
-            result = veglGetWindowBackBuffer(dpy, draw, &draw->backBuffer);
+            result = dpy->platform->getWindowBackBuffer(dpy, draw, &draw->backBuffer);
 
             if (!result)
             {
@@ -3196,7 +3244,7 @@ eglPostBufferVIV(
              * reduce some resources.
              * HWComposer HAL has that fenceFd and can handle it there.
              */
-            veglPostWindowBackBuffer(dpy, draw, &draw->backBuffer, 0, gcvNULL);
+            dpy->platform->postWindowBackBuffer(dpy, draw, &draw->backBuffer, 0, gcvNULL);
 
             draw->backBuffer.context = gcvNULL;
             draw->backBuffer.surface = gcvNULL;
@@ -3204,7 +3252,7 @@ eglPostBufferVIV(
             if (draw->newSwapModel)
             {
                 /* Get native window back buffer for next frame. */
-                result = veglGetWindowBackBuffer(dpy, draw, &draw->backBuffer);
+                result = dpy->platform->getWindowBackBuffer(dpy, draw, &draw->backBuffer);
 
                 if (!result)
                 {

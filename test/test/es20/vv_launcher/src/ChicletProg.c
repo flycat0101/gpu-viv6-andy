@@ -33,73 +33,73 @@
 
 ChicletProg* ChicletProgConstruct()
 {
-	ChicletProg* cp = (ChicletProg*)malloc(sizeof (ChicletProg));
+    ChicletProg* cp = (ChicletProg*)malloc(sizeof (ChicletProg));
 
-	cp->pos_attr = -1;
-	cp->norm_attr = -1;
-	cp->light_unif = -1;
-	cp->proj_unif = -1;
-	cp->modelview_unif = -1;
-	cp->env_unif = -1;
-	cp->env_tex_unif = -1;
+    cp->pos_attr = -1;
+    cp->norm_attr = -1;
+    cp->light_unif = -1;
+    cp->proj_unif = -1;
+    cp->modelview_unif = -1;
+    cp->env_unif = -1;
+    cp->env_tex_unif = -1;
 
-	cp->prog = LoadProgram("chiclet.vert", "chiclet.frag");
-	ShaderProgramUse(cp->prog);
+    cp->prog = LoadProgram("chiclet.vert", "chiclet.frag");
+    ShaderProgramUse(cp->prog);
 
-	if (cp->prog == NULL)
-	{
-		return NULL;
-	}
+    if (cp->prog == NULL)
+    {
+        return NULL;
+    }
 
-	cp->pos_attr = ShaderProgramGetAttribLoc(cp->prog, "pos_attr");
-	cp->norm_attr = ShaderProgramGetAttribLoc(cp->prog, "norm_attr");
+    cp->pos_attr = ShaderProgramGetAttribLoc(cp->prog, "pos_attr");
+    cp->norm_attr = ShaderProgramGetAttribLoc(cp->prog, "norm_attr");
 
-	cp->light_unif = ShaderProgramGetUniformLoc(cp->prog, "light_unif");
-	cp->proj_unif = ShaderProgramGetUniformLoc(cp->prog, "proj_unif");
-	cp->modelview_unif = ShaderProgramGetUniformLoc(cp->prog, "modelview_unif");
-	cp->env_unif = ShaderProgramGetUniformLoc(cp->prog, "env_unif");
+    cp->light_unif = ShaderProgramGetUniformLoc(cp->prog, "light_unif");
+    cp->proj_unif = ShaderProgramGetUniformLoc(cp->prog, "proj_unif");
+    cp->modelview_unif = ShaderProgramGetUniformLoc(cp->prog, "modelview_unif");
+    cp->env_unif = ShaderProgramGetUniformLoc(cp->prog, "env_unif");
 
-	cp->env_tex_unif = ShaderProgramGetUniformLoc(cp->prog, "env_tex_unif");
-	cp->content_tex_unif = ShaderProgramGetUniformLoc(cp->prog, "content_tex_unif");
+    cp->env_tex_unif = ShaderProgramGetUniformLoc(cp->prog, "env_tex_unif");
+    cp->content_tex_unif = ShaderProgramGetUniformLoc(cp->prog, "content_tex_unif");
 
-	return cp;
+    return cp;
 }
 
 void ChicletProgDestroy(ChicletProg* Cp)
 {
-	assert(Cp != NULL);
+    assert(Cp != NULL);
 
-	ShaderProgramDestroy(Cp->prog);
-	free(Cp);
+    ShaderProgramDestroy(Cp->prog);
+    free(Cp);
 }
 
 
 void ChicletProgUse(ChicletProg* Cp)
 {
-	ShaderProgramUse(Cp->prog);
+    ShaderProgramUse(Cp->prog);
 }
 
 
 void ChicletProgSetLight(ChicletProg* Cp, const Vec3f* V)
 {
-	glUniform3f(Cp->light_unif, V->v[0], V->v[1], V->v[2]);
+    glUniform3f(Cp->light_unif, V->v[0], V->v[1], V->v[2]);
 }
 
 
 void ChicletProgSetProj(ChicletProg* Cp, const Matf* proj)
 {
-	glUniformMatrix4fv(Cp->proj_unif, 1, GL_FALSE, &proj->m[0][0]);
+    glUniformMatrix4fv(Cp->proj_unif, 1, GL_FALSE, &proj->m[0][0]);
 }
 
 
 void ChicletProgSetModelview(ChicletProg* Cp, const Matf* mv)
 {
-	glUniformMatrix4fv(Cp->modelview_unif, 1, GL_FALSE, &mv->m[0][0]);
+    glUniformMatrix4fv(Cp->modelview_unif, 1, GL_FALSE, &mv->m[0][0]);
 }
 
 
 void ChicletProgSetEnv(ChicletProg* Cp, const Matf* env)
 {
-	glUniformMatrix4fv(Cp->env_unif, 1, GL_FALSE, &env->m[0][0]);
+    glUniformMatrix4fv(Cp->env_unif, 1, GL_FALSE, &env->m[0][0]);
 }
 

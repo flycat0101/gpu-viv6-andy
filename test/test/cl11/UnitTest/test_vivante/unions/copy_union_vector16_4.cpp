@@ -36,17 +36,17 @@
 
 const char *kernel_copy_union_vector16_4 =
 "#ifndef _TYPES8_H_                                                                                                                 \n"
-"#define _TYPES8_H_																												   \n"
-"																																   \n"
-"#ifdef __OPENCL_VERSION__																										   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
-"#else // __OPENCL_VERSION__																									   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType									   \n"
-"#endif // __OPENCL_VERSION__																									   \n"
-"																																   \n"
-"ALIGNED_STRUCT(union, 32) InputA {																							       \n"
-"    ushort16 a;																													   \n"
-"    float16 h;																												   \n"
+"#define _TYPES8_H_                                                                                                                   \n"
+"                                                                                                                                   \n"
+"#ifdef __OPENCL_VERSION__                                                                                                           \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))                               \n"
+"#else // __OPENCL_VERSION__                                                                                                       \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType                                       \n"
+"#endif // __OPENCL_VERSION__                                                                                                       \n"
+"                                                                                                                                   \n"
+"ALIGNED_STRUCT(union, 32) InputA {                                                                                                   \n"
+"    ushort16 a;                                                                                                                       \n"
+"    float16 h;                                                                                                                   \n"
 "};                                                                                                                                \n"
 "                                                                                                                                  \n"
 "ALIGNED_STRUCT(union, 32) InputB {                                                                                                \n"
@@ -67,8 +67,8 @@ const char *kernel_copy_union_vector16_4 =
 "                                                                                                                                  \n"
 "    // bound check (equivalent to the limit on a 'for' loop for standard/serial C code                                            \n"
 "                                                                                                                                  \n"
-"																																   \n"
-"		c[tid].r = convert_float16(a[tid].a);                                                                                            \n"
+"                                                                                                                                   \n"
+"        c[tid].r = convert_float16(a[tid].a);                                                                                            \n"
 "                                                                                                                                  \n"
 "}                                                                                                                                 \n";
 
@@ -119,8 +119,8 @@ public:
         _deviceResult = cl::Buffer(_context, CL_MEM_WRITE_ONLY, sizeof(Result) * _globalWorkSize);
 
         _kernel.setArg(0,sizeof (_deviceInputA), &_deviceInputA);
-		_kernel.setArg(1,sizeof (_deviceResult), &_deviceResult);
-		_kernel.setArg(2,sizeof (_numElements), &_numElements);
+        _kernel.setArg(1,sizeof (_deviceResult), &_deviceResult);
+        _kernel.setArg(2,sizeof (_numElements), &_numElements);
     }
 
     virtual bool Execute()
@@ -141,40 +141,40 @@ private:
     void _fillData()
     {
         for (int i = 0; i < _numElements; ++i) {
-			_inputA[i].a.s[0] = rand();
+            _inputA[i].a.s[0] = rand();
             _inputA[i].h.s[0] = (float)rand();
-			_inputA[i].a.s[1] = rand();
+            _inputA[i].a.s[1] = rand();
             _inputA[i].h.s[1] = (float)rand();
             _inputA[i].a.s[2] = rand();
             _inputA[i].h.s[2] = (float)rand();
-			_inputA[i].a.s[3] = rand();
+            _inputA[i].a.s[3] = rand();
             _inputA[i].h.s[3] = (float)rand();
-			/////////////////////////////////
-			_inputA[i].a.s[4] = rand();
+            /////////////////////////////////
+            _inputA[i].a.s[4] = rand();
             _inputA[i].h.s[4] = (float)rand();
-			_inputA[i].a.s[5] = rand();
+            _inputA[i].a.s[5] = rand();
             _inputA[i].h.s[5] = (float)rand();
             _inputA[i].a.s[6] = rand();
             _inputA[i].h.s[6] = (float)rand();
-			_inputA[i].a.s[7] = rand();
+            _inputA[i].a.s[7] = rand();
             _inputA[i].h.s[7] = (float)rand();
-			///////////////////////////////////
-			_inputA[i].a.s[8] = rand();
+            ///////////////////////////////////
+            _inputA[i].a.s[8] = rand();
             _inputA[i].h.s[8] = (float)rand();
-			_inputA[i].a.s[9] = rand();
+            _inputA[i].a.s[9] = rand();
             _inputA[i].h.s[9] = (float)rand();
             _inputA[i].a.s[10] = rand();
             _inputA[i].h.s[10] = (float)rand();
-			_inputA[i].a.s[11] = rand();
+            _inputA[i].a.s[11] = rand();
             _inputA[i].h.s[11] = (float)rand();
-			/////////////////////////////////
-			_inputA[i].a.s[12] = rand();
+            /////////////////////////////////
+            _inputA[i].a.s[12] = rand();
             _inputA[i].h.s[12] = (float)rand();
-			_inputA[i].a.s[13] = rand();
+            _inputA[i].a.s[13] = rand();
             _inputA[i].h.s[13] = (float)rand();
             _inputA[i].a.s[14] = rand();
             _inputA[i].h.s[14] = (float)rand();
-			_inputA[i].a.s[15] = rand();
+            _inputA[i].a.s[15] = rand();
             _inputA[i].h.s[15] = (float)rand();
         }
     }
@@ -182,25 +182,25 @@ private:
     void _computeGoldStandard()
     {
         for (int i = 0; i < _numElements; i++) {
-			_goldStandard[i].r.s[0] = _inputA[i].a.s[0];
-			_goldStandard[i].r.s[1] = _inputA[i].a.s[1];
-			_goldStandard[i].r.s[2] = _inputA[i].a.s[2];
-			_goldStandard[i].r.s[3] = _inputA[i].a.s[3];
-			////////////////////////////////////////////
-			_goldStandard[i].r.s[4] = _inputA[i].a.s[4];
-			_goldStandard[i].r.s[5] = _inputA[i].a.s[5];
-			_goldStandard[i].r.s[6] = _inputA[i].a.s[6];
-			_goldStandard[i].r.s[7] = _inputA[i].a.s[7];
-			////////////////////////////////////////////
-			_goldStandard[i].r.s[8] = _inputA[i].a.s[8];
-			_goldStandard[i].r.s[9] = _inputA[i].a.s[9];
-			_goldStandard[i].r.s[10] = _inputA[i].a.s[10];
-			_goldStandard[i].r.s[11] = _inputA[i].a.s[11];
-			////////////////////////////////////////////
-			_goldStandard[i].r.s[12] = _inputA[i].a.s[12];
-			_goldStandard[i].r.s[13] = _inputA[i].a.s[13];
-			_goldStandard[i].r.s[14] = _inputA[i].a.s[14];
-			_goldStandard[i].r.s[15] = _inputA[i].a.s[15];
+            _goldStandard[i].r.s[0] = _inputA[i].a.s[0];
+            _goldStandard[i].r.s[1] = _inputA[i].a.s[1];
+            _goldStandard[i].r.s[2] = _inputA[i].a.s[2];
+            _goldStandard[i].r.s[3] = _inputA[i].a.s[3];
+            ////////////////////////////////////////////
+            _goldStandard[i].r.s[4] = _inputA[i].a.s[4];
+            _goldStandard[i].r.s[5] = _inputA[i].a.s[5];
+            _goldStandard[i].r.s[6] = _inputA[i].a.s[6];
+            _goldStandard[i].r.s[7] = _inputA[i].a.s[7];
+            ////////////////////////////////////////////
+            _goldStandard[i].r.s[8] = _inputA[i].a.s[8];
+            _goldStandard[i].r.s[9] = _inputA[i].a.s[9];
+            _goldStandard[i].r.s[10] = _inputA[i].a.s[10];
+            _goldStandard[i].r.s[11] = _inputA[i].a.s[11];
+            ////////////////////////////////////////////
+            _goldStandard[i].r.s[12] = _inputA[i].a.s[12];
+            _goldStandard[i].r.s[13] = _inputA[i].a.s[13];
+            _goldStandard[i].r.s[14] = _inputA[i].a.s[14];
+            _goldStandard[i].r.s[15] = _inputA[i].a.s[15];
 
         }
     }
@@ -219,11 +219,11 @@ private:
     {
         for (int i = 0; i < _numElements; ++i) {
             if (_goldStandard[i].r.s[0] != _result[i].r.s[0] && _goldStandard[i].r.s[1] != _result[i].r.s[1] && _goldStandard[i].r.s[2] != _result[i].r.s[2] && _goldStandard[i].r.s[3] != _result[i].r.s[3]
-					&& _goldStandard[i].r.s[4] != _result[i].r.s[4] && _goldStandard[i].r.s[5] != _result[i].r.s[5] && _goldStandard[i].r.s[6] != _result[i].r.s[6] && _goldStandard[i].r.s[7] != _result[i].r.s[7]
-					 && _goldStandard[i].r.s[8] != _result[i].r.s[8] && _goldStandard[i].r.s[9] != _result[i].r.s[9] && _goldStandard[i].r.s[10] != _result[i].r.s[10] && _goldStandard[i].r.s[11] != _result[i].r.s[11]
-					&& _goldStandard[i].r.s[12] != _result[i].r.s[12] && _goldStandard[i].r.s[13] != _result[i].r.s[13] && _goldStandard[i].r.s[14] != _result[i].r.s[14] && _goldStandard[i].r.s[15] != _result[i].r.s[15]) {
-				std::cout << "c:" << _goldStandard[i].r.s[0] << " ocl:" << _result[i].r.s[0] << std::endl;
-				return false;
+                    && _goldStandard[i].r.s[4] != _result[i].r.s[4] && _goldStandard[i].r.s[5] != _result[i].r.s[5] && _goldStandard[i].r.s[6] != _result[i].r.s[6] && _goldStandard[i].r.s[7] != _result[i].r.s[7]
+                     && _goldStandard[i].r.s[8] != _result[i].r.s[8] && _goldStandard[i].r.s[9] != _result[i].r.s[9] && _goldStandard[i].r.s[10] != _result[i].r.s[10] && _goldStandard[i].r.s[11] != _result[i].r.s[11]
+                    && _goldStandard[i].r.s[12] != _result[i].r.s[12] && _goldStandard[i].r.s[13] != _result[i].r.s[13] && _goldStandard[i].r.s[14] != _result[i].r.s[14] && _goldStandard[i].r.s[15] != _result[i].r.s[15]) {
+                std::cout << "c:" << _goldStandard[i].r.s[0] << " ocl:" << _result[i].r.s[0] << std::endl;
+                return false;
             }
         }
         return true;
@@ -249,7 +249,7 @@ private:
 int copy_union_vector16_4(void)
 {
     cl_int err = CL_SUCCESS;
-	int  cnt = 1;
+    int  cnt = 1;
 
     try {
         std::vector<cl::Platform> platforms;
@@ -265,7 +265,7 @@ int copy_union_vector16_4(void)
 
         std::vector<cl::Device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
 
-
+        
         const char* clProgramSource = kernel_copy_union_vector16_4;//oclLoadProgSource("multiply.cl", "", &szKernelLength);
         if (clProgramSource == 0) {
             std::cerr << "OpenCL program not found." << std::endl;
@@ -289,13 +289,13 @@ int copy_union_vector16_4(void)
         std::cout << "Running test copy_union_vector16_4..." << std::endl;
         TestCase_copy_union_vector16_4 copy_union_vector16_4(10, program_, context, devices);
 
-		bool control = true;
+        bool control = true;
         copy_union_vector16_4.SetUp();
         for (int i = 0; i < 10; ++i) {
-			if(!copy_union_vector16_4.Execute()){
-				control = false;
-				cnt = 0;
-			}
+            if(!copy_union_vector16_4.Execute()){
+                control = false;
+                cnt = 0;
+            }
             std::cout << "RUN " << i + 1<< ": " << (control ? "PASSED" : "FAILED!") << std::endl;
         }
         copy_union_vector16_4.TearDown();

@@ -45,27 +45,27 @@ extern "C" {
 
 typedef struct _Chiclet
 {
-	int index;
-	float aspect;
+    int index;
+    float aspect;
 
-	Matf mat;
+    Matf mat;
 
-	// Home is zero. Front is one.
-	float t;
+    // Home is zero. Front is one.
+    float t;
 
-	int selected;
+    int selected;
 
-	float home_x_spin;
-	float home_y_spin;
-	Vec3f home_pos;
+    float home_x_spin;
+    float home_y_spin;
+    Vec3f home_pos;
 
-	float front_x_spin;
-	float front_y_spin;
-	Vec3f front_pos;
+    float front_x_spin;
+    float front_y_spin;
+    Vec3f front_pos;
 
-	Vec3f pos;
-	float x_spin;
-	float y_spin;
+    Vec3f pos;
+    float x_spin;
+    float y_spin;
 } Chiclet;
 
 Chiclet* ChicletConstruct(int index, float aspect);

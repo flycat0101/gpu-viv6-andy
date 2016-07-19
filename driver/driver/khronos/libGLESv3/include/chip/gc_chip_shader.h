@@ -18,6 +18,12 @@
 extern "C" {
 #endif
 
+enum __gceRecompileOptions
+{
+    __GL_CHIP_RO_DEFAULT = 0,
+    __GL_CHIP_RO_OUTPUT_HIGHP_CONVERSION = 1,
+};
+
 typedef struct __GLchipSLBindingRec
 {
     struct __GLchipSLBindingRec *next;
@@ -354,7 +360,7 @@ typedef struct __GLchipSLInputRec
     GLboolean           refByStage[__GLSL_STAGE_LAST];
     gctBOOL             isPerPatch;
     gctBOOL             isSampleIn;
-    gctBOOL				isDirectPosition;
+    gctBOOL                isDirectPosition;
 } __GLchipSLInput;
 
 typedef struct __GLchipSLLocationRec
@@ -439,6 +445,7 @@ typedef struct __GLchipProgramStateStaticKeyRec
     gctBOOL                             colorKill;
     gctBOOL                             alphaBlend;                               /* has blend code */
     gctBOOL                             ShaderPolygonOffset;                      /* has shader polygon offset */
+    gctBOOL                             highpConversion;
 }__GLchipProgramStateStaticKey;
 
 typedef struct __GLchipProgramStateKeyRec
@@ -472,7 +479,8 @@ typedef union __GLchipProgramStateKeyMaskRec
         GLuint                          hasColorKill            : 1; /* Set when we found color.xyzw = 0 and blend function (1, 1-srcAlpha) to discard color */
         GLuint                          hasAlphaBlend           : 1; /* Set when we need do shader blend */
         GLuint                          hasPolygonOffset        : 1; /* Set when we do shader polygone offset */
-        GLuint                          reserved                : 17;
+        GLuint                          hasPSOutHighpConversion : 1; /*  */
+        GLuint                          reserved                : 16;
     } s;
 
     GLuint                              value;
@@ -517,12 +525,14 @@ typedef struct __GLchipProgramFlagsRec
     gctUINT msaaOQ                  : 1;
     gctUINT alphaBlend              : 1;
 
+    gctUINT outputHighpConversion   : 1;
     gctUINT VIRCGNone               : 1;    /* for compile-time purpose */
     gctUINT VIRCGOne                : 1;    /* for compile-time purpose */
     gctUINT disableInline           : 1;
     gctUINT deqpMinCompTime         : 1;    /* for compile-time purpose */
 
-    gctUINT reserved                : 9;
+    gctUINT helperInvocationCheck   : 1;
+    gctUINT reserved                : 6;
 
 
 } __GLchipProgramFlags;
@@ -742,6 +752,13 @@ struct __GLchipSLProgramRec
 
     GLint                               uboIndex;
     __GLchipSLUniform                   *indexUniform;
+
+    /* Used for helper check.*/
+    __GLchipSLUniform                   *pointXYUniform;
+    __GLchipSLUniform                   *halfLineWidthUniform;
+    __GLchipSLUniform                   *rtWHUniform;
+    __GLchipSLUniform                   *bXMajorUniform;
+    __GLchipSLUniform                   *bCheckHelperUniform;
 #endif
 
     __GLchipProgramFlags                progFlags;
@@ -761,7 +778,8 @@ extern gceSTATUS
 gcChipDynamicPatchProgram(
     __GLcontext *gc,
     __GLprogramObject *programObject,
-    gcPatchDirective* recompilePatchDirectivePtr
+    gcPatchDirective* recompilePatchDirectivePtr,
+    gctUINT32 Options
     );
 
 extern GLboolean

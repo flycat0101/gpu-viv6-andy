@@ -50,15 +50,15 @@ ALIGNED_STRUCT(union, 32) unionC {
 ALIGNED_STRUCT(struct, 32) InputA {
     cl_int a[4];
     float h[4];
-	structB strB;
-	unionC uniC;
+    structB strB;
+    unionC uniC;
 };
 
 ALIGNED_STRUCT(struct, 32) Result {
     cl_int z[4];
     float r[4];
-	structB strB;
-	unionC uniC;
+    structB strB;
+    unionC uniC;
 };
 
 #endif // _TYPES1_H_

@@ -33,15 +33,15 @@
 
 Resource* GetResource(const char* Name)
 {
-	unsigned int i;
-	for (i = 0; i < (sizeof (resources) / sizeof (resources[0])); i++)
-	{
-		if (resources[i] && !strcmp(resources[i]->name, Name))
-		{
-			return resources[i];
-		}
-	}
+    unsigned int i;
+    for (i = 0; i < (sizeof (resources) / sizeof (resources[0])); i++)
+    {
+        if (resources[i] && !strcmp(resources[i]->name, Name))
+        {
+            return resources[i];
+        }
+    }
 
-	return NULL;
+    return NULL;
 }
 

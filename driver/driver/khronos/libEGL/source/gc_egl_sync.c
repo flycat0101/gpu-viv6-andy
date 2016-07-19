@@ -342,6 +342,16 @@ veglDestroySync(
 #if gcdANDROID_NATIVE_FENCE_SYNC
     if (sync->fenceFD != EGL_NO_NATIVE_FENCE_FD_ANDROID)
     {
+        /* GPU wait. */
+        status = gcoOS_WaitNativeFence(gcvNULL, sync->fenceFD, 0);
+
+        if (gcmIS_ERROR(status))
+        {
+            /* Error. */
+            thread->error = EGL_BAD_ACCESS;
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+
         /* Close file descriptor. */
         status = gcoOS_CloseFD(gcvNULL, sync->fenceFD);
 

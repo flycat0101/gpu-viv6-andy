@@ -174,6 +174,13 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
         gcmONERROR(gco2D_SetROP(egn2D, 0xCC, 0xCC));
 
+        /* Disable multiply first. */
+        gcmONERROR(gco2D_SetPixelMultiplyModeAdvanced(egn2D,
+            gcv2D_COLOR_MULTIPLY_DISABLE,
+            gcv2D_COLOR_MULTIPLY_DISABLE,
+            gcv2D_GLOBAL_COLOR_MULTIPLY_DISABLE,
+            gcv2D_COLOR_MULTIPLY_DISABLE));
+
         if (surfaceIndex < 2)
         {
             gcmONERROR(gco2D_EnableAlphaBlend(egn2D,

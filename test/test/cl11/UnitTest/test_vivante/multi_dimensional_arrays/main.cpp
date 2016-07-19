@@ -138,121 +138,121 @@ const size_t sizeZ = 4;
 
 int main(int argc, const char *argv[]) {
 
-	if (!initializeCL()) {
-		std::cerr << getErrorMessage() << std::endl;
-		exit(0);
-	}
+    if (!initializeCL()) {
+        std::cerr << getErrorMessage() << std::endl;
+        exit(0);
+    }
 
-	addTest(new Test2DInt(sizeX,sizeY));
-	addTest(new Test2DInt2(sizeX,sizeY));
-	addTest(new Test2DInt3(sizeX,sizeY));
-	addTest(new Test2DInt4(sizeX,sizeY));
-	addTest(new Test2DInt8(sizeX,sizeY));
-	addTest(new Test2DInt16(sizeX,sizeY));
+    addTest(new Test2DInt(sizeX,sizeY));
+    addTest(new Test2DInt2(sizeX,sizeY));
+    addTest(new Test2DInt3(sizeX,sizeY));
+    addTest(new Test2DInt4(sizeX,sizeY));
+    addTest(new Test2DInt8(sizeX,sizeY));
+    addTest(new Test2DInt16(sizeX,sizeY));
 
-	addTest(new Test2DUInt(sizeX,sizeY));
-	addTest(new Test2DUInt2(sizeX,sizeY));
-	addTest(new Test2DUInt3(sizeX,sizeY));
-	addTest(new Test2DUInt4(sizeX,sizeY));
-	addTest(new Test2DUInt8(sizeX,sizeY));
-	addTest(new Test2DUInt16(sizeX,sizeY));
+    addTest(new Test2DUInt(sizeX,sizeY));
+    addTest(new Test2DUInt2(sizeX,sizeY));
+    addTest(new Test2DUInt3(sizeX,sizeY));
+    addTest(new Test2DUInt4(sizeX,sizeY));
+    addTest(new Test2DUInt8(sizeX,sizeY));
+    addTest(new Test2DUInt16(sizeX,sizeY));
 
-	addTest(new Test2DChar(sizeX,sizeY));
-	addTest(new Test2DChar2(sizeX,sizeY));
-	addTest(new Test2DChar3(sizeX,sizeY));
-	addTest(new Test2DChar4(sizeX,sizeY));
-	addTest(new Test2DChar8(sizeX,sizeY));
-	addTest(new Test2DChar16(sizeX,sizeY));
+    addTest(new Test2DChar(sizeX,sizeY));
+    addTest(new Test2DChar2(sizeX,sizeY));
+    addTest(new Test2DChar3(sizeX,sizeY));
+    addTest(new Test2DChar4(sizeX,sizeY));
+    addTest(new Test2DChar8(sizeX,sizeY));
+    addTest(new Test2DChar16(sizeX,sizeY));
 
-	addTest(new Test2DUChar(sizeX,sizeY));
-	addTest(new Test2DUChar2(sizeX,sizeY));
-	addTest(new Test2DUChar3(sizeX,sizeY));
-	addTest(new Test2DUChar4(sizeX,sizeY));
-	addTest(new Test2DUChar8(sizeX,sizeY));
-	addTest(new Test2DUChar16(sizeX,sizeY));
+    addTest(new Test2DUChar(sizeX,sizeY));
+    addTest(new Test2DUChar2(sizeX,sizeY));
+    addTest(new Test2DUChar3(sizeX,sizeY));
+    addTest(new Test2DUChar4(sizeX,sizeY));
+    addTest(new Test2DUChar8(sizeX,sizeY));
+    addTest(new Test2DUChar16(sizeX,sizeY));
 
-	addTest(new Test2DShort(sizeX,sizeY));
-	addTest(new Test2DShort2(sizeX,sizeY));
-	addTest(new Test2DShort3(sizeX,sizeY));
-	addTest(new Test2DShort4(sizeX,sizeY));
-	addTest(new Test2DShort8(sizeX,sizeY));
-	addTest(new Test2DShort16(sizeX,sizeY));
+    addTest(new Test2DShort(sizeX,sizeY));
+    addTest(new Test2DShort2(sizeX,sizeY));
+    addTest(new Test2DShort3(sizeX,sizeY));
+    addTest(new Test2DShort4(sizeX,sizeY));
+    addTest(new Test2DShort8(sizeX,sizeY));
+    addTest(new Test2DShort16(sizeX,sizeY));
 
-	addTest(new Test2DUShort(sizeX,sizeY));
-	addTest(new Test2DUShort2(sizeX,sizeY));
-	addTest(new Test2DUShort3(sizeX,sizeY));
-	addTest(new Test2DUShort4(sizeX,sizeY));
-	addTest(new Test2DUShort8(sizeX,sizeY));
-	addTest(new Test2DUShort16(sizeX,sizeY));
+    addTest(new Test2DUShort(sizeX,sizeY));
+    addTest(new Test2DUShort2(sizeX,sizeY));
+    addTest(new Test2DUShort3(sizeX,sizeY));
+    addTest(new Test2DUShort4(sizeX,sizeY));
+    addTest(new Test2DUShort8(sizeX,sizeY));
+    addTest(new Test2DUShort16(sizeX,sizeY));
 
-	addTest(new Test2DFloat(sizeX,sizeY));
-	addTest(new Test2DFloat2(sizeX,sizeY));
-	addTest(new Test2DFloat3(sizeX,sizeY));
-	addTest(new Test2DFloat4(sizeX,sizeY));
-	addTest(new Test2DFloat8(sizeX,sizeY));
-	addTest(new Test2DFloat16(sizeX,sizeY));
+    addTest(new Test2DFloat(sizeX,sizeY));
+    addTest(new Test2DFloat2(sizeX,sizeY));
+    addTest(new Test2DFloat3(sizeX,sizeY));
+    addTest(new Test2DFloat4(sizeX,sizeY));
+    addTest(new Test2DFloat8(sizeX,sizeY));
+    addTest(new Test2DFloat16(sizeX,sizeY));
 
-	addTest(new Test3DInt(sizeX,sizeY,sizeZ));
-	addTest(new Test3DInt2(sizeX,sizeY,sizeZ));
-	addTest(new Test3DInt3(sizeX,sizeY,sizeZ));
-	addTest(new Test3DInt4(sizeX,sizeY,sizeZ));
-	addTest(new Test3DInt8(sizeX,sizeY,sizeZ));
-	addTest(new Test3DInt16(sizeX,sizeY,sizeZ));
+    addTest(new Test3DInt(sizeX,sizeY,sizeZ));
+    addTest(new Test3DInt2(sizeX,sizeY,sizeZ));
+    addTest(new Test3DInt3(sizeX,sizeY,sizeZ));
+    addTest(new Test3DInt4(sizeX,sizeY,sizeZ));
+    addTest(new Test3DInt8(sizeX,sizeY,sizeZ));
+    addTest(new Test3DInt16(sizeX,sizeY,sizeZ));
 
-	addTest(new Test3DUInt(sizeX,sizeY,sizeZ));
-	addTest(new Test3DUInt2(sizeX,sizeY,sizeZ));
-	addTest(new Test3DUInt3(sizeX,sizeY,sizeZ));
-	addTest(new Test3DUInt4(sizeX,sizeY,sizeZ));
-	addTest(new Test3DUInt8(sizeX,sizeY,sizeZ));
-	addTest(new Test3DUInt16(sizeX,sizeY,sizeZ));
+    addTest(new Test3DUInt(sizeX,sizeY,sizeZ));
+    addTest(new Test3DUInt2(sizeX,sizeY,sizeZ));
+    addTest(new Test3DUInt3(sizeX,sizeY,sizeZ));
+    addTest(new Test3DUInt4(sizeX,sizeY,sizeZ));
+    addTest(new Test3DUInt8(sizeX,sizeY,sizeZ));
+    addTest(new Test3DUInt16(sizeX,sizeY,sizeZ));
 
-	addTest(new Test3DShort(sizeX,sizeY,sizeZ));
-	addTest(new Test3DShort2(sizeX,sizeY,sizeZ));
-	addTest(new Test3DShort3(sizeX,sizeY,sizeZ));
-	addTest(new Test3DShort4(sizeX,sizeY,sizeZ));
-	addTest(new Test3DShort8(sizeX,sizeY,sizeZ));
-	addTest(new Test3DShort16(sizeX,sizeY,sizeZ));
+    addTest(new Test3DShort(sizeX,sizeY,sizeZ));
+    addTest(new Test3DShort2(sizeX,sizeY,sizeZ));
+    addTest(new Test3DShort3(sizeX,sizeY,sizeZ));
+    addTest(new Test3DShort4(sizeX,sizeY,sizeZ));
+    addTest(new Test3DShort8(sizeX,sizeY,sizeZ));
+    addTest(new Test3DShort16(sizeX,sizeY,sizeZ));
 
-	addTest(new Test3DUShort(sizeX,sizeY,sizeZ));
-	addTest(new Test3DUShort2(sizeX,sizeY,sizeZ));
-	addTest(new Test3DUShort3(sizeX,sizeY,sizeZ));
-	addTest(new Test3DUShort4(sizeX,sizeY,sizeZ));
-	addTest(new Test3DUShort8(sizeX,sizeY,sizeZ));
-	addTest(new Test3DUShort16(sizeX,sizeY,sizeZ));
+    addTest(new Test3DUShort(sizeX,sizeY,sizeZ));
+    addTest(new Test3DUShort2(sizeX,sizeY,sizeZ));
+    addTest(new Test3DUShort3(sizeX,sizeY,sizeZ));
+    addTest(new Test3DUShort4(sizeX,sizeY,sizeZ));
+    addTest(new Test3DUShort8(sizeX,sizeY,sizeZ));
+    addTest(new Test3DUShort16(sizeX,sizeY,sizeZ));
 
-	addTest(new Test3DChar(sizeX,sizeY,sizeZ));
-	addTest(new Test3DChar2(sizeX,sizeY,sizeZ));
-	addTest(new Test3DChar3(sizeX,sizeY,sizeZ));
-	addTest(new Test3DChar4(sizeX,sizeY,sizeZ));
-	addTest(new Test3DChar8(sizeX,sizeY,sizeZ));
-	addTest(new Test3DChar16(sizeX,sizeY,sizeZ));
+    addTest(new Test3DChar(sizeX,sizeY,sizeZ));
+    addTest(new Test3DChar2(sizeX,sizeY,sizeZ));
+    addTest(new Test3DChar3(sizeX,sizeY,sizeZ));
+    addTest(new Test3DChar4(sizeX,sizeY,sizeZ));
+    addTest(new Test3DChar8(sizeX,sizeY,sizeZ));
+    addTest(new Test3DChar16(sizeX,sizeY,sizeZ));
 
-	addTest(new Test3DUChar(sizeX,sizeY,sizeZ));
-	addTest(new Test3DUChar2(sizeX,sizeY,sizeZ));
-	addTest(new Test3DUChar3(sizeX,sizeY,sizeZ));
-	addTest(new Test3DUChar4(sizeX,sizeY,sizeZ));
-	addTest(new Test3DUChar8(sizeX,sizeY,sizeZ));
-	addTest(new Test3DUChar16(sizeX,sizeY,sizeZ));
+    addTest(new Test3DUChar(sizeX,sizeY,sizeZ));
+    addTest(new Test3DUChar2(sizeX,sizeY,sizeZ));
+    addTest(new Test3DUChar3(sizeX,sizeY,sizeZ));
+    addTest(new Test3DUChar4(sizeX,sizeY,sizeZ));
+    addTest(new Test3DUChar8(sizeX,sizeY,sizeZ));
+    addTest(new Test3DUChar16(sizeX,sizeY,sizeZ));
 
-	addTest(new Test3DFloat(sizeX,sizeY,sizeZ));
-	addTest(new Test3DFloat2(sizeX,sizeY,sizeZ));
-	addTest(new Test3DFloat3(sizeX,sizeY,sizeZ));
-	addTest(new Test3DFloat4(sizeX,sizeY,sizeZ));
-	addTest(new Test3DFloat8(sizeX,sizeY,sizeZ));
-	addTest(new Test3DFloat16(sizeX,sizeY,sizeZ));
+    addTest(new Test3DFloat(sizeX,sizeY,sizeZ));
+    addTest(new Test3DFloat2(sizeX,sizeY,sizeZ));
+    addTest(new Test3DFloat3(sizeX,sizeY,sizeZ));
+    addTest(new Test3DFloat4(sizeX,sizeY,sizeZ));
+    addTest(new Test3DFloat8(sizeX,sizeY,sizeZ));
+    addTest(new Test3DFloat16(sizeX,sizeY,sizeZ));
 
 
-	int error = runTests(argc, argv);
+    int error = runTests(argc, argv);
 
-	char a;
-	scanf(&a);
+    char a;
+    scanf(&a);
 
-	cleanTests();
+    cleanTests();
 
-	if (!releaseCL()) {
-		std::cerr << getErrorMessage() << std::endl;
-		exit(0);
-	}
+    if (!releaseCL()) {
+        std::cerr << getErrorMessage() << std::endl;
+        exit(0);
+    }
 
-	return 0;
+    return 0;
 }

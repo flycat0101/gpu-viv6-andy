@@ -1392,15 +1392,7 @@ static gctBOOL _CanInstVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectorizerInfo,
     }
 
     /* Following insts must keep scalar */
-    if (VIR_Inst_GetOpcode(pSeedInst) == VIR_OP_RCP ||
-        VIR_Inst_GetOpcode(pSeedInst) == VIR_OP_RSQ ||
-        VIR_Inst_GetOpcode(pSeedInst) == VIR_OP_EXP2 ||
-        VIR_Inst_GetOpcode(pSeedInst) == VIR_OP_PRE_LOG2 ||
-        VIR_Inst_GetOpcode(pSeedInst) == VIR_OP_SQRT ||
-        VIR_Inst_GetOpcode(pSeedInst) == VIR_OP_SINPI ||
-        VIR_Inst_GetOpcode(pSeedInst) == VIR_OP_COSPI ||
-        VIR_Inst_GetOpcode(pSeedInst) == VIR_OP_DIV ||
-        VIR_Inst_GetOpcode(pSeedInst) == VIR_OP_PRE_DIV)
+    if (VIR_OPCODE_isTranscendental(VIR_Inst_GetOpcode(pSeedInst)))
     {
         return gcvFALSE;
     }

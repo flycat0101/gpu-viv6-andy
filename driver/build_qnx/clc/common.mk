@@ -27,6 +27,7 @@ NAME=CLC
 
 include $(qnx_build_dir)/common.mk
 
+EXTRA_INCVPATH += $(driver_root)/sdk/inc
 EXTRA_INCVPATH += $(driver_root)/hal/inc
 EXTRA_INCVPATH += $(driver_root)/hal/user
 EXTRA_INCVPATH += $(driver_root)/hal/os/qnx/user

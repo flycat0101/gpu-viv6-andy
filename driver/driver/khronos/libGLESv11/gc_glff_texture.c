@@ -9849,6 +9849,8 @@ GL_API void GL_APIENTRY glTexDirectVIV(
             break;
 
         default:
+            sourceYuv = gcvFALSE;
+            planarYuv = gcvFALSE;
             status = gcvSTATUS_INVALID_ARGUMENT;
             break;
         }

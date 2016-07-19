@@ -1,4 +1,3 @@
-
 package com.vivantecorp.graphics.shareContext;
 
 import javax.microedition.khronos.egl.EGLContext;

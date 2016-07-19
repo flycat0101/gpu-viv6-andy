@@ -21,6 +21,22 @@ extern glsDEVICEPIPELINEGLOBAL dpGlobalInfo;
 
 extern int currentDesktop;
 
+extern gceSTATUS
+glSURF_Blit(
+    IN OPTIONAL gcoSURF SrcSurface,
+    IN gcoSURF DstSurface,
+    IN gctUINT32 RectCount,
+    IN OPTIONAL gcsRECT_PTR SrcRect,
+    IN gcsRECT_PTR DstRect,
+    IN OPTIONAL gcoBRUSH Brush,
+    IN gctUINT8 FgRop,
+    IN gctUINT8 BgRop,
+    IN OPTIONAL gceSURF_TRANSPARENCY Transparency,
+    IN OPTIONAL gctUINT32 TransparencyColor,
+    IN OPTIONAL gctPOINTER Mask,
+    IN OPTIONAL gceSURF_MONOPACK MaskPack
+    );
+
 #define _GC_OBJ_ZONE    gcvZONE_API_GL
 
 #if DIRECT_TO_FB
@@ -318,7 +334,7 @@ GLvoid resolveRenderTargetToScreen(__GLcontext * gc)
                 gcsRECT srcrect= {0,0,draw->width,draw->height};
                 gcsRECT dstrect= {draw->xWOrigin,draw->yWOrigin,draw->xWOrigin+ draw->width,draw->yWOrigin+draw->height};
                 resolve = chipDraw->resolveBuffer->renderTarget;
-                gcoSURF_Blit(
+                glSURF_Blit(
                     resolve,
                     displaySurf,
                     1,

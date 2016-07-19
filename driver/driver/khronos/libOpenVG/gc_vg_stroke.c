@@ -4600,11 +4600,6 @@ static gceSTATUS _GetS32_I(
 {
     gctFIXED x = (gctFIXED) *((gctINT *) Data);
 
-    if (x > FIXED_MAX || x < FIXED_MIN)
-    {
-        return gcvSTATUS_NOT_SUPPORTED;
-    }
-
     x *= PathScale; /* Includes 16 bits shift. */
     x += PathBias;
     *X = x;
@@ -4624,10 +4619,6 @@ static gceSTATUS _GetF_I(
 
     x += PathBias;
 
-    if (x > FIXED_MAX || x < FIXED_MIN)
-    {
-        return gcvSTATUS_NOT_SUPPORTED;
-    }
     if (x != 0 && x < FIXED_EPSILON && x > -FIXED_EPSILON)
     {
         return gcvSTATUS_NOT_SUPPORTED;
@@ -4677,11 +4668,6 @@ static gceSTATUS _GetS32_I_NB(
 {
     gctFIXED x = (gctFIXED) *((gctINT *) Data);
 
-    if (x > FIXED_MAX || x < FIXED_MIN)
-    {
-        return gcvSTATUS_NOT_SUPPORTED;
-    }
-
     x *= PathScale; /* Includes 16 bits shift. */
     *X = x;
 
@@ -4698,10 +4684,6 @@ static gceSTATUS _GetF_I_NB(
     gctFLOAT x0 = *((gctFLOAT *) Data);
     gctINT64 x = (gctINT64) (x0 * PathScale);   /* Includes 16 bits shift. */
 
-    if (x > FIXED_MAX || x < FIXED_MIN)
-    {
-        return gcvSTATUS_NOT_SUPPORTED;
-    }
     if (x != 0 && x < FIXED_EPSILON && x > -FIXED_EPSILON)
     {
         return gcvSTATUS_NOT_SUPPORTED;
@@ -4753,11 +4735,6 @@ static gceSTATUS _GetS32_I_NS(
 {
     gctFIXED x = (gctFIXED) *((gctINT *) Data);
 
-    if (x > FIXED_MAX || x < FIXED_MIN)
-    {
-        return gcvSTATUS_NOT_SUPPORTED;
-    }
-
     x <<= FIXED_FRACTION_BITS;
     x += PathBias;
     *X = x;
@@ -4777,10 +4754,6 @@ static gceSTATUS _GetF_I_NS(
 
     x += PathBias;
 
-    if (x > FIXED_MAX || x < FIXED_MIN)
-    {
-        return gcvSTATUS_NOT_SUPPORTED;
-    }
     if (x != 0 && x < FIXED_EPSILON && x > -FIXED_EPSILON)
     {
         return gcvSTATUS_NOT_SUPPORTED;
@@ -4830,11 +4803,6 @@ static gceSTATUS _GetS32_I_NS_NB(
 {
     gctFIXED x = (gctFIXED) *((gctINT *) Data);
 
-    if (x > FIXED_MAX || x < FIXED_MIN)
-    {
-        return gcvSTATUS_NOT_SUPPORTED;
-    }
-
     x <<= FIXED_FRACTION_BITS;
     *X = x;
 
@@ -4851,10 +4819,6 @@ static gceSTATUS _GetF_I_NS_NB(
     gctFLOAT x0 = *((gctFLOAT *) Data);
     gctINT64 x = (gctINT64) (x0 * FIXED_ONE);
 
-    if (x > FIXED_MAX || x < FIXED_MIN)
-    {
-        return gcvSTATUS_NOT_SUPPORTED;
-    }
     if (x != 0 && x < FIXED_EPSILON && x > -FIXED_EPSILON)
     {
         return gcvSTATUS_NOT_SUPPORTED;

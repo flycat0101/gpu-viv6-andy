@@ -36,11 +36,11 @@
 
 Timer::Timer()
 {
-	// We must initialize all our variables.
-	m_LastTime   = 0;
-	m_DiffTime   = 0;
-	m_TotalTime  = 0;
-	m_FrameCount = 0;
+    // We must initialize all our variables.
+    m_LastTime   = 0;
+    m_DiffTime   = 0;
+    m_TotalTime  = 0;
+    m_FrameCount = 0;
 }
 
 //-----------------------------------------------------
@@ -48,8 +48,8 @@ Timer::Timer()
 void Timer::UpdateTimer()
 {
 #ifndef ANDROID_JNI
-	// Get current time.
-	unsigned long currentTime = vdkGetTicks();
+    // Get current time.
+    unsigned long currentTime = vdkGetTicks();
 #else
     struct timeval tm;
     gettimeofday(&tm, NULL);
@@ -58,14 +58,14 @@ void Timer::UpdateTimer()
 
     if (m_LastTime != 0)
     {
-		// Compute difference for frame.
-		m_DiffTime = currentTime - m_LastTime;
+        // Compute difference for frame.
+        m_DiffTime = currentTime - m_LastTime;
 
-		// Update total time and frame counter.
-		m_TotalTime  += m_DiffTime;
-		m_FrameCount ++;
-	}
+        // Update total time and frame counter.
+        m_TotalTime  += m_DiffTime;
+        m_FrameCount ++;
+    }
 
-	// Save current time.
-	m_LastTime = currentTime;
+    // Save current time.
+    m_LastTime = currentTime;
 }

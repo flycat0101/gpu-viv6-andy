@@ -48,91 +48,91 @@ static IDirectFB *dfb;
 
 int main( int argc, char *argv[] )
 {
-	DFBResult			    err;
-	DFBSurfaceDescription   dsc;
-	DFBAccelerationMask     mask;
-	DFBSurfacePixelFormat   format;
-	DFBRectangle			rect;
-	IDirectFBDisplayLayer  *layer;
-	IDirectFBSurface       *primary, *source;
-	IDirectFBImageProvider *provider;
+    DFBResult                err;
+    DFBSurfaceDescription   dsc;
+    DFBAccelerationMask     mask;
+    DFBSurfacePixelFormat   format;
+    DFBRectangle            rect;
+    IDirectFBDisplayLayer  *layer;
+    IDirectFBSurface       *primary, *source;
+    IDirectFBImageProvider *provider;
 
-	int width, height, src_width, src_height, x, y;
+    int width, height, src_width, src_height, x, y;
 
-	/* Initialize the core. */
-	DFBCHECK(DirectFBInit( &argc, &argv ));
+    /* Initialize the core. */
+    DFBCHECK(DirectFBInit( &argc, &argv ));
 
-	/* Create the super interface. */
-	DFBCHECK(DirectFBCreate( &dfb ));
+    /* Create the super interface. */
+    DFBCHECK(DirectFBCreate( &dfb ));
 
-	/* Get the Layer Interface for the primary layer. */
-	DFBCHECK(dfb->GetDisplayLayer( dfb, DLID_PRIMARY, &layer ));
+    /* Get the Layer Interface for the primary layer. */
+    DFBCHECK(dfb->GetDisplayLayer( dfb, DLID_PRIMARY, &layer ));
 
-	/* Set the layer cooperative level. */
-	DFBCHECK(layer->SetCooperativeLevel( layer, DLSCL_ADMINISTRATIVE ));
-	DFBCHECK(layer->SetBackgroundColor( layer, 0, 0, 0, 0xFF ));
-	DFBCHECK(layer->SetBackgroundMode( layer, DLBM_COLOR ));
+    /* Set the layer cooperative level. */
+    DFBCHECK(layer->SetCooperativeLevel( layer, DLSCL_ADMINISTRATIVE ));
+    DFBCHECK(layer->SetBackgroundColor( layer, 0, 0, 0, 0xFF ));
+    DFBCHECK(layer->SetBackgroundMode( layer, DLBM_COLOR ));
 
-	/* Get the layer's surface. */
-	DFBCHECK(layer->GetSurface( layer, &primary ));
+    /* Get the layer's surface. */
+    DFBCHECK(layer->GetSurface( layer, &primary ));
 
-	primary->GetSize( primary, &width, &height );
-	primary->Clear( primary, 0xFF, 0xFF, 0xFF, 0x80 );
+    primary->GetSize( primary, &width, &height );
+    primary->Clear( primary, 0xFF, 0xFF, 0xFF, 0x80 );
 
-	primary->SetBlittingFlags( primary, DSBLIT_XOR );
+    primary->SetBlittingFlags( primary, DSBLIT_XOR );
 
-	/* create a surface and render an image to it */
-	DFBCHECK(dfb->CreateImageProvider( dfb,
-									   DATADIR"/conflight.png",
-									   &provider ));
+    /* create a surface and render an image to it */
+    DFBCHECK(dfb->CreateImageProvider( dfb,
+                                       DATADIR"/conflight.png",
+                                       &provider ));
 
-	DFBCHECK(provider->GetSurfaceDescription( provider, &dsc ));
-	DFBCHECK(primary->GetPixelFormat( primary, &format ));
+    DFBCHECK(provider->GetSurfaceDescription( provider, &dsc ));
+    DFBCHECK(primary->GetPixelFormat( primary, &format ));
 
-	dsc.flags = DSDESC_WIDTH | DSDESC_HEIGHT | DSDESC_PIXELFORMAT;
-	dsc.pixelformat = format;
+    dsc.flags = DSDESC_WIDTH | DSDESC_HEIGHT | DSDESC_PIXELFORMAT;
+    dsc.pixelformat = format;
 
-	src_width  = dsc.width;
-	src_height = dsc.height;
+    src_width  = dsc.width;
+    src_height = dsc.height;
 
-	DFBCHECK(dfb->CreateSurface( dfb, &dsc, &source ));
+    DFBCHECK(dfb->CreateSurface( dfb, &dsc, &source ));
 
-	DFBCHECK(provider->RenderTo( provider, source, NULL ));
+    DFBCHECK(provider->RenderTo( provider, source, NULL ));
 
-	provider->Release( provider );
+    provider->Release( provider );
 
-	DFBCHECK(primary->GetAccelerationMask( primary, source, &mask ));
+    DFBCHECK(primary->GetAccelerationMask( primary, source, &mask ));
 
-	if (mask & DFXL_BLIT) {
-		printf( "DFXL_BLIT is accelerated.\n" );
-	} else {
-		printf( "DFXL_BLIT is NOT accelerated.\n" );
-	}
+    if (mask & DFXL_BLIT) {
+        printf( "DFXL_BLIT is accelerated.\n" );
+    } else {
+        printf( "DFXL_BLIT is NOT accelerated.\n" );
+    }
 
-	rect.x = 0;
-	rect.y = 0;
-	rect.w = width < src_width ? width : src_width;
-	rect.h = height < src_height ? height : src_height;
+    rect.x = 0;
+    rect.y = 0;
+    rect.w = width < src_width ? width : src_width;
+    rect.h = height < src_height ? height : src_height;
 
-	x = width < src_width ? 0 : (width - src_width) / 2;
-	y = height < src_height ? 0 : (height - src_height) / 2;
+    x = width < src_width ? 0 : (width - src_width) / 2;
+    y = height < src_height ? 0 : (height - src_height) / 2;
 
-	DFBCHECK(primary->Blit( primary, source, &rect, x, y ));
+    DFBCHECK(primary->Blit( primary, source, &rect, x, y ));
 
-	DFBCHECK(primary->Flip( primary, NULL, DSFLIP_NONE ));
+    DFBCHECK(primary->Flip( primary, NULL, DSFLIP_NONE ));
 
-	/* Save the picture. */
-	DFBCHECK(primary->Dump( primary, ".", "blit_xor" ));
+    /* Save the picture. */
+    DFBCHECK(primary->Dump( primary, ".", "blit_xor" ));
 
-	/* Make sure all of the hardware operations have completed. */
-	DFBCHECK(dfb->WaitIdle( dfb ));
+    /* Make sure all of the hardware operations have completed. */
+    DFBCHECK(dfb->WaitIdle( dfb ));
 
-	/* Release the resources. */
-	DFBCHECK(source->Release( source ));
-	DFBCHECK(primary->Release( primary ));
-	DFBCHECK(layer->Release( layer ));
-	DFBCHECK(dfb->Release( dfb ));
+    /* Release the resources. */
+    DFBCHECK(source->Release( source ));
+    DFBCHECK(primary->Release( primary ));
+    DFBCHECK(layer->Release( layer ));
+    DFBCHECK(dfb->Release( dfb ));
 
-	return EXIT_SUCCESS;
+    return EXIT_SUCCESS;
 }
 

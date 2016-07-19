@@ -86,21 +86,12 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     gco2D egn2D = t2d->runtime->engine2d;
     gceSTATUS status;
 
-#if 0
-    gcmONERROR(gco2D_LoadSolidBrush(egn2D,
-                /* This should not be taken. */
-                gcvSURF_UNKNOWN,
-                gcvTRUE,
-                0x00FF0000,
-                0xffffffffffffffffull));
-#else
     gcmONERROR(gco2D_LoadSolidBrush(egn2D,
                 /* This should not be taken. */
                 gcvSURF_UNKNOWN,
                 gcvTRUE,
                 0x00FF0000,
                 0));
-#endif
 
     if (t2d->runtime->pe20)
     {

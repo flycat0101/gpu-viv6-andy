@@ -1267,7 +1267,7 @@ gcoHAL_Commit(
         /* Stall the hardware. */
         gcmONERROR(gcoHARDWARE_Stall(gcvNULL));
 
-#if gcdENABLE_DEC_COMPRESSION && gcdDEC_ENABLE_AHB
+#if gcdDEC_ENABLE_AHB
         gcmONERROR(gcoDECHARDWARE_FlushDECCompression(gcvNULL, gcvFALSE, gcvTRUE));
 #endif
     }

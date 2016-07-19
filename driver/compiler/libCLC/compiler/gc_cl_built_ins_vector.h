@@ -294,6 +294,7 @@ _GenSetLongCode(
 
     clsIOPERAND_InitializeWithComponentSelection(iOperand,
                                                  OperandsParameters[0].rOperands[0].dataType,
+                                                 OperandsParameters[0].rOperands[0].u.reg.dataType,
                                                  OperandsParameters[0].rOperands[0].u.reg.regIndex,
                                                  OperandsParameters[0].rOperands[0].u.reg.componentSelection);
 

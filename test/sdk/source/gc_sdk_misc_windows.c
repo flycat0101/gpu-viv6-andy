@@ -31,40 +31,40 @@
 
 /*******************************************************************************
 **
-**	vdkGetCurrentTime
+**    vdkGetCurrentTime
 **
-**	Query the current system time.
+**    Query the current system time.
 **
-**	INPUT:
+**    INPUT:
 **
-**		Nothing.
+**        Nothing.
 **
-**	OUTPUT:
+**    OUTPUT:
 **
-**		gcsTIME_PTR CurrTime
-**			Points to the current system time.
+**        gcsTIME_PTR CurrTime
+**            Points to the current system time.
 **
-**	RETURN:
+**    RETURN:
 **
-**		Nothing.
+**        Nothing.
 */
 
 void
 vdkGetCurrentTime(
-	gcsTIME_PTR CurrTime
-	)
+    gcsTIME_PTR CurrTime
+    )
 {
-	SYSTEMTIME currentTime;
+    SYSTEMTIME currentTime;
 
-	/* Query the time. */
-	GetLocalTime(&currentTime);
+    /* Query the time. */
+    GetLocalTime(&currentTime);
 
-	/* Translate the structure. */
-	CurrTime->year    = currentTime.wYear;
-	CurrTime->month   = currentTime.wMonth;
-	CurrTime->day     = currentTime.wDay;
-	CurrTime->weekday = currentTime.wDayOfWeek;
-	CurrTime->hour    = currentTime.wHour;
-	CurrTime->minute  = currentTime.wMinute;
-	CurrTime->second  = currentTime.wSecond;
+    /* Translate the structure. */
+    CurrTime->year    = currentTime.wYear;
+    CurrTime->month   = currentTime.wMonth;
+    CurrTime->day     = currentTime.wDay;
+    CurrTime->weekday = currentTime.wDayOfWeek;
+    CurrTime->hour    = currentTime.wHour;
+    CurrTime->minute  = currentTime.wMinute;
+    CurrTime->second  = currentTime.wSecond;
 }

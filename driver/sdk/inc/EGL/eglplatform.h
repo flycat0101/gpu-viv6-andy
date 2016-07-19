@@ -91,8 +91,8 @@ typedef struct wl_egl_pixmap *EGLNativePixmapType;
 #elif defined(__GBM__) /* GBM */
 
 typedef struct gbm_device *EGLNativeDisplayType;
-typedef struct gbm_bo *    EGLNativePixmapType;
-typedef void *             EGLNativeWindowType;
+typedef struct gbm_bo     *EGLNativePixmapType;
+typedef void              *EGLNativeWindowType;
 
 #elif defined(__ANDROID__) || defined(ANDROID)
 
@@ -123,22 +123,22 @@ typedef screen_pixmap_t EGLNativePixmapType;
 #if defined(EGL_API_DFB)
 
 /* Vivante DFB */
-#include <directfb.h>
-
-typedef IDirectFB *        EGLNativeDisplayType;
-typedef IDirectFBWindow *  EGLNativeWindowType;
-typedef struct _DFBPixmap *EGLNativePixmapType;
+typedef void * EGLNativeDisplayType;
+typedef void * EGLNativeWindowType;
+typedef void * EGLNativePixmapType;
 
 #elif defined(EGL_API_FB)
 
 /* Vivante FBDEV */
-struct _FBDisplay;
-struct _FBWindow;
-struct _FBPixmap;
+typedef void * EGLNativeDisplayType;
+typedef void * EGLNativeWindowType;
+typedef void * EGLNativePixmapType;
 
-typedef struct _FBDisplay *EGLNativeDisplayType;
-typedef struct _FBWindow * EGLNativeWindowType;
-typedef struct _FBPixmap * EGLNativePixmapType;
+#elif defined(EGL_API_NULLWS)
+
+typedef void * EGLNativeDisplayType;
+typedef void * EGLNativeWindowType;
+typedef void * EGLNativePixmapType;
 
 #else
 

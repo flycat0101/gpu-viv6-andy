@@ -45,6 +45,9 @@
 		eglCreatePlatformWindowSurface;
 		eglCreatePlatformPixmapSurface;
 		eglWaitSync;
+		eglGetPlatformDisplayEXT;
+		eglCreatePlatformWindowSurfaceEXT;
+		eglCreatePlatformPixmapSurfaceEXT;
 
 		eglLockSurfaceKHR;
 		eglUnlockSurfaceKHR;
@@ -78,6 +81,9 @@
 		fbCreateWindow;
 		fbGetWindowGeometry;
 		fbGetWindowInfo;
+		fbShowWindow;
+		fbHideWindow;
+		fbGetEvent;
 		fbDestroyWindow;
 		fbCreatePixmap;
 		fbGetPixmapGeometry;
@@ -87,6 +93,11 @@
 
 		wl_egl_window_create;
 		wl_egl_window_destroy;
+		wl_egl_window_resize;
+		wl_egl_window_get_attached_size;
+		wl_egl_pixmap_create;
+		wl_egl_pixmap_destroy;
+		wl_egl_pixmap_get_pixels;
 		eglBindWaylandDisplayWL;
 		eglUnbindWaylandDisplayWL;
 		eglQueryWaylandBufferWL;
@@ -95,6 +106,9 @@
 		dfbGetDisplay;
 		dfbDestroyDisplay;
 		dfbCreateWindow;
+		dfbShowWindow;
+		dfbHideWindow;
+		dfbGetEvent;
 		dfbDestroyWindow;
 		dfbCreatePixmap;
 		dfbCreatePixmapWithBpp;

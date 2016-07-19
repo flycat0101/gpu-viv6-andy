@@ -270,6 +270,14 @@ gcOPTIMIZER_OPTION theOptimizerOption =
      */
     gcvFALSE, /* createDefaultUBO; */
 
+   /*
+    * Handle OCL  relaxing local address space in OCV
+    *
+    *   VC_OPTION=-OCLOCVLOCALADDRESSSPACE:0|1
+    *
+    */
+    gcvFALSE, /* oclOcvLocalAddressSpace; */
+
     /*  OCL has long:
      *
      *   VC_OPTION=-OCLHASLONG:0|1

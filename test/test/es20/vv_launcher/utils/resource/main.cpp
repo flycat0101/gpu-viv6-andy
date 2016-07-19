@@ -40,120 +40,120 @@
 
 int main(int argc, char* argv[])
 {
-	if (argc != 2)
-	{
-		std::cout << argv[0] << " expects <infile>" << std::endl;
-		return -1;
-	}
+    if (argc != 2)
+    {
+        std::cout << argv[0] << " expects <infile>" << std::endl;
+        return -1;
+    }
 
-	std::string infile = argv[1];
+    std::string infile = argv[1];
 
-	/*
-	 Because different build systems unfortunately will produce
-	 different paths to the original source, the path can't practically
-	 be a part of the resource name. (One alternative is to provide
-	 the resource name and output file path explicitly.)
-	*/
-
-#ifdef _WIN32
-	char sep = '\\';
-#else
-	char sep = '/';
-#endif
-
-	size_t pos = infile.rfind(sep);
-	std::string name;
-	char rc_name[255];
-	if (pos != std::string::npos)
-	{
-		name = infile.substr(pos+1);
-	}
-	else
-	{
-		name = infile;
-	}
-
-	strcpy(rc_name, "_");
-	strcat(rc_name, name.c_str());
-	for (size_t i = 0; i < strlen(rc_name) && rc_name[i] != '\0'; i++)
-	{
-		if (!isdigit(rc_name[i]) && !isalpha(rc_name[i]) )
-		{
-			rc_name[i] = '_';
-		}
-	}
-
-
-	std::string outfile = infile + ".c";
-
-	std::ifstream in;
-	in.open(infile.c_str(), std::ios::binary);
-
-	if (!in)
-	{
-		std::cerr << argv[0] << ": can't open input file" << std::endl;
-		perror(infile.c_str());
-		return -1;
-	}
-
-	std::ofstream out;
-	out.open(outfile.c_str());
-	if (!out)
-	{
-		std::cerr << argv[0] << ": can't open output file" << std::endl;
-		perror(outfile.c_str());
-	}
-
-	int size = 0;
+    /*
+     Because different build systems unfortunately will produce
+     different paths to the original source, the path can't practically
+     be a part of the resource name. (One alternative is to provide
+     the resource name and output file path explicitly.)
+    */
 
 #ifdef _WIN32
-	{
-		CTime now = CTime::GetCurrentTime();
-		CString s = now.Format( "%A, %B %d, %Y at %H:%M:%S" );
-		const char* date = s;
-
-		out << "//   Resource: " << name << "\n"
-			<< "//       Path: " << outfile << "\n//\n"
-			<< "//  Generated: " << date << "\n"
-			<< "//         By: " << argv[0] << "\n\n";
-	}
+    char sep = '\\';
 #else
-	{
-		time_t now;
-		time(&now);
-		const char* date = ctime(&now);
-
-		out << "// Resource file: " << outfile << "\n"
-			<< "// Generated at: " << date << "\n"
-			<< "// By: " << argv[0] << "\n\n";
-	}
+    char sep = '/';
 #endif
 
-	out << "#include <rc/resource.h>\n\n"
-		<< "static unsigned char "
-		<< rc_name
-		<<"_data[] = {\n";
+    size_t pos = infile.rfind(sep);
+    std::string name;
+    char rc_name[255];
+    if (pos != std::string::npos)
+    {
+        name = infile.substr(pos+1);
+    }
+    else
+    {
+        name = infile;
+    }
 
-	char c;
-	while (in.get(c))
-	{
+    strcpy(rc_name, "_");
+    strcat(rc_name, name.c_str());
+    for (size_t i = 0; i < strlen(rc_name) && rc_name[i] != '\0'; i++)
+    {
+        if (!isdigit(rc_name[i]) && !isalpha(rc_name[i]) )
+        {
+            rc_name[i] = '_';
+        }
+    }
 
-		unsigned char uc = (unsigned char)(c);
 
-		if (size%10==0) out << "\n\t";
-		out << (unsigned int)(uc) << ",";
-		++size;
-	}
+    std::string outfile = infile + ".c";
 
-	out << "\n};\n\n";
+    std::ifstream in;
+    in.open(infile.c_str(), std::ios::binary);
 
-	out <<"Resource "<<rc_name<<" = \n"
-		<<"{\n"
-		<<"\t\""<<name<<"\",\n"
-		<<"\t"<<rc_name<<"_data,\n"
-		<<"\t"<<size<<"\n"
-		<<"};\n\n";
+    if (!in)
+    {
+        std::cerr << argv[0] << ": can't open input file" << std::endl;
+        perror(infile.c_str());
+        return -1;
+    }
 
-	return 0;
+    std::ofstream out;
+    out.open(outfile.c_str());
+    if (!out)
+    {
+        std::cerr << argv[0] << ": can't open output file" << std::endl;
+        perror(outfile.c_str());
+    }
+
+    int size = 0;
+
+#ifdef _WIN32
+    {
+        CTime now = CTime::GetCurrentTime();
+        CString s = now.Format( "%A, %B %d, %Y at %H:%M:%S" );
+        const char* date = s;
+
+        out << "//   Resource: " << name << "\n"
+            << "//       Path: " << outfile << "\n//\n"
+            << "//  Generated: " << date << "\n"
+            << "//         By: " << argv[0] << "\n\n";
+    }
+#else
+    {
+        time_t now;
+        time(&now);
+        const char* date = ctime(&now);
+
+        out << "// Resource file: " << outfile << "\n"
+            << "// Generated at: " << date << "\n"
+            << "// By: " << argv[0] << "\n\n";
+    }
+#endif
+
+    out << "#include <rc/resource.h>\n\n"
+        << "static unsigned char "
+        << rc_name
+        <<"_data[] = {\n";
+
+    char c;
+    while (in.get(c))
+    {
+
+        unsigned char uc = (unsigned char)(c);
+
+        if (size%10==0) out << "\n\t";
+        out << (unsigned int)(uc) << ",";
+        ++size;
+    }
+
+    out << "\n};\n\n";
+
+    out <<"Resource "<<rc_name<<" = \n"
+        <<"{\n"
+        <<"\t\""<<name<<"\",\n"
+        <<"\t"<<rc_name<<"_data,\n"
+        <<"\t"<<size<<"\n"
+        <<"};\n\n";
+
+    return 0;
 }
 

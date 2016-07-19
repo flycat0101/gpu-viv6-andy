@@ -53,8 +53,8 @@
 
 int main(int argc, const char *argv[])
 {
-	int error =initializeCL();
-	error |= runTests(argc, argv);
-	error |= releaseCL();
-	return error;
+    int error =initializeCL();
+    error |= runTests(argc, argv);
+    error |= releaseCL();
+    return error;
 }

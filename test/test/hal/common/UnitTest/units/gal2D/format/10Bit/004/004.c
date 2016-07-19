@@ -181,14 +181,14 @@ OnError:
     return status;
 }
 
-gceSURF_ROTATION sRotList[] =
+static gce2D_NATURE_ROTATION sRots[] =
 {
-    gcvSURF_0_DEGREE,
-    gcvSURF_90_DEGREE,
-    gcvSURF_180_DEGREE,
-    gcvSURF_270_DEGREE,
-    gcvSURF_FLIP_X,
-    gcvSURF_FLIP_Y,
+    gcvNR_0_DEGREE,
+    gcvNR_LEFT_90_DEGREE,
+    gcvNR_RIGHT_90_DEGREE,
+    gcvNR_180_DEGREE,
+    gcvNR_FLIP_X,
+    gcvNR_FLIP_Y,
 };
 
 gceSURF_FORMAT sFormat[] =
@@ -211,6 +211,8 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     T2D_SURF_PTR tempSurf = gcvNULL;
     gcsRECT sRect, dRect;
     gctBOOL hMirror, vMirror;
+    gce2D_NATURE_ROTATION trot;
+    gceSURF_ROTATION srot, drot;
 
     gcmONERROR(GalCreateTSurf(
         t2d->runtime->hal,
@@ -223,8 +225,28 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
     dRect.left   = 0;
     dRect.top    = 0;
-    dRect.right  = dRect.left + tempSurf->aWidth;
-    dRect.bottom = dRect.top + tempSurf->aHeight;
+    dRect.right  = 400;
+    dRect.bottom = 400;
+
+    sRect = dRect;
+
+    trot = sRots[frameNo % gcmCOUNTOF(sRots)];
+
+    if (tempSurf->format == gcvSURF_NV12_10BIT ||
+        tempSurf->format == gcvSURF_NV21_10BIT ||
+        tempSurf->format == gcvSURF_NV16_10BIT ||
+        tempSurf->format == gcvSURF_NV61_10BIT)
+    {
+        trot = gcvNR_0_DEGREE;
+    }
+
+    gcmONERROR(gco2D_NatureRotateTranslation(
+        gcvFALSE,
+        trot,
+        0, 0,
+        tempSurf->width, tempSurf->height,
+        &sRect, &dRect,
+        &srot, &drot));
 
     gcmONERROR(gco2D_SetClipping(egn2D, &dRect));
 
@@ -236,7 +258,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         tempSurf->validStrideNum,
         tempSurf->tiling,
         tempSurf->format,
-        sRotList[frameNo % gcmCOUNTOF(sRotList)],
+        drot,
         tempSurf->aWidth,
         tempSurf->aHeight));
 
@@ -246,7 +268,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     for (i = 0; i < 8; i++)
     {
         MultiSrcPTR curSrc = &t2d->multiSrc[i % gcmCOUNTOF(t2d->multiSrc)];
-        gceSURF_ROTATION srot = sRotList[(i + frameNo) % gcmCOUNTOF(sRotList)];
+        trot = sRots[(i + frameNo) % gcmCOUNTOF(sRots)];
 
         switch ((i+frameNo) % 4)
         {
@@ -269,9 +291,22 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
                 break;
         }
 
-        sRect.left = sRect.top = 0;
-        sRect.right = gcmMIN(tempSurf->aWidth, curSrc->srcWidth);
-        sRect.bottom = gcmMIN(tempSurf->aHeight, curSrc->srcHeight);
+        if (tempSurf->format == gcvSURF_NV12_10BIT ||
+            tempSurf->format == gcvSURF_NV21_10BIT ||
+            tempSurf->format == gcvSURF_NV16_10BIT ||
+            tempSurf->format == gcvSURF_NV61_10BIT)
+        {
+            trot = gcvNR_0_DEGREE;
+            hMirror = vMirror = gcvFALSE;
+        }
+
+        gcmONERROR(gco2D_NatureRotateTranslation(
+            gcvFALSE,
+            trot,
+            curSrc->srcWidth, curSrc->srcHeight,
+            tempSurf->width, tempSurf->height,
+            &sRect, &dRect,
+            &srot, &drot));
 
         gcmONERROR(gco2D_SetCurrentSourceIndex(egn2D, i));
 
@@ -328,20 +363,12 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     gcmONERROR(gco2D_MultiSourceBlit(egn2D, 0xFF, &dRect, 1));
 
 
-    if (!t2d->runtime->noSaveTargetNew)
-    {
-        char name[200];
-
-        gcmONERROR(gcoHAL_Commit(gcvNULL, gcvTRUE));
-        sprintf(name, "gal2DFormat10Bit004_intermediate_%03d.bmp", frameNo);
-        GalSaveTSurfToDIB(tempSurf, name);
-    }
 
     /* decompress the medial result to dst surface. */
     sRect.left = 0;
     sRect.top = 0;
-    sRect.right = tempSurf->aWidth,
-    sRect.bottom = tempSurf->aHeight;
+    sRect.right = tempSurf->width,
+    sRect.bottom = tempSurf->height;
 
     gcmONERROR(gco2D_SetSource(egn2D, &sRect));
 

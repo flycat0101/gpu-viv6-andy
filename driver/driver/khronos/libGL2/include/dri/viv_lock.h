@@ -109,7 +109,7 @@ extern _glthread_Mutex __glDrmMutex;
                  vivGetLock( gc, 0 );                           \
                  dri->bDrawableInitied = 1;                     \
             } else {                                            \
-                DRM_CAS( dri->hwLock, dri->hwContext,           \
+                DRMGL_CAS( dri->hwLock, dri->hwContext,           \
                    (DRM_LOCK_HELD | dri->hwContext), __ret );   \
                 if ( __ret)                                     \
                     vivGetLock( gc, 0 );                        \
@@ -122,7 +122,7 @@ extern _glthread_Mutex __glDrmMutex;
     do {                                                        \
         vivDriMirror *dri = (vivDriMirror *)gc->imports.other;  \
         if (--dri->lockCnt == 0) {                              \
-            DRM_UNLOCK( dri->fd,                                \
+            DRMGL_UNLOCK( dri->fd,                                \
               dri->hwLock,                                      \
               dri->hwContext );                                 \
         }                                                       \
@@ -133,7 +133,7 @@ extern _glthread_Mutex __glDrmMutex;
 #define LINUX_LOCK_FRAMEBUFFER_DUMMY( sPriv ) \
     do { \
         if (sPriv->dummyContextPriv.hHWContext) { \
-            DRM_LOCK(sPriv->fd, &sPriv->pSAREA->lock, sPriv->dummyContextPriv.hHWContext, 0); \
+            DRMGL_LOCK(sPriv->fd, &sPriv->pSAREA->lock, sPriv->dummyContextPriv.hHWContext, 0); \
             DEBUG_LOCK(); \
         } \
     }while(0)
@@ -141,7 +141,7 @@ extern _glthread_Mutex __glDrmMutex;
 #define LINUX_UNLOCK_FRAMEBUFFER_DUMMY( sPriv ) \
     do { \
         if (sPriv->dummyContextPriv.hHWContext) { \
-            DRM_UNLOCK(sPriv->fd, &sPriv->pSAREA->lock, sPriv->dummyContextPriv.hHWContext); \
+            DRMGL_UNLOCK(sPriv->fd, &sPriv->pSAREA->lock, sPriv->dummyContextPriv.hHWContext); \
             DEBUG_RESET(); \
         } \
     }while(0)

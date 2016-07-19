@@ -117,7 +117,7 @@ bool InitGLES()
 #ifndef ANDROID_JNI
     texture = vdkLoadTexture(&egl, "font.tga", VDK_TGA, VDK_2D);
 #else
-	FILE* file;
+    FILE* file;
     void * bits;
     GLenum  format;
     GLsizei width;
@@ -133,11 +133,11 @@ bool InitGLES()
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
     if (bits != NULL)
-	    glTexImage2D(GL_TEXTURE_2D,0,format,width,height,0,format,GL_UNSIGNED_BYTE,bits);
+        glTexImage2D(GL_TEXTURE_2D,0,format,width,height,0,format,GL_UNSIGNED_BYTE,bits);
     else
         return false;
 
-	fclose(file);
+    fclose(file);
 #endif
     if (texture == 0)
     {
@@ -152,8 +152,8 @@ bool InitGLES()
     srand(vdkGetTicks());
 #else
     gettimeofday(&tm, NULL);
-	currenttime = tm.tv_sec * 1000 + tm.tv_usec / 1000;
-	srand(currenttime);
+    currenttime = tm.tv_sec * 1000 + tm.tv_usec / 1000;
+    srand(currenttime);
 #endif
     int n = 0;
     int final_x = 0, final_y = (height - 4 * 15) / 2 - 15;

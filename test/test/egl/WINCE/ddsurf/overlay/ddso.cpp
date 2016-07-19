@@ -49,7 +49,7 @@
 #define TIMER_RATE2         300
 
 #define PRECISION 16
-#define ONE	(1 << PRECISION)
+#define ONE    (1 << PRECISION)
 #define ZERO 0
 inline GLfixed FixedFromInt(int value) {return value << PRECISION;};
 //-----------------------------------------------------------------------------
@@ -71,8 +71,8 @@ static BOOL                        g_bActive = FALSE;
 
 // OpenGL variables
 static EGLDisplay glesDisplay;   // EGL display
-static EGLSurface glesSurface;	 // EGL rendering surface
-static EGLContext glesContext;	 // EGL rendering context
+static EGLSurface glesSurface;     // EGL rendering surface
+static EGLContext glesContext;     // EGL rendering context
 
 static DDPIXELFORMAT ddpfOverlayFormats[] = {
     {sizeof(DDPIXELFORMAT), DDPF_RGB, 0, 16,  0xF800, 0x07e0, 0x001F, 0},         // 16-bit RGB 5:6:5
@@ -129,7 +129,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
     {
     case WM_PAINT:
         ValidateRect(hWnd,NULL);
-	    break;
+        break;
 
     case WM_DESTROY:
         PostQuitMessage(0);
@@ -176,29 +176,29 @@ MoveOverlay()
     // Have we gone off the left edge?
 
     if (nOverlayXPos < 0) {
-	    nOverlayXPos = 0;
-	    nOverlayXVel = RANDOM_VELOCITY();
+        nOverlayXPos = 0;
+        nOverlayXVel = RANDOM_VELOCITY();
     }
 
     // Have we gone off the right edge?
 
     if ((nOverlayXPos + nOverlayWidth) >  GetSystemMetrics(SM_CXSCREEN)){
-	    nOverlayXPos = GetSystemMetrics(SM_CXSCREEN) - nOverlayWidth;
-	    nOverlayXVel = -RANDOM_VELOCITY();
+        nOverlayXPos = GetSystemMetrics(SM_CXSCREEN) - nOverlayWidth;
+        nOverlayXVel = -RANDOM_VELOCITY();
     }
 
     // Have we gone off the top edge?
 
     if (nOverlayYPos < 0) {
-	    nOverlayYPos = 0;
-	    nOverlayYVel = RANDOM_VELOCITY();
+        nOverlayYPos = 0;
+        nOverlayYVel = RANDOM_VELOCITY();
     }
 
     // Have we gone off the bottom edge?
 
     if ( (nOverlayYPos + nOverlayHeight) >  GetSystemMetrics(SM_CYSCREEN)) {
-	    nOverlayYPos = GetSystemMetrics(SM_CYSCREEN) - nOverlayHeight;
-	    nOverlayYVel = -RANDOM_VELOCITY();
+        nOverlayYPos = GetSystemMetrics(SM_CYSCREEN) - nOverlayHeight;
+        nOverlayYVel = -RANDOM_VELOCITY();
     }
 
     // Set the overlay to it's new position.
@@ -250,8 +250,8 @@ CreateDDObjects(void)
     ddsd.ddsCaps.dwCaps = DDSCAPS_OVERLAY | DDSCAPS_FLIP;
     ddsd.dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH | DDSD_BACKBUFFERCOUNT |
                    DDSD_PIXELFORMAT;
-	ddsd.dwWidth = g_OverlayRect.right;
-	ddsd.dwHeight = g_OverlayRect.bottom;
+    ddsd.dwWidth = g_OverlayRect.right;
+    ddsd.dwHeight = g_OverlayRect.bottom;
     ddsd.dwBackBufferCount = 1;
     ddsd.ddpfPixelFormat = ddpfOverlayFormats[0];
 
@@ -335,7 +335,7 @@ HRESULT InitOGLES()
         EGL_NONE,           EGL_NONE
     };
 
-    glesDisplay = eglGetDisplay((EGLNativeDisplayType)g_Hdc);	 //Ask for an available display
+    glesDisplay = eglGetDisplay((EGLNativeDisplayType)g_Hdc);     //Ask for an available display
 
     //Display initialization (we don't care about the OGLES version numbers)
     if(!eglInitialize(glesDisplay, NULL, NULL))
@@ -391,7 +391,7 @@ HRESULT InitOGLES()
 void Render()
 {
     static int rotation = 0;
-    				        /* Vertex 1    Vertex 2 	 Vertex 3   Vertex 4*/
+                            /* Vertex 1    Vertex 2      Vertex 3   Vertex 4*/
     GLshort vertexArray[] = {-25,-25,0,   25,-25,0,     -25,25,0,    25,25,0};
     GLubyte colorArray[] = {255,0,0,0,   0,255,0,0,    0,0,255,0,   128,128,128,0};
 

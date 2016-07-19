@@ -59,6 +59,12 @@ LFLAGS += -Wl,--version-script=icd_exports.map
 endif
 endif
 
+ifeq ($(ENABLE_CL_GL), 1)
+CFLAGS += -DgcdENABLE_CL_GL=1
+else
+CFLAGS += -DgcdENABLE_CL_GL=0
+endif
+
 ################################################################################
 # Add extra library path.
 LIBS += -ldl

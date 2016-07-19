@@ -322,7 +322,7 @@ _VSC_MC_GEN_GenOpcode(
             *BaseOpcode = 0x64;
         }
         break;
-    case VIR_OP_MOD:
+    case VIR_OP_AQ_IMOD:
         *BaseOpcode = 0x48;
         break;
     case VIR_OP_ADDLO:

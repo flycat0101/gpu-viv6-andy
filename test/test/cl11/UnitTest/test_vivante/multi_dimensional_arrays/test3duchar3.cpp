@@ -35,42 +35,42 @@
 
 Test3DUChar3::Test3DUChar3(const size_t sizeX, const size_t sizeY, const size_t sizeZ):
 MultiDimensionalArraysTest3D("uchar3", sizeX, sizeY, sizeZ) {
-	inputAHost = new cl_uchar3[size];
-	inputBHost = new cl_uchar3[size];
-	resultHost = new cl_uchar3[size];
-	inputA = inputAHost;
-	inputB = inputBHost;
-	result = resultHost;
+    inputAHost = new cl_uchar3[size];
+    inputBHost = new cl_uchar3[size];
+    resultHost = new cl_uchar3[size];
+    inputA = inputAHost;
+    inputB = inputBHost;
+    result = resultHost;
 }
 
 Test3DUChar3::~Test3DUChar3() {
-	delete[] inputAHost;
-	delete[] inputBHost;
-	delete[] resultHost;
+    delete[] inputAHost;
+    delete[] inputBHost;
+    delete[] resultHost;
 }
 
 const int Test3DUChar3::getMemSize() const {
-	return sizeof(cl_uchar3)*size;
+    return sizeof(cl_uchar3)*size;
 }
 
 void Test3DUChar3::generateInput(const unsigned int &kernelIndex) {
-	for (unsigned int i=0; i<VECTOR_SIZE; i++) {
-		for (unsigned int k=0; k<size; k++) {
-			inputAHost[k].s[i] = randUChar();
-			if (getKernelInputArgNum(kernelIndex) == 2)
-				inputBHost[k].s[i] = randUChar();
-		}
-	}
+    for (unsigned int i=0; i<VECTOR_SIZE; i++) {
+        for (unsigned int k=0; k<size; k++) {
+            inputAHost[k].s[i] = randUChar();
+            if (getKernelInputArgNum(kernelIndex) == 2)
+                inputBHost[k].s[i] = randUChar();
+        }
+    }
 }
 
 void* Test3DUChar3::getInputAElement(const unsigned int &index) const {
-	return inputAHost[index].s;
+    return inputAHost[index].s;
 }
 
 void* Test3DUChar3::getInputBElement(const unsigned int &index) const {
-	return &inputBHost[index].s;
+    return &inputBHost[index].s;
 }
 
 void* Test3DUChar3::getResultElement(const unsigned int &index) const {
-	return &resultHost[index].s;
+    return &resultHost[index].s;
 }

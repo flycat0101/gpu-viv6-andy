@@ -38,14 +38,14 @@
 
 const char *kernel_restrict_constant =
 "#ifndef _TYPES1_H_                                                                                                                 \n"
-"#define _TYPES1_H_																												   \n"
-"#																																   \n"
-"#ifdef __OPENCL_VERSION__																										   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
-"#else // __OPENCL_VERSION__																									   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType									   \n"
-"#endif // __OPENCL_VERSION__																									   \n"
-"#																													   \n"
+"#define _TYPES1_H_                                                                                                                   \n"
+"#                                                                                                                                   \n"
+"#ifdef __OPENCL_VERSION__                                                                                                           \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))                               \n"
+"#else // __OPENCL_VERSION__                                                                                                       \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType                                       \n"
+"#endif // __OPENCL_VERSION__                                                                                                       \n"
+"#                                                                                                                       \n"
 "                                                                                                                                  \n"
 "ALIGNED_STRUCT(struct, 32) structB {                                                                                                \n"
 "    int k;                                                                                                                     \n"
@@ -57,9 +57,9 @@ const char *kernel_restrict_constant =
 "    float c;                                                                                                                   \n"
 "};                                                                                                                                \n"
 "                                                                                                                                  \n"
-"ALIGNED_STRUCT(struct, 32) InputA {																							       \n"
-"    int a[4];																													   \n"
-"    float h[4];																												   \n"
+"ALIGNED_STRUCT(struct, 32) InputA {                                                                                                   \n"
+"    int a[4];                                                                                                                       \n"
+"    float h[4];                                                                                                                   \n"
 "    struct structB strB; \n"
 "    union unionC uniC; \n"
 "};                                                                                                                                \n"
@@ -71,7 +71,7 @@ const char *kernel_restrict_constant =
 "};                                                                                                                                \n"
 "                                                                                                                                  \n"
 "#endif // _TYPES_H_                                                                                                               \n"
-"__constant int in3 = 1;										                                                           \n"
+"__constant int in3 = 1;                                                                                                   \n"
 "__kernel void sum(__constant struct InputA* restrict a, __global struct Result* c, int iNumElements)\n"
 "{                                                                                                                                 \n"
 "    // get index into global data array                                                                                           \n"
@@ -82,12 +82,12 @@ const char *kernel_restrict_constant =
 "    float* restrict pin2;                                                                                                                                \n"
 "    int in1 = 2;                                                                                                                             \n"
 "    float in2 = 2.5;                                                                                                                             \n"
-"	 pin1 = &in1;									                                                           \n"
-"	 pin2 = &in2;									                                                           \n"
+"     pin1 = &in1;                                                                                               \n"
+"     pin2 = &in2;                                                                                               \n"
 "                                                                                                                                  \n"
-"										                                                           \n"
+"                                                                                                   \n"
 "    for (int i = 0; i < sizeof(c[tid].r) / sizeof(c[tid].r[0]); ++i) {                                                            \n"
-"		c[tid].r[i] = a[tid].strB.b + a[tid].uniC.c + convert_float(a[tid].a[i]) + (*pin1)*(*pin2)*in3 ;                                                                                   \n"
+"        c[tid].r[i] = a[tid].strB.b + a[tid].uniC.c + convert_float(a[tid].a[i]) + (*pin1)*(*pin2)*in3 ;                                                                                   \n"
 "    }                                                                                                                             \n"
 "                                                                                                                                  \n"
 "}                                                                                                                                 \n";
@@ -139,8 +139,8 @@ public:
         _deviceResult = cl::Buffer(_context, CL_MEM_WRITE_ONLY, sizeof(Result) * _globalWorkSize);
 
         _kernel.setArg(0,sizeof (_deviceInputA), &_deviceInputA);
-		_kernel.setArg(1,sizeof (_deviceResult), &_deviceResult);
-		_kernel.setArg(2,sizeof (_numElements), &_numElements);
+        _kernel.setArg(1,sizeof (_deviceResult), &_deviceResult);
+        _kernel.setArg(2,sizeof (_numElements), &_numElements);
     }
 
     virtual bool Execute()
@@ -162,17 +162,17 @@ private:
     {
         for (int i = 0; i < _numElements; ++i) {
                 _inputA[i].a[0] = rand();
-				_inputA[i].a[1] = rand();
-				_inputA[i].a[2] = rand();
-				_inputA[i].a[3] = rand();
+                _inputA[i].a[1] = rand();
+                _inputA[i].a[2] = rand();
+                _inputA[i].a[3] = rand();
 
-				_inputA[i].h[0] = (float)rand();
-				_inputA[i].h[1] = (float)rand();
-				_inputA[i].h[2] = (float)rand();
-				_inputA[i].h[3] = (float)rand();
+                _inputA[i].h[0] = (float)rand();
+                _inputA[i].h[1] = (float)rand();
+                _inputA[i].h[2] = (float)rand();
+                _inputA[i].h[3] = (float)rand();
 
-				_inputA[i].strB.b = (float)rand();
-				_inputA[i].uniC.c = (float)rand();
+                _inputA[i].strB.b = (float)rand();
+                _inputA[i].uniC.c = (float)rand();
 
 
         }
@@ -182,9 +182,9 @@ private:
     {
         for (int i = 0; i < _numElements; i++) {
             _goldStandard[i].r[0] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[0] + 5;
-			_goldStandard[i].r[1] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[1] + 5;
-			_goldStandard[i].r[2] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[2] + 5;
-			_goldStandard[i].r[3] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[3] + 5;
+            _goldStandard[i].r[1] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[1] + 5;
+            _goldStandard[i].r[2] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[2] + 5;
+            _goldStandard[i].r[3] = _inputA[i].strB.b + _inputA[i].uniC.c + _inputA[i].a[3] + 5;
         }
     }
 
@@ -201,13 +201,13 @@ private:
     bool _compare()
     {
         for (int i = 0; i < _numElements; ++i) {
-			for (int j = 0; j < 4; ++j) {
+            for (int j = 0; j < 4; ++j) {
                 if (_goldStandard[i].r[j] != _result[i].r[j]) {
                     std::cout << "c:" << _goldStandard[i].r[j] << "ocl:" << _result[i].r[j] << std::endl;
-					return false;
+                    return false;
 
                 }
-			}
+            }
         }
         return true;
     }
@@ -232,7 +232,7 @@ private:
 int restrict_constant(void)
 {
     cl_int err = CL_SUCCESS;
-	int cnt = 0;
+    int cnt = 0;
 
     try {
         std::vector<cl::Platform> platforms;
@@ -248,7 +248,7 @@ int restrict_constant(void)
 
         std::vector<cl::Device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
 
-
+        
         const char* clProgramSource = kernel_restrict_constant;//oclLoadProgSource("multiply.cl", "", &szKernelLength);
         if (clProgramSource == 0) {
             std::cerr << "OpenCL program not found." << std::endl;
@@ -272,12 +272,12 @@ int restrict_constant(void)
         std::cout << "Running test restrict_constant..." << std::endl;
         TestCase_restrict_constant restrict_constant(10, program_, context, devices);
 
-		bool control = false;
+        bool control = false;
         restrict_constant.SetUp();
-		if(restrict_constant.Execute()){
-				control = true;
-				cnt = 1;
-			}
+        if(restrict_constant.Execute()){
+                control = true;
+                cnt = 1;
+            }
         for (int i = 0; i < 10; ++i) {
             std::cout << "RUN " << i + 1<< ": " << (control ? "PASSED" : "FAILED!") << std::endl;
         }

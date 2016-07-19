@@ -234,7 +234,7 @@ GCHAL::GCHAL(
 
     for (i = 0; i < gcdMAX_GPU_COUNT; i++)
     {
-		m_Kernels[i]         = gcvNULL;
+        m_Kernels[i]         = gcvNULL;
         m_InterruptIDs[i]    = INVALID_IRQ_NO;
         m_MemBases[i]        = 0;
     }

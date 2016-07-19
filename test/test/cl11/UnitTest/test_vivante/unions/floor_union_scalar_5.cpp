@@ -36,17 +36,17 @@
 
 const char *kernel_floor_union_scalar_5 =
 "#ifndef _TYPES2_H_                                                                                                                 \n"
-"#define _TYPES2_H_																												   \n"
-"																																   \n"
-"#ifdef __OPENCL_VERSION__																										   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
-"#else // __OPENCL_VERSION__																									   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType									   \n"
-"#endif // __OPENCL_VERSION__																									   \n"
-"																																   \n"
-"ALIGNED_STRUCT(union, 32) InputA {																							       \n"
-"    char a;																													   \n"
-"    float h;																												   \n"
+"#define _TYPES2_H_                                                                                                                   \n"
+"                                                                                                                                   \n"
+"#ifdef __OPENCL_VERSION__                                                                                                           \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))                               \n"
+"#else // __OPENCL_VERSION__                                                                                                       \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType                                       \n"
+"#endif // __OPENCL_VERSION__                                                                                                       \n"
+"                                                                                                                                   \n"
+"ALIGNED_STRUCT(union, 32) InputA {                                                                                                   \n"
+"    char a;                                                                                                                       \n"
+"    float h;                                                                                                                   \n"
 "};                                                                                                                                \n"
 "                                                                                                                                  \n"
 "ALIGNED_STRUCT(union, 32) InputB {                                                                                                \n"
@@ -68,7 +68,7 @@ const char *kernel_floor_union_scalar_5 =
 "    // bound check (equivalent to the limit on a 'for' loop for standard/serial C code                                            \n"
 "                                                                                                                                  \n"
 "                                                               \n"
-"		c[tid].r = floor(convert_float(a[tid].a));                                                                                   \n"
+"        c[tid].r = floor(convert_float(a[tid].a));                                                                                   \n"
 "                                                                                                                                \n"
 "}                                                                                                                                 \n";
 
@@ -119,8 +119,8 @@ public:
         _deviceResult = cl::Buffer(_context, CL_MEM_WRITE_ONLY, sizeof(Result) * _globalWorkSize);
 
         _kernel.setArg(0,sizeof (_deviceInputA), &_deviceInputA);
-		_kernel.setArg(1,sizeof (_deviceResult), &_deviceResult);
-		_kernel.setArg(2,sizeof (_numElements), &_numElements);
+        _kernel.setArg(1,sizeof (_deviceResult), &_deviceResult);
+        _kernel.setArg(2,sizeof (_numElements), &_numElements);
     }
 
     virtual bool Execute()
@@ -169,10 +169,10 @@ private:
     {
         for (int i = 0; i < _numElements; ++i) {
                 if (_goldStandard[i].r != _result[i].r) {
-					std::cout << "  c:" << _goldStandard[i].r << " ocl:" << _result[i].r << std::endl;
+                    std::cout << "  c:" << _goldStandard[i].r << " ocl:" << _result[i].r << std::endl;
                     return false;
                 }
-				//std::cout << "c:" << _goldStandard[i].r[j] << " ocl:" << _result[i].r[j] << std::endl;
+                //std::cout << "c:" << _goldStandard[i].r[j] << " ocl:" << _result[i].r[j] << std::endl;
 
         }
         return true;
@@ -198,7 +198,7 @@ private:
 int floor_union_scalar_5(void)
 {
     cl_int err = CL_SUCCESS;
-	int cnt = 1;
+    int cnt = 1;
 
     try {
         std::vector<cl::Platform> platforms;
@@ -214,7 +214,7 @@ int floor_union_scalar_5(void)
 
         std::vector<cl::Device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
 
-
+        
         const char* clProgramSource = kernel_floor_union_scalar_5;//oclLoadProgSource("multiply.cl", "", &szKernelLength);
         if (clProgramSource == 0) {
             std::cerr << "OpenCL program not found." << std::endl;
@@ -238,13 +238,13 @@ int floor_union_scalar_5(void)
         std::cout << "Running test floor_union_scalar_5..." << std::endl;
         TestCase_floor_union_scalar_5 floor_union_scalar_5(10, program_, context, devices);
 
-		bool control  = 1;
+        bool control  = 1;
         floor_union_scalar_5.SetUp();
         for (int i = 0; i < 10; ++i) {
-			if(!floor_union_scalar_5.Execute()){
-				control = false;
-				cnt = 0;
-			}
+            if(!floor_union_scalar_5.Execute()){
+                control = false;
+                cnt = 0;
+            }
             std::cout << "RUN " << i + 1<< ": " << (control ? "PASSED" : "FAILED!") << std::endl;
         }
         floor_union_scalar_5.TearDown();

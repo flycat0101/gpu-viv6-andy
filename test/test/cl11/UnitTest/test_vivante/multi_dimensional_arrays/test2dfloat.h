@@ -33,19 +33,19 @@
 
 class Test2DFloat: public MultiDimensionalArraysTest2D {
 public:
-	Test2DFloat(const size_t sizeX, const size_t sizeY);
-	~Test2DFloat();
+    Test2DFloat(const size_t sizeX, const size_t sizeY);
+    ~Test2DFloat();
 
 protected:
-	cl_float* inputAHost;
-	cl_float* inputBHost;
-	cl_float* resultHost;
+    cl_float* inputAHost;
+    cl_float* inputBHost;
+    cl_float* resultHost;
 
-	const int getMemSize() const;
-	void generateInput(const unsigned int &kernelIndex);
-	void* getInputAElement(const unsigned int &index) const;
-	void* getInputBElement(const unsigned int &index) const;
-	void* getResultElement(const unsigned int &index) const;
+    const int getMemSize() const;
+    void generateInput(const unsigned int &kernelIndex);
+    void* getInputAElement(const unsigned int &index) const;
+    void* getInputBElement(const unsigned int &index) const;
+    void* getResultElement(const unsigned int &index) const;
 };
 
 #endif /*_test2dfloat_h*/

@@ -18,9 +18,8 @@
 #define _GC_OBJ_ZONE    __GLES3_ZONE_DRAW
 
 #if gcdFRAMEINFO_STATISTIC
+GLint g_dbgDumpImagePerDraw = __GL_PERDRAW_DUMP_NONE;
 GLboolean g_dbgPerDrawKickOff = GL_FALSE;
-GLboolean g_dbgDumpImagePerDraw = GL_FALSE;
-GLboolean g_dbgDumpTexturePerDraw = GL_FALSE;
 GLboolean g_dbgSkipDraw = GL_FALSE;
 GLint   g_dbgReleasePhony = 0;
 #endif
@@ -3708,8 +3707,8 @@ gcChipValidateDrawPath(
                         }
                     }
                      else if (chipCtx->indexLoops &&
-							 chipCtx->chipFeature.patchTriangleStrip &&
-							 chipCtx->patchId == gcvPATCH_DEQP)
+                             chipCtx->chipFeature.patchTriangleStrip &&
+                             chipCtx->patchId == gcvPATCH_DEQP)
                     {
                         gcmONERROR(gcChipPatchTriangleFanIndexed(gc, chipCtx, defaultInstant, gcvFALSE));
                     }
@@ -4174,9 +4173,9 @@ gcChipValidateStream(
                     }
 
                     if (vsProgram->attribLocation[attribPtr->linkage].pInput->isDirectPosition)
-					{
-						chipCtx->directPositionIndex = arrayIdx;
-					}
+                    {
+                        chipCtx->directPositionIndex = arrayIdx;
+                    }
                 }
                 else
                 {
@@ -4786,116 +4785,116 @@ __GLcontext *gc,
 __GLchipInstantDraw* instantDraw
 )
 {
-	__GLchipContext  *chipCtx = CHIP_CTXINFO(gc);
+    __GLchipContext  *chipCtx = CHIP_CTXINFO(gc);
 
-	gctSIZE_T i;
-	gctINT j;
-	gcsATTRIBUTE_PTR attrib;
-	gctPOINTER indexPtr = gcvNULL;
-	gctFLOAT *vertexPtr;
-	gceSTATUS status = gcvSTATUS_OK;
-	gctFLOAT vertexs[3][4] = {
-		{ 0.0f, 0.0f, 0.0f, 1.0f },
-		{ 0.0f, 0.0f, 0.0f, 1.0f },
-		{ 0.0f, 0.0f, 0.0f, 1.0f }
-	};
-	gctFLOAT det = 0.0;
-	gctBOOL ret = gcvFALSE;
-	gcmHEADER_ARG("gc=0x%x instantDraw=%d", gc, instantDraw);
+    gctSIZE_T i;
+    gctINT j;
+    gcsATTRIBUTE_PTR attrib;
+    gctPOINTER indexPtr = gcvNULL;
+    gctFLOAT *vertexPtr;
+    gceSTATUS status = gcvSTATUS_OK;
+    gctFLOAT vertexs[3][4] = {
+        { 0.0f, 0.0f, 0.0f, 1.0f },
+        { 0.0f, 0.0f, 0.0f, 1.0f },
+        { 0.0f, 0.0f, 0.0f, 1.0f }
+    };
+    gctFLOAT det = 0.0;
+    gctBOOL ret = gcvFALSE;
+    gcmHEADER_ARG("gc=0x%x instantDraw=%d", gc, instantDraw);
 
-	attrib = &instantDraw->attributes[chipCtx->directPositionIndex];
+    attrib = &instantDraw->attributes[chipCtx->directPositionIndex];
 
-	for (i = 0; i < instantDraw->count; i++)
-	{
-		gctSIZE_T vertex;
-		gctFLOAT vector[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+    for (i = 0; i < instantDraw->count; i++)
+    {
+        gctSIZE_T vertex;
+        gctFLOAT vector[] = { 0.0f, 0.0f, 0.0f, 1.0f };
 
-		if (chipCtx->indexLoops)
-		{
-			if (instantDraw->indexBuffer)
-			{
-				gcmONERROR(gcoBUFOBJ_FastLock(instantDraw->indexBuffer, gcvNULL, &indexPtr));
-				indexPtr = (gctPOINTER)gcmUINT64_TO_PTR((gcmPTR_TO_UINT64(indexPtr) + gcmPTR_TO_UINT64(instantDraw->indexMemory)));
-			}
-			else
-			{
-				indexPtr = instantDraw->indexMemory;
-			}
+        if (chipCtx->indexLoops)
+        {
+            if (instantDraw->indexBuffer)
+            {
+                gcmONERROR(gcoBUFOBJ_FastLock(instantDraw->indexBuffer, gcvNULL, &indexPtr));
+                indexPtr = (gctPOINTER)gcmUINT64_TO_PTR((gcmPTR_TO_UINT64(indexPtr) + gcmPTR_TO_UINT64(instantDraw->indexMemory)));
+            }
+            else
+            {
+                indexPtr = instantDraw->indexMemory;
+            }
 
-			switch (instantDraw->indexType)
-			{
-			case gcvINDEX_8:
-				vertex = *(gctUINT8 *)((gctUINT8_PTR)indexPtr + i * sizeof(GLubyte));
-				break;
+            switch (instantDraw->indexType)
+            {
+            case gcvINDEX_8:
+                vertex = *(gctUINT8 *)((gctUINT8_PTR)indexPtr + i * sizeof(GLubyte));
+                break;
 
-			case gcvINDEX_16:
-				vertex = *(gctUINT16 *)((gctUINT8_PTR)indexPtr + i * sizeof(GLushort));
-				break;
+            case gcvINDEX_16:
+                vertex = *(gctUINT16 *)((gctUINT8_PTR)indexPtr + i * sizeof(GLushort));
+                break;
 
-			case gcvINDEX_32:
-				vertex = *(gctUINT *)((gctUINT8_PTR)indexPtr + i * sizeof(GLuint));
-				break;
+            case gcvINDEX_32:
+                vertex = *(gctUINT *)((gctUINT8_PTR)indexPtr + i * sizeof(GLuint));
+                break;
 
-			default:
-				vertex = 0;
-				gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-				break;
-			}
-		}
-		else
-		{
-			vertex = i;
-		}
+            default:
+                vertex = 0;
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+                break;
+            }
+        }
+        else
+        {
+            vertex = i;
+        }
 
-		if (attrib->stream)
-		{
-			gcmONERROR(gcoBUFOBJ_FastLock(attrib->stream, gcvNULL, (gctPOINTER *)&vertexPtr));
-			vertexPtr = (gctFLOAT *)gcmUINT64_TO_PTR((gcmPTR_TO_UINT64(vertexPtr) + gcmPTR_TO_UINT64(attrib->pointer) + (instantDraw->first + vertex) * attrib->stride));
-		}
-		else
-		{
-			vertexPtr = (gctFLOAT *)gcmUINT64_TO_PTR((gcmPTR_TO_UINT64(attrib->pointer) + (instantDraw->first + vertex) * attrib->stride));
-		}
+        if (attrib->stream)
+        {
+            gcmONERROR(gcoBUFOBJ_FastLock(attrib->stream, gcvNULL, (gctPOINTER *)&vertexPtr));
+            vertexPtr = (gctFLOAT *)gcmUINT64_TO_PTR((gcmPTR_TO_UINT64(vertexPtr) + gcmPTR_TO_UINT64(attrib->pointer) + (instantDraw->first + vertex) * attrib->stride));
+        }
+        else
+        {
+            vertexPtr = (gctFLOAT *)gcmUINT64_TO_PTR((gcmPTR_TO_UINT64(attrib->pointer) + (instantDraw->first + vertex) * attrib->stride));
+        }
 
 
-		/* Get Value */
-		if ((((gcmPTR2INT(vertexPtr)) & 3) == 0))
-		{
-			for (j = 0; j < attrib->size; j++)
-			{
-				vector[j] = vertexPtr[j];
-			}
-		}
-		else
-		{
-			for (j = 0; j < attrib->size; j++)
-			{
+        /* Get Value */
+        if ((((gcmPTR2INT(vertexPtr)) & 3) == 0))
+        {
+            for (j = 0; j < attrib->size; j++)
+            {
+                vector[j] = vertexPtr[j];
+            }
+        }
+        else
+        {
+            for (j = 0; j < attrib->size; j++)
+            {
 
-				readDataForWLimit(vertexPtr + j, vector[j])
-			}
+                readDataForWLimit(vertexPtr + j, vector[j])
+            }
 
-		}
+        }
 
-		/*MVP matrix is identiy */
-		vertexs[i][0] = vector[0];
+        /*MVP matrix is identiy */
+        vertexs[i][0] = vector[0];
 
-		vertexs[i][1] = vector[1];
+        vertexs[i][1] = vector[1];
 
-		vertexs[i][2] = vector[2];
+        vertexs[i][2] = vector[2];
 
-		vertexs[i][3] = vector[3];
-	}
-	det = vertexs[0][0] * (vertexs[1][1] * vertexs[2][3] - vertexs[1][3] * vertexs[2][1])
-		- vertexs[0][1] * (vertexs[1][0] * vertexs[2][3] - vertexs[1][3] * vertexs[2][0])
-		+ vertexs[0][3] * (vertexs[1][0] * vertexs[2][1] - vertexs[1][1] * vertexs[2][0]);
+        vertexs[i][3] = vector[3];
+    }
+    det = vertexs[0][0] * (vertexs[1][1] * vertexs[2][3] - vertexs[1][3] * vertexs[2][1])
+        - vertexs[0][1] * (vertexs[1][0] * vertexs[2][3] - vertexs[1][3] * vertexs[2][0])
+        + vertexs[0][3] * (vertexs[1][0] * vertexs[2][1] - vertexs[1][1] * vertexs[2][0]);
 
-	if (det > 0.0f)
-	{
-		ret = gcvTRUE;
-	}
+    if (det > 0.0f)
+    {
+        ret = gcvTRUE;
+    }
 OnError:
-	gcmFOOTER();
-	return ret;
+    gcmFOOTER();
+    return ret;
 }
 
 
@@ -5152,76 +5151,76 @@ __glChipDrawElementsInstanced(
                 instantDraw->primMode == gcvPRIMITIVE_LINE_STRIP &&
                 instantDraw->count == 0x81;
 
-            	GLboolean splitDraw3 = !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PE_ENHANCEMENTS2)
-				&& (chipCtx->patchId == gcvPATCH_DEQP)
-				&& (gc->vertexArray.instanceCount == 1 &&
-				instantDraw->primMode == gcvPRIMITIVE_TRIANGLE_LIST &&
-				gc->state.enables.stencilTest &&
-				(
-				gc->state.stencil.back.writeMask != gc->state.stencil.front.writeMask ||
-				gc->state.stencil.back.mask != gc->state.stencil.front.mask ||
-				gc->state.stencil.back.reference != gc->state.stencil.front.reference
-				)
-				&& chipCtx->directPositionIndex != -1
-				);
+                GLboolean splitDraw3 = !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PE_ENHANCEMENTS2)
+                && (chipCtx->patchId == gcvPATCH_DEQP)
+                && (gc->vertexArray.instanceCount == 1 &&
+                instantDraw->primMode == gcvPRIMITIVE_TRIANGLE_LIST &&
+                gc->state.enables.stencilTest &&
+                (
+                gc->state.stencil.back.writeMask != gc->state.stencil.front.writeMask ||
+                gc->state.stencil.back.mask != gc->state.stencil.front.mask ||
+                gc->state.stencil.back.reference != gc->state.stencil.front.reference
+                )
+                && chipCtx->directPositionIndex != -1
+                );
 
-			if (splitDraw3)
-			{
-				gctSIZE_T i;
-				__GLchipInstantDraw tmpInstantDraw;
-				gctUINT mask, writeMask;
-				gctUINT8 reference;
+            if (splitDraw3)
+            {
+                gctSIZE_T i;
+                __GLchipInstantDraw tmpInstantDraw;
+                gctUINT mask, writeMask;
+                gctUINT8 reference;
 
-				__GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
-				tmpInstantDraw.primCount = 1;
-				tmpInstantDraw.count = 3;
+                __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
+                tmpInstantDraw.primCount = 1;
+                tmpInstantDraw.count = 3;
 
-				for (i = 0; i < instantDraw->count / 3; ++i)
-				{
+                for (i = 0; i < instantDraw->count / 3; ++i)
+                {
 
-					gctBOOL frontFace;
-					frontFace = gcChipCheckTriangle2CCW(gc, &tmpInstantDraw);
-					if (gc->state.polygon.frontFace == GL_CW)
-					{
-						frontFace = !frontFace;
-					}
+                    gctBOOL frontFace;
+                    frontFace = gcChipCheckTriangle2CCW(gc, &tmpInstantDraw);
+                    if (gc->state.polygon.frontFace == GL_CW)
+                    {
+                        frontFace = !frontFace;
+                    }
 
-					if (frontFace)
-					{
-						mask = gc->state.stencil.front.mask;
-						writeMask = gc->state.stencil.front.writeMask;
-						reference = (gctUINT8)__glClampi(gc->state.stencil.front.reference, 0, chipCtx->drawStencilMask);
-					}
-					else
-					{
-						mask = gc->state.stencil.back.mask;
-						writeMask = gc->state.stencil.back.writeMask;
-						reference = (gctUINT8)__glClampi(gc->state.stencil.back.reference, 0, chipCtx->drawStencilMask);
-					}
+                    if (frontFace)
+                    {
+                        mask = gc->state.stencil.front.mask;
+                        writeMask = gc->state.stencil.front.writeMask;
+                        reference = (gctUINT8)__glClampi(gc->state.stencil.front.reference, 0, chipCtx->drawStencilMask);
+                    }
+                    else
+                    {
+                        mask = gc->state.stencil.back.mask;
+                        writeMask = gc->state.stencil.back.writeMask;
+                        reference = (gctUINT8)__glClampi(gc->state.stencil.back.reference, 0, chipCtx->drawStencilMask);
+                    }
 
-					gcmONERROR(gco3D_SetStencilWriteMask(chipCtx->engine, (gctUINT8)(writeMask & 0x00FF)));
-					gcmONERROR(gco3D_SetStencilMask(chipCtx->engine, (gctUINT8)mask));
-					gcmONERROR(gco3D_SetStencilReference(chipCtx->engine, reference, gcvTRUE));
+                    gcmONERROR(gco3D_SetStencilWriteMask(chipCtx->engine, (gctUINT8)(writeMask & 0x00FF)));
+                    gcmONERROR(gco3D_SetStencilMask(chipCtx->engine, (gctUINT8)mask));
+                    gcmONERROR(gco3D_SetStencilReference(chipCtx->engine, reference, gcvTRUE));
 
-					/* Bind vertex array */
-					gcmONERROR(gcChipSetVertexArrayBind(gc, &tmpInstantDraw, gcvTRUE, gcvTRUE));
+                    /* Bind vertex array */
+                    gcmONERROR(gcChipSetVertexArrayBind(gc, &tmpInstantDraw, gcvTRUE, gcvTRUE));
 
-					/* Draw */
-					gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
-						tmpInstantDraw.primMode,
-						gcvTRUE,
-						tmpInstantDraw.first,
-						0,
-						tmpInstantDraw.primCount,
-						tmpInstantDraw.count,
-						tmpInstantDraw.spilitDraw,
-						tmpInstantDraw.spilitCount,
-						tmpInstantDraw.spilitPrimMode,
-						gc->vertexArray.instanceCount));
+                    /* Draw */
+                    gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
+                        tmpInstantDraw.primMode,
+                        gcvTRUE,
+                        tmpInstantDraw.first,
+                        0,
+                        tmpInstantDraw.primCount,
+                        tmpInstantDraw.count,
+                        tmpInstantDraw.spilitDraw,
+                        tmpInstantDraw.spilitCount,
+                        tmpInstantDraw.spilitPrimMode,
+                        gc->vertexArray.instanceCount));
 
-					tmpInstantDraw.indexMemory = (gctUINT8_PTR)(3 * tmpInstantDraw.indexBytes + __GL_PTR2SIZE(tmpInstantDraw.indexMemory));
-				}
-			}
+                    tmpInstantDraw.indexMemory = (gctUINT8_PTR)(3 * tmpInstantDraw.indexBytes + __GL_PTR2SIZE(tmpInstantDraw.indexMemory));
+                }
+            }
             else if (splitDraw)
             {
                 gctSIZE_T i;
@@ -6396,9 +6395,9 @@ __glChipDrawEnd(
         gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
     }
 
-    if (g_dbgDumpImagePerDraw)
+    if (g_dbgDumpImagePerDraw & (__GL_PERDRAW_DUMP_DRAW_RT | __GL_PERDRAW_DUMP_DRAW_DS))
     {
-        gcmONERROR(gcChipUtilsDumpRT(gc, 0));
+        gcmONERROR(gcChipUtilsDumpRT(gc, (__GL_PERDRAW_DUMP_DRAW_RT | __GL_PERDRAW_DUMP_DRAW_DS)));
     }
 #endif
 
@@ -6710,10 +6709,10 @@ __glChipDrawPattern(
         }
         vsInputArrayMask &= ~bitMask;
 
-        for(attribLinkage = program->attribLinkage[arrayIdx]; attribLinkage != gcvNULL; attribLinkage = attribLinkage->next)
+        for (attribLinkage = program->attribLinkage[arrayIdx]; attribLinkage != gcvNULL; attribLinkage = attribLinkage->next)
         {
             /* Check whether VS required attribute was enabled by apps */
-            if (program && vertexArrayState->attribEnabled & (__GL_ONE_32 << arrayIdx))
+            if (vertexArrayState->attribEnabled & (__GL_ONE_32 << arrayIdx))
             {
                 __GLvertexAttrib *pAttrib = &vertexArrayState->attribute[arrayIdx];
                 __GLvertexAttribBinding *pAttribBinding = &vertexArrayState->attributeBinding[pAttrib->attribBinding];
@@ -7011,7 +7010,7 @@ __glChipComputeEnd(
             gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
         }
 
-        if (g_dbgDumpImagePerDraw)
+        if (g_dbgDumpImagePerDraw & __GL_PERDRAW_DUMP_DRAW_RT)
         {
             __GLchipSLProgram *program = chipCtx->activePrograms[__GLSL_STAGE_CS];
             __GLchipSLProgramInstance *pInstance;
@@ -7155,6 +7154,10 @@ __glChipDispatchCompute(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
+#if VIVANTE_PROFILER_PROBE
+    __glChipProfiler(&gc->profiler, GL3_PROFILER_COMPUTE_BEGIN, 0);
+#endif
+
     do {
         gcsTHREAD_WALKER_INFO info;
         __GLprogramObject *programObject = gc->shaderProgram.activeProgObjs[__GLSL_STAGE_CS];
@@ -7206,6 +7209,10 @@ __glChipDispatchCompute(
 
         gcmERR_BREAK(gco3D_InvokeThreadWalker(chipCtx->engine, &info));
     } while (GL_FALSE);
+
+#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
+    __glChipProfiler(&gc->profiler, GL3_PROFILER_COMPUTE_END, 0);
+#endif
 
     if (bufInfo)
     {

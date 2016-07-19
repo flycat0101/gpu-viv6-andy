@@ -641,7 +641,7 @@ gcoVGHARDWARE_OpenContext(
     /* Free the context buffer. */
     if (node != 0)
     {
-        gcmCHECK_STATUS(gcoVGHARDWARE_FreeVideoMemory(Hardware, node));
+        gcmCHECK_STATUS(gcoVGHARDWARE_FreeVideoMemory(Hardware, node, gcvFALSE));
     }
 
     /* Free the state map. */
@@ -706,7 +706,7 @@ gcoVGHARDWARE_CloseContext(
 
             /* Schedule the buffer. */
             gcmERR_BREAK(gcoVGHARDWARE_FreeVideoMemory(
-                Hardware, (gctUINT32)(gctUINTPTR_T)context->header->node
+                Hardware, (gctUINT32)(gctUINTPTR_T)context->header->node, gcvFALSE
                 ));
 
             /* Reset the header. */

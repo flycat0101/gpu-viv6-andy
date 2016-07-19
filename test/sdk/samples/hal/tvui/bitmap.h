@@ -26,6 +26,8 @@
 *****************************************************************************/
 
 
+
+
 #ifndef __bitmap_h_
 #define __bitmap_h_
 
@@ -42,71 +44,71 @@ typedef struct _gcoBITMAP * gcoBITMAP;
 /* Construct bitmap object. */
 gceSTATUS
 gcoBITMAP_Construct(
-	IN gcoOS Os,
-	IN OUT gcoBITMAP * Bitmap
-	);
+    IN gcoOS Os,
+    IN OUT gcoBITMAP * Bitmap
+    );
 
 /* Destroy bitmap object. */
 gceSTATUS
 gcoBITMAP_Destroy(
-	IN gcoBITMAP Bitmap
-	);
+    IN gcoBITMAP Bitmap
+    );
 
 /* Free resources held by bitmap object. */
 gceSTATUS
 gcoBITMAP_Free(
-	IN gcoBITMAP Bitmap
-	);
+    IN gcoBITMAP Bitmap
+    );
 
 /* Load a bitmap file. */
 gceSTATUS
 gcoBITMAP_Load(
-	IN gcoBITMAP Bitmap,
-	IN char * FileName
-	);
+    IN gcoBITMAP Bitmap,
+    IN char * FileName
+    );
 
 /* Return the size of the bitmap. */
 gceSTATUS
 gcoBITMAP_GetSize(
-	IN gcoBITMAP Bitmap,
-	IN OUT gctUINT32 * Width,
-	IN OUT gctUINT32 * Height
-	);
+    IN gcoBITMAP Bitmap,
+    IN OUT gctUINT32 * Width,
+    IN OUT gctUINT32 * Height
+    );
 
 /* Upload the bitmap to the specified destination. */
 gceSTATUS
 gcoBITMAP_Upload(
-	IN gcoBITMAP Bitmap,
-	IN gctPOINTER Destination
-	);
+    IN gcoBITMAP Bitmap,
+    IN gctPOINTER Destination
+    );
 
 /* Save the bitmap to a file. */
 gceSTATUS
 gcoBITMAP_Save(
-	IN gctPOINTER source,
-	IN gctUINT stride,
-	IN gctINT left,
-	IN gctINT top,
-	IN gctINT right,
-	IN gctINT bottom,
-	IN char * fileName
-	);
+    IN gctPOINTER source,
+    IN gctUINT stride,
+    IN gctINT left,
+    IN gctINT top,
+    IN gctINT right,
+    IN gctINT bottom,
+    IN char * fileName
+    );
 
 /* Load bitmap into a new surface. */
 gceSTATUS
 gcoBITMAP_LoadSurface(
-	IN gcoHAL Hal,
-	IN gcoOS Os,
-	IN char * FileName,
-	IN OUT gcoSURF * Surface
-	);
+    IN gcoHAL Hal,
+    IN gcoOS Os,
+    IN char * FileName,
+    IN OUT gcoSURF * Surface
+    );
 
 /* Save surface into a bitmap. */
 gceSTATUS
 gcoBITMAP_SaveSurface(
-	IN gcoSURF Surface,
-	IN char * FileName
-	);
+    IN gcoSURF Surface,
+    IN char * FileName
+    );
 
 
 #ifdef __cplusplus

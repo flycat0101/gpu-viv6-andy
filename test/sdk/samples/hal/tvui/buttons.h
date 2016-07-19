@@ -26,6 +26,8 @@
 *****************************************************************************/
 
 
+
+
 #ifndef __buttons_h_
 #define __buttons_h_
 
@@ -39,16 +41,16 @@ extern "C" {
 
 typedef enum _BUTTON_CONSTANTS
 {
-	AQBUTTON_PLAY,
-	AQBUTTON_PAUSE,
-	AQBUTTON_STOP,
-	AQBUTTON_RECORD,
-	AQBUTTON_REWIND,
-	AQBUTTON_FAST_FORWARD,
-	AQBUTTON_SKIP_BACK,
-	AQBUTTON_SKIP_FORWARD,
-	AQBUTTON_UP,
-	AQBUTTON_DOWN,
+    AQBUTTON_PLAY,
+    AQBUTTON_PAUSE,
+    AQBUTTON_STOP,
+    AQBUTTON_RECORD,
+    AQBUTTON_REWIND,
+    AQBUTTON_FAST_FORWARD,
+    AQBUTTON_SKIP_BACK,
+    AQBUTTON_SKIP_FORWARD,
+    AQBUTTON_UP,
+    AQBUTTON_DOWN,
 }
 BUTTON_CONSTANTS;
 
@@ -62,30 +64,30 @@ typedef struct _gcoBUTTONS * gcoBUTTONS;
 /* Construct buttons object. */
 gceSTATUS
 gcoBUTTONS_Construct(
-	IN gcoHAL Hal,
-	IN gcoOS Os,
-	IN OUT gcoBUTTONS * Buttons
-	);
+    IN gcoHAL Hal,
+    IN gcoOS Os,
+    IN OUT gcoBUTTONS * Buttons
+    );
 
 /* Destroy buttons object. */
 gceSTATUS
 gcoBUTTONS_Destroy(
-	IN gcoBUTTONS Buttons
-	);
+    IN gcoBUTTONS Buttons
+    );
 
 /* Draw a button with an icon. */
 gceSTATUS
 gcoBUTTONS_DrawButton(
-	IN gco2D Engine,
-	IN gcoBUTTONS Buttons,
-	IN gcoSURF DestSurface,
-	IN gcsRECT_PTR DestRect,
-	IN gctUINT CornerRadius,
-	IN gctUINT32 TopColor,
-	IN gctUINT32 BottomColor,
-	IN gctUINT32 BorderColor,
-	IN BUTTON_CONSTANTS Button
-	);
+    IN gco2D Engine,
+    IN gcoBUTTONS Buttons,
+    IN gcoSURF DestSurface,
+    IN gcsRECT_PTR DestRect,
+    IN gctUINT CornerRadius,
+    IN gctUINT32 TopColor,
+    IN gctUINT32 BottomColor,
+    IN gctUINT32 BorderColor,
+    IN BUTTON_CONSTANTS Button
+    );
 
 #ifdef __cplusplus
 }

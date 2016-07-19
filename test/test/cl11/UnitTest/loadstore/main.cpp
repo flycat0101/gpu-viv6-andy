@@ -281,78 +281,78 @@ __kernel void loadstore( \
 
 /* test case 20 */
     "\
-	typedef struct _my_struct { \
-	    int a; \
-		char b; \
-		} my_struct; \
+    typedef struct _my_struct { \
+        int a; \
+        char b; \
+        } my_struct; \
 __kernel void loadstore( \
     __global my_struct *pdst \
     ) \
 { \
     int value = 2; \
     char cvalue = '2'; \
-	pdst->a = value; \
-	pdst->b = cvalue; \
+    pdst->a = value; \
+    pdst->b = cvalue; \
 }",
 
 /* test case 21 */
     "\
-	typedef struct _my_struct { \
-	    int a; \
-		char b; \
-		} my_struct; \
+    typedef struct _my_struct { \
+        int a; \
+        char b; \
+        } my_struct; \
 __kernel void loadstore( \
     my_struct src, \
     __global my_struct *pdst \
     ) \
 { \
-	pdst->a = src.a; \
-	pdst->b = src.b; \
+    pdst->a = src.a; \
+    pdst->b = src.b; \
 }",
 
 /* test case 22 */
     "\
 __kernel void loadstore( \
-	int src[4], \
+    __local int src[4], \
     __global int *pdst \
     ) \
 { \
-	pdst[0] = src[0]; \
-	pdst[1] = src[1]; \
-	pdst[2] = src[2]; \
-	pdst[3] = src[3]; \
+    pdst[0] = src[0]; \
+    pdst[1] = src[1]; \
+    pdst[2] = src[2]; \
+    pdst[3] = src[3]; \
 }",
 
 /* test case 23 */
     "\
 __kernel void loadstore( \
-	int src[2][2], \
+    __local int src[2][2], \
     __global int pdst[2][2] \
     ) \
 { \
-	pdst[0][0] = src[0][0]; \
-	pdst[0][1] = src[0][1]; \
-	pdst[1][0] = src[1][0]; \
-	pdst[1][1] = src[1][1]; \
+    pdst[0][0] = src[0][0]; \
+    pdst[0][1] = src[0][1]; \
+    pdst[1][0] = src[1][0]; \
+    pdst[1][1] = src[1][1]; \
 }",
 
 /* test case 24 */
     "\
 __kernel void loadstore( \
-	__global int *src, \
+    __global int *src, \
     __global int pdst[2][2] \
     ) \
 { \
-	__local int arr[2][2]; \
-	arr[0][0] = src[0] * 2; \
-	arr[0][1] = src[1] * 2; \
-	arr[1][0] = src[2] * 2; \
-	arr[1][1] = src[3] * 2; \
+    __local int arr[2][2]; \
+    arr[0][0] = src[0] * 2; \
+    arr[0][1] = src[1] * 2; \
+    arr[1][0] = src[2] * 2; \
+    arr[1][1] = src[3] * 2; \
 \
-	pdst[0][0] = arr[0][0] / 2; \
-	pdst[0][1] = arr[0][1] / 2; \
-	pdst[1][0] = arr[1][0] / 2; \
-	pdst[1][1] = arr[1][1] / 2; \
+    pdst[0][0] = arr[0][0] / 2; \
+    pdst[0][1] = arr[0][1] / 2; \
+    pdst[1][0] = arr[1][0] / 2; \
+    pdst[1][1] = arr[1][1] / 2; \
 }",
 
 /* test case 25 */
@@ -395,7 +395,7 @@ cl_int numPrograms = sizeof(programSources) / sizeof(programSources[0]);
 cl_int
 test(
     cl_context          context,
-	cl_device_id		device,
+    cl_device_id        device,
     cl_command_queue    commandQueue,
     int                 testCase
     )
@@ -404,11 +404,11 @@ test(
     cl_kernel           kernel;             /* OpenCL kernel. */
     cl_mem              srcBuf, dstBuf;     /* OpenCL memory buffer objects. */
 
-	cl_build_status		pgmBuildStatus;
-	char				*pgmBuildLog;
-	size_t				pgmBuildLogSize;
+    cl_build_status        pgmBuildStatus;
+    char                *pgmBuildLog;
+    size_t                pgmBuildLogSize;
 
-	cl_int status = CL_SUCCESS;
+    cl_int status = CL_SUCCESS;
     cl_int errNum;
 
     cl_int src[8] = { 2, 3, 4, 5, 6, 7, 8 };
@@ -433,16 +433,16 @@ test(
     const cl_uint  offset = 1;
     const cl_float foffset = 1.0f;
 
-	typedef struct _my_struct {
-		int a;
-	    char b;
-	} my_struct;
+    typedef struct _my_struct {
+        int a;
+        char b;
+    } my_struct;
 
-	my_struct ssrc = {2, '2'};
-	my_struct sdst =  {0, '0'};
+    my_struct ssrc = {2, '2'};
+    my_struct sdst =  {0, '0'};
 
-	int arrsrc [] = {4,3,2,1};
-	int arrdst [] = {0,0,0,0};
+    int arrsrc [] = {4,3,2,1};
+    int arrdst [] = {0,0,0,0};
 
     size_t localWorkSize[1], globalWorkSize[1];
 
@@ -460,26 +460,26 @@ test(
     clmVERBOSE("Building program...\n");
     errNum = clBuildProgram(program, 0, NULL, "-cl-fast-relaxed-math", NULL, NULL);
 
-	if (errNum) {
-		clmVERBOSE("Build Error: %i\n", errNum);
+    if (errNum) {
+        clmVERBOSE("Build Error: %i\n", errNum);
 
-		errNum = clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, NULL, NULL, &pgmBuildLogSize);
-		clmCHECKERROR(errNum, CL_SUCCESS);
+        errNum = clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, NULL, NULL, &pgmBuildLogSize);
+        clmCHECKERROR(errNum, CL_SUCCESS);
 
-		if (pgmBuildLogSize > 1) {
-			pgmBuildLog = (char *) malloc(sizeof(char) * pgmBuildLogSize);
-			errNum = clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, pgmBuildLogSize, pgmBuildLog, NULL);
-			clmCHECKERROR(errNum, CL_SUCCESS);
-			clmVERBOSE("%s", pgmBuildLog);
-		}
+        if (pgmBuildLogSize > 1) {
+            pgmBuildLog = (char *) malloc(sizeof(char) * pgmBuildLogSize);
+            errNum = clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, pgmBuildLogSize, pgmBuildLog, NULL);
+            clmCHECKERROR(errNum, CL_SUCCESS);
+            clmVERBOSE("%s", pgmBuildLog);
+        }
 
-		if (testCase == 22 || testCase == 23) {
-			/* Negative testcase */
-			return CL_SUCCESS;
-		}
+        if (testCase == 22 || testCase == 23) {
+            /* Negative testcase */
+            return CL_SUCCESS;
+        }
 
-		return CL_BUILD_PROGRAM_FAILURE;
-	}
+        return CL_BUILD_PROGRAM_FAILURE;
+    }
 
     clmVERBOSE("Creating kernel...\n");
     kernel = clCreateKernel(program, "loadstore", &errNum);
@@ -839,7 +839,7 @@ test(
                                 &errNum);
         clmCHECKERROR(errNum, CL_SUCCESS);
         break;
-	}
+    }
 
     clmVERBOSE("Performing kernel...\n");
     switch (testCase)
@@ -960,7 +960,7 @@ test(
         break;
 
     case 22:
-	case 23:
+    case 23:
         errNum  = clSetKernelArg(kernel, 0, sizeof(arrsrc),  (void *) &arrsrc);
         errNum |= clSetKernelArg(kernel, 1, sizeof(cl_mem),  (void *) &dstBuf);
         break;
@@ -1286,7 +1286,7 @@ test(
         clmCHECKERROR(errNum, CL_SUCCESS);
         break;
 
-	}
+    }
 
     switch (testCase)
     {
@@ -1336,92 +1336,92 @@ test(
     case 3:
         {
           int i;
-		  bool passed = true;
+          bool passed = true;
           for (i=0; i < 2; i++ ) {
             if (cdst[i] == csrc[i])
             {
-			  continue;
+              continue;
             }
-			else if(passed) {
+            else if(passed) {
               passed = false;
               clmINFO("Testcase 3 fails.\n");
-			}
+            }
               clmINFO("csrc=%f\n", csrc[i]);
               clmINFO("cdst=%f\n", cdst[i]);
               status = CL_INVALID_VALUE;
             continue;
-		  }
-		  if(passed) {
+          }
+          if(passed) {
              clmVERBOSE("Testcase 3 passes.\n");
-		   }
-		   else {
+           }
+           else {
              status = CL_INVALID_VALUE;
-		   }
+           }
         }
         break;
 
     case 4:
-	{
-	   int i;
-	   bool passed = true;
+    {
+       int i;
+       bool passed = true;
 
-	   for(i =0 ; i< 8; i++) {
+       for(i =0 ; i< 8; i++) {
              if (fdst[i] == (fsrc[i] + foffset)) continue;
              else if(passed) {
                  clmINFO("test 4 fails.\n");
                  clmINFO("offset=%f\n", foffset);
-	         passed = false;
+             passed = false;
              }
              clmINFO("fsrc[%d]=%f\n", i, fsrc[i]);
              clmINFO("fdst[%d]=%f\n", i, fdst[i]);
-	     continue;
-	   }
-	   if(passed) {
+         continue;
+       }
+       if(passed) {
              clmVERBOSE("Testcase 4 passes.\n");
-	   }
-	   else {
+       }
+       else {
              status = CL_INVALID_VALUE;
-	   }
-	}
+       }
+    }
         break;
 
     case 5:
-	{
-	   int i;
-	   bool passed = true;
+    {
+       int i;
+       bool passed = true;
 
-	   for(i =0 ; i< 8; i++) {
+       for(i =0 ; i< 8; i++) {
              if (fdst[i] == fsrc[i]) continue;
              else if(passed) {
                  clmINFO("test 5 fails.\n");
-	         passed = false;
+             passed = false;
              }
              clmINFO("fsrc[%d]=%f\n", i, fsrc[i]);
              clmINFO("fdst[%d]=%f\n", i, fdst[i]);
-	     continue;
-	   }
-	   if(passed) {
+         continue;
+       }
+       if(passed) {
              clmVERBOSE("Testcase 5 passes.\n");
-	   }
-	   else {
+       }
+       else {
              status = CL_INVALID_VALUE;
-	   }
-	}
+       }
+    }
         break;
 
     case 6:
-	{
-	   int i;
-	   bool passed = true;
+    {
+       int i;
+       bool passed = true;
 
-	   for(i =0 ; i< 8; i++) {
-		   if (fdst[i] == 5.0) continue;
+       for(i =0 ; i< 8; i++) {
+           if (fdst[i] == 5.0) continue;
              else if (passed) {
                  clmINFO("Test 6 fails.\n");
                  passed = false;
              }
              clmINFO("fdst[%d]=%f\n", i, fdst[i]);
-	     continue;
+         continue;
            }
            if(passed) {
              clmVERBOSE("Testcase 6 passes.\n");
@@ -1433,209 +1433,209 @@ test(
         break;
 
     case 7:
-	{
-	   int i;
-	   bool passed = true;
+    {
+       int i;
+       bool passed = true;
 
-	   for(i =0 ; i< 16; i++) {
+       for(i =0 ; i< 16; i++) {
              if (chardst[i] == (charsrc[i] + coffset)) continue;
              else if(passed) {
                  clmINFO("test 7 fails.\n");
-	         passed = false;
+             passed = false;
              }
              clmINFO("charsrc[%c]=%c\n", i, charsrc[i]);
              clmINFO("chardst[%c]=%c\n", i, chardst[i]);
-	     continue;
-	   }
-	   if(passed) {
+         continue;
+       }
+       if(passed) {
              clmVERBOSE("Testcase 7 passes.\n");
-	   }
-	   else {
+       }
+       else {
              status = CL_INVALID_VALUE;
-	   }
-	}
+       }
+    }
         break;
 
     case 8:
-	{
-	   int i;
-	   bool passed = true;
+    {
+       int i;
+       bool passed = true;
 
-	   for(i =0 ; i< 8; i++) {
+       for(i =0 ; i< 8; i++) {
              if (fdst[i] == (fsrc[i] + 5)) continue;
              else if(passed) {
                  clmINFO("test 8 fails.\n");
                  clmINFO("offset=%d\n", 5);
-	         passed = false;
+             passed = false;
              }
              clmINFO("fsrc[%d]=%f\n", i, fsrc[i]);
              clmINFO("fdst[%d]=%f\n", i, fdst[i]);
-	     continue;
-	   }
-	   if(passed) {
+         continue;
+       }
+       if(passed) {
              clmVERBOSE("Testcase 8 passes.\n");
-	   }
-	   else {
+       }
+       else {
              status = CL_INVALID_VALUE;
-	   }
-	}
+       }
+    }
         break;
 
     case 9:
-	{
-	   int i;
-	   bool passed = true;
+    {
+       int i;
+       bool passed = true;
 
-	   for(i =0 ; i< 8; i++) {
+       for(i =0 ; i< 8; i++) {
              if (fdst[i] == (fsrc[i] + 5)) continue;
              else if(passed) {
                  clmINFO("test 9 fails.\n");
                  clmINFO("offset=%d\n", 5);
-	         passed = false;
+             passed = false;
              }
              clmINFO("fsrc[%d]=%f\n", i, fsrc[i]);
              clmINFO("fdst[%d]=%f\n", i, fdst[i]);
-	     continue;
-	   }
-	   if(passed) {
+         continue;
+       }
+       if(passed) {
              clmVERBOSE("Testcase 9 passes.\n");
-	   }
-	   else {
+       }
+       else {
              status = CL_INVALID_VALUE;
-	   }
-	}
+       }
+    }
         break;
 
     case 10:
-	{
-	   int i;
-	   bool passed = true;
+    {
+       int i;
+       bool passed = true;
 
-	   for(i =0 ; i< 16; i++) {
+       for(i =0 ; i< 16; i++) {
              if (fdst[i] == (fsrc[i] + 5)) continue;
              else if(passed) {
                  clmINFO("test 10 fails.\n");
                  clmINFO("offset=%d\n", 5);
-	         passed = false;
+             passed = false;
              }
              clmINFO("fsrc[%d]=%f\n", i, fsrc[i]);
              clmINFO("fdst[%d]=%f\n", i, fdst[i]);
-	     continue;
-	   }
-	   if(passed) {
+         continue;
+       }
+       if(passed) {
              clmVERBOSE("Testcase 10 passes.\n");
-	   }
-	   else {
+       }
+       else {
              status = CL_INVALID_VALUE;
-	   }
-	}
+       }
+    }
         break;
 
     case 11:
-	{
-	   int i;
-	   bool passed = true;
+    {
+       int i;
+       bool passed = true;
 
-	   for(i =0 ; i< 16; i++) {
+       for(i =0 ; i< 16; i++) {
              if (fdst[i] == fsrctransposed[i]) continue;
              else if(passed) {
                  clmINFO("test 11 fails.\n");
                  clmINFO("offset=%d\n", 5);
-	         passed = false;
+             passed = false;
              }
              clmINFO("fsrc[%d]=%f\n", i, fsrc[i]);
              clmINFO("fdst[%d]=%f\n", i, fdst[i]);
-	     continue;
-	   }
-	   if(passed) {
+         continue;
+       }
+       if(passed) {
              clmVERBOSE("Testcase 11 passes.\n");
-	   }
-	   else {
+       }
+       else {
              status = CL_INVALID_VALUE;
-	   }
-	}
+       }
+    }
         break;
 
     case 12:
     case 13:
-	{
-	   int i;
-	   bool passed = true;
+    {
+       int i;
+       bool passed = true;
 
-	   for(i =0 ; i< 8; i++) {
+       for(i =0 ; i< 8; i++) {
              if (fdst[i] == (fsrc[i] + 5)) continue;
              else if(passed) {
                  clmINFO("test %d fails.\n", testCase);
                  clmINFO("offset=%d\n", 5);
-	         passed = false;
+             passed = false;
              }
              clmINFO("fsrc[%d]=%f\n", i, fsrc[i]);
              clmINFO("fdst[%d]=%f\n", i, fdst[i]);
-	     continue;
-	   }
-	   if(passed) {
+         continue;
+       }
+       if(passed) {
              clmVERBOSE("Testcase %d passes.\n", testCase);
-	   }
-	   else {
+       }
+       else {
              status = CL_INVALID_VALUE;
-	   }
-	}
+       }
+    }
         break;
 
     case 14:
-	{
-	   int i;
-	   bool passed = true;
+    {
+       int i;
+       bool passed = true;
 
-	   for(i =0 ; i< 8; i++) {
+       for(i =0 ; i< 8; i++) {
              if (fdst[i] == (fsrc[7 - i] + foffset)) continue;
              else if(passed) {
                  clmINFO("test 14 fails.\n");
                  clmINFO("offset=%f\n", foffset);
-	         passed = false;
+             passed = false;
              }
              clmINFO("fsrc[%d]=%f\n", 7 - i, fsrc[7 - i]);
              clmINFO("fdst[%d]=%f\n", i, fdst[i]);
-	     continue;
-	   }
-	   if(passed) {
+         continue;
+       }
+       if(passed) {
              clmVERBOSE("Testcase 14 passes.\n");
-	   }
-	   else {
+       }
+       else {
              status = CL_INVALID_VALUE;
-	   }
-	}
+       }
+    }
         break;
 
     case 15:
-	{
-	   int i;
-	   bool passed = true;
+    {
+       int i;
+       bool passed = true;
 
-	   for(i =0 ; i< 8; i++) {
+       for(i =0 ; i< 8; i++) {
              if (fdst[i] == (fsrc[7 - i] + foffset)) continue;
              else if(passed) {
                  clmINFO("test 15 fails.\n");
                  clmINFO("offset=%f\n", foffset);
-	         passed = false;
+             passed = false;
              }
              clmINFO("fsrc[%d]=%f\n", 7 - i, fsrc[7 - i]);
              clmINFO("fdst[%d]=%f\n", i, fdst[i]);
-	     continue;
-	   }
-	   if(passed) {
+         continue;
+       }
+       if(passed) {
              clmVERBOSE("Testcase 15 passes.\n");
-	   }
-	   else {
+       }
+       else {
              status = CL_INVALID_VALUE;
-	   }
-	}
+       }
+    }
         break;
 
     case 16:
-	{
-	   int i;
-	   bool passed = false;
+    {
+       int i;
+       bool passed = false;
 
            do {
              if(fdst[0] != (fsrc[7] + foffset)) break;
@@ -1651,23 +1651,23 @@ test(
 
            if(passed) {
              clmVERBOSE("Testcase 16 passes.\n");
-	   }
-	   else {
+       }
+       else {
              status = CL_INVALID_VALUE;
              clmINFO("test 16 fails.\n");
              clmINFO("offset=%f\n", foffset);
-	     for(i =0 ; i< 8; i++) {
+         for(i =0 ; i< 8; i++) {
                 clmINFO("fsrc[%d]=%f\n", i, fsrc[i]);
                 clmINFO("fdst[%d]=%f\n", i, fdst[i]);
              }
-	   }
-	}
+       }
+    }
         break;
 
     case 17:
-	{
-	   int i;
-	   bool passed = false;
+    {
+       int i;
+       bool passed = false;
 
            do {
              if(fdst[0] != (fsrc[7] + foffset)) break;
@@ -1683,23 +1683,23 @@ test(
 
            if(passed) {
              clmVERBOSE("Testcase 17 passes.\n");
-	   }
-	   else {
+       }
+       else {
              status = CL_INVALID_VALUE;
              clmINFO("test 17 fails.\n");
              clmINFO("offset=%f\n", foffset);
-	     for(i =0 ; i< 8; i++) {
+         for(i =0 ; i< 8; i++) {
                 clmINFO("fsrc[%d]=%f\n", i, fsrc[i]);
                 clmINFO("fdst[%d]=%f\n", i, fdst[i]);
              }
-	   }
-	}
+       }
+    }
         break;
 
     case 18:
-	{
-	   int i;
-	   bool passed = false;
+    {
+       int i;
+       bool passed = false;
 
            do {
              if(fdst[0] != (fsrc[11] + foffset)) break;
@@ -1715,17 +1715,17 @@ test(
 
            if(passed) {
              clmVERBOSE("Testcase 18 passes.\n");
-	   }
-	   else {
+       }
+       else {
              status = CL_INVALID_VALUE;
              clmINFO("test 18 fails.\n");
              clmINFO("offset=%f\n", foffset);
-	     for(i =0 ; i< 8; i++) {
+         for(i =0 ; i< 8; i++) {
                 clmINFO("fsrc[%d]=%f\n", i, fsrc[i]);
                 clmINFO("fdst[%d]=%f\n", i, fdst[i]);
              }
-	   }
-	}
+       }
+    }
         break;
 
     case 19:
@@ -1757,54 +1757,54 @@ test(
         break;
 
     case 24:
-	{
-		int i;
-		bool passed = false;
+    {
+        int i;
+        bool passed = false;
 
-		do {
-		  if(arrsrc[0] != arrdst[0]) break;
-		  if(arrsrc[1] != arrdst[1]) break;
-		  if(arrsrc[2] != arrdst[2]) break;
-		  if(arrsrc[3] != arrdst[3]) break;
-		  passed = true;
-		} while (false);
+        do {
+          if(arrsrc[0] != arrdst[0]) break;
+          if(arrsrc[1] != arrdst[1]) break;
+          if(arrsrc[2] != arrdst[2]) break;
+          if(arrsrc[3] != arrdst[3]) break;
+          passed = true;
+        } while (false);
 
-		if(passed) {
-		  clmVERBOSE("Testcase %d passes.\n", testCase);
-		} else {
+        if(passed) {
+          clmVERBOSE("Testcase %d passes.\n", testCase);
+        } else {
           status = CL_INVALID_VALUE;
           clmINFO("Testcase %d fails.\n", testCase);
-	      for(i =0 ; i< 4; i++) {
+          for(i =0 ; i< 4; i++) {
             clmINFO("arrsrc[%d]=%d\n", i, arrsrc[i]);
             clmINFO("arrdst[%d]=%d\n", i, arrdst[i]);
           }
-	    }
- 	}
+        }
+     }
         break;
 
     case 25:
-	{
-	   int i;
-	   bool passed = false;
+    {
+       int i;
+       bool passed = false;
 
-	   do {
-		  if(charsrc[0] != chardst[5]) break;
-		  if(charsrc[1] != chardst[12]) break;
-		  if(charsrc[2] != chardst[16]) break;
-		  if(charsrc[3] != chardst[26]) break;
-		  if(charsrc[17] != chardst[33]) break;
-		  if(charsrc[17] != chardst[35]) break;
-		  if(charsrc[17] != chardst[42]) break;
-		  if(charsrc[17] != chardst[43]) break;
-		  passed = true;
-	   } while (false);
+       do {
+          if(charsrc[0] != chardst[5]) break;
+          if(charsrc[1] != chardst[12]) break;
+          if(charsrc[2] != chardst[16]) break;
+          if(charsrc[3] != chardst[26]) break;
+          if(charsrc[17] != chardst[33]) break;
+          if(charsrc[17] != chardst[35]) break;
+          if(charsrc[17] != chardst[42]) break;
+          if(charsrc[17] != chardst[43]) break;
+          passed = true;
+       } while (false);
 
-	   if(passed) {
-		  clmVERBOSE("Testcase %d passes.\n", testCase);
-	   } else {
+       if(passed) {
+          clmVERBOSE("Testcase %d passes.\n", testCase);
+       } else {
               status = CL_INVALID_VALUE;
               clmINFO("Testcase %d fails.\n", testCase);
-	      for(i =0 ; i< 4; i++) {
+          for(i =0 ; i< 4; i++) {
                 clmINFO("charsrc[%d]=%c\n", i, charsrc[i]);
                 clmINFO("chardst[5]=%c\n", chardst[5]);
                 clmINFO("chardst[12]=%c\n", chardst[12]);
@@ -1816,27 +1816,27 @@ test(
               clmINFO("chardst[33]=%c\n", chardst[33]);
               clmINFO("chardst[42]=%c\n", chardst[42]);
               clmINFO("chardst[43]=%c\n", chardst[43]);
-	   }
-	}
+       }
+    }
         break;
 
     }
 
-	/* Release kernels and program. */
+    /* Release kernels and program. */
     errNum  = clReleaseKernel(kernel);
     errNum |= clReleaseProgram(program);
     clmCHECKERROR(errNum, CL_SUCCESS);
 
     /* Release other OpenCL objects. */
     errNum  = clReleaseMemObject(dstBuf);
-	if (testCase != 2 &&
-		testCase != 6 &&
-		testCase != 19 &&
-		testCase != 20 &&
-		testCase != 21 &&
-		testCase != 22 &&
-		testCase != 23
-		)
+    if (testCase != 2 &&
+        testCase != 6 &&
+        testCase != 19 &&
+        testCase != 20 &&
+        testCase != 21 &&
+        testCase != 22 &&
+        testCase != 23
+        )
     {
         errNum |= clReleaseMemObject(srcBuf);
     }

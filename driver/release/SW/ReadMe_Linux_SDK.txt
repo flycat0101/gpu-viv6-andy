@@ -15,7 +15,6 @@ sdk
 |
 \---include
     |  gc_vdk_types.h
-    |  gc_vdk_hal.h
     |  gc_vdk.h
     |
     +---HAL
@@ -36,8 +35,6 @@ sdk
     |     gc_hal_profiler.h
     |     gc_hal_statistics.h
     |     gc_hal_version.h
-    |     gc_hal_eglplatform.h
-    |     gc_hal_eglplatform_type.h
     |
     +---KHR
     |     khrplatform.h

@@ -39,5 +39,5 @@ INCLUDES=\
 	$(AQROOT)\test\es20\vv_launcher\lib; \
 	$(AQROOT)\test\es20\vv_launcher\lib\rc; \
 	$(_SYSGENSDKROOT)\inc; \
-	$(VIVANTE_SDK_INC);$(VIVANTE_SDK_INC)/HAL;$(AQROOT)/sdk/inc; \
+	$(VIVANTE_SDK_INC); \
 

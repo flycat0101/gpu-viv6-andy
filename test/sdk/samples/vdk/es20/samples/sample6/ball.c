@@ -37,66 +37,66 @@ extern vdkEGL VdkEgl;
 /*
  * Model
 */
-static const char *		PositionFile = "ball_position.txt";
-static float *			PositionFloats = NULL;
-static size_t			PositionFloatsCount = 0;
-static GLuint			PositionGLBuffer = 0;
+static const char *        PositionFile = "ball_position.txt";
+static float *            PositionFloats = NULL;
+static size_t            PositionFloatsCount = 0;
+static GLuint            PositionGLBuffer = 0;
 #ifndef ANDROID
-const static GLuint		PositionVertexAttributeArrayIndex = 0;
+const static GLuint        PositionVertexAttributeArrayIndex = 0;
 #else
 static const GLuint     PositionVertexAttributeArrayIndex = 0;
 #endif
 
-static const char *		NormalFile = "ball_normal.txt";
-static float *			NormalFloats = NULL;
-static size_t			NormalFloatsCount = 0;
-static GLuint			NormalGLBuffer = 0;
+static const char *        NormalFile = "ball_normal.txt";
+static float *            NormalFloats = NULL;
+static size_t            NormalFloatsCount = 0;
+static GLuint            NormalGLBuffer = 0;
 #ifndef ANDROID
-const static GLuint		NormalVertexAttributeArrayIndex = 1;
+const static GLuint        NormalVertexAttributeArrayIndex = 1;
 #else
 static const GLuint     NormalVertexAttributeArrayIndex = 1;
 #endif
 
-static const char *		TriangleFile = "ball_triangles.txt";
-static unsigned short *	TriangleData = NULL;
-static size_t			TriangleVertexCount = 0;
-static GLuint			TriangleGLBuffer = 0;
+static const char *        TriangleFile = "ball_triangles.txt";
+static unsigned short *    TriangleData = NULL;
+static size_t            TriangleVertexCount = 0;
+static GLuint            TriangleGLBuffer = 0;
 #ifdef ANDROID
-static const GLuint 	TriangleVertexAttributeArrayIndex = 2;
+static const GLuint     TriangleVertexAttributeArrayIndex = 2;
 #else
-const static GLuint		TriangleVertexAttributeArrayIndex = 2;
+const static GLuint        TriangleVertexAttributeArrayIndex = 2;
 #endif
 
 static float CenterX = 0.0f;
 static float CenterY = 0.0f;
 static float CenterZ = 0.0f;
-static float Radius	 = 0.0f;
+static float Radius     = 0.0f;
 
 /*
  * Shaders
 */
 
-static const char *	VSFile = "ball.vert";
-static const char *	FGFile = "ball.frag";
+static const char *    VSFile = "ball.vert";
+static const char *    FGFile = "ball.frag";
 
-static GLuint		Program = 0;
-
-/*
- * Matrix
-*/
+static GLuint        Program = 0;
 
 /*
  * Matrix
 */
 
-extern const float	ModelView	[16];
-extern const float	Projection	[16];
-extern const float	MVP			[16];
+/*
+ * Matrix
+*/
 
-static float	MV_INV_TRANS[16];
+extern const float    ModelView    [16];
+extern const float    Projection    [16];
+extern const float    MVP            [16];
+
+static float    MV_INV_TRANS[16];
 
 /*
-*	Uniforms
+*    Uniforms
 */
 #ifndef ANDROID
 const static float BallSize = 40;
@@ -104,7 +104,7 @@ const static float BounceHeight = 300;
 const static float BounceSpeed = 1.0;
 
 const static float LightDirection[] = {-0.43644f, 0.21822f, -0.87287f, 1.0f};
-const static float BallColor	 [] = {1.0, 0.3f, 0.2f, 1.0};
+const static float BallColor     [] = {1.0, 0.3f, 0.2f, 1.0};
 #else
 static const float BallSize = 40;
 static const float BounceHeight = 300;
@@ -119,317 +119,317 @@ static GLuint TimeLocation = 0;
 
 VDKS_BOOL BallInit()
 {
-	char szCurDir[MAX_PATH + 1];
-	char szVSFile[MAX_PATH + 1], szFGFile[MAX_PATH + 1], szTempFile[MAX_PATH + 1];
+    char szCurDir[MAX_PATH + 1];
+    char szVSFile[MAX_PATH + 1], szFGFile[MAX_PATH + 1], szTempFile[MAX_PATH + 1];
 #ifdef ANDROID
-	strcpy(szCurDir,"/sdcard/sample/sample6/");
+    strcpy(szCurDir,"/sdcard/sample/sample6/");
 #else
-	VDKS_Func_GetCurrentDir(szCurDir);
+    VDKS_Func_GetCurrentDir(szCurDir);
 #endif
-	strcpy(szVSFile, szCurDir);
-	strcpy(szFGFile, szCurDir);
-	strcat(szVSFile, VSFile);
-	strcat(szFGFile, FGFile);
+    strcpy(szVSFile, szCurDir);
+    strcpy(szFGFile, szCurDir);
+    strcat(szVSFile, VSFile);
+    strcat(szFGFile, FGFile);
 
-	/*
-	 * Read in Model's Positon Floats Data.
-	*/
-	strcpy(szTempFile, szCurDir);
-	strcat(szTempFile, PositionFile);
-	if (VDKS_TRUE !=  VDKS_ReadFloats (szTempFile, &PositionFloats, (SIZE_T *)&PositionFloatsCount))
-	{
-		printf("Init : Failed to read position data file.");
-		return VDKS_FALSE;
-	}
+    /*
+     * Read in Model's Positon Floats Data.
+    */
+    strcpy(szTempFile, szCurDir);
+    strcat(szTempFile, PositionFile);
+    if (VDKS_TRUE !=  VDKS_ReadFloats (szTempFile, &PositionFloats, (SIZE_T *)&PositionFloatsCount))
+    {
+        printf("Init : Failed to read position data file.");
+        return VDKS_FALSE;
+    }
 
-	glGenBuffers(1, &PositionGLBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, PositionGLBuffer);
-	glBufferData(GL_ARRAY_BUFFER, PositionFloatsCount * sizeof(float), PositionFloats, GL_STATIC_DRAW);
+    glGenBuffers(1, &PositionGLBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, PositionGLBuffer);
+    glBufferData(GL_ARRAY_BUFFER, PositionFloatsCount * sizeof(float), PositionFloats, GL_STATIC_DRAW);
 
-	/*
-	 * Read in Model's Normal Floats Data.
-	*/
-	strcpy(szTempFile, szCurDir);
-	strcat(szTempFile, NormalFile);
-	if (VDKS_TRUE !=  VDKS_ReadFloats (szTempFile, &NormalFloats, (SIZE_T *)&NormalFloatsCount))
-	{
-		printf("Init : Failed to read position data file.");
-		return VDKS_FALSE;
-	}
+    /*
+     * Read in Model's Normal Floats Data.
+    */
+    strcpy(szTempFile, szCurDir);
+    strcat(szTempFile, NormalFile);
+    if (VDKS_TRUE !=  VDKS_ReadFloats (szTempFile, &NormalFloats, (SIZE_T *)&NormalFloatsCount))
+    {
+        printf("Init : Failed to read position data file.");
+        return VDKS_FALSE;
+    }
 
-	glGenBuffers(1, &NormalGLBuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, NormalGLBuffer);
-	glBufferData(GL_ARRAY_BUFFER, NormalFloatsCount * sizeof(float), NormalFloats, GL_STATIC_DRAW);
+    glGenBuffers(1, &NormalGLBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, NormalGLBuffer);
+    glBufferData(GL_ARRAY_BUFFER, NormalFloatsCount * sizeof(float), NormalFloats, GL_STATIC_DRAW);
 
-	/*
-	 * Model Postion Center & Radius
-	*/
+    /*
+     * Model Postion Center & Radius
+    */
 
-	VDKS_Func_ModelCenterRadius(PositionFloats, PositionFloatsCount, &CenterX, &CenterY, &CenterZ, &Radius);
-	VDKS_Macro_AlertUser(0, "CenterX : %f, CenterY : %f, CenterZ : %f, Radius : %f\n",CenterX, CenterY, CenterZ, Radius);
+    VDKS_Func_ModelCenterRadius(PositionFloats, PositionFloatsCount, &CenterX, &CenterY, &CenterZ, &Radius);
+    VDKS_Macro_AlertUser(0, "CenterX : %f, CenterY : %f, CenterZ : %f, Radius : %f\n",CenterX, CenterY, CenterZ, Radius);
 
-	/*
-	 * Read in Model's Triangle Floats Data.
-	*/
-	strcpy(szTempFile, szCurDir);
-	strcat(szTempFile, TriangleFile);
-	if (VDKS_TRUE != VDKS_ReadTriangle(szTempFile, &TriangleData, (SIZE_T *)&TriangleVertexCount))
-	{
-		printf("Init : Failed to read triangle data file.");
-		return VDKS_FALSE;
-	}
+    /*
+     * Read in Model's Triangle Floats Data.
+    */
+    strcpy(szTempFile, szCurDir);
+    strcat(szTempFile, TriangleFile);
+    if (VDKS_TRUE != VDKS_ReadTriangle(szTempFile, &TriangleData, (SIZE_T *)&TriangleVertexCount))
+    {
+        printf("Init : Failed to read triangle data file.");
+        return VDKS_FALSE;
+    }
 
-	glGenBuffers(1, &TriangleGLBuffer);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, TriangleGLBuffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, TriangleVertexCount * sizeof(unsigned short), TriangleData, GL_STATIC_DRAW);
+    glGenBuffers(1, &TriangleGLBuffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, TriangleGLBuffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, TriangleVertexCount * sizeof(unsigned short), TriangleData, GL_STATIC_DRAW);
 
-	/*
-	 * Matrix
-	*/
-	do
-	{
-		VDKS_Func_Matrix_Inverse(ModelView, MV_INV_TRANS);
-		VDKS_Func_Matrix_Transpose(MV_INV_TRANS);
-	}
-	while(0);
+    /*
+     * Matrix
+    */
+    do
+    {
+        VDKS_Func_Matrix_Inverse(ModelView, MV_INV_TRANS);
+        VDKS_Func_Matrix_Transpose(MV_INV_TRANS);
+    }
+    while(0);
 
-	/*
-	* Shaders
-	*/
-	Program = glCreateProgram();
+    /*
+    * Shaders
+    */
+    Program = glCreateProgram();
 
-	glBindAttribLocation(Program, PositionVertexAttributeArrayIndex, "position");
-	glBindAttribLocation(Program, NormalVertexAttributeArrayIndex, "normal");
+    glBindAttribLocation(Program, PositionVertexAttributeArrayIndex, "position");
+    glBindAttribLocation(Program, NormalVertexAttributeArrayIndex, "normal");
 
-	Program = VDKS_Func_MakeShaderProgram2(szVSFile, szFGFile, Program);
+    Program = VDKS_Func_MakeShaderProgram2(szVSFile, szFGFile, Program);
 
-	if (Program == 0)
-	{
-		printf("Failed to make test program.");
-		return VDKS_FALSE;
-	}
+    if (Program == 0)
+    {
+        printf("Failed to make test program.");
+        return VDKS_FALSE;
+    }
 
-	/*
-	*	Attributes
-	*/
-	do
-	{
-		int		index = 0;
-		GLint	nr_act_att = 0;
-		char *	name  = NULL;
-		GLsizei bufsize = 128;
+    /*
+    *    Attributes
+    */
+    do
+    {
+        int        index = 0;
+        GLint    nr_act_att = 0;
+        char *    name  = NULL;
+        GLsizei bufsize = 128;
 
-		GLint	location = 0;
+        GLint    location = 0;
 
 
-		glGetProgramiv(Program, GL_ACTIVE_ATTRIBUTES, &nr_act_att);
+        glGetProgramiv(Program, GL_ACTIVE_ATTRIBUTES, &nr_act_att);
 
-		name = malloc(bufsize);
-		if (NULL == name) {
-			printf("out-of-memory\n");
-			return VDKS_FALSE;
-		}
+        name = malloc(bufsize);
+        if (NULL == name) {
+            printf("out-of-memory\n");
+            return VDKS_FALSE;
+        }
 
-		for (index = 0; index < nr_act_att; index++)
-		{
-			GLsizei length;
-			GLenum	type;
-			GLint	size = 0;
-			glGetActiveAttrib(Program, index, bufsize, &length, &size, &type, name);
+        for (index = 0; index < nr_act_att; index++)
+        {
+            GLsizei length;
+            GLenum    type;
+            GLint    size = 0;
+            glGetActiveAttrib(Program, index, bufsize, &length, &size, &type, name);
 
-			if (!strcmp(name, "position"))
-			{
-				assert(size == 1);
-				assert(type == GL_FLOAT_VEC3);
+            if (!strcmp(name, "position"))
+            {
+                assert(size == 1);
+                assert(type == GL_FLOAT_VEC3);
 
-				location = glGetAttribLocation(Program, name);
-				assert( location == PositionVertexAttributeArrayIndex);
+                location = glGetAttribLocation(Program, name);
+                assert( location == PositionVertexAttributeArrayIndex);
 
-			}
-			else if (!strcmp(name, "normal"))
-			{
-				assert(size == 1);
-				assert(type == GL_FLOAT_VEC3);
+            }
+            else if (!strcmp(name, "normal"))
+            {
+                assert(size == 1);
+                assert(type == GL_FLOAT_VEC3);
 
-				location = glGetAttribLocation(Program, name);
-				assert( location == NormalVertexAttributeArrayIndex);
-			}
-			else
-			{
-				printf("The attribute name is not in handling.");
-				free(name);
-				return VDKS_FALSE;
-			}
-		}
+                location = glGetAttribLocation(Program, name);
+                assert( location == NormalVertexAttributeArrayIndex);
+            }
+            else
+            {
+                printf("The attribute name is not in handling.");
+                free(name);
+                return VDKS_FALSE;
+            }
+        }
 
-		free(name);
-	}
-	while(0);
+        free(name);
+    }
+    while(0);
 
-	/*
-	 * Uniforms
-	*/
-	do
-	{
-		GLint nr_act_uni = 0;
+    /*
+     * Uniforms
+    */
+    do
+    {
+        GLint nr_act_uni = 0;
 
-		GLint i = 0;
+        GLint i = 0;
 
-		char *	name  = NULL;
-		GLsizei bufsize = 128;
-		GLint location = 0;
+        char *    name  = NULL;
+        GLsizei bufsize = 128;
+        GLint location = 0;
 
-		name = malloc(bufsize);
-		if (NULL == name) {
-			printf("out-of-memory\n");
-			return VDKS_FALSE;
-		}
+        name = malloc(bufsize);
+        if (NULL == name) {
+            printf("out-of-memory\n");
+            return VDKS_FALSE;
+        }
 
-		glGetProgramiv(Program, GL_ACTIVE_UNIFORMS, &nr_act_uni);
+        glGetProgramiv(Program, GL_ACTIVE_UNIFORMS, &nr_act_uni);
 
-		glUseProgram(Program);
+        glUseProgram(Program);
 
-		for(i = 0; i < nr_act_uni; i++)
-		{
-			GLsizei length;
-			GLenum	type;
-			GLint	size = 0;
-			glGetActiveUniform(Program, i, bufsize, &length, &size, &type, name);
+        for(i = 0; i < nr_act_uni; i++)
+        {
+            GLsizei length;
+            GLenum    type;
+            GLint    size = 0;
+            glGetActiveUniform(Program, i, bufsize, &length, &size, &type, name);
 
-			if (!strcmp(name, "mv"))
-			{
-				assert(size == 1);
-				assert(type == GL_FLOAT_MAT4);
+            if (!strcmp(name, "mv"))
+            {
+                assert(size == 1);
+                assert(type == GL_FLOAT_MAT4);
 
-				location = glGetUniformLocation(Program, name);
-				glUniformMatrix4fv(location, 1, GL_FALSE, ModelView);
-			}
-			else if (!strcmp(name, "mvp"))
-			{
+                location = glGetUniformLocation(Program, name);
+                glUniformMatrix4fv(location, 1, GL_FALSE, ModelView);
+            }
+            else if (!strcmp(name, "mvp"))
+            {
 
-				assert(size == 1);
-				assert(type == GL_FLOAT_MAT4);
+                assert(size == 1);
+                assert(type == GL_FLOAT_MAT4);
 
-				location = glGetUniformLocation(Program, name);
-				glUniformMatrix4fv(location, 1, GL_FALSE, MVP);
-			}
-			else if (!strcmp(name, "mv_inverse_transpose"))
-			{
+                location = glGetUniformLocation(Program, name);
+                glUniformMatrix4fv(location, 1, GL_FALSE, MVP);
+            }
+            else if (!strcmp(name, "mv_inverse_transpose"))
+            {
 
-				assert(size == 1);
-				assert(type == GL_FLOAT_MAT4);
+                assert(size == 1);
+                assert(type == GL_FLOAT_MAT4);
 
-				location = glGetUniformLocation(Program, name);
-				glUniformMatrix4fv(location, 1, GL_FALSE, MV_INV_TRANS);
-			}
-			else if (!strcmp(name, "ball_size"))
-			{
-				assert(size == 1);
-				assert(type == GL_FLOAT);
+                location = glGetUniformLocation(Program, name);
+                glUniformMatrix4fv(location, 1, GL_FALSE, MV_INV_TRANS);
+            }
+            else if (!strcmp(name, "ball_size"))
+            {
+                assert(size == 1);
+                assert(type == GL_FLOAT);
 
-				location = glGetUniformLocation(Program, name);
+                location = glGetUniformLocation(Program, name);
 
-				glUniform1f(location, BallSize);
-			}
-			else if (!strcmp(name, "bounce_speed"))
-			{
-				assert(size == 1);
-				assert(type == GL_FLOAT);
+                glUniform1f(location, BallSize);
+            }
+            else if (!strcmp(name, "bounce_speed"))
+            {
+                assert(size == 1);
+                assert(type == GL_FLOAT);
 
-				location = glGetUniformLocation(Program, name);
+                location = glGetUniformLocation(Program, name);
 
-				glUniform1f(location, BounceSpeed);
-			}
-			else if (!strcmp(name, "bounce_height"))
-			{
-				assert(size == 1);
-				assert(type == GL_FLOAT);
+                glUniform1f(location, BounceSpeed);
+            }
+            else if (!strcmp(name, "bounce_height"))
+            {
+                assert(size == 1);
+                assert(type == GL_FLOAT);
 
-				location = glGetUniformLocation(Program, name);
+                location = glGetUniformLocation(Program, name);
 
-				glUniform1f(location, BounceHeight);
-			}
-			else if (!strcmp(name, "time"))
-			{
-				assert(size == 1);
-				assert(type == GL_FLOAT);
+                glUniform1f(location, BounceHeight);
+            }
+            else if (!strcmp(name, "time"))
+            {
+                assert(size == 1);
+                assert(type == GL_FLOAT);
 
-				TimeLocation = glGetUniformLocation(Program, name);
+                TimeLocation = glGetUniformLocation(Program, name);
 
-				assert(TimeLocation);
-			}
-			else if (!strcmp(name, "light_dir"))
-			{
-				assert(size == 1);
-				assert(type == GL_FLOAT_VEC4);
+                assert(TimeLocation);
+            }
+            else if (!strcmp(name, "light_dir"))
+            {
+                assert(size == 1);
+                assert(type == GL_FLOAT_VEC4);
 
-				location = glGetUniformLocation(Program, name);
+                location = glGetUniformLocation(Program, name);
 
-				assert(location);
+                assert(location);
 
-				glUniform4fv(location, 1, LightDirection);
-			}
-			else if (!strcmp(name, "ball_color"))
-			{
-				assert(size == 1);
-				assert(type == GL_FLOAT_VEC4);
+                glUniform4fv(location, 1, LightDirection);
+            }
+            else if (!strcmp(name, "ball_color"))
+            {
+                assert(size == 1);
+                assert(type == GL_FLOAT_VEC4);
 
-				location = glGetUniformLocation(Program, name);
+                location = glGetUniformLocation(Program, name);
 
-				assert(location);
+                assert(location);
 
-				glUniform4fv(location, 1, BallColor);
-			}
-			else
-			{
-				printf("The uniform name is not in handling.");
-				return VDKS_FALSE;
-			}
-		}
+                glUniform4fv(location, 1, BallColor);
+            }
+            else
+            {
+                printf("The uniform name is not in handling.");
+                return VDKS_FALSE;
+            }
+        }
 
-		free(name);
+        free(name);
 
-		glUseProgram(0);
-	}
-	while(0);
+        glUseProgram(0);
+    }
+    while(0);
 
-	/*
-	 * Miscellaneous GL States
-	*/
+    /*
+     * Miscellaneous GL States
+    */
 
-	VDKS_Macro_CheckGLError();
-	return VDKS_TRUE;
+    VDKS_Macro_CheckGLError();
+    return VDKS_TRUE;
 }
 
 void BallPass()
 {
-	/*
-	*	Attributes.
-	*/
+    /*
+    *    Attributes.
+    */
 
-	VDKS_Func_DisableAllVertexAttributeArray();
+    VDKS_Func_DisableAllVertexAttributeArray();
 
-	glBindBuffer(GL_ARRAY_BUFFER, PositionGLBuffer);
-	glVertexAttribPointer(PositionVertexAttributeArrayIndex, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(PositionVertexAttributeArrayIndex);
+    glBindBuffer(GL_ARRAY_BUFFER, PositionGLBuffer);
+    glVertexAttribPointer(PositionVertexAttributeArrayIndex, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(PositionVertexAttributeArrayIndex);
 
-	glBindBuffer(GL_ARRAY_BUFFER, NormalGLBuffer);
-	glVertexAttribPointer(NormalVertexAttributeArrayIndex, 3, GL_FLOAT, GL_FALSE, 0, 0);
-	glEnableVertexAttribArray(NormalVertexAttributeArrayIndex);
+    glBindBuffer(GL_ARRAY_BUFFER, NormalGLBuffer);
+    glVertexAttribPointer(NormalVertexAttributeArrayIndex, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(NormalVertexAttributeArrayIndex);
 
 
-	glUseProgram(Program);
+    glUseProgram(Program);
 
-	glUniform1f(TimeLocation, passed_time);
+    glUniform1f(TimeLocation, passed_time);
 
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, TriangleGLBuffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, TriangleGLBuffer);
 
-	glDrawElements(GL_TRIANGLES, TriangleVertexCount, GL_UNSIGNED_SHORT, 0);
+    glDrawElements(GL_TRIANGLES, TriangleVertexCount, GL_UNSIGNED_SHORT, 0);
 
-	VDKS_Macro_CheckGLError();
+    VDKS_Macro_CheckGLError();
 
-	glUseProgram(0);
+    glUseProgram(0);
 
-	glFinish();
+    glFinish();
 }
 

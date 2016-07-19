@@ -26,6 +26,7 @@
 ##############################################################################
 
 
+
 DOSYSGEN = 1
 SYNCHRONIZE_DRAIN = 1
 
@@ -36,7 +37,7 @@ EXEENTRY = WinMain
 SOURCES = main.cpp
 
 
-INCLUDES = $(INCLUDES);$(VIVANTE_SDK_INC);$(VIVANTE_SDK_INC)/HAL;$(AQROOT)/sdk/inc
+INCLUDES = $(INCLUDES);$(VIVANTE_SDK_INC)
 
 
 TARGETLIBS = $(_SYSGENSDKROOT)\lib\$(_CPUINDPATH)\coredll.lib \

@@ -17,6 +17,7 @@
 #define _GC_OBJ_ZONE    gcdZONE_EGL_API
 
 #if defined(WL_EGL_PLATFORM)
+#include <gc_hal_eglplatform.h>
 #include "wayland-server.h"
 #endif
 
@@ -68,7 +69,7 @@ eglSwapInterval(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    if (dpy->hdc == (NativeDisplayType)gcvNULL)
+    if (dpy->hdc == (void *) gcvNULL)
     {
         /* Not initialized. */
         veglSetEGLerror(thread,  EGL_NOT_INITIALIZED);
@@ -87,7 +88,7 @@ eglSwapInterval(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    if (!veglSetSwapInterval(dpy, Interval))
+    if (!dpy->platform->setSwapInterval(dpy, Interval))
     {
         /* Not initialized. */
         veglSetEGLerror(thread,  EGL_NOT_INITIALIZED);
@@ -1056,28 +1057,16 @@ void GL_APIENTRY glTexDirectTiledMapVIV_Entry(EGLenum target, EGLint width, EGLi
 #if defined(WL_EGL_PLATFORM)
 EGLAPI EGLBoolean EGLAPIENTRY eglBindWaylandDisplayWL(EGLDisplay dpy, struct wl_display *display)
 {
-    gcsWL_LOCAL_DISPLAY* wl_localDisplay;
-    gctPOINTER tmp = VEGL_DISPLAY(dpy)->localInfo;
-
-    gcoOS_AllocateMemory(gcvNULL, sizeof *wl_localDisplay, (gctPOINTER) &wl_localDisplay );
-    gcoOS_ZeroMemory( wl_localDisplay, sizeof *wl_localDisplay);
-
-    wl_localDisplay->wl_signature = WL_LOCAL_DISPLAY_SIGNATURE;
-    wl_localDisplay->localInfo = (gctPOINTER)display;
-
-    VEGL_DISPLAY(dpy)->localInfo = wl_localDisplay;
-    veglInitLocalDisplayInfo(VEGL_DISPLAY(dpy));
-
-    VEGL_DISPLAY(dpy)->localInfo = tmp;
-
-    gcoOS_FreeMemory(gcvNULL, wl_localDisplay);
-
-    return EGL_TRUE;
+    VEGLDisplay d = VEGL_DISPLAY(dpy);
+    return veglBindWaylandDisplayWL(d, display);
 }
+
 EGLAPI EGLBoolean EGLAPIENTRY eglUnbindWaylandDisplayWL(EGLDisplay dpy, struct wl_display *display)
 {
-    return veglDeinitLocalDisplayInfo(VEGL_DISPLAY(dpy));
+    VEGLDisplay d = VEGL_DISPLAY(dpy);
+    return veglUnbindWaylandDisplayWL(d, display);
 }
+
 EGLAPI EGLBoolean EGLAPIENTRY eglQueryWaylandBufferWL(EGLDisplay dpy, struct wl_resource *buffer, EGLint attribute, EGLint *value)
 {
     gcsWL_VIV_BUFFER *wl_viv_buffer;
@@ -1164,6 +1153,10 @@ static veglLOOKUP _veglLookup[] =
     eglMAKE_LOOKUP(eglSignalSyncKHR),
     /* EGL_KHR_wait_sync. */
     eglMAKE_LOOKUP(eglWaitSyncKHR),
+    /* EGL_EXT_platform_base. */
+    eglMAKE_LOOKUP(eglGetPlatformDisplayEXT),
+    eglMAKE_LOOKUP(eglCreatePlatformWindowSurfaceEXT),
+    eglMAKE_LOOKUP(eglCreatePlatformPixmapSurfaceEXT),
 #if defined(WL_EGL_PLATFORM)
     /* EGL_WL_bind_wayland_display. */
     eglMAKE_LOOKUP(eglBindWaylandDisplayWL),

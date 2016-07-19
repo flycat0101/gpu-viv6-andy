@@ -53,16 +53,16 @@ typedef struct Test2D {
     GalTest     base;
     GalRuntime  *runtime;
 
-	// destination surface
-    gcoSURF			dstSurf;
-	gceSURF_FORMAT	dstFormat;
-	gctUINT			dstWidth;
-	gctUINT			dstHeight;
-	gctINT			dstStride;
-	gctUINT32		dstPhyAddr;
-	gctPOINTER		dstLgcAddr;
+    // destination surface
+    gcoSURF            dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT            dstWidth;
+    gctUINT            dstHeight;
+    gctINT            dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
 
-	/* misc. */
+    /* misc. */
     gctUINT         rotationNum;
 } Test2D;
 
@@ -78,12 +78,12 @@ static gceSURF_ROTATION rotationList [] =
 
 static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 {
-	gcsRECT   dstRect = { 0, 0, t2d->dstWidth, t2d->dstHeight };
+    gcsRECT   dstRect = { 0, 0, t2d->dstWidth, t2d->dstHeight };
     gcsRECT   clipRect;
     gcsRECT   rects[10];
     gctUINT32 rectNum = 0;
-	gco2D     egn2D   = t2d->runtime->engine2d;
-	gceSTATUS status  = gcvSTATUS_OK;
+    gco2D     egn2D   = t2d->runtime->engine2d;
+    gceSTATUS status  = gcvSTATUS_OK;
     gctUINT   i, j;
     gceSURF_ROTATION  rot;
     gctUINT   delta   = gcmMIN(t2d->dstWidth, t2d->dstHeight);
@@ -152,19 +152,19 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 OnError:
     GalOutput(GalOutputType_Error | GalOutputType_Console,
         "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
-	return gcvFALSE;
+    return gcvFALSE;
 }
 
 static void CDECL Destroy(Test2D *t2d)
 {
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
     if ((t2d->dstSurf != gcvNULL) && (t2d->dstLgcAddr != gcvNULL))
     {
-		if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
-		}
-		t2d->dstLgcAddr = gcvNULL;
+        if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
+        }
+        t2d->dstLgcAddr = gcvNULL;
     }
 
     free(t2d);
@@ -177,7 +177,7 @@ const gceFEATURE FeatureList[]=
 
 static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 {
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
     gctINT    argc   = runtime->argc;
     gctSTRING *argv  = runtime->argv;
 
@@ -211,33 +211,33 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     memset(t2d, 0, sizeof(Test2D));
 
     t2d->runtime     = runtime;
-	t2d->dstSurf     = runtime->target;
-	t2d->dstFormat   = runtime->format;
-	t2d->dstWidth    = 0;
-	t2d->dstHeight   = 0;
-	t2d->dstStride   = 0;
-	t2d->dstPhyAddr  = 0;
-	t2d->dstLgcAddr  = 0;
+    t2d->dstSurf     = runtime->target;
+    t2d->dstFormat   = runtime->format;
+    t2d->dstWidth    = 0;
+    t2d->dstHeight   = 0;
+    t2d->dstStride   = 0;
+    t2d->dstPhyAddr  = 0;
+    t2d->dstLgcAddr  = 0;
     t2d->rotationNum = gcmCOUNTOF(rotationList);
 
-	gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
-										&t2d->dstWidth,
-										&t2d->dstHeight,
-										&t2d->dstStride));
+    gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
+                                        &t2d->dstWidth,
+                                        &t2d->dstHeight,
+                                        &t2d->dstStride));
 
-	gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
+    gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
 
-	t2d->base.render      = (PGalRender)Render;
+    t2d->base.render      = (PGalRender)Render;
     t2d->base.destroy     = (PGalDestroy)Destroy;
     t2d->base.frameCount  = t2d->rotationNum * 2;
-	t2d->base.description = s_CaseDescription;
+    t2d->base.description = s_CaseDescription;
 
     return gcvTRUE;
 
 OnError:
     GalOutput(GalOutputType_Error | GalOutputType_Console,
         "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
-	return gcvFALSE;
+    return gcvFALSE;
 }
 
 GalTest * CDECL GalCreateTestObject(GalRuntime *runtime)

@@ -219,6 +219,13 @@ static gceSTATUS RenderSubFrame(Test2D *t2d, gctUINT frameNo, gctUINT subFrameIn
                 t2d->surf[surfaceIndex]->superTileVersion);
         }
 
+        /* Disable multiply first. */
+        gcmONERROR(gco2D_SetPixelMultiplyModeAdvanced(egn2D,
+            gcv2D_COLOR_MULTIPLY_DISABLE,
+            gcv2D_COLOR_MULTIPLY_DISABLE,
+            gcv2D_GLOBAL_COLOR_MULTIPLY_DISABLE,
+            gcv2D_COLOR_MULTIPLY_DISABLE));
+
         if (surfaceIndex < 6)
         {
             gcmONERROR(gco2D_EnableAlphaBlend(egn2D,
@@ -290,7 +297,16 @@ static gceSTATUS RenderSubFrame(Test2D *t2d, gctUINT frameNo, gctUINT subFrameIn
 
     gcmONERROR(gco2D_MultiSourceBlit(egn2D, 0xff, &Rect, 1));
 
+    gcmONERROR(gco2D_SetCurrentSourceIndex(egn2D, 0));
+
     gcmONERROR(gco2D_DisableAlphaBlend(egn2D));
+
+    gcmONERROR(gco2D_SetPixelMultiplyModeAdvanced(
+        egn2D,
+        gcv2D_COLOR_MULTIPLY_DISABLE,
+        gcv2D_COLOR_MULTIPLY_DISABLE,
+        gcv2D_GLOBAL_COLOR_MULTIPLY_DISABLE,
+        gcv2D_COLOR_MULTIPLY_DISABLE));
 
     gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvFALSE, gcvFALSE));
 
@@ -352,13 +368,6 @@ static gceSTATUS RenderSubFrame(Test2D *t2d, gctUINT frameNo, gctUINT subFrameIn
 
     gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
 
-#if 0
-    {
-        char buff[128];
-        sprintf(buff, "%03d.bmp", subFrameIndex);
-        GalSaveTSurfToDIB(result, buff);
-    }
-#endif
 
 OnError:
     if (compressedTarget)
@@ -600,7 +609,7 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     runtime->cleanTarget = gcvFALSE;
 
     // create source surface
-	for (i = 0; i < gcmCOUNTOF(t2d->surf); ++i)
+    for (i = 0; i < gcmCOUNTOF(t2d->surf); ++i)
     {
         if (!InitSourceSurface(t2d, i))
             gcmONERROR(gcvSTATUS_NOT_FOUND);

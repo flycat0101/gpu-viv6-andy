@@ -482,7 +482,8 @@ gcoHARDWARE_QueryCommandBuffer(
     OUT gctUINT32 * ReservedHead,
     OUT gctUINT32 * ReservedTail,
     OUT gctUINT32 * ReservedUser,
-    OUT gceCMDBUF_SOURCE *Source
+    OUT gceCMDBUF_SOURCE * Source,
+    OUT gctUINT32 * MGPUModeSwitchBytes
     );
 
 /* Select a graphics pipe. */
@@ -554,6 +555,14 @@ gcoHARDWARE_LoadCtrlStateNEW(
     INOUT gctPOINTER *Memory
     );
 
+gceSTATUS
+gcoHARDWARE_LoadCtrlStateNEW_GPU0(
+    IN gcoHARDWARE Hardware,
+    IN gctUINT32 Address,
+    IN gctUINT32 Data,
+    INOUT gctPOINTER *Memory
+    );
+
 /* Load a number of load states in fixed-point (3D pipe). */
 gceSTATUS
 gcoHARDWARE_LoadStateX(
@@ -615,6 +624,12 @@ gcoHARDWARE_MultiGPUSync(
     IN gcoHARDWARE Hardware,
     OUT gctUINT32_PTR *Memory
 );
+
+gceSTATUS
+gcoHARDWARE_MultiGPUCacheFlush(
+    IN gcoHARDWARE Hardware,
+    OUT gctUINT32_PTR *Memory
+    );
 
 gceSTATUS
 gcoHARDWARE_QueryReset(
@@ -824,7 +839,7 @@ gcoHARDWARE_CallEvent(
 /* Schedule destruction for the specified video memory node. */
 gceSTATUS
 gcoHARDWARE_ScheduleVideoMemory(
-    IN gcsSURF_NODE_PTR Node
+    IN gctUINT32 Node
     );
 
 /* Allocate a temporary surface with specified parameters. */
@@ -1023,6 +1038,12 @@ gcoHARDWARE_QuerySuperTileMode(
 
 gceSTATUS
 gcoHARDWARE_QueryMultiGPUSyncLength(
+    IN gcoHARDWARE Hardware,
+    OUT gctUINT32_PTR Bytes
+    );
+
+gceSTATUS
+gcoHARDWARE_QueryMultiGPUCacheFlushLength(
     IN gcoHARDWARE Hardware,
     OUT gctUINT32_PTR Bytes
     );
@@ -1509,6 +1530,12 @@ gcoHARDWARE_QueryFormat(
     OUT gcsSURF_FORMAT_INFO_PTR * Info
     );
 
+gceSTATUS
+gcoHARDWARE_QueryBPP(
+    IN gceSURF_FORMAT Format,
+    OUT gctFLOAT_PTR BppArray
+    );
+
 /* Copy data into video memory. */
 gceSTATUS
 gcoHARDWARE_CopyData(
@@ -1773,33 +1800,19 @@ gcoDECHARDWARE_FlushDECCompression(
 #define gcmHAS2DCOMPRESSION(Surface) \
     ((Surface)->tileStatusConfig == gcv2D_TSC_2D_COMPRESSED)
 
-#if gcdENABLE_DEC_COMPRESSION
 #define gcmHASOTHERCOMPRESSION(Surface) \
     ( \
-        (Surface)->tileStatusConfig == gcv2D_TSC_TPC_COMPRESSED \
+        ((Surface)->tileStatusConfig & gcv2D_TSC_TPC_COMPRESSED) \
      || ((Surface)->tileStatusConfig & gcv2D_TSC_DEC_COMPRESSED) \
      || ((Surface)->tileStatusConfig & gcv2D_TSC_V4_COMPRESSED) \
     )
 
 #define gcmHASOTHERCOMPRESSIONNO3D(Surface) \
     ( \
-        (Surface)->tileStatusConfig == gcv2D_TSC_TPC_COMPRESSED \
+        ((Surface)->tileStatusConfig & gcv2D_TSC_TPC_COMPRESSED) \
      || (((Surface)->tileStatusConfig & gcv2D_TSC_DEC_COMPRESSED) && \
           !((Surface)->tileStatusConfig & (gcv2D_TSC_ENABLE | gcv2D_TSC_COMPRESSED | gcv2D_TSC_DOWN_SAMPLER | gcv2D_TSC_V4_COMPRESSED))) \
     )
-#else
-#define gcmHASOTHERCOMPRESSION(Surface) \
-    ( \
-        (Surface)->tileStatusConfig == gcv2D_TSC_TPC_COMPRESSED \
-      || ((Surface)->tileStatusConfig & gcv2D_TSC_V4_COMPRESSED) \
-    )
-
-#define gcmHASOTHERCOMPRESSIONNO3D(Surface) \
-    ( \
-        (Surface)->tileStatusConfig == gcv2D_TSC_TPC_COMPRESSED \
-     || (!((Surface)->tileStatusConfig & (gcv2D_TSC_ENABLE | gcv2D_TSC_COMPRESSED | gcv2D_TSC_DOWN_SAMPLER | gcv2D_TSC_V4_COMPRESSED))) \
-    )
-#endif
 
 #define gcmHASCOMPRESSION(Surface) \
     ( \
@@ -2875,7 +2888,8 @@ gcoHARDWARE_GetContext(
 
 gceSTATUS
 gcoHARDWARE_EnableCounters(
-    IN gcoHARDWARE Hardware
+    IN gcoHARDWARE Hardware,
+    IN gcsPROBEBUFFER *ProbeBuffer
     );
 
 #if VIVANTE_PROFILER_PROBE
@@ -2884,7 +2898,8 @@ gcoHARDWARE_ProbeCounter(
     IN gcoHARDWARE Hardware,
     IN gctUINT32 address,
     IN gceCOUNTER module,
-    IN gctBOOL enable
+    IN gctBOOL enable,
+    INOUT gctPOINTER *Memory
     );
 #endif
 
@@ -2909,7 +2924,6 @@ gcoBUFFER_Construct(
     IN gcoHAL Hal,
     IN gcoHARDWARE Hardware,
     IN gceENGINE Engine,
-    IN gctUINT32 Context,
     IN gctSIZE_T MaxSize,
     IN gctBOOL ThreadDefault,
     OUT gcoBUFFER * Buffer
@@ -2981,6 +2995,7 @@ gcoBUFFER_Commit(
     IN gcePIPE_SELECT CurrentPipe,
     IN gcsSTATE_DELTA_PTR StateDelta,
     IN gcsSTATE_DELTA_PTR *StateDeltas,
+    IN gctUINT32 Context,
     IN gctUINT32_PTR Contexts,
     IN gcoQUEUE Queue,
     OUT gctPOINTER *DumpLogical,
@@ -3335,11 +3350,10 @@ struct _gcoSURF
     gctUINT32                   tileStatusClearValue;
     gctUINT32                   tileStatusGpuAddress;
 
-#if gcdENABLE_DEC_COMPRESSION
+    /* For 2D DEC Compression. */
     gctBOOL                     srcDECTPC10BitNV12;
     /* For possible YUV compression. */
     gctUINT32                   tileStatusGpuAddressEx[2];
-#endif
 
     /* Format information. */
     gcsSURF_FORMAT_INFO         formatInfo;
@@ -3559,7 +3573,6 @@ typedef struct _gcs2D_State
     gctBOOL                     unifiedDstRect;
 
     gctBOOL                     multiBilinearFilter;
-    gcsRECT                     dstRect;
 
    /* XRGB */
     gctBOOL                     enableXRGB;
@@ -3568,6 +3581,7 @@ typedef struct _gcs2D_State
 
     gce2D_COMMAND               command;
 
+    gcsRECT_PTR                 dstRect;
     gctUINT32                   dstRectCount;
 
 } gcs2D_State;
@@ -3746,7 +3760,7 @@ struct _gcsVERTEXARRAY_BUFOBJ_ATTRIBUTE
 
     gctBOOL                                 enabled;
 
-    gctUINT32                               offset;
+    gctSIZE_T                               offset;
 
     gctCONST_POINTER                        pointer;
 
@@ -3788,7 +3802,7 @@ struct _gcsVERTEXARRAY_BUFOBJ
     gctUINT                                 attributeCount;
     gcsVERTEXARRAY_BUFOBJ_ATTRIBUTE_PTR     attributePtr;
 
-    gctUINT                                 maxAttribOffset;
+    gctSIZE_T                               maxAttribOffset;
 
     /* pointer to next stream */
     gcsVERTEXARRAY_BUFOBJ_PTR               next;
@@ -4391,6 +4405,11 @@ gcoHAL_FreeTXDescArray(
 #endif
 
 extern const gcsSAMPLES g_sampleInfos[];
+
+#if gcdDUMP_2D
+extern gctPOINTER dumpMemInfoListMutex;
+extern gctBOOL    dump2DFlag;
+#endif
 
 #ifdef __cplusplus
 }

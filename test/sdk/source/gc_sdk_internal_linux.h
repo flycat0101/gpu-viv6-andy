@@ -40,12 +40,12 @@ extern "C" {
 
 struct _gcsAPPLICATION
 {
-	/* Number of the passed arguments. */
-	int argCount;
+    /* Number of the passed arguments. */
+    int argCount;
 
-	/* An array of null-terminated strings representing command-line
-	   arguments entered by the user of the program. */
-	char** argPointer;
+    /* An array of null-terminated strings representing command-line
+       arguments entered by the user of the program. */
+    char** argPointer;
 };
 
 

@@ -1,5 +1,3 @@
-
-
 package com.vivantecorp.graphics.tutorial7;
 
 // Wrapper for native library

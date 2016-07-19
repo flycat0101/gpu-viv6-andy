@@ -26071,6 +26071,31 @@ gcGetOptionFromEnv(
             }
 
              /*
+              * Handle OCL relaxing local address space in OCV
+              *
+              *   VC_OPTION=-OCLOCVLOCALADDRESSSPACE:0|1
+              *
+              */
+            gcoOS_StrStr(p, "-OCLOCVLOCALADDRESSSPACE:", &pos);
+            if (pos)
+            {
+                gctINT value=-1;
+                pos += sizeof("-OCLOCVLOCALADDRESSSPACE:") -1;
+                gcoOS_StrToInt(pos, &value);
+
+                if (value == 0)
+                {
+                    /* turn off ocl relaxing local address space in OCV */
+                    Option->oclOcvLocalAddressSpace = gcvFALSE;
+                }
+                else if (value == 1)
+                {
+                    /* turn on ocl relaxing local address space in OCV */
+                    Option->oclOcvLocalAddressSpace = gcvTRUE;
+                }
+            }
+
+             /*
               * Handle OCL long and ulong
               *
               *   VC_OPTION=-OCLHASLONG:0|1

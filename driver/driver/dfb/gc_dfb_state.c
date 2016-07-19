@@ -60,6 +60,20 @@ typedef enum {
                                   GMF_GLOBAL_COLOR_MODE_AgAg | \
                                   GMF_GLOBAL_COLOR_MODE_CgAgAg )
 
+#if GAL_SURFACE_COMPRESSED
+typedef struct _FBStruct
+{
+    unsigned int fb_address;
+    unsigned int fb_ts_address;
+    unsigned int fb_ts_size;
+}
+FBStruct;
+static FBStruct fb_pack[3] = {
+    {0x28000000, 0x2E000000, 0x100000},
+    {0x29FD1000, 0x2E100000, 0x100000},
+    {0x2BFA2000, 0x2E200000, 0x100000},
+};
+#endif
 
 static const unsigned int modulate_flags[] = {
     /* None. */
@@ -554,6 +568,26 @@ gal_validate_destination( GalDriverData          *vdrv,
                 gcmERR_BREAK( gcoSURF_Unlock( alloc->surf, gcvNULL ));
             }
 
+#if GAL_SURFACE_COMPRESSED
+            if (vdrv->vdev->hw_2d_compression)
+            {
+                vdrv->dst_tiling = gcvLINEAR;
+                if (!vdrv->per_process_compression)
+                {
+                    vdrv->dst_tile_status = alloc->tsphysical ==
+                                            gcvINVALID_ADDRESS ? gcv2D_TSC_DISABLE : gcv2D_TSC_2D_COMPRESSED;
+                }
+                vdrv->dst_tile_status_addr = alloc->tsphysical;
+                vdrv->dst_tile_status_logical = alloc->tslogical;
+                vdrv->dst_tile_status_size = alloc->tssize;
+
+                vdrv->dst_width  = state->destination->config.size.w;
+                vdrv->dst_height = state->destination->config.size.h;
+                vdrv->tmp_dst_format = vdrv->dst_native_format;
+                gcmERR_BREAK(_AllocateTempSurf( vdrv, vdrv->vdev ));
+            }
+#endif
+
             D_DEBUG_AT( Gal_State,
                         "Dest surface is allocated from GAL surface pool.\n" );
 
@@ -627,6 +661,42 @@ gal_validate_destination( GalDriverData          *vdrv,
             }
 
             vdrv->dst_phys_addr = mapping->gpu_addr;
+
+#if GAL_SURFACE_COMPRESSED
+            if (vdrv->vdev->hw_2d_compression)
+            {
+                unsigned int i, count = gcmCOUNTOF(fb_pack);
+
+                vdrv->dst_tiling = gcvLINEAR;
+                for (i=0; i<count; i++)
+                {
+                    if (state->dst.phys == fb_pack[i].fb_address)
+                    {
+                        vdrv->dst_tile_status = gcv2D_TSC_2D_COMPRESSED;
+                        vdrv->dst_tile_status_addr = fb_pack[i].fb_ts_address;
+                        vdrv->dst_tile_status_size = fb_pack[i].fb_ts_size;
+
+                        vdrv->dst_width  = state->destination->config.size.w;
+                        vdrv->dst_height = state->destination->config.size.h;
+                        vdrv->tmp_dst_format = vdrv->dst_native_format;
+                        gcmERR_BREAK(_AllocateTempSurf( vdrv, vdrv->vdev ));
+                        break;
+                    }
+                }
+
+                if (i == count)
+                {
+                    if (vdrv->per_process_compression &&
+                        vdrv->dst_tile_status != gcv2D_TSC_DISABLE)
+                    {
+                        vdrv->flush = true;
+                    }
+                    vdrv->dst_tile_status = gcv2D_TSC_DISABLE;
+                    vdrv->dst_tile_status_addr = gcvINVALID_ADDRESS;
+                    vdrv->dst_tile_status_size = 0;
+                }
+            }
+#endif
         }
         vdrv->last_dst_phys_addr = state->dst.phys;
         vdrv->dst_logic_addr     = state->dst.addr;
@@ -735,6 +805,18 @@ gal_validate_source( GalDriverData          *vdrv,
                 /* else if ( alloc->prealloc_addr ) */
                     /* TODO: Flush CPU cache here */
 
+#if GAL_SURFACE_COMPRESSED
+                if (vdrv->vdev->hw_2d_compression)
+                {
+                    vdrv->src_tiling = gcvLINEAR;
+                    vdrv->src_tile_status = alloc->tsphysical ==
+                                            gcvINVALID_ADDRESS ? gcv2D_TSC_DISABLE : gcv2D_TSC_2D_COMPRESSED;
+                    vdrv->src_tile_status_addr = alloc->tsphysical;
+                    vdrv->src_tile_status_logical = alloc->tslogical;
+                    vdrv->src_tile_status_size = alloc->tssize;
+                }
+#endif
+
                 D_DEBUG_AT( Gal_State,
                             "Source surface is allocated from GAL surface pool.\n" );
 
@@ -806,6 +888,42 @@ gal_validate_source( GalDriverData          *vdrv,
                 }
 
                 vdrv->src_phys_addr[0] = mapping->gpu_addr;
+#if GAL_SURFACE_COMPRESSED
+                if (vdrv->vdev->hw_2d_compression)
+                {
+                    unsigned int i, count = gcmCOUNTOF(fb_pack);
+
+                    for (i=0; i<count; i++)
+                    {
+                        if (state->src.phys == fb_pack[i].fb_address)
+                        {
+                            if (vdrv->per_process_compression &&
+                                vdrv->src_tile_status != gcv2D_TSC_2D_COMPRESSED)
+                            {
+                                vdrv->flush = true;
+                            }
+                            vdrv->src_tile_status = gcv2D_TSC_2D_COMPRESSED;
+                            vdrv->src_tile_status_addr = fb_pack[i].fb_ts_address;
+                            vdrv->src_tile_status_size = fb_pack[i].fb_ts_size;
+                            break;
+                        }
+                    }
+
+                    vdrv->src_tiling = gcvLINEAR;
+                    if (i == count)
+                    {
+                        if (vdrv->per_process_compression &&
+                            vdrv->src_tile_status != gcv2D_TSC_DISABLE)
+                        {
+                            vdrv->flush = true;
+                        }
+
+                        vdrv->src_tile_status = gcv2D_TSC_DISABLE;
+                        vdrv->src_tile_status_addr = gcvINVALID_ADDRESS;
+                        vdrv->src_tile_status_size = 0;
+                    }
+                }
+#endif
             }
             vdrv->last_src_phys_addr = state->src.phys;
             vdrv->src_logic_addr[0]  = state->src.addr;
@@ -1248,6 +1366,30 @@ gal_validate_df_blend( GalDriverData          *vdrv,
 
     /* Invalidate the relatives of the HW. */
     GAL_HSVF_INVALIDATE( HSVF_BLEND );
+
+    return;
+}
+
+static inline void
+gal_validate_df_src_colorkey( GalDriverData          *vdrv,
+                              CardState              *state,
+                              DFBSurfaceDrawingFlags  modified )
+{
+    D_ASSERT( vdrv  != NULL);
+    D_ASSERT( state != NULL);
+
+    D_DEBUG_ENTER( Gal_State, "\n" );
+
+    /* Just disable source color key for draw operation. */
+    if (!vdrv->vdev->hw_2d_pe20) {
+        vdrv->blit_trans = gcvSURF_OPAQUE;
+    } else {
+        vdrv->src_trans_mode = gcv2D_OPAQUE;
+    }
+
+    GAL_HSVF_INVALIDATE( HSVF_CKEY_MODE );
+
+    D_DEBUG_EXIT( Gal_State, "\n" );
 
     return;
 }
@@ -2053,6 +2195,8 @@ gal_validate_state( GalDriverData       *vdrv,
                 D_DEBUG_AT( Gal_State, "Validate draing flags.\n" );
 
                 gal_validate_df_blend( vdrv, state, modified );
+                if (vdrv->need_reprogram)
+                    gal_validate_df_src_colorkey( vdrv, state, modified );
                 gal_validate_df_dst_colorkey( vdrv, state, modified );
                 gal_validate_df_src_premultiply( vdrv, state, modified );
                 gal_validate_df_dst_premultiply( vdrv, state, modified );
@@ -2500,14 +2644,26 @@ gal_program_source( GalDriverData *vdrv,
             else
 #endif
             if (vdrv->use_source) {
-                gcmERR_BREAK(gco2D_SetColorSourceAdvanced( vdrv->engine_2d,
-                                                           vdrv->src_phys_addr[0],
-                                                           vdrv->src_pitch[0],
-                                                           vdrv->src_native_format,
-                                                           vdrv->src_rotation,
-                                                           vdrv->src_aligned_width,
-                                                           vdrv->src_aligned_height,
-                                                           gcvFALSE ));
+
+                gcmERR_BREAK(gco2D_SetSourceTileStatus(
+                    vdrv->engine_2d,
+                    vdrv->src_tile_status,
+                    vdrv->src_native_format,
+                    0,
+                    vdrv->src_tile_status_addr
+                    ));
+
+                gcmERR_BREAK(gco2D_SetGenericSource(vdrv->engine_2d,
+                                                    vdrv->src_phys_addr,
+                                                    1U,
+                                                    (unsigned int*) &vdrv->src_pitch,
+                                                    1U,
+                                                    vdrv->src_tiling,
+                                                    vdrv->src_native_format,
+                                                    vdrv->src_rotation,
+                                                    vdrv->src_aligned_width,
+                                                    vdrv->src_aligned_height));
+
                 GAL_HSVF_VALIDATE( HSVF_SOURCE );
             }
         }
@@ -2545,12 +2701,20 @@ gal_program_target( GalDriverData *vdrv,
                     "dst_native_format: 0x%08X, dst_pitch: %u, dst_logic_addr: %p, dst_phys_addr: 0x%08X.\n",
                     vdrv->dst_native_format, vdrv->dst_pitch, vdrv->dst_logic_addr, vdrv->dst_phys_addr );
 
+        gcmERR_BREAK(gco2D_SetTargetTileStatus(
+            vdrv->engine_2d,
+            vdrv->dst_tile_status,
+            vdrv->dst_native_format,
+            0,
+            vdrv->dst_tile_status_addr
+            ));
+
         gcmERR_BREAK(gco2D_SetGenericTarget(vdrv->engine_2d,
                                             &vdrv->dst_phys_addr,
                                             1U,
                                             (unsigned int*) &vdrv->dst_pitch,
                                             1U,
-                                            gcvLINEAR,
+                                            vdrv->dst_tiling,
                                             vdrv->dst_native_format,
                                             vdrv->dst_rotation,
                                             vdrv->dst_aligned_width,
@@ -2719,6 +2883,19 @@ gal_program_blend( GalDriverData *vdrv,
                                                          vdrv->dst_blend_funcs[vdrv->dst_blend - 1].factor_mode,
                                                          vdrv->src_blend_funcs[vdrv->src_blend - 1].color_mode,
                                                          vdrv->dst_blend_funcs[vdrv->dst_blend - 1].color_mode ));
+#if GAL_SURFACE_COMPRESSED
+                    vdrv->backup_src_global_alpha_value = vdrv->global_alpha_value;
+                    vdrv->backup_dst_global_alpha_value = vdrv->global_alpha_value;
+                    vdrv->backup_src_alpha_mode = gcvSURF_PIXEL_ALPHA_STRAIGHT;
+                    vdrv->backup_dst_alpha_mode = gcvSURF_PIXEL_ALPHA_STRAIGHT;
+                    vdrv->backup_src_global_alpha_mode = src_global_alpha_mode;
+                    vdrv->backup_dst_global_alpha_mode = gcvSURF_GLOBAL_ALPHA_OFF;
+                    vdrv->backup_drc_factor_mode = vdrv->src_blend_funcs[vdrv->src_blend - 1].factor_mode;
+                    vdrv->backup_dst_factor_mode = vdrv->dst_blend_funcs[vdrv->dst_blend - 1].factor_mode;
+                    vdrv->backup_src_color_mode  = vdrv->src_blend_funcs[vdrv->src_blend - 1].color_mode;
+                    vdrv->backup_dst_color_mode  = vdrv->dst_blend_funcs[vdrv->dst_blend - 1].color_mode;
+                    vdrv->backup_blended = gcvTRUE;
+#endif
                 }
             }
             else {
@@ -2738,6 +2915,20 @@ gal_program_blend( GalDriverData *vdrv,
                                                          gcvSURF_COLOR_MULTIPLY,
                                                          vdrv->dst_blend_funcs[vdrv->dst_blend - 1].color_mode
                                                          ));
+
+#if GAL_SURFACE_COMPRESSED
+                    vdrv->backup_src_global_alpha_value = vdrv->global_alpha_value;
+                    vdrv->backup_dst_global_alpha_value = vdrv->global_alpha_value;
+                    vdrv->backup_src_alpha_mode = gcvSURF_PIXEL_ALPHA_STRAIGHT;
+                    vdrv->backup_dst_alpha_mode = gcvSURF_PIXEL_ALPHA_STRAIGHT;
+                    vdrv->backup_src_global_alpha_mode = src_global_alpha_mode;
+                    vdrv->backup_dst_global_alpha_mode = gcvSURF_GLOBAL_ALPHA_OFF;
+                    vdrv->backup_drc_factor_mode = gcvSURF_BLEND_ONE;
+                    vdrv->backup_dst_factor_mode = vdrv->dst_blend_funcs[vdrv->dst_blend - 1].factor_mode;
+                    vdrv->backup_src_color_mode  = gcvSURF_COLOR_MULTIPLY;
+                    vdrv->backup_dst_color_mode  = vdrv->dst_blend_funcs[vdrv->dst_blend - 1].color_mode;
+                    vdrv->backup_blended = gcvTRUE;
+#endif
                 }
                 else {
                     gcmERR_BREAK(gco2D_EnableAlphaBlendAdvanced( vdrv->engine_2d,
@@ -2747,6 +2938,20 @@ gal_program_blend( GalDriverData *vdrv,
                                                                  gcvSURF_GLOBAL_ALPHA_OFF,
                                                                  vdrv->src_blend_funcs[vdrv->src_blend - 1].factor_mode,
                                                                  vdrv->dst_blend_funcs[vdrv->dst_blend - 1].factor_mode ));
+
+#if GAL_SURFACE_COMPRESSED
+                    vdrv->backup_src_global_alpha_value = vdrv->global_alpha_value;
+                    vdrv->backup_dst_global_alpha_value = vdrv->global_alpha_value;
+                    vdrv->backup_src_alpha_mode = gcvSURF_PIXEL_ALPHA_STRAIGHT;
+                    vdrv->backup_dst_alpha_mode = gcvSURF_PIXEL_ALPHA_STRAIGHT;
+                    vdrv->backup_src_global_alpha_mode = src_global_alpha_mode;
+                    vdrv->backup_dst_global_alpha_mode = gcvSURF_GLOBAL_ALPHA_OFF;
+                    vdrv->backup_drc_factor_mode = vdrv->src_blend_funcs[vdrv->src_blend - 1].factor_mode;
+                    vdrv->backup_dst_factor_mode = vdrv->dst_blend_funcs[vdrv->dst_blend - 1].factor_mode;
+                    vdrv->backup_src_color_mode  = vdrv->src_blend_funcs[vdrv->src_blend - 1].color_mode;
+                    vdrv->backup_dst_color_mode  = vdrv->dst_blend_funcs[vdrv->dst_blend - 1].color_mode;
+                    vdrv->backup_blended = gcvTRUE;
+#endif
                     GAL_HSVF_INVALIDATE( HSVF_MULTIPLY );
                 }
             }
@@ -2755,6 +2960,10 @@ gal_program_blend( GalDriverData *vdrv,
             D_DEBUG_AT( Gal_State, "Disable blending.\n" );
 
             gcmERR_BREAK(gco2D_DisableAlphaBlend( vdrv->engine_2d ));
+
+#if GAL_SURFACE_COMPRESSED
+            vdrv->backup_blended = gcvFALSE;
+#endif
         }
 
         GAL_HSVF_VALIDATE( HSVF_BLEND );
@@ -2790,8 +2999,10 @@ gal_program_multiply( GalDriverData *vdrv,
     D_DEBUG_ENTER( Gal_State, "\n" );
 
     do {
-        gce2D_PIXEL_COLOR_MULTIPLY_MODE src_pmp_src_alpha, dst_pmp_dst_alpha, dst_dmp_dst_alpha;
-        gce2D_GLOBAL_COLOR_MULTIPLY_MODE src_pmp_glb_mode;
+        gce2D_PIXEL_COLOR_MULTIPLY_MODE src_pmp_src_alpha = gcv2D_COLOR_MULTIPLY_DISABLE;
+        gce2D_PIXEL_COLOR_MULTIPLY_MODE dst_pmp_dst_alpha = gcv2D_COLOR_MULTIPLY_DISABLE;
+        gce2D_PIXEL_COLOR_MULTIPLY_MODE dst_dmp_dst_alpha = gcv2D_COLOR_MULTIPLY_DISABLE;
+        gce2D_GLOBAL_COLOR_MULTIPLY_MODE src_pmp_glb_mode = gcv2D_GLOBAL_COLOR_MULTIPLY_DISABLE;
 
         if (vdrv->need_src_alpha_multiply) {
             if (vdrv->src_pmp_src_alpha != gcv2D_COLOR_MULTIPLY_DISABLE) {
@@ -2839,6 +3050,13 @@ gal_program_multiply( GalDriverData *vdrv,
                                                                  src_pmp_glb_mode,
                                                                  dst_dmp_dst_alpha ));
         }
+
+#if GAL_SURFACE_COMPRESSED
+        vdrv->backup_src_premultiply_src_alpha = src_pmp_src_alpha;
+        vdrv->backup_dst_premultiply_dst_alpha = dst_pmp_dst_alpha;
+        vdrv->backup_src_premultiply_global_mode = src_pmp_glb_mode;
+        vdrv->backup_dst_demultiply_dst_alpha = dst_dmp_dst_alpha;
+#endif
 
         GAL_HSVF_VALIDATE( HSVF_MULTIPLY );
     } while (0);
@@ -2891,6 +3109,11 @@ gal_program_mirror( GalDriverData *vdrv,
         gcmERR_BREAK(gco2D_SetBitBlitMirror( vdrv->engine_2d,
                                              hor_mirror,
                                              ver_mirror ));
+
+#if GAL_SURFACE_COMPRESSED
+        vdrv->backup_hor_mirror = hor_mirror;
+        vdrv->backup_ver_mirror = ver_mirror;
+#endif
 
         GAL_HSVF_VALIDATE( HSVF_MIRROR );
     } while (0);

@@ -108,7 +108,7 @@ bool InitGLES()
         }
     }
 
-	return true;
+    return true;
 }
 #endif
 /*******************************************************************************
@@ -203,7 +203,7 @@ void Render()
     glTranslatex(FixedFromFloat(offset += 0.01f), ZERO, ZERO);
     glMatrixMode(GL_MODELVIEW);
 
-	static GLubyte front[]  = { 2, 1, 3, 0 };
+    static GLubyte front[]  = { 2, 1, 3, 0 };
     static GLubyte back[]   = { 5, 6, 4, 7 };
     static GLubyte top[]    = { 6, 2, 7, 3 };
     static GLubyte bottom[] = { 1, 5, 0, 4 };
@@ -228,22 +228,22 @@ void Render()
     else
     {
         // Render front face.
-	    glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_BYTE, front);
+        glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_BYTE, front);
 
-	    // Render back face.
-	    glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_BYTE, back);
+        // Render back face.
+        glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_BYTE, back);
 
-	    // Render top face.
-	    glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_BYTE, top);
+        // Render top face.
+        glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_BYTE, top);
 
-	    // Render bottom face.
-	    glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_BYTE, bottom);
+        // Render bottom face.
+        glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_BYTE, bottom);
 
-	    // Render left face.
-	    glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_BYTE, left);
+        // Render left face.
+        glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_BYTE, left);
 
-	    // Render right face.
-	    glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_BYTE, right);
+        // Render right face.
+        glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_BYTE, right);
     }
 
     // Disable both texture arrays and vertex array (we are good citizens).

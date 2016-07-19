@@ -1564,6 +1564,8 @@ vgmDEFINETESSELATE(gcvVGCMD_MOVE)
             Info->right = gcmMAX(Info->right, moveToX);
             Info->bottom = gcmMAX(Info->bottom, moveToY);
             Info->top = gcmMIN(Info->top, moveToY);
+            Info->coords.lastX = moveToX;
+            Info->coords.lastY = moveToY;
         }
         else
         {
@@ -1605,6 +1607,8 @@ vgmDEFINETESSELATE(gcvVGCMD_MOVE_REL)
             Info->right = gcmMAX(Info->right, moveToX);
             Info->bottom = gcmMAX(Info->bottom, moveToY);
             Info->top = gcmMIN(Info->top, moveToY);
+            Info->coords.lastX = moveToX;
+            Info->coords.lastY = moveToY;
         }
         else
         {
@@ -1652,6 +1656,8 @@ vgmDEFINETESSELATE(gcvVGCMD_LINE)
             Info->right = gcmMAX(Info->right, lineToX);
             Info->bottom = gcmMAX(Info->bottom, lineToY);
             Info->top = gcmMIN(Info->top, lineToY);
+            Info->coords.lastX = lineToX;
+            Info->coords.lastY = lineToY;
 
             status = gcvSTATUS_OK;
         }
@@ -1703,6 +1709,8 @@ vgmDEFINETESSELATE(gcvVGCMD_LINE_REL)
             Info->right = gcmMAX(Info->right, lineToX);
             Info->bottom = gcmMAX(Info->bottom, lineToY);
             Info->top = gcmMIN(Info->top, lineToY);
+            Info->coords.lastX = lineToX;
+            Info->coords.lastY = lineToY;
 
             status = gcvSTATUS_OK;
         }
@@ -1768,6 +1776,8 @@ vgmDEFINETESSELATE(gcvVGCMD_QUAD)
             Info->right = gcmMAX(Info->right, quadToX);
             Info->bottom = gcmMAX(Info->bottom, quadToY);
             Info->top = gcmMIN(Info->top, quadToY);
+            Info->coords.lastX = quadToX;
+            Info->coords.lastY = quadToY;
 
             status = gcvSTATUS_OK;
         }
@@ -1828,6 +1838,8 @@ vgmDEFINETESSELATE(gcvVGCMD_QUAD_REL)
             Info->right = gcmMAX(Info->right, quadToX);
             Info->bottom = gcmMAX(Info->bottom, quadToY);
             Info->top = gcmMIN(Info->top, quadToY);
+            Info->coords.lastX = quadToX;
+            Info->coords.lastY = quadToY;
 
             status = gcvSTATUS_OK;
         }
@@ -1902,6 +1914,8 @@ vgmDEFINETESSELATE(gcvVGCMD_CUBIC)
             Info->bottom = gcmMAX(Info->bottom, cubicToY);
             Info->top = gcmMIN(Info->top, cubicToY);
 
+            Info->coords.lastX = cubicToX;
+            Info->coords.lastY = cubicToY;
             status = gcvSTATUS_OK;
         }
         else
@@ -1972,6 +1986,8 @@ vgmDEFINETESSELATE(gcvVGCMD_CUBIC_REL)
             Info->bottom = gcmMAX(Info->bottom, cubicToY);
             Info->top = gcmMIN(Info->top, cubicToY);
 
+            Info->coords.lastX = cubicToX;
+            Info->coords.lastY = cubicToY;
             status = gcvSTATUS_OK;
         }
         else

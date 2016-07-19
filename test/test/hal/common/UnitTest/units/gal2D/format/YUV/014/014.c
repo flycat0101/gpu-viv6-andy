@@ -68,26 +68,26 @@ typedef struct Test2D {
     GalRuntime  *runtime;
 
     // destination surface
-    gcoSURF		dstSurf;
-    gceSURF_FORMAT	dstFormat;
-    gctUINT		dstWidth;
-    gctUINT		dstHeight;
-    gctINT		dstStride;
-    gctUINT32		dstPhyAddr;
-    gctPOINTER		dstLgcAddr;
+    gcoSURF        dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT        dstWidth;
+    gctUINT        dstHeight;
+    gctINT        dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
 
     T2D_SURF_PTR    dstTemp;
 
     //source surface
-    gcoSURF	    srcSurf;
+    gcoSURF        srcSurf;
     gceSURF_FORMAT  srcFormat;
-    gctUINT	    srcWidth;
-    gctUINT	    srcHeight;
-    gctINT	    srcStride[3];
+    gctUINT        srcWidth;
+    gctUINT        srcHeight;
+    gctINT        srcStride[3];
     gctINT          srcStrideNum;
     gctINT          srcAddressNum;
-    gctUINT32	    srcPhyAddr[3];
-    gctPOINTER	    srcLgcAddr[3];
+    gctUINT32        srcPhyAddr[3];
+    gctPOINTER        srcLgcAddr[3];
 
 } Test2D;
 

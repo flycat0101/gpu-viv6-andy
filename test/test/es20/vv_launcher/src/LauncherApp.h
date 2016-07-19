@@ -51,35 +51,35 @@ typedef Texture2D Icon;
 
 typedef struct _LauncherApp
 {
-	Chiclet* chiclets[max_chiclets];
+    Chiclet* chiclets[max_chiclets];
 
-	Icon* icons[max_chiclets];
+    Icon* icons[max_chiclets];
 
-	ChicletProg* chiclet_prog;
-	EnvProg* env_prog;
-	ContentProg* content_prog;
+    ChicletProg* chiclet_prog;
+    EnvProg* env_prog;
+    ContentProg* content_prog;
 
-	TextureCube* env_tex;
-	Geodesic* geodesic;
+    TextureCube* env_tex;
+    Geodesic* geodesic;
 
-	Texture2DRenderSurface* content_tex;
+    Texture2DRenderSurface* content_tex;
 
-	int width;
-	int height;
-	float aspect;
+    int width;
+    int height;
+    float aspect;
 
-	int flip_vertical;
+    int flip_vertical;
 
-	// -1 means none selected
-	int selected;
+    // -1 means none selected
+    int selected;
 
-	Vec3f light_dir;
-	Matf proj_mat;
+    Vec3f light_dir;
+    Matf proj_mat;
 
-	Matf env_mat;
-	float env_y_rot;
+    Matf env_mat;
+    float env_y_rot;
 
-	GLuint cubeTex;
+    GLuint cubeTex;
 } LauncherApp;
 
 LauncherApp* LauncherAppConstruct(int width, int height);
@@ -95,7 +95,6 @@ const char* LauncherAppTick(LauncherApp* App, float dt);
 void LauncherAppDraw(LauncherApp* App, int width, int height);
 
 void LauncherAppSelect(LauncherApp* App, int);
-
 
 void flipVertical(LauncherApp*, int);
 

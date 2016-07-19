@@ -2447,6 +2447,7 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
 
     if (mode == Hardware->gpuRenderingMode)
     {
+        gcmFOOTER();
         return gcvSTATUS_OK;
     }
 
@@ -3018,8 +3019,6 @@ gcoHARDWARE_Initialize3D(
  0:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))));
     }
-
-    gcmONERROR(gcoHARDWARE_EnableCounters(Hardware));
 
     if (Hardware->robust)
     {
@@ -8681,8 +8680,8 @@ gcoHARDWARE_FlushSampling(
     /* Determine enable value. */
     msaaEnable = Hardware->MsaaStates->sampleMask & Hardware->MsaaStates->sampleEnable;
 
-    if 	(!Hardware->features[gcvFEATURE_PSIO_MSAA_CL_FIX] &&
-		(Hardware->SHStates->programState.hints->stageBits & gcvPROGRAM_STAGE_COMPUTE_BIT))
+    if     (!Hardware->features[gcvFEATURE_PSIO_MSAA_CL_FIX] &&
+        (Hardware->SHStates->programState.hints->stageBits & gcvPROGRAM_STAGE_COMPUTE_BIT))
     {
         msaaEnable = gcvFALSE;
     }
@@ -9583,6 +9582,11 @@ static gctINT32 _GetPsOutPutMode(gcoHARDWARE Hardware, gcoSURF surface)
     {
         switch (format)
         {
+        case gcvSURF_R32F:
+        case gcvSURF_X32R32F:
+        case gcvSURF_G32R32F:
+        case gcvSURF_X32G32R32F:
+        case gcvSURF_B32G32R32F:
         case gcvSURF_G32R32I_1_G32R32F:
         case gcvSURF_G32R32UI_1_G32R32F:
         case gcvSURF_X16B16G16R16I_1_G32R32F:
@@ -9592,6 +9596,7 @@ static gctINT32 _GetPsOutPutMode(gcoHARDWARE Hardware, gcoSURF surface)
         case gcvSURF_X32B32G32R32I_2_G32R32I:
         case gcvSURF_A32B32G32R32I_2_G32R32I:
         case gcvSURF_A32B32G32R32I_2_G32R32F:
+        case gcvSURF_A32B32G32R32F_2_G32R32F:
         case gcvSURF_X32B32G32R32UI_2_G32R32UI:
         case gcvSURF_A32B32G32R32UI_2_G32R32UI:
         case gcvSURF_A32B32G32R32UI_2_G32R32F:
@@ -10685,7 +10690,7 @@ gcoHARDWARE_FlushShaders(
 };
 
 #if TEMP_SHADER_PATCH
-    if (hints && hints->pachedShaderIdentifier == gcvMACHINECODE_ANTUTU0)
+    if (hints->pachedShaderIdentifier == gcvMACHINECODE_ANTUTU0)
     {
         hints->componentCount = 0x00000006;
     }
@@ -11571,6 +11576,9 @@ gcoHARDWARE_SetQuery(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
+    gctUINT32 tfbCmd = (Type == gcvQUERY_XFB_WRITTEN)
+                     ? 0x0
+                     : 0x1;
 
     gcmHEADER_ARG("Hardware=0x%x QueryHeader = 0x%x, Type = %u, QueryCmd = %u, Memory=0x%x",
                   Hardware, QueryHeader, Type, QueryCmd, Memory);
@@ -11588,7 +11596,7 @@ gcoHARDWARE_SetQuery(
         goto OnError;
     }
 
-    /* query pause/resuem is always from internal and never
+    /* query pause/resume is always from internal and never
     ** from application side, either from command submit
     ** or RA/PE depth write switch.
     ** For query state change, we will generate command immediately,
@@ -11610,65 +11618,59 @@ gcoHARDWARE_SetQuery(
             {
                 if (Hardware->features[gcvFEATURE_RA_DEPTH_WRITE])
                 {
-                    if(Hardware->previousPEDepth)
-                    {
-                        gcmONERROR(gcoHARDWARE_LoadState32(
-                            Hardware,
-                            0x03860,
-                            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) (0x6 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                            ));
-                    }
-                    else
-                    {
-                        gcmONERROR(gcoHARDWARE_LoadState32(
-                            Hardware,
-                            0x03860,
-                            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) (0x7 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                            ));
-                    }
+                    gctUINT32 oqCtrl = Hardware->previousPEDepth
+                                     ? 0x6
+                                     : 0x7;
+
+                    gcmONERROR(gcoHARDWARE_LoadState32NEW(
+                        Hardware,
+                        0x03860,
+                        oqCtrl,
+                        Memory
+                        ));
                 }
-                gcmONERROR(gcoHARDWARE_LoadCtrlState(
+
+                gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW_GPU0(
                     Hardware,
                     0x03824,
-                    (gctUINT32)((gctUINTPTR_T)(Hardware->QUERYStates->queryHeaderPhysical[gcvQUERY_OCCLUSION]))
+                    (gctUINT32)((gctUINTPTR_T)(Hardware->QUERYStates->queryHeaderPhysical[gcvQUERY_OCCLUSION])),
+                    Memory
                     ));
 
                 Hardware->PEDirty->depthConfigDirty = gcvTRUE;
             }
             else if ((Type == gcvQUERY_XFB_WRITTEN) || (Type == gcvQUERY_PRIM_GENERATED))
             {
-                gcmONERROR(gcoHARDWARE_LoadState32(Hardware,
+                gcmONERROR(gcoHARDWARE_LoadState32NEW(Hardware,
                     0x1C014,
-                    Hardware->QUERYStates->queryHeaderPhysical[Type]));
+                    Hardware->QUERYStates->queryHeaderPhysical[Type],
+                    Memory
+                    ));
 
-                gcmONERROR(gcoHARDWARE_LoadCtrlState(Hardware,
-                                                     0x1C010,
-                                                     ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW_GPU0(Hardware,
+                    0x1C010,
+                      ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
  2:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                                                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  7:4) - (0 ? 7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
  7:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 7:4) - (0 ?
  7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
  7:4)))
-                                                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
- 11:8))) | (((gctUINT32) ((gctUINT32) ((Type == gcvQUERY_XFB_WRITTEN) ?
- 0x0 : 0x1) & ((gctUINT32) ((((1 ? 11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ?
- 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8)))
+ 11:8))) | (((gctUINT32) ((gctUINT32) (tfbCmd) & ((gctUINT32) ((((1 ? 11:8) - (0 ?
+ 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
+ 11:8))),
+                    Memory
                     ));
             }
             else
             {
                 gcmASSERT(0);
             }
+
             Hardware->QUERYStates->queryStatus[Type] = gcvQUERY_Enabled;
             Hardware->QUERYStates->queryHeaderIndex[Type] = 0;
 
@@ -11677,7 +11679,6 @@ gcoHARDWARE_SetQuery(
                 Hardware->multiGPURenderingModeDirty = gcvTRUE;
             }
         }
-
         break;
 
     case gcvQUERYCMD_PAUSE:
@@ -11686,86 +11687,39 @@ gcoHARDWARE_SetQuery(
         {
             if (Type == gcvQUERY_OCCLUSION)
             {
-                gctUINT32_PTR memory = (gctUINT32_PTR) *Memory;
-                if (Hardware->config->gpuCoreCount > 1)
-                {
-                    gcoHARDWARE_MultiGPUSync(Hardware, &memory);
-
-                    { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | gcvCORE_3D_0_MASK << gcmTO_CHIP_ID(0);
- memory++;
-  gcmDUMP(gcvNULL, "#[chip.enable 0x%04X]", gcvCORE_3D_0_MASK << gcmTO_CHIP_ID(0));
- } };
-
-                }
-
-                memory[0] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
-                            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 26:26) - (0 ?
- 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))
-                            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))
-                            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E0C) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));
-                memory[1] = 31415926;
-
-                memory += 2;
-
-                if (Hardware->config->gpuCoreCount > 1)
-                {
-                    { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | gcvCORE_3D_ALL_MASK;
- memory++;
-  gcmDUMP(gcvNULL, "#[chip.enable 0x%04X]", gcvCORE_3D_ALL_MASK);
- } };
-
-
-                    gcoHARDWARE_MultiGPUSync(Hardware, &memory);
-                }
-
-                *Memory = memory;
-
+                gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW_GPU0(
+                    Hardware,
+                    0x03830,
+                    31415926,
+                    Memory
+                    ));
             }
             else if ((Type == gcvQUERY_XFB_WRITTEN) || (Type == gcvQUERY_PRIM_GENERATED))
             {
                 gcmONERROR(gcoHARDWARE_LoadState32NEW(Hardware,
-                                                      0x1C014,
-                                                      Hardware->QUERYStates->queryHeaderPhysical[Type],
-                                                      Memory));
+                    0x1C014,
+                    Hardware->QUERYStates->queryHeaderPhysical[Type],
+                    Memory
+                    ));
 
-                gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW(Hardware,
-                                                        0x1C010,
-                                                        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW_GPU0(Hardware,
+                    0x1C010,
+                      ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
  2:0))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                                                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  7:4) - (0 ? 7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
  7:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 7:4) - (0 ?
  7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
  7:4)))
-                                                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
- 11:8))) | (((gctUINT32) ((gctUINT32) ((Type == gcvQUERY_XFB_WRITTEN) ?
- 0x0 : 0x1) & ((gctUINT32) ((((1 ? 11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ?
- 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8))),
-                                                        Memory));
-
+ 11:8))) | (((gctUINT32) ((gctUINT32) (tfbCmd) & ((gctUINT32) ((((1 ? 11:8) - (0 ?
+ 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
+ 11:8))),
+                    Memory
+                    ));
             }
             else
             {
@@ -11775,56 +11729,62 @@ gcoHARDWARE_SetQuery(
         break;
 
     case gcvQUERYCMD_RESUME:
-        gcmASSERT(Memory);
-        gcmASSERT(Hardware->QUERYStates->queryStatus[Type] == gcvQUERY_Enabled);
-        if (Type == gcvQUERY_OCCLUSION)
         {
-            gctUINT32 nextOQSlot;
+            gcmASSERT(Memory);
+            gcmASSERT(Hardware->QUERYStates->queryStatus[Type] == gcvQUERY_Enabled);
 
-            Hardware->QUERYStates->queryHeaderIndex[Type]++;
-
-            if (Hardware->QUERYStates->queryHeaderIndex[Type] >= 64)
+            if (Type == gcvQUERY_OCCLUSION)
             {
-                gcmFATAL("commit 64 time, when OQ enable!!!!");
-                Hardware->QUERYStates->queryHeaderIndex[Type] = 63;
-            }
-            nextOQSlot = gcmALL_TO_UINT32(Hardware->QUERYStates->queryHeaderPhysical[Type])
-                      + (Hardware->QUERYStates->queryHeaderIndex[Type]) * gcmSIZEOF(gctUINT64);
+                gctUINT32 nextOQSlot;
 
-            gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW(
-                Hardware,
-                0x03824,
-                nextOQSlot,
-                Memory
-                ));
-        }
-        else if ((Type == gcvQUERY_XFB_WRITTEN) || (Type == gcvQUERY_PRIM_GENERATED))
-        {
-            gcmONERROR(gcoHARDWARE_LoadState32NEW(Hardware,
-                                                  0x1C014,
-                                                  Hardware->QUERYStates->queryHeaderPhysical[Type],
-                                                  Memory));
-            gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW(Hardware,
-                                                    0x1C010,
-                                                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                Hardware->QUERYStates->queryHeaderIndex[Type]++;
+
+                if (Hardware->QUERYStates->queryHeaderIndex[Type] >= 64)
+                {
+                    gcmFATAL("commit 64 time, when OQ enable!!!!");
+                    Hardware->QUERYStates->queryHeaderIndex[Type] = 63;
+                }
+                nextOQSlot = gcmALL_TO_UINT32(Hardware->QUERYStates->queryHeaderPhysical[Type])
+                           + (Hardware->QUERYStates->queryHeaderIndex[Type]) * gcmSIZEOF(gctUINT64);
+
+                gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW_GPU0(
+                    Hardware,
+                    0x03824,
+                    nextOQSlot,
+                    Memory
+                    ));
+            }
+            else if ((Type == gcvQUERY_XFB_WRITTEN) || (Type == gcvQUERY_PRIM_GENERATED))
+            {
+                gcmONERROR(gcoHARDWARE_LoadState32NEW(Hardware,
+                    0x1C014,
+                    Hardware->QUERYStates->queryHeaderPhysical[Type],
+                    Memory
+                    ));
+
+                gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW_GPU0(Hardware,
+                    0x1C010,
+                      ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
  2:0))) | (((gctUINT32) (0x4 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                                                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  7:4) - (0 ? 7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
  7:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 7:4) - (0 ?
  7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
  7:4)))
-                                                  | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                    | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
- 11:8))) | (((gctUINT32) ((gctUINT32) ((Type == gcvQUERY_XFB_WRITTEN) ?
- 0x0 : 0x1) & ((gctUINT32) ((((1 ? 11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ?
- 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8))),
-                                                    Memory));
-        }
-        else
-        {
-            gcmASSERT(0);
+ 11:8))) | (((gctUINT32) ((gctUINT32) (tfbCmd) & ((gctUINT32) ((((1 ? 11:8) - (0 ?
+ 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
+ 11:8))),
+                    Memory
+                    ));
+            }
+            else
+            {
+                gcmASSERT(0);
+            }
         }
         break;
 
@@ -11842,78 +11802,28 @@ gcoHARDWARE_SetQuery(
             /* pause HZ TS */
             if (hzTSEnabled)
             {
-                gcoHARDWARE_PauseTileStatus(Hardware,gcvTILE_STATUS_PAUSE);
+                gcoHARDWARE_PauseTileStatus(Hardware, gcvTILE_STATUS_PAUSE);
             }
 
             if (Hardware->QUERYStates->queryStatus[Type] == gcvQUERY_Enabled)
             {
-                gctPOINTER *Memory = gcvNULL;
-                    /* Define state buffer variables. */
-                    gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);
-                    gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
-
-                    if (Hardware->config->gpuCoreCount > 1)
-                    {
-                        gcoHARDWARE_MultiGPUSync(Hardware, &memory);
-                        { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | gcvCORE_3D_0_MASK << gcmTO_CHIP_ID(0);
- memory++;
-  gcmDUMP(gcvNULL, "#[chip.enable 0x%04X]", gcvCORE_3D_0_MASK << gcmTO_CHIP_ID(0));
- } };
-
-                        /* Validate the state Hardware. */
-                    }
-
-                    memory[0] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27)))
-                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 26:26) - (0 ?
- 26:26) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 26:26) - (0 ? 26:26) + 1))))))) << (0 ?
- 26:26)))
-                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 25:16) - (0 ?
- 25:16) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 25:16) - (0 ? 25:16) + 1))))))) << (0 ?
- 25:16)))
-                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E0C) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));
-                    memory[1] = 31415926;
-                    memory += 2;
-
-                    if (Hardware->config->gpuCoreCount > 1)
-                    {
-                        { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
- 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
- ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | gcvCORE_3D_ALL_MASK;
- memory++;
-  gcmDUMP(gcvNULL, "#[chip.enable 0x%04X]", gcvCORE_3D_ALL_MASK);
- } };
-
-                        gcoHARDWARE_MultiGPUSync(Hardware, &memory);
-                    }
-                    /* Validate the state Hardware. */
-                    gcmENDSTATEBUFFER_NEW(Hardware, reserve, memory, Memory);
-
-                    stateDelta = stateDelta; /* Keep the compiler happy. */
+                gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW_GPU0(
+                        Hardware,
+                        0x03830,
+                        31415926,
+                        Memory
+                        ));
             }
 
             if (hzTSEnabled)
             {
-                gcoHARDWARE_PauseTileStatus(Hardware,gcvTILE_STATUS_RESUME);
+                gcoHARDWARE_PauseTileStatus(Hardware, gcvTILE_STATUS_RESUME);
             }
 
             /* OQ state change could affect current depth HZ status,
-            which depend on depth config dirty and Target dirty now,
-            TO_DO, refine*/
+            ** which depend on depth config dirty and Target dirty now,
+            ** TO_DO, refine
+            */
             Hardware->PEDirty->depthConfigDirty = gcvTRUE;
             Hardware->PEDirty->depthTargetDirty = gcvTRUE;
 
@@ -11921,26 +11831,30 @@ gcoHARDWARE_SetQuery(
         }
         else if ((Type == gcvQUERY_XFB_WRITTEN || Type == gcvQUERY_PRIM_GENERATED))
         {
-            gcmONERROR(gcoHARDWARE_LoadCtrlState(Hardware,
-                                                 0x1C014,
-                                                 Hardware->QUERYStates->queryHeaderPhysical[Type]));
+            gcmONERROR(gcoHARDWARE_LoadState32NEW(Hardware,
+                0x1C014,
+                Hardware->QUERYStates->queryHeaderPhysical[Type],
+                Memory
+                ));
 
-            gcmONERROR(gcoHARDWARE_LoadCtrlState(Hardware,
-                                                 0x1C010,
-                                                 ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            gcmONERROR(gcoHARDWARE_LoadCtrlStateNEW_GPU0(Hardware,
+                0x1C010,
+                  ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
  2:0))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0)))
-                                               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  7:4) - (0 ? 7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
  7:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 7:4) - (0 ?
  7:4) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
  7:4)))
-                                               | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
- 11:8))) | (((gctUINT32) ((gctUINT32) ((Type == gcvQUERY_XFB_WRITTEN) ?
- 0x0 : 0x1) & ((gctUINT32) ((((1 ? 11:8) - (0 ? 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ?
- 11:8) - (0 ? 11:8) + 1))))))) << (0 ? 11:8)))));
+ 11:8))) | (((gctUINT32) ((gctUINT32) (tfbCmd) & ((gctUINT32) ((((1 ? 11:8) - (0 ?
+ 11:8) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 11:8) - (0 ? 11:8) + 1))))))) << (0 ?
+ 11:8))),
+                Memory
+                ));
 
             Hardware->QUERYStates->queryStatus[Type] = gcvQUERY_Disabled;
         }
@@ -11957,7 +11871,6 @@ gcoHARDWARE_SetQuery(
     }
 
 OnError:
-
     /* Return the status. */
     gcmFOOTER();
     return status;
@@ -14578,13 +14491,15 @@ gcoHARDWARE_SetXfbCmd(
         gcmASSERT(Memory);
         if (Hardware->XFBStates->statusInCmd == gcvXFB_Enabled)
         {
-            gcoHARDWARE_LoadCtrlStateNEW(Hardware,
-                                         0x1C004,
-                                         ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            gcoHARDWARE_LoadCtrlStateNEW_GPU0(
+                Hardware,
+                0x1C004,
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
  2:0))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))),
-                                         Memory);
+                Memory
+                );
         }
         break;
 
@@ -14593,13 +14508,16 @@ gcoHARDWARE_SetXfbCmd(
         if (Hardware->XFBStates->status == gcvXFB_Enabled)
         {
             gcmASSERT(Hardware->XFBStates->statusInCmd == gcvXFB_Enabled);
-            gcoHARDWARE_LoadCtrlStateNEW(Hardware,
-                                         0x1C004,
-                                         ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+
+            gcoHARDWARE_LoadCtrlStateNEW_GPU0(
+                Hardware,
+                0x1C004,
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
  2:0))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))),
-                                         Memory);
+                Memory
+                );
 
             Hardware->XFBStates->statusInCmd =
             Hardware->XFBStates->status = gcvXFB_Paused;
@@ -14613,14 +14531,16 @@ gcoHARDWARE_SetXfbCmd(
         gcmASSERT(Memory);
         gcmASSERT(Hardware->XFBStates->statusInCmd == gcvXFB_Enabled);
 
-        gcoHARDWARE_LoadCtrlStateNEW(Hardware,
-                                     0x1C004,
-                                     ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+        gcoHARDWARE_LoadCtrlStateNEW_GPU0(
+            Hardware,
+            0x1C004,
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 2:0) - (0 ?
+ 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
  2:0))) | (((gctUINT32) (0x4 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))),
-                                     Memory);
-        break;
+            Memory
+            );
+         break;
 
     case gcvXFBCMD_RESUME:
         gcmASSERT(Memory == gcvNULL);
@@ -14642,13 +14562,15 @@ gcoHARDWARE_SetXfbCmd(
         gcmASSERT(Memory == gcvNULL);
         if (Hardware->XFBStates->status == gcvXFB_Enabled)
         {
-            gcoHARDWARE_LoadCtrlStateNEW(Hardware,
-                                         0x1C004,
-                                         ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            gcoHARDWARE_LoadCtrlStateNEW_GPU0(
+                Hardware,
+                0x1C004,
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
  2:0))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
  ~0 : (~(~0 << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))),
-                                         Memory);
+                Memory
+                );
         }
         Hardware->XFBStates->statusInCmd =
         Hardware->XFBStates->status = gcvXFB_Disabled;
@@ -14665,7 +14587,6 @@ gcoHARDWARE_SetXfbCmd(
 OnError:
     gcmFOOTER();
     return status;
-
 }
 
 
@@ -14828,6 +14749,20 @@ gcoHARDWARE_FlushXfb(
 
     if (Hardware->XFBDirty->s.cmdDirty)
     {
+        /* Switch to single GPU mode */
+        if (Hardware->config->gpuCoreCount > 1)
+        {
+            gcoHARDWARE_MultiGPUSync(Hardware, &memory);
+            { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | gcvCORE_3D_0_MASK << gcmTO_CHIP_ID(0);
+ memory++;
+  gcmDUMP(gcvNULL, "#[chip.enable 0x%04X]", gcvCORE_3D_0_MASK << gcmTO_CHIP_ID(0));
+ } };
+
+        }
+
         switch (Hardware->XFBStates->cmd)
         {
         case gcvXFBCMD_BEGIN:
@@ -14927,6 +14862,20 @@ gcoHARDWARE_FlushXfb(
             break;
         default:
             break;
+        }
+
+        /* Resume to multiple GPU mode */
+        if (Hardware->config->gpuCoreCount > 1)
+        {
+            { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ?
+ 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ? 31:27) - (0 ? 31:27) + 1) == 32) ?
+ ~0 : (~(~0 << ((1 ? 31:27) - (0 ? 31:27) + 1))))))) << (0 ? 31:27))) | gcvCORE_3D_ALL_MASK;
+ memory++;
+  gcmDUMP(gcvNULL, "#[chip.enable 0x%04X]", gcvCORE_3D_ALL_MASK);
+ } };
+
+            gcoHARDWARE_MultiGPUSync(Hardware, &memory);
         }
     }
 

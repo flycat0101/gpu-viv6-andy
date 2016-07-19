@@ -185,9 +185,7 @@ _GetTessellationBuffer(
                MSAA. */
 #if gcdMOVG
             aw = gcmALIGN(Width, 128);
-            bufferStride = (Vg->renderQuality == gcvVG_NONANTIALIASED)
-                ? ( aw * 2)
-                : ( aw * 8);
+            bufferStride = aw * 8;
 
             ah = gcmALIGN(Height, 16);
             bufferSize = bufferStride * ah;
@@ -641,7 +639,8 @@ gcoHAL_FreeVideoMemory(
     IN gctUINT saveLayerTreeDepth,
     IN gctUINT varTreeDepth,
 #endif
-    IN gctUINT32 Node
+    IN gctUINT32 Node,
+    IN gctBOOL asynchroneous
     )
 {
     gceSTATUS status;
@@ -650,7 +649,7 @@ gcoHAL_FreeVideoMemory(
     vghalENTERSUBAPI(gcoHAL_FreeVideoMemory);
 #endif
     /* Call down to gcoHARDWARE. */
-    status = gcoVGHARDWARE_FreeVideoMemory(gcvNULL, Node);
+    status = gcoVGHARDWARE_FreeVideoMemory(gcvNULL, Node, asynchroneous);
 #if gcdGC355_PROFILER
     vghalLEAVESUBAPI(gcoHAL_FreeVideoMemory);
 #endif
@@ -2562,6 +2561,7 @@ gcoVG_DrawPath(
                     tessellationBuffer,
                     gcvNULL
                     ));
+                gcoHAL_Commit(Vg->hal, gcvFALSE);
             }
         }
 #else
@@ -2672,6 +2672,161 @@ gcoVG_DrawImage(
     return status;
 }
 
+#if gcdMOVG
+static gceSTATUS
+    ComputeImageParams(
+        IN gctINT   Width,
+        IN gctINT   Height,
+        IN gctFLOAT UserToSurface[9],
+        IN gctFLOAT SurfaceToImage[9],
+        OUT gctFLOAT StepX[9],
+        OUT gctFLOAT StepY[9],
+        OUT gctFLOAT Const[9],
+        OUT gctFLOAT Point0[3],
+        OUT gctFLOAT Point1[2],
+        OUT gctFLOAT Point2[2],
+        OUT gctFLOAT Point3[2]
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctFLOAT widthProduct[3];
+    gctFLOAT heightProduct[3];
+
+    gctFLOAT point0[3];
+    gctFLOAT point1[3];
+    gctFLOAT point2[3];
+    gctFLOAT point3[3];
+
+    /***********************************************************************
+    ** Get shortcuts to the size of the image.
+    */
+
+    gctINT width  = Width;
+    gctINT height = Height;
+
+
+    do {
+        /***********************************************************************
+        ** Transform image corners into the surface space.
+        */
+
+        widthProduct[0] = gcmMAT(UserToSurface, 0, 0) * width;
+        widthProduct[1] = gcmMAT(UserToSurface, 1, 0) * width;
+        widthProduct[2] = gcmMAT(UserToSurface, 2, 0) * width;
+
+        heightProduct[0] = gcmMAT(UserToSurface, 0, 1) * height;
+        heightProduct[1] = gcmMAT(UserToSurface, 1, 1) * height;
+        heightProduct[2] = gcmMAT(UserToSurface, 2, 1) * height;
+
+        point0[0] = gcmMAT(UserToSurface, 0, 2);
+        point0[1] = gcmMAT(UserToSurface, 1, 2);
+        point0[2] = gcmMAT(UserToSurface, 2, 2);
+
+        point1[0] = heightProduct[0] + point0[0];
+        point1[1] = heightProduct[1] + point0[1];
+        point1[2] = heightProduct[2] + point0[2];
+
+        point2[0] = widthProduct[0] + point1[0];
+        point2[1] = widthProduct[1] + point1[1];
+        point2[2] = widthProduct[2] + point1[2];
+
+        point3[0] = widthProduct[0] + point0[0];
+        point3[1] = widthProduct[1] + point0[1];
+        point3[2] = widthProduct[2] + point0[2];
+
+        if ((point0[2] <= 0.0f) || (point1[2] <= 0.0f) ||
+            (point2[2] <= 0.0f) || (point3[2] <= 0.0f))
+        {
+            status = gcvSTATUS_INVALID_ARGUMENT;
+            break;
+        }
+
+        /* Projection. */
+        point0[0] /= point0[2];
+        point0[1] /= point0[2];
+        point0[2]  = 1.0f;
+
+        point1[0] /= point1[2];
+        point1[1] /= point1[2];
+        point1[2]  = 1.0f;
+
+        point2[0] /= point2[2];
+        point2[1] /= point2[2];
+        point2[2]  = 1.0f;
+
+        point3[0] /= point3[2];
+        point3[1] /= point3[2];
+        point3[2]  = 1.0f;
+
+#define NEG_MOST    -524288.0f
+
+#define POS_MOST    524287.0f
+
+        if ((point0[0] > POS_MOST) || (point0[0] < NEG_MOST) ||
+            (point0[1] > POS_MOST) || (point0[1] < NEG_MOST) ||
+            (point1[0] > POS_MOST) || (point1[0] < NEG_MOST) ||
+            (point1[1] > POS_MOST) || (point1[1] < NEG_MOST) ||
+            (point2[0] > POS_MOST) || (point2[0] < NEG_MOST) ||
+            (point2[1] > POS_MOST) || (point2[1] < NEG_MOST) ||
+            (point3[0] > POS_MOST) || (point3[0] < NEG_MOST) ||
+            (point3[1] > POS_MOST) || (point3[1] < NEG_MOST))
+        {
+            status = gcvSTATUS_DATA_TOO_LARGE;
+            break;
+        }
+
+#undef NEG_MOST
+#undef POS_MOST
+
+        /***********************************************************************
+        ** Transform image parameters.
+        */
+
+        StepX[0] = gcmMAT(SurfaceToImage, 0, 0) / width;
+        StepX[1] = gcmMAT(SurfaceToImage, 1, 0) / height;
+        StepX[2] = gcmMAT(SurfaceToImage, 2, 0);
+
+        StepY[0] = gcmMAT(SurfaceToImage, 0, 1) / width;
+        StepY[1] = gcmMAT(SurfaceToImage, 1, 1) / height;
+        StepY[2] = gcmMAT(SurfaceToImage, 2, 1);
+
+        Const[0] =
+            (
+                0.5f
+                    * ( gcmMAT(SurfaceToImage, 0, 0) + gcmMAT(SurfaceToImage, 0, 1) )
+                    +   gcmMAT(SurfaceToImage, 0, 2)
+            )
+            / width;
+
+        Const[1] =
+            (
+                0.5f
+                    * ( gcmMAT(SurfaceToImage, 1, 0) + gcmMAT(SurfaceToImage, 1, 1) )
+                    +   gcmMAT(SurfaceToImage, 1, 2)
+            )
+            / height;
+
+        Const[2] =
+            (
+                0.5f
+                    * ( gcmMAT(SurfaceToImage, 2, 0) + gcmMAT(SurfaceToImage, 2, 1) )
+                    +   gcmMAT(SurfaceToImage, 2, 2)
+            );
+
+        Point0[0] = point0[0];
+        Point0[1] = point0[1];
+        Point1[0] = point1[0];
+        Point1[1] = point1[1];
+        Point2[0] = point2[0];
+        Point2[1] = point2[1];
+        Point3[0] = point3[0];
+        Point3[1] = point3[1];
+    } while (0);
+
+    return status;
+}
+#endif
+
 gceSTATUS
 gcoVG_TesselateImage(
     IN gcoVG Vg,
@@ -2686,13 +2841,22 @@ gcoVG_TesselateImage(
     IN gctBOOL Mask,
 #if gcdMOVG
     IN gctBOOL SoftwareTesselation,
-    IN gceVG_BLEND BlendMode
+    IN gceVG_BLEND BlendMode,
+    IN gctINT Width,
+    IN gctINT Height
 #else
     IN gctBOOL SoftwareTesselation
 #endif
     )
 {
     gceSTATUS status;
+
+#if gcdMOVG
+        gctINT tsWidth, tsHeight;
+        gctINT x, y;
+        gctFLOAT minx, miny, maxx, maxy;  /* Bounding box of the path. */
+        gctFLOAT tBounds[4][2];    /* LEFT, RIGHT, BOTTOM, TOP. */
+#endif
 
     gcmHEADER_ARG("Vg=0x%x Image=0x%x Rectangle=0x%x Filter=0x%x Mask=0x%x, SoftwareTesselation=0x%x",
                   Vg, Image, Rectangle,  Filter, Mask, SoftwareTesselation
@@ -2713,39 +2877,92 @@ gcoVG_TesselateImage(
 
 #if gcdMOVG
         gcsTESSELATION_PTR tessellationBuffer = gcvNULL;
-        gctBOOL     withTS = gcvFALSE;
 
-        if ((BlendMode != gcvVG_BLEND_SRC_OVER)
-            || Vg->scissor != gcvNULL
-            || SoftwareTesselation)
         {
-            withTS = gcvTRUE;
-        }
+            gctFLOAT imgStepX[3];
+            gctFLOAT imgStepY[3];
+            gctFLOAT imgConst[3];
 
-        if (withTS)
-        {
-            gctINT tsw, tsh;
+            gcmERR_BREAK(ComputeImageParams(Rectangle->width, Rectangle->height,
+                               Vg->userToSurface, Vg->surfaceToImage,
+                               imgStepX, imgStepY, imgConst,
+                               tBounds[0], tBounds[1], tBounds[2], tBounds[3])
+                        );
 #if gcdGC355_PROFILER
             /* Get the pointer to the current tesselation buffer. */
             gcmERR_BREAK(_GetTessellationBuffer(
-                Vg, Vg->TreeDepth, Vg->saveLayerTreeDepth, Vg->varTreeDepth, Vg->targetWidth, Vg->targetHeight, &tessellationBuffer, &tsw, &tsh
+                Vg, Vg->TreeDepth, Vg->saveLayerTreeDepth, Vg->varTreeDepth, Width, Height, &tessellationBuffer, &tsWidth, &tsHeight
                 ));
 #else
             gcmERR_BREAK(_GetTessellationBuffer(
-                Vg, Vg->targetWidth, Vg->targetHeight, &tessellationBuffer, &tsw, &tsh
+                Vg, Width, Height, &tessellationBuffer, &tsWidth, &tsHeight
                 ));
 #endif
-            /* Program tesselation buffers. */
-            gcmERR_BREAK(gcoVGHARDWARE_SetTessellation(
-                Vg->hw,
-                SoftwareTesselation,
-                0, 0,
-                0, 0,
-                (gctUINT16)Vg->targetWidth, (gctUINT16)Vg->targetHeight,
-                0.0f, 1.0f,
-                userToSurface,
-                tessellationBuffer
-                ));
+#if gcdMOVG
+        if (!SoftwareTesselation)
+        {
+            minx = maxx = tBounds[0][0];
+            miny = maxy = tBounds[0][1];
+            minx = gcmMIN(minx, gcmMIN(tBounds[1][0], gcmMIN(tBounds[2][0], tBounds[3][0])));
+            maxx = gcmMAX(maxx, gcmMAX(tBounds[1][0], gcmMAX(tBounds[2][0], tBounds[3][0])));
+            miny = gcmMIN(miny, gcmMIN(tBounds[1][1], gcmMIN(tBounds[2][1], tBounds[3][1])));
+            maxy = gcmMAX(maxy, gcmMAX(tBounds[1][1], gcmMAX(tBounds[2][1], tBounds[3][1])));
+
+            /* Clip to render target area. */
+            if (minx < 0.0f)
+                minx = 0.0f;
+            if (miny < 0.0f)
+                miny = 0.0f;
+            if (maxx > (gctFLOAT)Vg->targetWidth)
+                maxx = (gctFLOAT)Vg->targetWidth;
+            if (maxy > (gctFLOAT)Vg->targetHeight)
+                maxy = (gctFLOAT)Vg->targetHeight;
+        }
+        else
+        {
+            minx = miny = 0.0f;
+            maxx = (gctFLOAT)Vg->targetWidth;
+            maxy = (gctFLOAT)Vg->targetHeight;
+        }
+
+        /* Looping tessellation in small tiles. */
+        for (y = (gctINT)miny; y < (gctINT)maxy; y += tsHeight)
+        {
+            for (x = (gctINT)minx; x < (gctINT)maxx; x += tsWidth)
+            {
+                /* Program tesselation buffers. */
+                gcmERR_BREAK(gcoVGHARDWARE_SetTessellation(
+                    Vg->hw,
+                    SoftwareTesselation,
+                    x, y,
+                    x, y,
+                    (gctUINT16)tsWidth, (gctUINT16)tsHeight,
+                    0.0f, 1.0f,
+                    userToSurface,
+                    tessellationBuffer
+                    ));
+
+                /* Draw the image. */
+                status = gcoVGHARDWARE_TesselateImage(
+                    Vg->hw,
+                    SoftwareTesselation,
+                    Image,
+                    Rectangle,
+                    Filter,
+                    Mask,
+                    imgStepX,
+                    imgStepY,
+                    imgConst,
+                    tBounds[0],
+                    tBounds[1],
+                    tBounds[2],
+                    tBounds[3],
+                    (x == (gctINT)minx) && (y == (gctINT)miny),
+                    tessellationBuffer
+                    );
+            }
+        }
+#endif
         }
 #else
         gcsTESSELATION_PTR tessellationBuffer;
@@ -2768,7 +2985,6 @@ gcoVG_TesselateImage(
             userToSurface,
             tessellationBuffer
             ));
-#endif
 
         /* Draw the image. */
         status = gcoVGHARDWARE_TesselateImage(
@@ -2782,39 +2998,9 @@ gcoVG_TesselateImage(
             Vg->surfaceToImage,
             tessellationBuffer
             );
+#endif
 
-#if gcdMOVG
-        if (withTS)
-        {
-            if ((status != gcvSTATUS_OK) && !SoftwareTesselation)
-            {
-                /* Program tesselation buffers. */
-                gcmERR_BREAK(gcoVGHARDWARE_SetTessellation(
-                    Vg->hw,
-                    gcvTRUE,
-                    0, 0,
-                    0, 0,
-                    (gctUINT16)Vg->targetWidth, (gctUINT16)Vg->targetHeight,
-                    0.0f, 1.0f,
-                    userToSurface,
-                    tessellationBuffer
-                    ));
-
-                /* Draw the image. */
-                gcmERR_BREAK(gcoVGHARDWARE_TesselateImage(
-                    Vg->hw,
-                    gcvTRUE,
-                    Image,
-                    Rectangle,
-                    Filter,
-                    Mask,
-                    Vg->userToSurface,
-                    Vg->surfaceToImage,
-                    tessellationBuffer
-                    ));
-            }
-        }
-#else
+#if !gcdMOVG
         if ((status != gcvSTATUS_OK) && !SoftwareTesselation)
         {
             /* Program tesselation buffers. */

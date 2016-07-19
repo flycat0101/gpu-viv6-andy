@@ -30,7 +30,7 @@
 //
 //  OpenCL Conformance Tests
 //
-//  Copyright:	(c) 2008-2009 by Apple Inc. All Rights Reserved.
+//  Copyright:    (c) 2008-2009 by Apple Inc. All Rights Reserved.
 //
 ******************************************************************/
 
@@ -56,138 +56,138 @@ const char *kernel_code_reserved_data_types = "__kernel void reserved_data_types
 
 
 int reserved_data_types(cl_device_id device, cl_context context, cl_command_queue queue, int num_elements, int& fail, int& pass){
-	cl_mem streams;
-	unsigned char *output_h;
-	cl_program program = NULL;
-	cl_kernel kernel = NULL;
-	size_t threads[1];
-	char kernel_code_int[512];
-	const char *constkernelint;
-	const char *floatnxm="float%sx%s";
-	const char *doublenxm="double%sx%s";
-	char charf_nxm[10];
-	char chard_nxm[10];
+    cl_mem streams;
+    unsigned char *output_h;
+    cl_program program = NULL;
+    cl_kernel kernel = NULL;
+    size_t threads[1];
+    char kernel_code_int[512];
+    const char *constkernelint;
+    const char *floatnxm="float%sx%s";
+    const char *doublenxm="double%sx%s";
+    char charf_nxm[10];
+    char chard_nxm[10];
 
-	int err;
+    int err;
 
-	int randomN1 = rand()%20;
-	char R1[2];
-	//itoa(randomN1, R1, 10);
-	sprintf(R1, "%d", randomN1);
+    int randomN1 = rand()%20;
+    char R1[2];
+    //itoa(randomN1, R1, 10);
+    sprintf(R1, "%d", randomN1);
 
-	int randomN2 = rand()%20;
-	char R2[2];
-	//itoa(randomN2, R2, 10);
-	sprintf(R2, "%d", randomN2);
+    int randomN2 = rand()%20;
+    char R2[2];
+    //itoa(randomN2, R2, 10);
+    sprintf(R2, "%d", randomN2);
 
-	sprintf(charf_nxm, floatnxm,R1,R2);
-	sprintf(chard_nxm, doublenxm,R1,R2);
+    sprintf(charf_nxm, floatnxm,R1,R2);
+    sprintf(chard_nxm, doublenxm,R1,R2);
 
-	const char    *types[] = {
-		"quad", "half", "complex half", "imaginary half", "complex float", "imaginary float", "complex double",
-		"imaginary double","complex quad", "imaginary quad", "long double", "long long","unsigned long long","ulong long",
-		"char", "uchar", "short", "ushort", "int", "uint", "long", "ulong", "float", charf_nxm, chard_nxm
-	};
+    const char    *types[] = {
+        "quad", "half", "complex half", "imaginary half", "complex float", "imaginary float", "complex double",
+        "imaginary double","complex quad", "imaginary quad", "long double", "long long","unsigned long long","ulong long",
+        "char", "uchar", "short", "ushort", "int", "uint", "long", "ulong", "float", charf_nxm, chard_nxm
+    };
 
-	const char    *Ntypes[] = {
-		"", "2", "3", "4", "8", "16"
-	};
-
-
-	size_t length = sizeof(unsigned char) * num_elements;
-	output_h = (unsigned char*)malloc(length);
-
-	streams = clCreateBuffer(context, CL_MEM_READ_WRITE, length, NULL, NULL);
-	if (!streams)
-	{
-		printf("clCreateBuffer failed\n");
-		clReleaseMemObject(streams);
-		clReleaseKernel(kernel);
-		clReleaseProgram(program);
-		free(output_h);
-		fail++;
-		return -1;
-	}
+    const char    *Ntypes[] = {
+        "", "2", "3", "4", "8", "16"
+    };
 
 
-	for(int t=0; t<25; t++)
-	{
-		int s=0;
-		int n=6;
-		if((strcmp(types[t], "quad")==0) ||
-			(strcmp(types[t], "half")==0) ||
-			(strcmp(types[t], "unsigned long long")==0) ||
-			(strcmp(types[t], "char")==0) ||
-			(strcmp(types[t], "uchar")==0) ||
-			(strcmp(types[t], "short")==0) ||
-			(strcmp(types[t], "ushort")==0) ||
-			(strcmp(types[t], "int")==0) ||
-			(strcmp(types[t], "uint")==0) ||
-			(strcmp(types[t], "long")==0) ||
-			(strcmp(types[t], "ulong")==0) ||
-			(strcmp(types[t], "float")==0))
-			s=1;
-		if((strcmp(types[t], charf_nxm)==0) || (strcmp(types[t], chard_nxm)==0))
-			n=1;
+    size_t length = sizeof(unsigned char) * num_elements;
+    output_h = (unsigned char*)malloc(length);
 
-		for( ;s<n;s++)
-		{
-			sprintf(kernel_code_int, kernel_code_reserved_data_types,types[t],Ntypes[s]);
-			constkernelint = kernel_code_int;
+    streams = clCreateBuffer(context, CL_MEM_READ_WRITE, length, NULL, NULL);
+    if (!streams)
+    {
+        printf("clCreateBuffer failed\n");
+        clReleaseMemObject(streams);
+        clReleaseKernel(kernel);
+        clReleaseProgram(program);
+        free(output_h);
+        fail++;
+        return -1;
+    }
 
-			err = create_kernel(context, &program, &kernel, 1, &constkernelint, "reserved_data_types" );
 
-			if (err != CL_SUCCESS) {
-				printf("Kernel compilation error using %s%s as a type name.\n", types[t],Ntypes[s]);
-				err = CL_SUCCESS;
-			        pass++;
-				continue;
-			}
+    for(int t=0; t<25; t++)
+    {
+        int s=0;
+        int n=6;
+        if((strcmp(types[t], "quad")==0) ||
+            (strcmp(types[t], "half")==0) ||
+            (strcmp(types[t], "unsigned long long")==0) ||
+            (strcmp(types[t], "char")==0) ||
+            (strcmp(types[t], "uchar")==0) ||
+            (strcmp(types[t], "short")==0) ||
+            (strcmp(types[t], "ushort")==0) ||
+            (strcmp(types[t], "int")==0) ||
+            (strcmp(types[t], "uint")==0) ||
+            (strcmp(types[t], "long")==0) ||
+            (strcmp(types[t], "ulong")==0) ||
+            (strcmp(types[t], "float")==0))
+            s=1;
+        if((strcmp(types[t], charf_nxm)==0) || (strcmp(types[t], chard_nxm)==0))
+            n=1;
 
-			err  = clSetKernelArg(kernel, 0, sizeof streams, &streams);
-			if (err != CL_SUCCESS)
-			{
-				printf("clSetKernelArgs failed\n");
-				clReleaseMemObject(streams);
-				clReleaseKernel(kernel);
-				clReleaseProgram(program);
-				free(output_h);
-				fail++;
-				return -1;
-			}
-			threads[0] = (unsigned int)num_elements;
-			err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, threads, NULL, 0, NULL, NULL);
-			if (err != CL_SUCCESS)
-			{
-				printf("clEnqueueNDRangeKernel failed\n");
-				clReleaseMemObject(streams);
-				clReleaseKernel(kernel);
-				clReleaseProgram(program);
-				free(output_h);
-				fail++;
-				return -1;
-			}
-			err = clEnqueueReadBuffer(queue, streams, CL_TRUE, 0, length, output_h, 0, NULL, NULL);
-			if (err != CL_SUCCESS)
-			{
-				printf("clReadArray failed\n");
-				clReleaseMemObject(streams);
-				clReleaseKernel(kernel);
-				clReleaseProgram(program);
-				free(output_h);
-				fail++;
-				return -1;
-			}
-			pass++;
-		}
-	}
+        for( ;s<n;s++)
+        {
+            sprintf(kernel_code_int, kernel_code_reserved_data_types,types[t],Ntypes[s]);
+            constkernelint = kernel_code_int;
 
-	clReleaseMemObject(streams);
-	clReleaseKernel(kernel);
-	clReleaseProgram(program);
-	free(output_h);
+            err = create_kernel(context, &program, &kernel, 1, &constkernelint, "reserved_data_types" );
 
-	return err;
+            if (err != CL_SUCCESS) {
+                printf("Kernel compilation error using %s%s as a type name.\n", types[t],Ntypes[s]);
+                err = CL_SUCCESS;
+                    pass++;
+                continue;
+            }
+
+            err  = clSetKernelArg(kernel, 0, sizeof streams, &streams);
+            if (err != CL_SUCCESS)
+            {
+                printf("clSetKernelArgs failed\n");
+                clReleaseMemObject(streams);
+                clReleaseKernel(kernel);
+                clReleaseProgram(program);
+                free(output_h);
+                fail++;
+                return -1;
+            }
+            threads[0] = (unsigned int)num_elements;
+            err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, threads, NULL, 0, NULL, NULL);
+            if (err != CL_SUCCESS)
+            {
+                printf("clEnqueueNDRangeKernel failed\n");
+                clReleaseMemObject(streams);
+                clReleaseKernel(kernel);
+                clReleaseProgram(program);
+                free(output_h);
+                fail++;
+                return -1;
+            }
+            err = clEnqueueReadBuffer(queue, streams, CL_TRUE, 0, length, output_h, 0, NULL, NULL);
+            if (err != CL_SUCCESS)
+            {
+                printf("clReadArray failed\n");
+                clReleaseMemObject(streams);
+                clReleaseKernel(kernel);
+                clReleaseProgram(program);
+                free(output_h);
+                fail++;
+                return -1;
+            }
+            pass++;
+        }
+    }
+
+    clReleaseMemObject(streams);
+    clReleaseKernel(kernel);
+    clReleaseProgram(program);
+    free(output_h);
+
+    return err;
 }
 
 

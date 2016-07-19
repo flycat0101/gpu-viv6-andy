@@ -492,7 +492,7 @@ gcoHARDWARE_LoadProgram(
 
     if ((Hardware->prevProgramStageBits & gcvPROGRAM_STAGE_COMPUTE_BIT) !=
         (Hardware->SHStates->programState.hints->stageBits & gcvPROGRAM_STAGE_COMPUTE_BIT) &&
-		!Hardware->features[gcvFEATURE_PSIO_MSAA_CL_FIX])
+        !Hardware->features[gcvFEATURE_PSIO_MSAA_CL_FIX])
     {
         Hardware->MsaaDirty->msaaConfigDirty = gcvTRUE;
     }
@@ -568,25 +568,22 @@ gcoHARDWARE_LoadKernel(
  24:24) - (0 ? 24:24) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 24:24) - (0 ? 24:24) + 1))))))) << (0 ?
  24:24)))));
 #if TEMP_SHADER_PATCH
-        if (Hints != gcvNULL)
+        switch (Hints->pachedShaderIdentifier)
         {
-            switch (Hints->pachedShaderIdentifier)
-            {
-            case gcvMACHINECODE_GLB27_RELEASE_0:
-                Hints->fsMaxTemp = 0x00000004;
-                break;
+        case gcvMACHINECODE_GLB27_RELEASE_0:
+            Hints->fsMaxTemp = 0x00000004;
+            break;
 
-            case gcvMACHINECODE_GLB25_RELEASE_0:
-                Hints->fsMaxTemp = 0x00000008;
-                break;
+        case gcvMACHINECODE_GLB25_RELEASE_0:
+            Hints->fsMaxTemp = 0x00000008;
+            break;
 
-            case gcvMACHINECODE_GLB25_RELEASE_1:
-                Hints->fsMaxTemp = 0x00000008;
-                break;
+        case gcvMACHINECODE_GLB25_RELEASE_1:
+            Hints->fsMaxTemp = 0x00000008;
+            break;
 
-            default:
-                break;
-            }
+        default:
+            break;
         }
 #endif
 

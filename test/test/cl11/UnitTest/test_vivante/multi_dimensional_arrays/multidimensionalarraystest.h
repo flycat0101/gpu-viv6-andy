@@ -33,53 +33,53 @@
 
 class MultiDimensionalArraysTest {
 public:
-	MultiDimensionalArraysTest(const char *typeName, const char *dimension,
-		const size_t size);
-	~MultiDimensionalArraysTest();
-	void cleanup();
-	char* getErrorMessage() const;
-	char* getBuildLog() const;
-	int runHarnessMode(cl_device_id device, cl_context context, cl_command_queue queue);
-	const char* getTitle() const;
+    MultiDimensionalArraysTest(const char *typeName, const char *dimension,
+        const size_t size);
+    ~MultiDimensionalArraysTest();
+    void cleanup();
+    char* getErrorMessage() const;
+    char* getBuildLog() const;
+    int runHarnessMode(cl_device_id device, cl_context context, cl_command_queue queue);
+    const char* getTitle() const;
 
 protected:
-	cl_platform_id platform;
-	cl_device_id device;
-	cl_context context;
-	cl_command_queue queue;
-	cl_program program;
-	cl_mem inputADevice;
-	cl_mem inputBDevice;
-	cl_mem resultDevice;
-	char *errorMessage;
-	char *buildLog;
-	char *controlFailMessage;
-	const size_t size;
-	const char *typeName;
-	const char *dimension;
-	char title[30];
-	cl_kernel *kernels;
-	void *inputA;
-	void *inputB;
-	void *result;
+    cl_platform_id platform;
+    cl_device_id device;
+    cl_context context;
+    cl_command_queue queue;
+    cl_program program;
+    cl_mem inputADevice;
+    cl_mem inputBDevice;
+    cl_mem resultDevice;
+    char *errorMessage;
+    char *buildLog;
+    char *controlFailMessage;
+    const size_t size;
+    const char *typeName;
+    const char *dimension;
+    char title[30];
+    cl_kernel *kernels;
+    void *inputA;
+    void *inputB;
+    void *result;
 
-	virtual const int getMemSize() const = 0;
-	virtual void generateInput(const unsigned int &kernelIndex) = 0;
-	void getFullKernelName(const unsigned int &kernelIndex, char *kernelName);
-	virtual cl_int enqueueKernel(cl_kernel kernel) = 0;
-	virtual void* getInputAElement(const unsigned int &index) const = 0;
-	virtual void* getInputBElement(const unsigned int &index) const = 0;
-	virtual void* getResultElement(const unsigned int &index) const = 0;
-	virtual void generateSource(char *source, unsigned int *sourceSize) = 0;
+    virtual const int getMemSize() const = 0;
+    virtual void generateInput(const unsigned int &kernelIndex) = 0;
+    void getFullKernelName(const unsigned int &kernelIndex, char *kernelName);
+    virtual cl_int enqueueKernel(cl_kernel kernel) = 0;
+    virtual void* getInputAElement(const unsigned int &index) const = 0;
+    virtual void* getInputBElement(const unsigned int &index) const = 0;
+    virtual void* getResultElement(const unsigned int &index) const = 0;
+    virtual void generateSource(char *source, unsigned int *sourceSize) = 0;
 
-	cl_bool controlResult(const unsigned int &kernelIndex);
-	cl_bool checkInt(const unsigned int &kernelIndex, const unsigned int &vectorSize);
-	cl_bool checkUInt(const unsigned int &kernelIndex, const unsigned int &vectorSize);
-	cl_bool checkShort(const unsigned int &kernelIndex, const unsigned int &vectorSize);
-	cl_bool checkUShort(const unsigned int &kernelIndex, const unsigned int &vectorSize);
-	cl_bool checkChar(const unsigned int &kernelIndex, const unsigned int &vectorSize);
-	cl_bool checkUChar(const unsigned int &kernelIndex, const unsigned int &vectorSize);
-	cl_bool checkFloat(const unsigned int &kernelIndex, const unsigned int &vectorSize);
+    cl_bool controlResult(const unsigned int &kernelIndex);
+    cl_bool checkInt(const unsigned int &kernelIndex, const unsigned int &vectorSize);
+    cl_bool checkUInt(const unsigned int &kernelIndex, const unsigned int &vectorSize);
+    cl_bool checkShort(const unsigned int &kernelIndex, const unsigned int &vectorSize);
+    cl_bool checkUShort(const unsigned int &kernelIndex, const unsigned int &vectorSize);
+    cl_bool checkChar(const unsigned int &kernelIndex, const unsigned int &vectorSize);
+    cl_bool checkUChar(const unsigned int &kernelIndex, const unsigned int &vectorSize);
+    cl_bool checkFloat(const unsigned int &kernelIndex, const unsigned int &vectorSize);
 };
 
 #endif /*_multidimensionalarraystest_h*/

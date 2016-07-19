@@ -29,6 +29,7 @@ endif
 CFLAGS  += -DHAVE_CONFIG_H -DPIC
 
 CFLAGS  += -DGAL_SURFACE_POOL=1
+CFLAGS  += -DGAL_SURFACE_COMPRESSED=0
 
 INCLUDE := -I$(AQROOT)/hal/inc
 INCLUDE += -I$(DFB_DIR)/usr/include
@@ -41,9 +42,8 @@ CFLAGS  += $(INCLUDE)
 ################################################################################
 # Describe extra libraries.
 
-LIBS    += -L$(SDK_DIR)/drivers -L$(DFB_DIR)/lib -ldirectfb -ldirect -lfusion -lz
+LIBS    += -L$(SDK_DIR)/drivers -L$(DFB_DIR)/lib -ldirectfb -ldirect -lfusion
 LIBS    += -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL
-LIBS    += -lm -lpthread
 
 ################################################################################
 # Describe object files.

@@ -54,7 +54,7 @@ LOCAL_PACKAGE_NAME := GL2Tutorial7
 LOCAL_JNI_SHARED_LIBRARIES := libgl2tutorial7
 
 LOCAL_MULTILIB := $(VIV_MULTILIB)
-LOCAL_MODULE_PATH := $(AQROOT)/bin/$(VIV_TARGET_ABI)
+LOCAL_MODULE_PATH := $(AQROOT)/bin/$(VIV_TARGET_ABI)/vdk
 include $(BUILD_PACKAGE)
 
 #########################################################################
@@ -94,7 +94,6 @@ ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 18),1)
 LOCAL_SHARED_LIBRARIES += \
         liblog
 endif
-
 LOCAL_MODULE := libgl2tutorial7
 
 LOCAL_PRELINK_MODULE := false

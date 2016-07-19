@@ -26,6 +26,7 @@
 ##############################################################################
 
 
+
 #
 # This file is a part of Vivante software stack build environment for Linux.
 # It defines the rules necessary to build Vivante SDK samples.

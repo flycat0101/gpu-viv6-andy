@@ -50,7 +50,7 @@ main(
     if (len < 16)
     {
         printf("FFT length has to at least be 16.\n");
-	return -1;
+        return -1;
     }
 
     if ((len != 1) && (len & (len - 1)))

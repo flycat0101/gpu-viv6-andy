@@ -58,9 +58,9 @@ static const char *sBitmapFile[] = {
     "resource/zero2_A1R5G5B5.bmp",
     "resource/zero2_ARGB4.bmp",
     "resource/zero2_ARGB8.bmp",
-	"resource/zero2_YUY2_640X480_Linear.vimg",
-	"resource/zero2_UYVY_640X480_Linear.vimg",
-	"resource/zero2_YUV420_640X480_Linear.vimg",
+    "resource/zero2_YUY2_640X480_Linear.vimg",
+    "resource/zero2_UYVY_640X480_Linear.vimg",
+    "resource/zero2_YUV420_640X480_Linear.vimg",
     "resource/Boston_YV12_640x480_Linear.vimg",
 };
 
@@ -68,30 +68,30 @@ typedef struct Test2D {
     GalTest     base;
     GalRuntime  *runtime;
 
-	// destination surface
-    gcoSURF			dstSurf;
-	gceSURF_FORMAT	dstFormat;
-	gctUINT			dstWidth;
-	gctUINT			dstHeight;
-	gctINT			dstStride;
-	gctUINT32		dstPhyAddr;
-	gctPOINTER		dstLgcAddr;
-	gctUINT8		dstGlobalAlpha;
+    // destination surface
+    gcoSURF            dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT            dstWidth;
+    gctUINT            dstHeight;
+    gctINT            dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
+    gctUINT8        dstGlobalAlpha;
 
-	// destination temp surface
+    // destination temp surface
     T2D_SURF_PTR    dstTemp;
 
-	//source surface
-    gcoSURF			srcSurf;
-	gceSURF_FORMAT	srcFormat;
-	gctUINT			srcWidth;
-	gctUINT			srcHeight;
-	gctINT			srcStride[3];
+    //source surface
+    gcoSURF            srcSurf;
+    gceSURF_FORMAT    srcFormat;
+    gctUINT            srcWidth;
+    gctUINT            srcHeight;
+    gctINT            srcStride[3];
     gctINT          srcStrideNum;
     gctINT          srcAddressNum;
-	gctUINT32		srcPhyAddr[3];
-	gctPOINTER		srcLgcAddr[3];
-	gctUINT8		srcGlobalAlpha;
+    gctUINT32        srcPhyAddr[3];
+    gctPOINTER        srcLgcAddr[3];
+    gctUINT8        srcGlobalAlpha;
 } Test2D;
 
 static gceSTATUS ReloadSourceSurface(Test2D *t2d, const char * sourcefile)
@@ -104,11 +104,11 @@ static gceSTATUS ReloadSourceSurface(Test2D *t2d, const char * sourcefile)
     // destroy source surface
     if (t2d->srcSurf != gcvNULL)
     {
-	    if (t2d->srcLgcAddr[0])
-	    {
-		    gcmONERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcLgcAddr));
-		    t2d->srcLgcAddr[0] = gcvNULL;
-	    }
+        if (t2d->srcLgcAddr[0])
+        {
+            gcmONERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcLgcAddr));
+            t2d->srcLgcAddr[0] = gcvNULL;
+        }
 
         gcmONERROR(gcoSURF_Destroy(t2d->srcSurf));
         t2d->srcSurf = gcvNULL;
@@ -132,14 +132,14 @@ static gceSTATUS ReloadSourceSurface(Test2D *t2d, const char * sourcefile)
     }
 
     gcmONERROR(gcoSURF_GetAlignedSize(t2d->srcSurf,
-									    gcvNULL,
-									    gcvNULL,
-									    t2d->srcStride));
+                                        gcvNULL,
+                                        gcvNULL,
+                                        t2d->srcStride));
 
     gcmONERROR(gcoSURF_GetSize(t2d->srcSurf,
-							    &t2d->srcWidth,
-							    &t2d->srcHeight,
-							    gcvNULL));
+                                &t2d->srcWidth,
+                                &t2d->srcHeight,
+                                gcvNULL));
 
     gcmONERROR(gcoSURF_GetFormat(t2d->srcSurf, gcvNULL, &t2d->srcFormat));
 
@@ -193,18 +193,18 @@ OnError:
 
 static gctBOOL CreateTempSurface(Test2D *t2d, gctUINT width, gctUINT height)
 {
-	gceSTATUS status = gcvTRUE;
+    gceSTATUS status = gcvTRUE;
 
-	if (t2d->dstTemp != gcvNULL)
+    if (t2d->dstTemp != gcvNULL)
     {
         gcmONERROR(GalDeleteTSurf(t2d->runtime->hal, t2d->dstTemp));
         t2d->dstTemp = gcvNULL;
     }
 
-	gcmONERROR(GalCreateTSurf(
+    gcmONERROR(GalCreateTSurf(
             t2d->runtime->hal, gcvSURF_A8R8G8B8, gcvTILED, gcv2D_TSC_DISABLE, t2d->dstWidth, t2d->dstHeight, &t2d->dstTemp));
 
-	return gcvTRUE;
+    return gcvTRUE;
 
 OnError:
 
@@ -215,21 +215,21 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 {
     gceSTATUS status;
     gcsRECT srcRect = {0, 0, t2d->srcWidth, t2d->srcHeight};
-	gcsRECT dstTempRect = {0, 0, t2d->dstWidth, t2d->dstHeight};
-	gcsRECT dstRect = {0, 0, t2d->dstWidth, t2d->dstHeight};
+    gcsRECT dstTempRect = {0, 0, t2d->dstWidth, t2d->dstHeight};
+    gcsRECT dstRect = {0, 0, t2d->dstWidth, t2d->dstHeight};
     gco2D egn2D = t2d->runtime->engine2d;
-	gctUINT8 ROP;
+    gctUINT8 ROP;
 
     gcmONERROR(ReloadSourceSurface(t2d, sBitmapFile[frameNo]));
 
-	gcmONERROR(CreateTempSurface(t2d, t2d->srcWidth, t2d->srcHeight));
+    gcmONERROR(CreateTempSurface(t2d, t2d->srcWidth, t2d->srcHeight));
 
-	t2d->srcGlobalAlpha = 0x80;
-	t2d->dstGlobalAlpha = 0x80;
+    t2d->srcGlobalAlpha = 0x80;
+    t2d->dstGlobalAlpha = 0x80;
 
-	ROP = (t2d->runtime->pe20) ? 0xCC : 0x88;
+    ROP = (t2d->runtime->pe20) ? 0xCC : 0x88;
 
-	gcmONERROR(gco2D_SetSource(egn2D, &srcRect));
+    gcmONERROR(gco2D_SetSource(egn2D, &srcRect));
 
     gcmONERROR(gco2D_SetGenericSource(
         egn2D,
@@ -241,7 +241,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         t2d->srcWidth,
         t2d->srcHeight));
 
-	gcmONERROR(gco2D_SetGenericTarget(
+    gcmONERROR(gco2D_SetGenericTarget(
         egn2D,
         t2d->dstTemp->address,
         t2d->dstTemp->validAddressNum,
@@ -253,22 +253,22 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         t2d->dstTemp->width,
         t2d->dstTemp->height));
 
-	gcmONERROR(gco2D_Blit(egn2D, 1, &dstTempRect, 0xCC, 0xCC, t2d->dstTemp->format));
+    gcmONERROR(gco2D_Blit(egn2D, 1, &dstTempRect, 0xCC, 0xCC, t2d->dstTemp->format));
 
-	// enalbe alphablend
-	gcmONERROR(gco2D_EnableAlphaBlend(egn2D,
-					t2d->srcGlobalAlpha, t2d->dstGlobalAlpha,
-					gcvSURF_PIXEL_ALPHA_STRAIGHT, gcvSURF_PIXEL_ALPHA_STRAIGHT,
-					gcvSURF_GLOBAL_ALPHA_ON, gcvSURF_GLOBAL_ALPHA_ON,
-					gcvSURF_BLEND_STRAIGHT, gcvSURF_BLEND_STRAIGHT,
-					gcvSURF_COLOR_STRAIGHT, gcvSURF_COLOR_STRAIGHT));
+    // enalbe alphablend
+    gcmONERROR(gco2D_EnableAlphaBlend(egn2D,
+                    t2d->srcGlobalAlpha, t2d->dstGlobalAlpha,
+                    gcvSURF_PIXEL_ALPHA_STRAIGHT, gcvSURF_PIXEL_ALPHA_STRAIGHT,
+                    gcvSURF_GLOBAL_ALPHA_ON, gcvSURF_GLOBAL_ALPHA_ON,
+                    gcvSURF_BLEND_STRAIGHT, gcvSURF_BLEND_STRAIGHT,
+                    gcvSURF_COLOR_STRAIGHT, gcvSURF_COLOR_STRAIGHT));
 
-	gcmONERROR(gco2D_Blit(egn2D, 1, &dstTempRect, ROP, ROP, t2d->dstTemp->format));
+    gcmONERROR(gco2D_Blit(egn2D, 1, &dstTempRect, ROP, ROP, t2d->dstTemp->format));
 
-	// disalbe alphablend
-	gcmONERROR(gco2D_DisableAlphaBlend(egn2D));
+    // disalbe alphablend
+    gcmONERROR(gco2D_DisableAlphaBlend(egn2D));
 
-	//Blit to dest
+    //Blit to dest
     gcmONERROR(gco2D_SetClipping(egn2D, &dstRect));
 
     gcmONERROR(gco2D_SetGenericSource(
@@ -283,7 +283,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         t2d->dstTemp->width,
         t2d->dstTemp->height));
 
-	gcmONERROR(gco2D_SetGenericTarget(
+    gcmONERROR(gco2D_SetGenericTarget(
         egn2D,
         &t2d->dstPhyAddr, 1,
         &t2d->dstStride, 1,
@@ -293,7 +293,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         t2d->dstWidth,
         t2d->dstHeight));
 
-	gcmONERROR(gco2D_Blit(egn2D, 1, &dstRect, 0xCC, 0xCC, t2d->dstFormat));
+    gcmONERROR(gco2D_Blit(egn2D, 1, &dstRect, 0xCC, 0xCC, t2d->dstFormat));
 
     gcmONERROR(gco2D_Flush(egn2D));
     gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
@@ -310,32 +310,32 @@ OnError:
 
 static void CDECL Destroy(Test2D *t2d)
 {
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
     if ((t2d->dstSurf != gcvNULL) && (t2d->dstLgcAddr != gcvNULL))
     {
-		if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
-		}
-		t2d->dstLgcAddr = gcvNULL;
+        if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
+        }
+        t2d->dstLgcAddr = gcvNULL;
     }
 
-	// destroy source surface
-	if (t2d->srcSurf != gcvNULL)
+    // destroy source surface
+    if (t2d->srcSurf != gcvNULL)
     {
-		if (t2d->srcLgcAddr[0])
-		{
-			if (gcmIS_ERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcLgcAddr)))
-			{
-				GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock srcSurf failed:%s\n", GalStatusString(status));
-			}
-			t2d->srcLgcAddr[0] = gcvNULL;
-		}
+        if (t2d->srcLgcAddr[0])
+        {
+            if (gcmIS_ERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcLgcAddr)))
+            {
+                GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock srcSurf failed:%s\n", GalStatusString(status));
+            }
+            t2d->srcLgcAddr[0] = gcvNULL;
+        }
 
         if (gcmIS_ERROR(gcoSURF_Destroy(t2d->srcSurf)))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
-		}
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
+        }
     }
 
     if (t2d->dstTemp != gcvNULL)
@@ -379,12 +379,12 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     t2d->srcLgcAddr[0] = gcvNULL;
     t2d->srcFormat = gcvSURF_UNKNOWN;
 
-	t2d->dstTemp    = gcvNULL;
+    t2d->dstTemp    = gcvNULL;
 
     gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
-									    &t2d->dstWidth,
-									    &t2d->dstHeight,
-									    &t2d->dstStride));
+                                        &t2d->dstWidth,
+                                        &t2d->dstHeight,
+                                        &t2d->dstStride));
 
     gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
 
@@ -399,7 +399,7 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     else
     {
         t2d->base.frameCount = sizeof(sBitmapFile)/sizeof(sBitmapFile[0]) - 4;
-	    GalOutput(GalOutputType_Result, "YUV BitBlit is not supported.\n");
+        GalOutput(GalOutputType_Result, "YUV BitBlit is not supported.\n");
     }
 
     return gcvTRUE;

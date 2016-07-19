@@ -35,7 +35,7 @@
 #include <GLES\glext.h>
 
 #define PRECISION 16
-#define ONE	(1 << PRECISION)
+#define ONE    (1 << PRECISION)
 #define ZERO 0
 inline GLfixed FixedFromInt(int value) {return value << PRECISION;};
 
@@ -49,8 +49,8 @@ int winWidth = 640;
 int winHeight = 480;
 
 EGLDisplay glesDisplay = NULL;  // EGL display
-EGLSurface glesSurface = NULL;	 // EGL rendering surface
-EGLContext glesContext = NULL;	 // EGL rendering context
+EGLSurface glesSurface = NULL;     // EGL rendering surface
+EGLContext glesContext = NULL;     // EGL rendering context
 EGLImageKHR eglimage = NULL;
 GLuint gTexture = 0xFFFFFFFF;
 
@@ -78,14 +78,14 @@ BOOL InitPixmap(HBITMAP Bitmap, RECT &rect, TCHAR *Text)
     int n;
     for (n = rect.left; n < rect.right; n += 10)
     {
-    	MoveToEx(hdcMem, n, rect.top, NULL);
-    	LineTo(hdcMem, n, rect.bottom);
+        MoveToEx(hdcMem, n, rect.top, NULL);
+        LineTo(hdcMem, n, rect.bottom);
     }
 
     for (n = rect.top; n < rect.bottom; n += 10)
     {
-    	MoveToEx(hdcMem, rect.left, n, NULL);
-    	LineTo(hdcMem, rect.right, n);
+        MoveToEx(hdcMem, rect.left, n, NULL);
+        LineTo(hdcMem, rect.right, n);
     }
 
     SetTextColor(hdcMem, RGB(0, 0, 0xFF));
@@ -96,7 +96,7 @@ BOOL InitPixmap(HBITMAP Bitmap, RECT &rect, TCHAR *Text)
 EXIT:
     if (old)
     {
-    	SelectObject(hdcMem, old);
+        SelectObject(hdcMem, old);
     }
 
     if (hdcMem)
@@ -107,11 +107,11 @@ EXIT:
     return ret;
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine,	int nCmdShow)
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLine,    int nCmdShow)
 {
     MSG msg;
     bool done = FALSE;
-	int ret = -1;
+    int ret = -1;
     WNDCLASS wc;
 
     if(hWnd = FindWindow(szAppName, szAppName))
@@ -126,9 +126,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
     wc.cbWndExtra     = 0;
     wc.hInstance      = hInstance;
     wc.hIcon          = LoadIcon(hInstance, NULL);
-    wc.hCursor	    = 0;
+    wc.hCursor        = 0;
     wc.hbrBackground  = 0;
-    wc.lpszMenuName	= NULL;
+    wc.lpszMenuName    = NULL;
     wc.lpszClassName  = szAppName;
 
     if(!RegisterClass(&wc))
@@ -137,14 +137,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
     }
 
     RECT rect;
-	SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, FALSE);
+    SystemParametersInfo(SPI_GETWORKAREA, 0, &rect, FALSE);
 
-	rect.left = (rect.right - winWidth) / 2;
-	rect.top  = (rect.bottom - winHeight) / 2;
-	rect.right  = rect.left + winWidth;
-	rect.bottom = rect.top + winHeight;
+    rect.left = (rect.right - winWidth) / 2;
+    rect.top  = (rect.bottom - winHeight) / 2;
+    rect.right  = rect.left + winWidth;
+    rect.bottom = rect.top + winHeight;
 
-	UINT style = WS_VISIBLE | WS_CAPTION | WS_SYSMENU;
+    UINT style = WS_VISIBLE | WS_CAPTION | WS_SYSMENU;
 
     AdjustWindowRectEx(&rect, style, FALSE, 0);
 
@@ -154,12 +154,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
                       rect.left,
                       rect.top,
                       rect.right - rect.left,
-					  rect.bottom - rect.top,
+                      rect.bottom - rect.top,
                       NULL, NULL,
                       hInstance, NULL);
     if(!hWnd)
     {
-		UnregisterClass(szAppName, hInstance);
+        UnregisterClass(szAppName, hInstance);
         return FALSE;
     }
 
@@ -171,9 +171,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
 
     //OpenGL ES Initialization
     if(!InitOGLES())
-	{
-		goto EXIT;
-	}
+    {
+        goto EXIT;
+    }
 
     //Message Loop
     while(!done)
@@ -182,19 +182,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPTSTR lpCmdLin
         {
           if(msg.message==WM_QUIT)
             done=TRUE;
-  	      else
+            else
           {
-  	        TranslateMessage(&msg);
-  	        DispatchMessage(&msg);
-  	      }
+              TranslateMessage(&msg);
+              DispatchMessage(&msg);
+            }
         }
         else
-  	    {
-  	        Render();
-  	    }
+          {
+              Render();
+          }
     }
 
-	ret = 0;
+    ret = 0;
 
 EXIT:
 
@@ -218,27 +218,27 @@ EXIT:
         eglMakeCurrent(glesDisplay, NULL, NULL, NULL);
 
         if(glesContext)
-		{
-			eglDestroyContext(glesDisplay, glesContext);
-		}
+        {
+            eglDestroyContext(glesDisplay, glesContext);
+        }
 
-		if(glesSurface)
-		{
-			eglDestroySurface(glesDisplay, glesSurface);
-		}
+        if(glesSurface)
+        {
+            eglDestroySurface(glesDisplay, glesSurface);
+        }
 
         eglTerminate(glesDisplay);
     }
 
-	if (hDC)
-	{
-		ReleaseDC(hWnd, hDC);
-	}
+    if (hDC)
+    {
+        ReleaseDC(hWnd, hDC);
+    }
 
-	if (hWnd)
-	{
-		DestroyWindow(hWnd);
-	}
+    if (hWnd)
+    {
+        DestroyWindow(hWnd);
+    }
 
     UnregisterClass(szAppName, hInstance);
 
@@ -252,7 +252,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
     case WM_PAINT:
         ValidateRect(hWnd,NULL);
-	    break;
+        break;
 
     case WM_DESTROY:
         PostQuitMessage(0);
@@ -330,21 +330,21 @@ BOOL InitOGLES()
     r.bottom = 64;
 
     BITMAPINFO     bmi;
-	memset(&bmi, 0, sizeof(BITMAPINFO));
-	bmi.bmiHeader.biSize           = sizeof(BITMAPINFO);
-	bmi.bmiHeader.biWidth          = r.right;
-	bmi.bmiHeader.biHeight         = -r.bottom;
-	bmi.bmiHeader.biPlanes         = (short)1;
-	bmi.bmiHeader.biCompression    = BI_RGB;
+    memset(&bmi, 0, sizeof(BITMAPINFO));
+    bmi.bmiHeader.biSize           = sizeof(BITMAPINFO);
+    bmi.bmiHeader.biWidth          = r.right;
+    bmi.bmiHeader.biHeight         = -r.bottom;
+    bmi.bmiHeader.biPlanes         = (short)1;
+    bmi.bmiHeader.biCompression    = BI_RGB;
     bmi.bmiHeader.biBitCount       = 32;
-	bmi.bmiHeader.biSizeImage      = 0;
-	bmi.bmiHeader.biXPelsPerMeter  = 0;
-	bmi.bmiHeader.biYPelsPerMeter  = 0;
-	bmi.bmiHeader.biClrUsed        = 0;
-	bmi.bmiHeader.biClrImportant   = 0;
+    bmi.bmiHeader.biSizeImage      = 0;
+    bmi.bmiHeader.biXPelsPerMeter  = 0;
+    bmi.bmiHeader.biYPelsPerMeter  = 0;
+    bmi.bmiHeader.biClrUsed        = 0;
+    bmi.bmiHeader.biClrImportant   = 0;
 
-	// Create DIB
-	hBitmapTex = CreateDIBSection(hDC, &bmi, DIB_RGB_COLORS, NULL, NULL, 0);
+    // Create DIB
+    hBitmapTex = CreateDIBSection(hDC, &bmi, DIB_RGB_COLORS, NULL, NULL, 0);
     if (!InitPixmap(hBitmapTex, r, TEXT("DIB PIXMAP")))
     {
           return FALSE;
@@ -353,9 +353,9 @@ BOOL InitOGLES()
     eglimage = (EGLImageKHR)eglCreateImageKHR(
         glesDisplay, EGL_NO_CONTEXT, EGL_NATIVE_PIXMAP_KHR, hBitmapTex, NULL);
     if (!eglimage)
-	{
-		return FALSE;
-	}
+    {
+        return FALSE;
+    }
 
     glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, (GLeglImageOES)eglimage);
 
@@ -397,5 +397,5 @@ void Render()
     glDisableClientState(GL_VERTEX_ARRAY);
 
 
-	eglSwapBuffers(glesDisplay, glesSurface);
+    eglSwapBuffers(glesDisplay, glesSurface);
 }

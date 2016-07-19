@@ -296,13 +296,13 @@ vx_status vxSobelMxN(vx_node node, vx_image input, vx_scalar win, vx_image grad_
     status = vxAccessScalarValue(win, &wins);
 
     /*index = 0*/
-	gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
+    gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
 
-	/*index = 1*/
+    /*index = 1*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, grad_x, GC_VX_INDEX_AUTO);
 
     /*index = 2*/
-	gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, grad_y, GC_VX_INDEX_AUTO);
+    gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, grad_y, GC_VX_INDEX_AUTO);
 
     kernelContext->params.kernel = gcvVX_KERNEL_SOBEL_MxN;
 

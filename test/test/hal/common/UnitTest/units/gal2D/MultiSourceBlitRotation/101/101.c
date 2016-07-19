@@ -73,40 +73,40 @@ static gctCONST_STRING s_CaseDescription =
 
 typedef struct _MultiSrc
 {
-    gcoSURF			srcSurf;
-	gceSURF_FORMAT	srcFormat;
-	gctUINT			srcWidth;
-	gctUINT			srcHeight;
-	gctINT			srcStride[3];
+    gcoSURF            srcSurf;
+    gceSURF_FORMAT    srcFormat;
+    gctUINT            srcWidth;
+    gctUINT            srcHeight;
+    gctINT            srcStride[3];
     gctINT          srcStrideNum;
     gctINT          srcAddressNum;
-	gctUINT32		srcPhyAddr[3];
-	gctPOINTER		srcLgcAddr[3];
+    gctUINT32        srcPhyAddr[3];
+    gctPOINTER        srcLgcAddr[3];
 } MultiSrc, *MultiSrcPTR;
 
 typedef struct Test2D {
     GalTest     base;
     GalRuntime  *runtime;
 
-	// destination surface
-    gcoSURF			dstSurf;
-	gceSURF_FORMAT	dstFormat;
-	gctUINT			dstWidth;
-	gctUINT			dstHeight;
-	gctINT			dstStride;
-	gctUINT32		dstPhyAddr;
-	gctPOINTER		dstLgcAddr;
+    // destination surface
+    gcoSURF            dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT            dstWidth;
+    gctUINT            dstHeight;
+    gctINT            dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
 
-	// destination temp surface
-    gcoSURF			dstTempSurf;
-	gceSURF_FORMAT	dstTempFormat;
-	gctUINT			dstTempWidth;
-	gctUINT			dstTempHeight;
-	gctINT			dstTempStride;
-	gctUINT32		dstTempPhyAddr;
-	gctPOINTER		dstTempLgcAddr;
+    // destination temp surface
+    gcoSURF            dstTempSurf;
+    gceSURF_FORMAT    dstTempFormat;
+    gctUINT            dstTempWidth;
+    gctUINT            dstTempHeight;
+    gctINT            dstTempStride;
+    gctUINT32        dstTempPhyAddr;
+    gctPOINTER        dstTempLgcAddr;
 
-	//source surface
+    //source surface
     MultiSrc multiSrc[4];
 
 } Test2D;
@@ -171,34 +171,34 @@ static gceSTATUS ReloadSourceSurface(Test2D *t2d, gctUINT SrcIndex, const char *
 
     if (GalIsYUVFormat(curSrc->srcFormat))
     {
-	    gcmONERROR(GalQueryUVStride(curSrc->srcFormat, curSrc->srcStride[0],
-	            &curSrc->srcStride[1], &curSrc->srcStride[2]));
+        gcmONERROR(GalQueryUVStride(curSrc->srcFormat, curSrc->srcStride[0],
+                &curSrc->srcStride[1], &curSrc->srcStride[2]));
 
-	    curSrc->srcPhyAddr[1] = address[1];
-	    curSrc->srcLgcAddr[1] = memory[1];
+        curSrc->srcPhyAddr[1] = address[1];
+        curSrc->srcLgcAddr[1] = memory[1];
 
-	    curSrc->srcPhyAddr[2] = address[2];
-	    curSrc->srcLgcAddr[2] = memory[2];
-	    switch (curSrc->srcFormat)
-	    {
-	    case gcvSURF_YUY2:
-	    case gcvSURF_UYVY:
-	        curSrc->srcStrideNum = curSrc->srcAddressNum = 1;
-	        break;
+        curSrc->srcPhyAddr[2] = address[2];
+        curSrc->srcLgcAddr[2] = memory[2];
+        switch (curSrc->srcFormat)
+        {
+        case gcvSURF_YUY2:
+        case gcvSURF_UYVY:
+            curSrc->srcStrideNum = curSrc->srcAddressNum = 1;
+            break;
 
-	    case gcvSURF_I420:
-	    case gcvSURF_YV12:
-	        curSrc->srcStrideNum = curSrc->srcAddressNum = 3;
-	        break;
+        case gcvSURF_I420:
+        case gcvSURF_YV12:
+            curSrc->srcStrideNum = curSrc->srcAddressNum = 3;
+            break;
 
-	    case gcvSURF_NV16:
-	    case gcvSURF_NV12:
-	        curSrc->srcStrideNum = curSrc->srcAddressNum = 2;
-	        break;
+        case gcvSURF_NV16:
+        case gcvSURF_NV12:
+            curSrc->srcStrideNum = curSrc->srcAddressNum = 2;
+            break;
 
-	    default:
-	        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-	    }
+        default:
+            gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+        }
 
     }
 
@@ -217,7 +217,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     gctINT i;
 
     // clear dest temp with grey color
-	gcmONERROR(Gal2DCleanSurface(t2d->runtime->hal, t2d->dstTempSurf, COLOR_ARGB8(0x00, 0x80, 0x80, 0x80)));
+    gcmONERROR(Gal2DCleanSurface(t2d->runtime->hal, t2d->dstTempSurf, COLOR_ARGB8(0x00, 0x80, 0x80, 0x80)));
 
     for (i = 0; i < 4; i++)
     {
@@ -267,26 +267,26 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
         gcmONERROR(gco2D_SetROP(egn2D, 0xCC, 0xCC));
 
-	    switch(frameNo){
-		    case 0:
-			    // disable mirror
-			    gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvFALSE, gcvFALSE));
-			    break;
-		    case 1:
-			    // enable horizontal mirror
-			    gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvTRUE, gcvFALSE));
-			    break;
-		    case 2:
-			    // enable vertical mirror
-			    gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvFALSE, gcvTRUE));
-			    break;
-		    case 3:
-			    // enable horizontal & vertical mirror
-			    gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvTRUE, gcvTRUE));
-			    break;
-		    default:
-			    return gcvFALSE;
-	    }
+        switch(frameNo){
+            case 0:
+                // disable mirror
+                gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvFALSE, gcvFALSE));
+                break;
+            case 1:
+                // enable horizontal mirror
+                gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvTRUE, gcvFALSE));
+                break;
+            case 2:
+                // enable vertical mirror
+                gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvFALSE, gcvTRUE));
+                break;
+            case 3:
+                // enable horizontal & vertical mirror
+                gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvTRUE, gcvTRUE));
+                break;
+            default:
+                return gcvFALSE;
+        }
     }
 
     gcmONERROR(gco2D_SetClipping(egn2D, &Rect));
@@ -302,8 +302,8 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         t2d->dstTempHeight));
 
     gcmONERROR(gco2D_MultiSourceBlit(egn2D, 0xF, &Rect, 1));
-	// disable mirror
-	gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvFALSE, gcvFALSE));
+    // disable mirror
+    gcmONERROR(gco2D_SetBitBlitMirror(egn2D, gcvFALSE, gcvFALSE));
 
     gcmONERROR(gco2D_Flush(egn2D));
 
@@ -353,7 +353,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 OnError:
     GalOutput(GalOutputType_Error | GalOutputType_Console,
         "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
-	return gcvFALSE;
+    return gcvFALSE;
 }
 
 static void CDECL Destroy(Test2D *t2d)
@@ -362,8 +362,8 @@ static void CDECL Destroy(Test2D *t2d)
 
     if ((t2d->dstSurf != gcvNULL) && (t2d->dstLgcAddr != gcvNULL))
     {
-		gcmVERIFY_OK(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr));
-		t2d->dstLgcAddr = gcvNULL;
+        gcmVERIFY_OK(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr));
+        t2d->dstLgcAddr = gcvNULL;
     }
 
     if (t2d->dstTempSurf != gcvNULL)
@@ -371,24 +371,24 @@ static void CDECL Destroy(Test2D *t2d)
         if (t2d->dstTempLgcAddr != gcvNULL)
         {
             gcmVERIFY_OK(gcoSURF_Unlock(t2d->dstTempSurf, t2d->dstTempLgcAddr));
-		    t2d->dstTempLgcAddr = gcvNULL;
+            t2d->dstTempLgcAddr = gcvNULL;
         }
 
         gcmVERIFY_OK(gcoSURF_Destroy(t2d->dstTempSurf));
     }
 
-	// destroy source surface
+    // destroy source surface
     for (i = 0; i < 4; i++)
     {
         MultiSrcPTR curSrc = &t2d->multiSrc[i];
 
-	    if (curSrc->srcSurf != gcvNULL)
+        if (curSrc->srcSurf != gcvNULL)
         {
-		    if (curSrc->srcLgcAddr[0])
-		    {
-			    gcmVERIFY_OK(gcoSURF_Unlock(curSrc->srcSurf, curSrc->srcLgcAddr));
-			    curSrc->srcLgcAddr[0] = gcvNULL;
-		    }
+            if (curSrc->srcLgcAddr[0])
+            {
+                gcmVERIFY_OK(gcoSURF_Unlock(curSrc->srcSurf, curSrc->srcLgcAddr));
+                curSrc->srcLgcAddr[0] = gcvNULL;
+            }
 
             gcmVERIFY_OK(gcoSURF_Destroy(curSrc->srcSurf));
         }
@@ -494,7 +494,7 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 OnError:
     GalOutput(GalOutputType_Error | GalOutputType_Console,
         "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
-	return gcvFALSE;
+    return gcvFALSE;
 }
 
 GalTest * CDECL GalCreateTestObject(GalRuntime *runtime)

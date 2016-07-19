@@ -70,7 +70,6 @@ SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_mem.o
 endif
 endif
 
-SOURCE_OBJECTS += $(driver_root)/hal/os/qnx/user/gc_hal_user_qnx.o
 EXTRA_SRCVPATH += $(driver_root)/hal/os/qnx/user
 
 SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_profiler.o

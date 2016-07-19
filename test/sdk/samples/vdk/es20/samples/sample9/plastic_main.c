@@ -27,8 +27,8 @@
 
 
 /*
-*	History : 2009.01.25, Created by qizhuang.liu.
-*			  2009.02.01, Finished by qizhuang.liu.
+*    History : 2009.01.25, Created by qizhuang.liu.
+*              2009.02.01, Finished by qizhuang.liu.
 */
 #include "vdk_sample_common.h"
 
@@ -44,89 +44,89 @@ int VDKS_Val_WindowsHeight = 0;
 char* VDKS_ARG0 = NULL;
 #endif
 /*
-*	Outside Routine
+*    Outside Routine
 */
-extern VDKS_BOOL	PlasticInit();
-extern void			PlasticPass();
+extern VDKS_BOOL    PlasticInit();
+extern void            PlasticPass();
 
 /*
-*	Save Screen.
+*    Save Screen.
 */
 
 int SaveResult = 0;
 
 VDKS_BOOL Init()
 {
-	return PlasticInit();
+    return PlasticInit();
 }
 
 void Run ()
 {
-	PlasticPass();
+    PlasticPass();
 
-	if (SaveResult)
-	{
-		VDKS_Func_SaveScreen("vdksample9_es20_result.bmp");
-	}
+    if (SaveResult)
+    {
+        VDKS_Func_SaveScreen("vdksample9_es20_result.bmp");
+    }
 #ifndef ANDROID
-	vdkSwapEGL(&VdkEgl);
+        vdkSwapEGL(&VdkEgl);
 #endif
 }
 #ifndef ANDROID
 int main(int argc, char * argv[])
 {
-	int i = 0;
-	int count = 1;
+    int i = 0;
+    int count = 1;
 
-	/*
-	 * Miscellaneous
-	*/
-	if (argc == 2)
-	{
-		count = atoi(argv[1]);
-	}
-	else if(argc == 4)
-	{
-		count = atoi(argv[1]);
-		VDKS_Val_WindowsWidth = atoi(argv[2]);
-		VDKS_Val_WindowsHeight = atoi(argv[3]);
-	}
-	else if(argc == 5)
-	{
-		count = atoi(argv[1]);
-		VDKS_Val_WindowsWidth = atoi(argv[2]);
-		VDKS_Val_WindowsHeight = atoi(argv[3]);
-		SaveResult = atoi(argv[4]);;
-	}
+    /*
+     * Miscellaneous
+    */
+    if (argc == 2)
+    {
+        count = atoi(argv[1]);
+    }
+    else if(argc == 4)
+    {
+        count = atoi(argv[1]);
+        VDKS_Val_WindowsWidth = atoi(argv[2]);
+        VDKS_Val_WindowsHeight = atoi(argv[3]);
+    }
+    else if(argc == 5)
+    {
+        count = atoi(argv[1]);
+        VDKS_Val_WindowsWidth = atoi(argv[2]);
+        VDKS_Val_WindowsHeight = atoi(argv[3]);
+        SaveResult = atoi(argv[4]);;
+    }
 
-	/*
-	 * VDKS
-	*/
-	VDKS_ARG0 = argv[0];
+    /*
+     * VDKS
+    */
+    VDKS_ARG0 = argv[0];
 
-	memset(&VdkEgl, 0, sizeof(vdkEGL));
+    memset(&VdkEgl, 0, sizeof(vdkEGL));
 
-	VDKS_Init(&VdkEgl);
+    VDKS_Init(&VdkEgl);
 
-	vdkShowWindow(VdkEgl.window);
+    vdkShowWindow(VdkEgl.window);
 
-	/*
-	 * App Data
-	*/
+    /*
+     * App Data
+    */
 
-	if (VDKS_TRUE != Init())
-	{
-		VDKS_Macro_AlertUser(1, "main : Failed to init case.");
-		return 1;
-	}
+    if (VDKS_TRUE != Init())
+    {
+        VDKS_Macro_AlertUser(1, "main : Failed to init case.");
+        return 1;
+    }
 
-	for(i = 0; i < count; i++)
-	{
-		Run();
-	}
+    for(i = 0; i < count; i++)
+    {
+        Run();
+    }
 
-	vdkFinishEGL(&VdkEgl);
+    vdkFinishEGL(&VdkEgl);
 
-	return 0;
+    return 0;
 }
 #endif

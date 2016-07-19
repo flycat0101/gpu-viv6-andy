@@ -32,13 +32,6 @@ LOCAL_SRC_FILES := \
     gc_hal_user_hardware_target.c \
     gc_hal_user_hardware_dec.c
 
-ifneq ($(THIRDPARTY_CUSTOMER),)
-ifneq ($(THIRDPARTY_TYPE),)
-LOCAL_SRC_FILES += \
-    $(GC_HAL_ARCH_USER_DIR)/thirdparty_special/$(THIRDPARTY_CUSTOMER)/gc_hal_user_hardware_thirdparty_$(THIRDPARTY_TYPE).c
-endif
-endif
-
 ifeq ($(VIVANTE_ENABLE_3D), 1)
 LOCAL_SRC_FILES += \
     gc_hal_user_hardware_clear.c \
@@ -52,6 +45,13 @@ LOCAL_SRC_FILES += \
     gc_hal_user_hardware_composition.c
 
 endif
+ifeq ($(VIVANTE_ENABLE_2D),1)
+LOCAL_SRC_FILES += \
+    thirdparty_special/gc_hal_user_hardware_thirdparty.c \
+    thirdparty_special/gc_hal_user_hardware_thirdparty_v10.c \
+    thirdparty_special/gc_hal_user_hardware_thirdparty_v11.c
+
+endif
 
 LOCAL_CFLAGS := \
     $(CFLAGS) \
@@ -61,9 +61,18 @@ LOCAL_CFLAGS := \
 LOCAL_C_INCLUDES := \
     $(AQROOT)/hal/inc \
     $(AQROOT)/hal/user \
-    $(AQROOT)/compiler/libVSC/include \
     $(AQROOT)/hal/os/linux/user \
     $(AQARCH)/cmodel/inc
+
+ifeq ($(VIVANTE_ENABLE_3D),1)
+LOCAL_C_INCLUDES += $(AQROOT)/compiler/libVSC/include
+
+endif
+
+ifeq ($(VIVANTE_ENABLE_2D),1)
+LOCAL_C_INCLUDES += $(AQROOT)/hal/user/arch/thirdparty_special
+
+endif
 
 ifeq ($(USE_OPENVX),1)
 LOCAL_SRC_FILES += \
@@ -73,13 +82,6 @@ LOCAL_C_INCLUDES += $(LOCAL_PATH)
 LOCAL_CFLAGS := \
     $(CFLAGS)
 
-endif
-
-ifneq ($(THIRDPARTY_CUSTOMER),)
-ifneq ($(THIRDPARTY_TYPE),)
-LOCAL_C_INCLUDES += \
-    $(AQROOT)/hal/user/arch/thirdparty_special/$(THIRDPARTY_CUSTOMER)
-endif
 endif
 
 LOCAL_GENERATED_SOURCES := \

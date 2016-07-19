@@ -40,7 +40,7 @@ int isPowerOfTwo(unsigned int i)
 
 float invSqrt(float t)
 {
-	return 1.0f/(float)sqrt(t);
+    return 1.0f/(float)sqrt(t);
 }
 
 
@@ -51,7 +51,7 @@ float wrap(float a, float min, float max)
     float q = s/d;
     float m = q - (float)floor(q);
 
-	assert(max > min);
+    assert(max > min);
 
     return m * d + min;
 }
@@ -59,7 +59,7 @@ float wrap(float a, float min, float max)
 
 float degToRad(float d)
 {
-	return d * 3.14159265358979323846f / 180.0f;
+    return d * 3.14159265358979323846f / 180.0f;
 }
 
 

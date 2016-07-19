@@ -617,9 +617,6 @@ endFrame(
 
             for (i = 0; i < GLES3_NUM_API_CALLS; ++i)
             {
-                if (i >= VPC_ES30CALLS && i <= VPC_ES30TRIANGLECOUNT)
-                    break;
-
                 if (Context->profiler.apiCalls[i] > 0)
                 {
                     gcmWRITE_COUNTER(VPG_ES30 + 1 + i, Context->profiler.apiCalls[i]);
@@ -814,8 +811,6 @@ resetFrameData(
 
     for (i = 0; i < GLES3_NUM_API_CALLS; ++i)
     {
-        if (i >= VPC_ES30CALLS && i <= VPC_ES30TRIANGLECOUNT)
-            break;
         Context->profiler.apiCalls[i] = 0;
         Context->profiler.apiTimes[i] = 0;
         Context->profiler.totalDriverTime = 0;
@@ -844,7 +839,7 @@ resetFrameData(
 #endif
 
 /* Function for printing draw number only once */
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
+#if VIVANTE_PROFILER_PROBE_PERDRAW | VIVANTE_PROFILER_PERDRAW
 static void beginDraw(IN __GLcontext *Context)
  {
 #if VIVANTE_PROFILER_PERDRAW
@@ -854,14 +849,24 @@ static void beginDraw(IN __GLcontext *Context)
          gcmWRITE_COUNTER(VPC_ES30_DRAW_NO, Context->profiler.drawCount);
      }
 #endif
-     gcoPROFILER_BeginDraw(GLFFPROFILER_HAL);
+     gcoPROFILER_Begin(GLFFPROFILER_HAL, gcvCOUNTER_OP_DRAW);
 }
 
 static void endDraw(IN __GLcontext *Context){
-    gcoPROFILER_EndDraw(GLFFPROFILER_HAL, (gctBOOL)(Context->profiler.drawCount == 0));
+    gcoPROFILER_End(GLFFPROFILER_HAL, (gctBOOL)(Context->profiler.drawCount == 0));
 }
 #endif
 
+#if VIVANTE_PROFILER_PROBE_PERDRAW
+static void beginCompute(IN __GLcontext *Context)
+{
+    gcoPROFILER_Begin(GLFFPROFILER_HAL, gcvCOUNTER_OP_COMPUTE);
+}
+
+static void endCompute(IN __GLcontext *Context){
+    gcoPROFILER_End(GLFFPROFILER_HAL, 0);
+}
+#endif
 
 #define gcmCHECK_VP_MODE(need_dump) \
     do \
@@ -972,7 +977,7 @@ __glChipProfiler(
         }
         break;
     case GL3_PROFILER_DRAW_BEGIN:
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
+#if VIVANTE_PROFILER_PROBE_PERDRAW | VIVANTE_PROFILER_PERDRAW
         if(Context->profiler.perDraw == gcvFALSE)
         {
             Context->profiler.perDraw = gcvTRUE;
@@ -981,15 +986,25 @@ __glChipProfiler(
         }
 #if VIVANTE_PROFILER_PERDRAW
         beginFrame(Context);
-#elif defined VIVANTE_PROFILER_PROBE
+#elif defined VIVANTE_PROFILER_PROBE_PERDRAW
         beginDraw(Context);
 #endif
 #endif
         break;
     case GL3_PROFILER_DRAW_END:
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
+#if VIVANTE_PROFILER_PROBE_PERDRAW | VIVANTE_PROFILER_PERDRAW
         endDraw(Context);
         Context->profiler.drawCount++;
+#endif
+        break;
+    case GL3_PROFILER_COMPUTE_BEGIN:
+#if VIVANTE_PROFILER_PROBE_PERDRAW
+        beginCompute(Context);
+#endif
+        break;
+    case GL3_PROFILER_COMPUTE_END:
+#if VIVANTE_PROFILER_PROBE_PERDRAW
+        endCompute(Context);
 #endif
         break;
     /* Print program info immediately as we do not save it. */
@@ -2635,7 +2650,8 @@ __glChipProfile_FramebufferTexture(
     GLint face,
     GLsizei samples,
     GLint zoffset,
-    GLboolean layered
+    GLboolean layered,
+    __GLfboAttachPoint *preAttach
     )
 {
     GLboolean ret;
@@ -2648,7 +2664,8 @@ __glChipProfile_FramebufferTexture(
                                       face,
                                       samples,
                                       zoffset,
-                                      layered);
+                                      layered,
+                                      preAttach);
     __GLCHIP_PROFILER_FOOTER();
     return ret;
 }
@@ -2658,11 +2675,12 @@ __glChipProfile_FramebufferRenderbuffer(
     __GLcontext *gc,
     __GLframebufferObject *fbo,
     GLint attachIndex,
-    __GLrenderbufferObject *rbo
+    __GLrenderbufferObject *rbo,
+    __GLfboAttachPoint *preAttach
     )
 {
     __GLCHIP_PROFILER_HEADER();
-    __glChipFramebufferRenderbuffer(gc, fbo, attachIndex, rbo);
+    __glChipFramebufferRenderbuffer(gc, fbo, attachIndex, rbo, preAttach);
     __GLCHIP_PROFILER_FOOTER();
 }
 

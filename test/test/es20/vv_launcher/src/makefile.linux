@@ -26,6 +26,7 @@
 ##############################################################################
 
 
+
 #
 # Linux build file for vv_launcher
 #
@@ -75,17 +76,17 @@ else
         LIBS += -L$(VIVANTE_SDK_LIB) -l GAL
         LIBS += -L$(VIVANTE_SDK_LIB) -lGLESv2
     endif
-
     ifeq ($(USE_VDK), 1)
         LIBS += -L$(VIVANTE_SDK_LIB) -l VDK
     endif
+
     ifneq ($(QNX), 1)
-        LIBS += -lm -lpthread -ldl -lstdc++ -lrt
+        LIBS += -lm -lpthread -ldl -lrt
         ifeq ($(EGL_API_DRI), 1)
-            LIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11
+            LIBS += -L$(X11_ARM_DIR)/lib -Wl,-rpath-link,$(X11_ARM_DIR)/lib -lXau -lXdmcp -lX11
         endif
         ifeq ($(EGL_API_X), 1)
-            LIBS += -L$(X11_ARM_DIR)/lib -lXau -lXdmcp -lX11
+            LIBS += -L$(X11_ARM_DIR)/lib -Wl,-rpath-link,$(X11_ARM_DIR)/lib -lXau -lXdmcp -lX11
         endif
         ifeq ($(EGL_API_DFB), 1)
             LIBS += -L$(DFB_DIR)/lib -ldirectfb -ldirect -lfusion
@@ -93,6 +94,7 @@ else
     endif
 
 endif
+
 LIBS += $(TOP_DIR)/lib/glutils/$(OBJ_DIR)/libglutils.a
 LIBS += $(TOP_DIR)/lib/math/$(OBJ_DIR)/libmath.a
 LIBS += $(TOP_DIR)/lib/rc/$(OBJ_DIR)/librc.a

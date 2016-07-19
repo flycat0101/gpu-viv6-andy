@@ -34,63 +34,63 @@
 #if USE_VDK
 #include <gc_vdk.h>
 #else
-	#ifdef LINUX
-		#ifndef EGL_API_FB
-			#include <X11/Xlib.h>
-			#include <X11/X.h>
-		#endif
-	#else
-	#endif
+    #ifdef LINUX
+        #ifndef EGL_API_FB
+            #include <X11/Xlib.h>
+            #include <X11/X.h>
+        #endif
+    #else
+    #endif
 #endif
 
 struct appAttribs
 {
-	int winWidth;
-	int winHeight;
-	int redSize;
-	int greenSize;
-	int blueSize;
-	int alphaSize;
-	int depthSize;
-	int stencilSize;
-	int samples;
-	int openvgbit;
-	int frameCount;
-	int save;
-	int fps;
+    int winWidth;
+    int winHeight;
+    int redSize;
+    int greenSize;
+    int blueSize;
+    int alphaSize;
+    int depthSize;
+    int stencilSize;
+    int samples;
+    int openvgbit;
+    int frameCount;
+    int save;
+    int fps;
 };
 
 #if (defined(LINUX) || defined(__QNXNTO__))
-	#define BI_RGB        0L
-	#define BI_RLE8       1L
-	#define BI_RLE4       2L
-	#define BI_BITFIELDS  3L
+    #define BI_RGB        0L
+    #define BI_RLE8       1L
+    #define BI_RLE4       2L
+    #define BI_BITFIELDS  3L
 
-	typedef unsigned long	DWORD;
-	typedef unsigned short	WORD;
-	typedef long			LONG;
+    typedef unsigned long    DWORD;
+    typedef unsigned short    WORD;
+    typedef long            LONG;
 
-	typedef struct tagBITMAPINFOHEADER{
-			DWORD      biSize;
-			LONG       biWidth;
-			LONG       biHeight;
-			WORD       biPlanes;
-			WORD       biBitCount;
-			DWORD      biCompression;
-			DWORD      biSizeImage;
-			LONG       biXPelsPerMeter;
-			LONG       biYPelsPerMeter;
-			DWORD      biClrUsed;
-			DWORD      biClrImportant;
-	} __attribute((packed)) BITMAPINFOHEADER;
+    typedef struct tagBITMAPINFOHEADER{
+            DWORD      biSize;
+            LONG       biWidth;
+            LONG       biHeight;
+            WORD       biPlanes;
+            WORD       biBitCount;
+            DWORD      biCompression;
+            DWORD      biSizeImage;
+            LONG       biXPelsPerMeter;
+            LONG       biYPelsPerMeter;
+            DWORD      biClrUsed;
+            DWORD      biClrImportant;
+    } __attribute((packed)) BITMAPINFOHEADER;
 
-	typedef struct tagBITMAPFILEHEADER {
-			WORD    bfType;
-			DWORD   bfSize;
-			WORD    bfReserved1;
-			WORD    bfReserved2;
-			DWORD   bfOffBits;
-	} __attribute((packed)) BITMAPFILEHEADER;
+    typedef struct tagBITMAPFILEHEADER {
+            WORD    bfType;
+            DWORD   bfSize;
+            WORD    bfReserved1;
+            WORD    bfReserved2;
+            DWORD   bfOffBits;
+    } __attribute((packed)) BITMAPFILEHEADER;
 #endif
 
 bool InitEGL();
@@ -106,10 +106,10 @@ void vfFRAME_Render();
 void vfFRAME_Clean();
 bool keyprocessor(unsigned char key);
 #if USE_VDK
-	void mouseKeyProcessor(int mouseX, int mouseY, vdkEvent msg);
-	void mouseExtKeyProcessor(int mouseX, int mouseY, bool bKeyDown);
-	//void mouseMoveProcessor(int mouseX, int mouseY, unsigned int keyState);
-	void mouseMoveProcessor(int mouseX, int mouseY, vdkEvent msg);
+    void mouseKeyProcessor(int mouseX, int mouseY, vdkEvent msg);
+    void mouseExtKeyProcessor(int mouseX, int mouseY, bool bKeyDown);
+    //void mouseMoveProcessor(int mouseX, int mouseY, unsigned int keyState);
+    void mouseMoveProcessor(int mouseX, int mouseY, vdkEvent msg);
 #endif
 
 void getArgument(const char *arguments, char *dest, int *i, int len);

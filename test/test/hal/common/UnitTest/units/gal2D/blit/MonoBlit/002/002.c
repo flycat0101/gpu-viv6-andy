@@ -59,20 +59,20 @@ typedef struct Test2D {
     GalTest     base;
     GalRuntime  *runtime;
 
-	/*destination surface*/
-    gcoSURF			dstSurf;
-	gceSURF_FORMAT	dstFormat;
-	gctUINT			dstWidth;
-	gctUINT			dstHeight;
-	gctINT			dstStride;
-	gctUINT32		dstPhyAddr;
-	gctPOINTER		dstLgcAddr;
+    /*destination surface*/
+    gcoSURF            dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT            dstWidth;
+    gctUINT            dstHeight;
+    gctINT            dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
 
-	/*monochrome source*/
-	gceSURF_MONOPACK monoSrcDataPackType;
-	gctUINT32 *monoSrcData;
-	gctUINT32 monoWidth;
-	gctUINT32 monoHeight;
+    /*monochrome source*/
+    gceSURF_MONOPACK monoSrcDataPackType;
+    gctUINT32 *monoSrcData;
+    gctUINT32 monoWidth;
+    gctUINT32 monoHeight;
 
     /*misc*/
     gctUINT         rotationNum;
@@ -104,15 +104,15 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     /* clear dst surface with blue */
     gcmONERROR(Gal2DCleanSurface(t2d->runtime->hal, t2d->dstSurf, COLOR_ARGB8(0x00, 0x00, 0x00, 0xFF)));
 
-	/*set mono source*/
-	gcmONERROR(gco2D_SetMonochromeSource(egn2D,
-									   gcvTRUE,
-									   0,
-									   t2d->monoSrcDataPackType,
-									   gcvFALSE,
-									   gcvSURF_SOURCE_MATCH,
-									   COLOR_ARGB8(0x00, 0x00, 0xFF, 0x00),
-									   COLOR_ARGB8(0x00, 0xFF, 0x00, 0x00)));
+    /*set mono source*/
+    gcmONERROR(gco2D_SetMonochromeSource(egn2D,
+                                       gcvTRUE,
+                                       0,
+                                       t2d->monoSrcDataPackType,
+                                       gcvFALSE,
+                                       gcvSURF_SOURCE_MATCH,
+                                       COLOR_ARGB8(0x00, 0x00, 0xFF, 0x00),
+                                       COLOR_ARGB8(0x00, 0xFF, 0x00, 0x00)));
 
     dstRot = rotationList[frameNo % t2d->rotationNum];
 
@@ -186,8 +186,8 @@ static void CDECL Destroy(Test2D *t2d)
         t2d->dstLgcAddr = gcvNULL;
     }
 
-	if (t2d->monoSrcData)
-		free(t2d->monoSrcData);
+    if (t2d->monoSrcData)
+        free(t2d->monoSrcData);
 
     free(t2d);
 }
@@ -200,8 +200,8 @@ const gceFEATURE FeatureList[]=
 
 static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 {
-	gceSTATUS status;
-	gctUINT srcSize, i;
+    gceSTATUS status;
+    gctUINT srcSize, i;
 
     gctUINT32 k, listLen = sizeof(FeatureList)/sizeof(gctINT);
     gctBOOL featureStatus;
@@ -238,24 +238,24 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 
     t2d->runtime    = runtime;
 
-	t2d->dstSurf    = runtime->target;
-	t2d->dstFormat  = runtime->format;
-	t2d->dstWidth   = 0;
-	t2d->dstHeight  = 0;
-	t2d->dstStride  = 0;
-	t2d->dstPhyAddr = 0;
-	t2d->dstLgcAddr = 0;
+    t2d->dstSurf    = runtime->target;
+    t2d->dstFormat  = runtime->format;
+    t2d->dstWidth   = 0;
+    t2d->dstHeight  = 0;
+    t2d->dstStride  = 0;
+    t2d->dstPhyAddr = 0;
+    t2d->dstLgcAddr = 0;
 
     t2d->rotationNum   = sizeof(rotationList) / sizeof(rotationList[0]);
 
-	gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
-										&t2d->dstWidth,
-										&t2d->dstHeight,
-										&t2d->dstStride));
+    gcmONERROR(gcoSURF_GetAlignedSize(t2d->dstSurf,
+                                        &t2d->dstWidth,
+                                        &t2d->dstHeight,
+                                        &t2d->dstStride));
 
-	gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
+    gcmONERROR(gcoSURF_Lock(t2d->dstSurf, &t2d->dstPhyAddr, &t2d->dstLgcAddr));
 
-	/*Mono source*/
+    /*Mono source*/
     if (runtime->height < 320)
     {
         t2d->monoWidth = 160;
@@ -267,25 +267,25 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
         t2d->monoHeight = 200;
     }
 
-	t2d->monoSrcDataPackType = gcvSURF_UNPACKED;
-	srcSize = t2d->monoWidth * t2d->monoHeight >> 5;
-	t2d->monoSrcData = (gctUINT32*)malloc(srcSize * sizeof(gctUINT32));
-	for (i = 0; i < srcSize; i++)
-	{
-		*(t2d->monoSrcData + i) = CONVERT_BYTE(i);
-	}
+    t2d->monoSrcDataPackType = gcvSURF_UNPACKED;
+    srcSize = t2d->monoWidth * t2d->monoHeight >> 5;
+    t2d->monoSrcData = (gctUINT32*)malloc(srcSize * sizeof(gctUINT32));
+    for (i = 0; i < srcSize; i++)
+    {
+        *(t2d->monoSrcData + i) = CONVERT_BYTE(i);
+    }
 
-	t2d->base.render      = (PGalRender)Render;
+    t2d->base.render      = (PGalRender)Render;
     t2d->base.destroy     = (PGalDestroy)Destroy;
     t2d->base.frameCount  = t2d->rotationNum * 2;
-	t2d->base.description = s_CaseDescription;
+    t2d->base.description = s_CaseDescription;
 
     return gcvTRUE;
 
 OnError:
     GalOutput(GalOutputType_Error | GalOutputType_Console,
         "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
-	return gcvFALSE;
+    return gcvFALSE;
 }
 
 GalTest * CDECL GalCreateTestObject(GalRuntime *runtime)

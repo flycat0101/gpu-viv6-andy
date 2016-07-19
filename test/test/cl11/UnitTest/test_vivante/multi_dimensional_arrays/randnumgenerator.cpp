@@ -32,35 +32,38 @@
 #include <ctime>
 #include <climits>
 #include "randnumgenerator.h"
+#if defined(__QNXNTO__)
+#include <time.h>
+#endif
 
 void setRand() {
-	srand(static_cast<unsigned int>(time(NULL)));
+    srand(static_cast<unsigned int>(time(NULL)));
 }
 
 int randInt() {
-	return static_cast<int>(rand()%9+1);
+    return static_cast<int>(rand()%9+1);
 }
 
 unsigned int randUInt() {
-	return static_cast<unsigned int>(rand()%9+1);
+    return static_cast<unsigned int>(rand()%9+1);
 }
 
 short randShort() {
-	return static_cast<short>(rand()%5+1);
+    return static_cast<short>(rand()%5+1);
 }
 
 unsigned short randUShort() {
-	return static_cast<unsigned short>(rand()%5+1);
+    return static_cast<unsigned short>(rand()%5+1);
 }
 
 char randChar() {
-	return static_cast<char>(rand()%3+1);
+    return static_cast<char>(rand()%3+1);
 }
 
 unsigned char randUChar() {
-	return static_cast<unsigned char>(rand()%3+1);
+    return static_cast<unsigned char>(rand()%3+1);
 }
 
 float randFloat() {
-	return static_cast<float>(rand()%9+1)/static_cast<float>(rand()%9+1);
+    return static_cast<float>(rand()%9+1)/static_cast<float>(rand()%9+1);
 }

@@ -36,17 +36,17 @@
 
 const char *kernel_copy_union_arrays_1 =
 "#ifndef _TYPES_H_                                                                                                                 \n"
-"#define _TYPES_H_																												   \n"
-"																																   \n"
-"#ifdef __OPENCL_VERSION__																										   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))							   \n"
-"#else // __OPENCL_VERSION__																									   \n"
-"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType									   \n"
-"#endif // __OPENCL_VERSION__																									   \n"
-"																																   \n"
-"ALIGNED_STRUCT(union, 32) InputA {																							       \n"
-"    int a[4];																													   \n"
-"    float h[4];																												   \n"
+"#define _TYPES_H_                                                                                                                   \n"
+"                                                                                                                                   \n"
+"#ifdef __OPENCL_VERSION__                                                                                                           \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) structureType __attribute__ ((aligned(alignBytes)))                               \n"
+"#else // __OPENCL_VERSION__                                                                                                       \n"
+"#define ALIGNED_STRUCT(structureType, alignBytes) __declspec(align(alignBytes)) structureType                                       \n"
+"#endif // __OPENCL_VERSION__                                                                                                       \n"
+"                                                                                                                                   \n"
+"ALIGNED_STRUCT(union, 32) InputA {                                                                                                   \n"
+"    int a[4];                                                                                                                       \n"
+"    float h[4];                                                                                                                   \n"
 "};                                                                                                                                \n"
 "                                                                                                                                  \n"
 "ALIGNED_STRUCT(union, 32) InputB {                                                                                                \n"
@@ -68,7 +68,7 @@ const char *kernel_copy_union_arrays_1 =
 "    // bound check (equivalent to the limit on a 'for' loop for standard/serial C code                                            \n"
 "                                                                                                                                  \n"
 "    for (int i = 0; i < sizeof(c[tid].r) / sizeof(c[tid].r[0]); ++i) {                                                            \n"
-"		c[tid].r[i] = convert_float(a[tid].a[i]);                                                                                   \n"
+"        c[tid].r[i] = convert_float(a[tid].a[i]);                                                                                   \n"
 "    }                                                                                                                             \n"
 "}                                                                                                                                 \n";
 
@@ -119,8 +119,8 @@ public:
         _deviceResult = cl::Buffer(_context, CL_MEM_WRITE_ONLY, sizeof(Result) * _globalWorkSize);
 
         _kernel.setArg(0,sizeof (_deviceInputA), &_deviceInputA);
-		_kernel.setArg(1,sizeof (_deviceResult), &_deviceResult);
-		_kernel.setArg(2,sizeof (_numElements), &_numElements);
+        _kernel.setArg(1,sizeof (_deviceResult), &_deviceResult);
+        _kernel.setArg(2,sizeof (_numElements), &_numElements);
     }
 
     virtual bool Execute()
@@ -172,7 +172,7 @@ private:
         for (int i = 0; i < _numElements; ++i) {
             for (int j = 0; j < 4; ++j) {
                 if (_goldStandard[i].r[j] != _result[i].r[j] && !isnan(_goldStandard[i].r[j]) && !isinf(_goldStandard[i].r[j])) {
-					std::cout << "c:" << _goldStandard[i].r[j] << " ocl:" << _result[i].r[j] << std::endl;
+                    std::cout << "c:" << _goldStandard[i].r[j] << " ocl:" << _result[i].r[j] << std::endl;
                     return false;
                 }
             }
@@ -200,7 +200,7 @@ private:
 int copy_union_arrays_1(void)
 {
     cl_int err = CL_SUCCESS;
-	int cnt = 1;
+    int cnt = 1;
 
     try {
         std::vector<cl::Platform> platforms;
@@ -216,7 +216,7 @@ int copy_union_arrays_1(void)
 
         std::vector<cl::Device> devices = context.getInfo<CL_CONTEXT_DEVICES>();
 
-
+        
         const char* clProgramSource = kernel_copy_union_arrays_1;//oclLoadProgSource("multiply.cl", "", &szKernelLength);
         if (clProgramSource == 0) {
             std::cerr << "OpenCL program not found." << std::endl;
@@ -240,13 +240,13 @@ int copy_union_arrays_1(void)
         std::cout << "Running test copy_union_arrays_1..." << std::endl;
         TestCase_copy_union_arrays_1 copy_union_arrays_1(10, program_, context, devices);
 
-		bool control = true;
+        bool control = true;
         copy_union_arrays_1.SetUp();
         for (int i = 0; i < 10; ++i) {
-			if(!copy_union_arrays_1.Execute()){
-				control = false;
-				cnt = 0;
-			}
+            if(!copy_union_arrays_1.Execute()){
+                control = false;
+                cnt = 0;
+            }
             std::cout << "RUN " << i + 1<< ": " << (control ? "PASSED" : "FAILED!") << std::endl;
         }
         copy_union_arrays_1.TearDown();

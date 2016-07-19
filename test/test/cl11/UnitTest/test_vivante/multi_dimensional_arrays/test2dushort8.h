@@ -33,19 +33,19 @@
 
 class Test2DUShort8: public MultiDimensionalArraysTest2D {
 public:
-	Test2DUShort8(const size_t sizeX, const size_t sizeY);
-	~Test2DUShort8();
+    Test2DUShort8(const size_t sizeX, const size_t sizeY);
+    ~Test2DUShort8();
 
 protected:
-	cl_ushort8* inputAHost;
-	cl_ushort8* inputBHost;
-	cl_ushort8* resultHost;
+    cl_ushort8* inputAHost;
+    cl_ushort8* inputBHost;
+    cl_ushort8* resultHost;
 
-	const int getMemSize() const;
-	void generateInput(const unsigned int &kernelIndex);
-	void* getInputAElement(const unsigned int &index) const;
-	void* getInputBElement(const unsigned int &index) const;
-	void* getResultElement(const unsigned int &index) const;
+    const int getMemSize() const;
+    void generateInput(const unsigned int &kernelIndex);
+    void* getInputAElement(const unsigned int &index) const;
+    void* getInputBElement(const unsigned int &index) const;
+    void* getResultElement(const unsigned int &index) const;
 };
 
 #endif /*_test2dushort8_h*/

@@ -4271,7 +4271,7 @@ static gceSTATUS processPixelTransfer(
     gcmFOOTER();
 
     /* Return status. */
-    return status;
+    return gcvSTATUS_OK;
 }
 /*******************************************************************************
 **

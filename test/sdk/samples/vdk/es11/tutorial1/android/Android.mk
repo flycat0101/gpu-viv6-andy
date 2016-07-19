@@ -54,7 +54,7 @@ LOCAL_PACKAGE_NAME := GL11Tutorial1_android
 LOCAL_JNI_SHARED_LIBRARIES := libgl11tutorial1_jni
 
 LOCAL_MULTILIB := $(VIV_MULTILIB)
-LOCAL_MODULE_PATH := $(AQROOT)/bin/$(VIV_TARGET_ABI)
+LOCAL_MODULE_PATH := $(AQROOT)/bin/$(VIV_TARGET_ABI)/vdk
 include $(BUILD_PACKAGE)
 
 #########################################################################
@@ -80,6 +80,7 @@ LOCAL_CFLAGS := -Werror -Wno-unused-parameter -DANDROID_SDK_VERSION=$(PLATFORM_S
 LOCAL_SRC_FILES:= \
  				tutorial1.cpp	\
 				../../tutorial1.cpp
+
 
 LOCAL_C_INCLUDES := \
 			$(LOCAL_PATH)/../../

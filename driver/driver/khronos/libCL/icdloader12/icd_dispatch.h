@@ -76,9 +76,11 @@
 #include <CL/cl_d3d11.h>
 #include <CL/cl_dx9_media_sharing.h>
 #endif
+#if gcdENABLE_CL_GL
 #include <GLES/gl.h>
 #include <CL/cl_gl.h>
 #include <CL/cl_gl_ext.h>
+#endif
 #include <CL/cl_ext.h>
 
 /*
@@ -682,6 +684,7 @@ typedef CL_API_ENTRY cl_int (CL_API_CALL *KHRpfn_clEnqueueBarrier)(cl_command_qu
 
 typedef CL_API_ENTRY void * (CL_API_CALL *KHRpfn_clGetExtensionFunctionAddress)(const char *function_name) CL_EXT_SUFFIX__VERSION_1_1_DEPRECATED;
 
+#if gcdENABLE_CL_GL
 /* GL and other APIs*/
 typedef CL_API_ENTRY cl_mem (CL_API_CALL *KHRpfn_clCreateFromGLBuffer)(
     cl_context    context,
@@ -760,7 +763,18 @@ typedef CL_API_ENTRY cl_event (CL_API_CALL *KHRpfn_clCreateEventFromGLsyncKHR)(
     cl_context context,
     cl_GLsync sync,
     cl_int *errcode_ret);
-
+#else
+typedef void *KHRpfn_clCreateFromGLBuffer;
+typedef void *KHRpfn_clCreateFromGLTexture2D;
+typedef void *KHRpfn_clCreateFromGLTexture3D;
+typedef void *KHRpfn_clCreateFromGLRenderbuffer;
+typedef void *KHRpfn_clGetGLObjectInfo;
+typedef void *KHRpfn_clGetGLTextureInfo;
+typedef void *KHRpfn_clEnqueueAcquireGLObjects;
+typedef void *KHRpfn_clEnqueueReleaseGLObjects;
+typedef void *KHRpfn_clGetGLContextInfoKHR;
+typedef void *KHRpfn_clCreateEventFromGLsyncKHR;
+#endif
 
 #if defined(_WIN32) && !defined(UNDER_CE)
 

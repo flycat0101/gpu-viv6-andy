@@ -340,15 +340,6 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
         gcmONERROR(gco2D_Blit(egn2D, 1, &rect, 0xCC, 0xCC, surf->format));
     }
-#if 0
-    {
-        char name[200];
-
-        gcmONERROR(gcoHAL_Commit(gcvNULL, gcvTRUE));
-        sprintf(name, "gal2DFormatCompressedTPC001_intermediate_%03d.bmp", frameNo);
-        GalSaveTSurfToDIB(surf, name);
-    }
-#endif
     /* Uncompress surf to result. */
     rect.left = rect.top = 0;
     rect.right = surf->width;

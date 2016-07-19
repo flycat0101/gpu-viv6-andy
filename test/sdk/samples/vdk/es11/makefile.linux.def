@@ -54,9 +54,6 @@ endif
 ifeq ($(EGL_API_X), 1)
 	INCLUDE += -I$(X11_ARM_DIR)/include
 endif
-ifeq ($(EGL_API_DFB), 1)
-	INCLUDE += -I$(DFB_DIR)/include/directfb
-endif
 
 CFLAGS += $(INCLUDE) -Wno-switch
 
@@ -69,7 +66,7 @@ else
   ifeq ($(QNX), 1)
     LIBS += -lVDK -lEGL -lGLESv1_CM -lm -lstdc++
   else
-    LIBS += -L$(VIVANTE_SDK_LIB) -lVDK -lGAL -lEGL -lGLESv1_CM
+    LIBS += -L$(VIVANTE_SDK_LIB) -lVDK -lEGL -lGLESv1_CM
   endif
 endif
 
@@ -79,7 +76,7 @@ ifneq ($(QNX), 1)
     LIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11
   endif
   ifeq ($(EGL_API_X), 1)
-    LIBS += -L$(X11_ARM_DIR)/lib -lXau -lXdmcp -lX11
+    LIBS += -L$(X11_ARM_DIR)/lib -Wl,-rpath-link,$(X11_ARM_DIR)/lib -lX11
   endif
   ifeq ($(EGL_API_DFB), 1)
     LIBS += -L$(DFB_DIR)/lib -ldirectfb -ldirect -lfusion

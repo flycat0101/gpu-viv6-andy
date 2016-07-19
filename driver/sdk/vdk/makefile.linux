@@ -60,12 +60,32 @@ INCLUDE += -I$(AQROOT)/sdk/inc
 INCLUDE += -I$(AQROOT)/hal/inc
 
 INCLUDE += -I$(AQROOT)/hal/os/linux/user
-ifeq ($(EGL_API_DRI), 1)
+
+ifeq ($(EGL_API_X),1)
   INCLUDE += -I$(X11_ARM_DIR)/include
 endif
 
-ifeq ($(EGL_API_X), 1)
-  INCLUDE += -I$(X11_ARM_DIR)/include
+ifeq ($(EGL_API_DRI),1)
+  INCLUDE += -I$(X11_ARM_DIR)/include \
+             -I$(X11_ARM_DIR)/include/X11/extensions \
+             -I$(X11_ARM_DIR)/include/libdrm \
+             -I$(AQROOT)/driver/X/DRI/src
+endif
+
+ifeq ($(EGL_API_GBM),1)
+  GBM_INCLUDE := $(shell $(PKG_CONFIG) --cflags gbm 2>/dev/null)
+
+  ifneq ($(GBM_INCLUDE),)
+    INCLUDE += $(GBM_INCLUDE)
+  else
+    INCLUDE += -I$(AQROOT)/driver/gbm/main
+  endif
+endif
+
+ifeq ($(EGL_API_WL),1)
+  INCLUDE += -I$(AQROOT)/driver/wl \
+             -I$(WAYLAND_DIR)/include \
+             -I$(WAYLAND_DIR)/include/wayland-viv
 endif
 
 ifeq ($(EGL_API_DFB), 1)
@@ -80,20 +100,17 @@ CFLAGS += $(INCLUDE)
 ################################################################################
 # Supply additional include directories.
 
-ifneq ($(USE_ARMCC), 1)
-  ifeq ($(EGL_API_DFB), 1)
-    CFLAGS  += -pipe -fPIC
-  else
-    ifeq ($(EGL_API_WL), 1)
-      CFLAGS += -fPIC -Werror
-    else
-      CFLAGS += -fPIC -Werror -ansi
-    endif
-  endif
+ifneq ($(filter 1,$(EGL_API_X) $(EGL_API_DRI)),)
+  CFLAGS += -DX11
 endif
 
-ifeq ($(EGL_API_DFB), 1)
-  CFLAGS += -DPIC
+ifneq ($(USE_ARMCC), 1)
+  CFLAGS  += -fPIC -Werror
+
+  # These header files don't follow ansi.
+  ifeq ($(filter 1,$(EGL_API_WL) $(EGL_API_DFB) $(EGL_API_GBM)),)
+    CFLAGS += -ansi
+  endif
 endif
 
 CFLAGS += -D__VDK_EXPORT
@@ -101,44 +118,90 @@ CFLAGS += -D__VDK_EXPORT
 ################################################################################
 # Define flags for the linker.
 
+LDFLAGS := $(LFLAGS)
+
 ifneq ($(USE_ARMCC),1)
   ifeq ($(EGL_APPENDIX),)
-    LFLAGS += -Wl,--version-script=libVDK.map
+    LDFLAGS += -Wl,--version-script=libVDK.map
   endif
 endif
 
 ifeq ($(USE_ARMCC),1)
-  LFLAGS += --shared -L--soname=,$(TARGET_SONAME)
+  LDFLAGS += --shared -L--soname=,$(TARGET_SONAME)
 else
-  LFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
+  LDFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
 endif
+
 
 ################################################################################
 # Supply necessary libraries.
 
-ifeq ($(gcdSTATIC_LINK), 0)
-  ifeq ($(EGL_API_DFB), 1)
-    LIBS    += -L$(DFB_DIR)/lib -ldirectfb -ldirect -lz
-  endif
+LDLIBS := -L$(SDK_DIR)/drivers -L$(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR) -lEGL -ldl
 
-  ifeq ($(EGL_API_DRI), 1)
-    LIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11
-  endif
+ifeq ($(EGL_API_DRI), 1)
+  LDLIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11
+endif
 
-  ifeq ($(EGL_API_X), 1)
-    LIBS += -L$(X11_ARM_DIR)/lib -lXau -lXdmcp -lX11
-  endif
+ifeq ($(EGL_API_X),1)
+  LDLIBS += -L$(X11_ARM_DIR)/lib -lXau -lXdmcp -lX11
+endif
 
-  LIBS += -L$(SDK_DIR)/drivers -L$(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR) -lEGL -lm -lpthread -ldl
+ifeq ($(EGL_API_GBM),1)
+  GBM_LIBS := $(shell $(PKG_CONFIG) --libs gbm 2>/dev/null)
+
+  ifneq ($(GBM_LIBS),)
+    LDLIBS += $(GBM_LIBS)
+  else
+    LDLIBS += -lgbm
+  endif
+endif
+
+ifeq ($(EGL_API_WL),1)
+  LDLIBS += -L$(WAYLAND_DIR)/lib \
+            -lwayland-client \
+            -lwayland-cursor
+
+  LDLIBS += -pthread
 endif
 
 ################################################################################
 # Describe object files.
 
-OBJECTS := $(OBJ_DIR)/gc_vdk.o \
-           $(OBJ_DIR)/gc_vdk_egl.o \
-           $(OBJ_DIR)/gc_vdk_gl.o \
-           $(OBJ_DIR)/gc_vdk_hal.o
+OBJECTS := $(OBJ_DIR)/gc_vdk_egl.o \
+           $(OBJ_DIR)/gc_vdk_gl.o
+
+EGL_API_OBJECT :=
+
+ifeq ($(EGL_API_X),1)
+  EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_x11.o
+endif
+
+ifeq ($(EGL_API_DRI),1)
+  EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_x11.o \
+                    $(OBJ_DIR)/XF86dri.o
+endif
+
+ifeq ($(EGL_API_NULLWS),1)
+  EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_nullws.o
+endif
+
+ifeq ($(EGL_API_FB),1)
+  EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_fbdev.o
+endif
+
+ifeq ($(EGL_API_DFB),1)
+  EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_dfb.o
+endif
+
+ifeq ($(EGL_API_GBM),1)
+  EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_gbm.o
+endif
+
+ifeq ($(EGL_API_WL),1)
+  EGL_API_OBJECT := $(OBJ_DIR)/gc_vdk_wayland.o
+endif
+
+OBJECTS += $(EGL_API_OBJECT)
 
 ################################################################################
 # Define targets.
@@ -156,7 +219,6 @@ install: all
 	@mkdir -p $(SDK_DIR)/include
 	@-cp -f  ../inc/gc_vdk.h $(SDK_DIR)/include
 	@-cp -f  ../inc/gc_vdk_types.h $(SDK_DIR)/include
-	@-cp -f  ../inc/gc_vdk_hal.h $(SDK_DIR)/include
 	@-cd $(SDK_DIR)/include; echo "#include \"gc_vdk.h\"" >vdk.h; cd -
 
 ################################################################################
@@ -178,11 +240,15 @@ $(TARGET_MODULES): $(wildcard $(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)/libEGL.
 
 
 $(TARGET_MODULE): $(OBJECTS)
-	$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LIBS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LDLIBS)
 endif
 
 ################################################################################
 # Object rules.
+
+ifeq ($(EGL_API_DRI),1)
+  vpath %.c ../../driver/X/DRI/src
+endif
 
 $(OBJ_DIR)/%.o: %.c
 	@mkdir -p $(OBJ_DIR)

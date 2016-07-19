@@ -64,6 +64,10 @@ ifeq ($(STATIC_LINK), 1)
 	CCFLAGS += -DSTATIC_LINK
 endif
 
+ifeq ($(PLATFORM), iMX8DV)
+        CCFLAGS += -DIMX8X
+endif
+
 ifeq ($(USE_VDK), 1)
 	CCFLAGS += -DUSE_VDK=1 -DUSE_SW_FB=$(USE_SW_FB)
 else
@@ -89,9 +93,9 @@ else
 endif
 
 ifeq ($(ENABLE_CL_GL), 1)
-	CCFLAGS += -DENABLE_CL_GL=1
+	CCFLAGS += -DgcdENABLE_CL_GL=1
 else
-	CCFLAGS += -DENABLE_CL_GL=0
+	CCFLAGS += -DgcdENABLE_CL_GL=0
 endif
 
 ifeq ($(VIVANTE_ENABLE_VG), 1)

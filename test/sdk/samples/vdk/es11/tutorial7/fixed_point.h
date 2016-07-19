@@ -34,34 +34,34 @@
 // Convert integer to fixed point.
 inline GLfixed FixedFromInt(int value)
 {
-	return static_cast<GLfixed>(value << 16);
+    return static_cast<GLfixed>(value << 16);
 }
 
-#define ZERO	FixedFromInt(0)
-#define ONE		FixedFromInt(1)
+#define ZERO    FixedFromInt(0)
+#define ONE        FixedFromInt(1)
 
 // Convert fixed point to integer.
 inline int IntFromFixed(GLfixed value)
 {
-	return static_cast<int>(value >> 16);
+    return static_cast<int>(value >> 16);
 }
 
 // Convert float to fixed point.
 inline GLfixed FixedFromFloat(float value)
 {
-	return static_cast<GLfixed>(value * static_cast<float>(ONE));
+    return static_cast<GLfixed>(value * static_cast<float>(ONE));
 }
 
 // Multiply two fixed point values.
 inline GLfixed MultiplyFixed(GLfixed value1, GLfixed value2)
 {
-	return (value1 * value2) >> 16;
+    return (value1 * value2) >> 16;
 }
 
 // Divide two fixed point values.
 inline GLfixed DivideFixed(GLfixed value1, GLfixed value2)
 {
-	return static_cast<GLfixed>(((long long) value1 << 16) / value2);
+    return static_cast<GLfixed>(((long long) value1 << 16) / value2);
 };
 
 #endif // __fixedpoint_h_

@@ -20,7 +20,7 @@
 
 #if gcdFRAMEINFO_STATISTIC
 extern GLboolean g_dbgPerDrawKickOff;
-extern GLboolean g_dbgDumpImagePerDraw;
+extern GLint g_dbgDumpImagePerDraw;
 extern GLboolean g_dbgSkipDraw;
 #endif
 
@@ -321,6 +321,10 @@ __glChipClearBegin(
     }
 
 #if gcdFRAMEINFO_STATISTIC
+    gcoHAL_FrameInfoOps(chipCtx->hal,
+                        gcvFRAMEINFO_DRAW_NUM,
+                        gcvFRAMEINFO_OP_INC,
+                        gcvNULL);
     if (g_dbgSkipDraw)
     {
         return GL_FALSE;
@@ -486,9 +490,9 @@ __glChipClearEnd(
         gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
     }
 
-    if (g_dbgDumpImagePerDraw == 3)
+    if (g_dbgDumpImagePerDraw & (__GL_PERDRAW_DUMP_CLEAR_RT | __GL_PERDRAW_DUMP_CLEAR_DS))
     {
-        gcmONERROR(gcChipUtilsDumpRT(gc, 1));
+        gcmONERROR(gcChipUtilsDumpRT(gc, (__GL_PERDRAW_DUMP_CLEAR_RT | __GL_PERDRAW_DUMP_CLEAR_DS)));
     }
 #endif
 

@@ -30,51 +30,51 @@
 
 ContentProg* ContentProgConstruct()
 {
-	ContentProg* cp = (ContentProg*)malloc(sizeof (ContentProg));
+    ContentProg* cp = (ContentProg*)malloc(sizeof (ContentProg));
 
-	cp->pos_attr = -1;
-	cp->uv_attr = -1;
-	cp->proj_unif = -1;
-	cp->modelview_unif = -1;
+    cp->pos_attr = -1;
+    cp->uv_attr = -1;
+    cp->proj_unif = -1;
+    cp->modelview_unif = -1;
 
-	cp->prog = LoadProgram("content.vert", "content.frag");
-	ShaderProgramUse(cp->prog);
+    cp->prog = LoadProgram("content.vert", "content.frag");
+    ShaderProgramUse(cp->prog);
 
-	cp->pos_attr = ShaderProgramGetAttribLoc(cp->prog, "pos_attr");
-	cp->uv_attr = ShaderProgramGetAttribLoc(cp->prog, "uv_attr");
+    cp->pos_attr = ShaderProgramGetAttribLoc(cp->prog, "pos_attr");
+    cp->uv_attr = ShaderProgramGetAttribLoc(cp->prog, "uv_attr");
 
-	cp->proj_unif = ShaderProgramGetUniformLoc(cp->prog, "proj_unif");
-	cp->modelview_unif = ShaderProgramGetUniformLoc(cp->prog, "modelview_unif");
+    cp->proj_unif = ShaderProgramGetUniformLoc(cp->prog, "proj_unif");
+    cp->modelview_unif = ShaderProgramGetUniformLoc(cp->prog, "modelview_unif");
 
-	cp->tex_unif = ShaderProgramGetUniformLoc(cp->prog, "tex_unif");
+    cp->tex_unif = ShaderProgramGetUniformLoc(cp->prog, "tex_unif");
 
-	return cp;
+    return cp;
 }
 
 
 void ContentProgDestroy(ContentProg* Cp)
 {
-	assert(Cp != NULL);
+    assert(Cp != NULL);
 
-	ShaderProgramDestroy(Cp->prog);
-	free(Cp);
+    ShaderProgramDestroy(Cp->prog);
+    free(Cp);
 }
 
 
 void ContentProgUse(ContentProg* Cp)
 {
-	ShaderProgramUse(Cp->prog);
+    ShaderProgramUse(Cp->prog);
 }
 
 
 void ContentProgSetProj(ContentProg* Cp, Matf* proj)
 {
-	glUniformMatrix4fv(Cp->proj_unif, 1, GL_FALSE, &proj->m[0][0]);
+    glUniformMatrix4fv(Cp->proj_unif, 1, GL_FALSE, &proj->m[0][0]);
 }
 
 
 void ContentProgSetModelview(ContentProg* Cp, Matf* mv)
 {
-	glUniformMatrix4fv(Cp->modelview_unif, 1, GL_FALSE, &mv->m[0][0]);
+    glUniformMatrix4fv(Cp->modelview_unif, 1, GL_FALSE, &mv->m[0][0]);
 }
 

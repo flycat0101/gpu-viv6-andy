@@ -96,7 +96,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     gce2D_NATURE_ROTATION natureRotation;
     gcsRECT srcRect, dstRect, tmpRect;
     gceSURF_ROTATION srcRotation, dstRotation;
-	gctUINT32 horFactor, verFactor;
+    gctUINT32 horFactor, verFactor;
 
     T2D_SURF_PTR srcSurf = t2d->srcSurf, tmpSurf;
 
@@ -235,21 +235,21 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         gcvSURF_0_DEGREE,
         t2d->dstAlignedWidth));
 
-	gcmONERROR(gco2D_CalcStretchFactor(
+    gcmONERROR(gco2D_CalcStretchFactor(
         egn2D,
         tmpRect.right - tmpRect.left,
-		dstRect.right - dstRect.left,
+        dstRect.right - dstRect.left,
         &horFactor));
 
-	gcmONERROR(gco2D_CalcStretchFactor(
+    gcmONERROR(gco2D_CalcStretchFactor(
         egn2D,
         tmpRect.bottom - tmpRect.top,
-		dstRect.bottom - dstRect.top,
+        dstRect.bottom - dstRect.top,
         &verFactor));
 
-	gcmONERROR(gco2D_SetStretchFactors(egn2D, horFactor, verFactor));
+    gcmONERROR(gco2D_SetStretchFactors(egn2D, horFactor, verFactor));
 
-	gcmONERROR(gco2D_StretchBlit(egn2D, 1, &dstRect, 0xCC, 0xCC, t2d->dstFormat));
+    gcmONERROR(gco2D_StretchBlit(egn2D, 1, &dstRect, 0xCC, 0xCC, t2d->dstFormat));
 
     gcmONERROR(gco2D_Flush(egn2D));
 

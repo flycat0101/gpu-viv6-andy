@@ -35,42 +35,42 @@
 
 Test2DInt4::Test2DInt4(const size_t sizeX, const size_t sizeY):
 MultiDimensionalArraysTest2D("int4", sizeX, sizeY) {
-	inputAHost = new cl_int4[size];
-	inputBHost = new cl_int4[size];
-	resultHost = new cl_int4[size];
-	inputA = inputAHost;
-	inputB = inputBHost;
-	result = resultHost;
+    inputAHost = new cl_int4[size];
+    inputBHost = new cl_int4[size];
+    resultHost = new cl_int4[size];
+    inputA = inputAHost;
+    inputB = inputBHost;
+    result = resultHost;
 }
 
 Test2DInt4::~Test2DInt4() {
-	delete[] inputAHost;
-	delete[] inputBHost;
-	delete[] resultHost;
+    delete[] inputAHost;
+    delete[] inputBHost;
+    delete[] resultHost;
 }
 
 const int Test2DInt4::getMemSize() const {
-	return sizeof(cl_int4)*size;
+    return sizeof(cl_int4)*size;
 }
 
 void Test2DInt4::generateInput(const unsigned int &kernelIndex) {
-	for (unsigned int i=0; i<VECTOR_SIZE; i++) {
-		for (unsigned int k=0; k<size; k++) {
-			inputAHost[k].s[i] = randInt();
-			if (getKernelInputArgNum(kernelIndex) == 2)
-				inputBHost[k].s[i] = randInt();
-		}
-	}
+    for (unsigned int i=0; i<VECTOR_SIZE; i++) {
+        for (unsigned int k=0; k<size; k++) {
+            inputAHost[k].s[i] = randInt();
+            if (getKernelInputArgNum(kernelIndex) == 2)
+                inputBHost[k].s[i] = randInt();
+        }
+    }
 }
 
 void* Test2DInt4::getInputAElement(const unsigned int &index) const {
-	return inputAHost[index].s;
+    return inputAHost[index].s;
 }
 
 void* Test2DInt4::getInputBElement(const unsigned int &index) const {
-	return &inputBHost[index].s;
+    return &inputBHost[index].s;
 }
 
 void* Test2DInt4::getResultElement(const unsigned int &index) const {
-	return &resultHost[index].s;
+    return &resultHost[index].s;
 }

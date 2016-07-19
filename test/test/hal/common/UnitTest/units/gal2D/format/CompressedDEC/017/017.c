@@ -264,15 +264,15 @@ const char *sBasicFile[] = {
 
 typedef struct _MultiSrc
 {
-    gcoSURF		srcSurf;
-    gceSURF_FORMAT	srcFormat;
-    gctUINT		srcWidth;
-    gctUINT		srcHeight;
-    gctINT		srcStride[3];
+    gcoSURF        srcSurf;
+    gceSURF_FORMAT    srcFormat;
+    gctUINT        srcWidth;
+    gctUINT        srcHeight;
+    gctINT        srcStride[3];
     gctINT              srcStrideNum;
     gctINT              srcAddressNum;
-    gctUINT32		srcPhyAddr[3];
-    gctPOINTER		srcLgcAddr[3];
+    gctUINT32        srcPhyAddr[3];
+    gctPOINTER        srcLgcAddr[3];
 } MultiSrc, *MultiSrcPTR;
 
 typedef struct Test2D {
@@ -660,7 +660,7 @@ static void CDECL Destroy(Test2D *t2d)
 
 const gceFEATURE FeatureList[]=
 {
-    gcvFEATURE_DEC_COMPRESSION,
+    gcvFEATURE_DEC300_COMPRESSION,
     gcvFEATURE_DEC_TPC_COMPRESSION,
 };
 

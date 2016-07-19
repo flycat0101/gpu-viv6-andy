@@ -26,6 +26,7 @@
 *****************************************************************************/
 
 
+
 #include "rounding_mode.h"
 
 #if !(defined(_WIN32) && defined(_MSC_VER))
@@ -148,7 +149,7 @@ void *FlushToZero( void )
         union{ int i;  void *p; }u = { _mm_getcsr() };
         _mm_setcsr( u.i | 0x8040 );
         return u.p;
-    #elif defined( __arm__ )
+    #elif defined( __arm__ ) || defined( __aarch64__ )
         // processor is already in FTZ mode -- do nothing
         return NULL;
     #elif defined( __PPC__ )
@@ -172,7 +173,7 @@ void UnFlushToZero( void *p)
     #if defined( __i386__ ) || defined( __x86_64__ ) || defined( __e2k__ ) || defined(_MSC_VER)
         union{ void *p; int i;  }u = { p };
         _mm_setcsr( u.i );
-    #elif defined( __arm__ )
+    #elif defined( __arm__ ) || defined( __aarch64__ )
         // processor is already in FTZ mode -- do nothing
     #elif defined( __PPC__)
         fpu_control_t flags = 0;

@@ -937,26 +937,68 @@ _FreeSurface(
     /* We only manage valid and non-user pools. */
     if (Surface->node.pool != gcvPOOL_UNKNOWN)
     {
+#if gcdENABLE_VG
+        gceHARDWARE_TYPE currentType = gcvHARDWARE_INVALID;
+        gcmGETCURRENTHARDWARE(currentType);
+#endif
+
         /* Unlock the video memory. */
         gcmONERROR(_Unlock(Surface));
 
         if (Surface->node.u.normal.node != 0)
         {
 #if gcdENABLE_VG
-            gceHARDWARE_TYPE currentType = gcvHARDWARE_INVALID;
-            gcmGETCURRENTHARDWARE(currentType);
-
             if (currentType == gcvHARDWARE_VG)
             {
                 /* Free the video memory. */
                 gcmONERROR(
-                    gcoVGHARDWARE_ScheduleVideoMemory(gcvNULL, Surface->node.u.normal.node, gcvFALSE));
+                    gcoVGHARDWARE_ScheduleVideoMemory(gcvNULL,
+                                                      Surface->node.u.normal.node,
+                                                      gcvFALSE));
             }
             else
 #endif
             {
                 /* Free the video memory. */
                 gcmONERROR(gcsSURF_NODE_Destroy(&Surface->node));
+            }
+        }
+
+        if (Surface->node2.u.normal.node != 0)
+        {
+#if gcdENABLE_VG
+            if (currentType == gcvHARDWARE_VG)
+            {
+                /* Free the video memory. */
+                gcmONERROR(
+                    gcoVGHARDWARE_ScheduleVideoMemory(gcvNULL,
+                                                      Surface->node2.u.normal.node,
+                                                      gcvFALSE));
+            }
+            else
+#endif
+            {
+                /* Free the video memory. */
+                gcmONERROR(gcsSURF_NODE_Destroy(&Surface->node2));
+            }
+        }
+
+        if (Surface->node3.u.normal.node != 0)
+        {
+#if gcdENABLE_VG
+            if (currentType == gcvHARDWARE_VG)
+            {
+                /* Free the video memory. */
+                gcmONERROR(
+                    gcoVGHARDWARE_ScheduleVideoMemory(gcvNULL,
+                                                      Surface->node3.u.normal.node,
+                                                      gcvFALSE));
+            }
+            else
+#endif
+            {
+                /* Free the video memory. */
+                gcmONERROR(gcsSURF_NODE_Destroy(&Surface->node3));
             }
         }
 
@@ -1022,6 +1064,60 @@ OnError:
     gcmFOOTER();
     return status;
 }
+
+static gceSTATUS
+_UnwrapUserMemory(
+    IN gcoSURF Surface
+    )
+{
+    gceSTATUS status;
+    gcmHEADER_ARG("Surface=0x%x", Surface);
+
+    gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
+
+    /* We only manage valid and non-user pools. */
+    if ((Surface->node.pool != gcvPOOL_UNKNOWN) &&
+        (Surface->node.u.normal.node != 0))
+    {
+#if gcdENABLE_VG
+        gceHARDWARE_TYPE currentType = gcvHARDWARE_INVALID;
+        gcmGETCURRENTHARDWARE(currentType);
+
+        if (currentType == gcvHARDWARE_VG)
+        {
+            /* Unlock the video memory. */
+            gcmONERROR(_Unlock(Surface));
+
+            /* Free the video memory. */
+            gcmONERROR(
+                gcoVGHARDWARE_ScheduleVideoMemory(gcvNULL,
+                                                  Surface->node.u.normal.node,
+                                                  gcvFALSE));
+        }
+        else
+#endif
+        {
+            /* Unlock the video memory. */
+            gcmONERROR(_Unlock(Surface));
+
+            /* Free the video memory. */
+            gcmONERROR(
+                gcoHARDWARE_ScheduleVideoMemory(Surface->node.u.normal.node));
+        }
+
+        Surface->node.u.normal.node = 0;
+    }
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
 
 #if gcdENABLE_3D
 #if gcdENABLE_BUFFER_ALIGNMENT
@@ -1179,7 +1275,8 @@ _GetBankOffsetBytes(
 
 static void
 _ComputeSurfacePlacement(
-    gcoSURF Surface
+    gcoSURF Surface,
+    gctBOOL calcStride
     )
 {
     gctUINT32 blockSize;
@@ -1189,10 +1286,12 @@ _ComputeSurfacePlacement(
     switch (Surface->format)
     {
     case gcvSURF_YV12:
-        /*  WxH Y plane followed by (W/2)x(H/2) V and U planes. */
-        Surface->stride
-            = Surface->alignedW;
+        if (calcStride)
+        {
+            Surface->stride = Surface->alignedW;
+        }
 
+        /*  WxH Y plane followed by (W/2)x(H/2) V and U planes. */
         Surface->uStride =
         Surface->vStride
 #if defined(ANDROID)
@@ -1200,9 +1299,9 @@ _ComputeSurfacePlacement(
              * Per google's requirement, we need u/v plane align to 16,
              * and there is no gap between YV plane
              */
-            = (Surface->alignedW / 2 + 0xf) & ~0xf;
+            = (Surface->stride / 2 + 0xf) & ~0xf;
 #else
-            = (Surface->alignedW / 2);
+            = (Surface->stride / 2);
 #endif
 
         Surface->vOffset
@@ -1218,10 +1317,12 @@ _ComputeSurfacePlacement(
         break;
 
     case gcvSURF_I420:
-        /*  WxH Y plane followed by (W/2)x(H/2) U and V planes. */
-        Surface->stride
-            = Surface->alignedW;
+        if (calcStride)
+        {
+            Surface->stride = Surface->alignedW;
+        }
 
+        /*  WxH Y plane followed by (W/2)x(H/2) U and V planes. */
         Surface->uStride =
         Surface->vStride
 #if defined(ANDROID)
@@ -1229,9 +1330,9 @@ _ComputeSurfacePlacement(
              * Per google's requirement, we need u/v plane align to 16,
              * and there is no gap between YV plane
              */
-            = (Surface->alignedW / 2 + 0xf) & ~0xf;
+            = (Surface->stride / 2 + 0xf) & ~0xf;
 #else
-            = (Surface->alignedW / 2);
+            = (Surface->stride / 2);
 #endif
 
         Surface->uOffset
@@ -1248,15 +1349,17 @@ _ComputeSurfacePlacement(
 
     case gcvSURF_NV12:
     case gcvSURF_NV21:
+        if (calcStride)
+        {
+            Surface->stride = Surface->alignedW;
+        }
+
         /*  WxH Y plane followed by (W)x(H/2) interleaved U/V plane. */
-        Surface->stride  =
         Surface->uStride =
-        Surface->vStride
-            = Surface->alignedW;
+        Surface->vStride = Surface->stride;
 
         Surface->uOffset =
-        Surface->vOffset
-            = Surface->stride * Surface->alignedH;
+        Surface->vOffset = Surface->stride * Surface->alignedH;
 
         Surface->sliceSize
             = Surface->uOffset
@@ -1265,15 +1368,17 @@ _ComputeSurfacePlacement(
 
     case gcvSURF_NV16:
     case gcvSURF_NV61:
+        if (calcStride)
+        {
+            Surface->stride = Surface->alignedW;
+        }
+
         /*  WxH Y plane followed by WxH interleaved U/V(V/U) plane. */
-        Surface->stride  =
         Surface->uStride =
-        Surface->vStride
-            = Surface->alignedW;
+        Surface->vStride = Surface->stride;
 
         Surface->uOffset =
-        Surface->vOffset
-            = Surface->stride * Surface->alignedH;
+        Surface->vOffset = Surface->stride * Surface->alignedH;
 
         Surface->sliceSize
             = Surface->uOffset
@@ -1284,28 +1389,32 @@ _ComputeSurfacePlacement(
     case gcvSURF_UYVY:
     case gcvSURF_YVYU:
     case gcvSURF_VYUY:
+        if (calcStride)
+        {
+            Surface->stride = Surface->alignedW * 2;
+        }
+
         /*  WxH interleaved Y/U/Y/V plane. */
-        Surface->stride  =
         Surface->uStride =
-        Surface->vStride
-            = Surface->alignedW * 2;
+        Surface->vStride = Surface->stride;
 
         Surface->uOffset = Surface->vOffset = 0;
 
-        Surface->sliceSize
-            = Surface->stride * Surface->alignedH;
+        Surface->sliceSize = Surface->stride * Surface->alignedH;
         break;
 
     case gcvSURF_YUV420_TILE_ST:
+        if (calcStride)
+        {
+            Surface->stride = Surface->alignedW;
+        }
+
         /*  WxH Y plane followed by (W)x(H/2) interleaved U/V plane. */
-        Surface->stride  =
         Surface->uStride =
-        Surface->vStride
-            = Surface->alignedW;
+        Surface->vStride = Surface->stride;
 
         Surface->uOffset =
-        Surface->vOffset
-            = Surface->stride * Surface->alignedH;
+        Surface->vOffset = Surface->stride * Surface->alignedH;
 
         Surface->sliceSize
             = Surface->uOffset
@@ -1314,35 +1423,61 @@ _ComputeSurfacePlacement(
 
     case gcvSURF_YUV420_10_ST:
     case gcvSURF_YUV420_TILE_10_ST:
+    case gcvSURF_NV12_10BIT:
+    case gcvSURF_NV21_10BIT:
+        if (calcStride)
+        {
+            Surface->stride = Surface->alignedW * 10 / 8;
+        }
+
         /*  WxH Y plane followed by WxH interleaved U/V(V/U) plane. */
-        Surface->stride  =
         Surface->uStride =
-        Surface->vStride
-            = Surface->alignedW * 10 / 8;
+        Surface->vStride = Surface->stride;
 
         Surface->uOffset =
-        Surface->vOffset
-            = Surface->stride * Surface->alignedH;
+        Surface->vOffset = Surface->stride * Surface->alignedH;
 
         Surface->sliceSize
             = Surface->uOffset
             + Surface->uStride * Surface->alignedH / 2;
         break;
 
-#if gcdVG_ONLY
-    case gcvSURF_ANV12:
-        /*  NV12 + Alpha: 8bit alpha per pixel. */
+    case gcvSURF_NV16_10BIT:
+    case gcvSURF_NV61_10BIT:
+        if (calcStride)
+        {
+            Surface->stride = Surface->alignedW * 10 / 8;
+        }
+
         Surface->stride  =
         Surface->uStride =
-        Surface->vStride =
-        Surface->aStride
-            = Surface->alignedW;
+        Surface->vStride = Surface->stride;
 
         Surface->uOffset =
-        Surface->vOffset
-            = Surface->stride * Surface->alignedH;
+        Surface->vOffset = Surface->stride * Surface->alignedH;
 
-        Surface->aOffset = Surface->uOffset
+        Surface->sliceSize
+            = Surface->uOffset
+            + Surface->uStride * Surface->alignedH;
+        break;
+
+#if gcdVG_ONLY
+    case gcvSURF_ANV12:
+        if (calcStride)
+        {
+            Surface->stride = Surface->alignedW;
+        }
+
+        /*  NV12 + Alpha: 8bit alpha per pixel. */
+        Surface->uStride =
+        Surface->vStride =
+        Surface->aStride = Surface->stride;
+
+        Surface->uOffset =
+        Surface->vOffset = Surface->stride * Surface->alignedH;
+
+        Surface->aOffset
+            = Surface->uOffset
             + Surface->uStride * Surface->alignedH / 2;
 
         Surface->sliceSize
@@ -1352,16 +1487,18 @@ _ComputeSurfacePlacement(
         break;
 
     case gcvSURF_ANV16:
+        if (calcStride)
+        {
+            Surface->stride = Surface->alignedW;
+        }
+
         /* NV16 + Alpha: 8bit alpha per pixel. */
-        Surface->stride  =
         Surface->uStride =
         Surface->vStride =
-        Surface->aStride
-            = Surface->alignedW;
+        Surface->aStride = Surface->stride;
 
         Surface->uOffset =
-        Surface->vOffset
-            = Surface->stride * Surface->alignedH;
+        Surface->vOffset = Surface->stride * Surface->alignedH;
 
         Surface->aOffset = Surface->uOffset
             + Surface->uStride * Surface->alignedH;
@@ -1373,16 +1510,18 @@ _ComputeSurfacePlacement(
         break;
 
     case gcvSURF_AYUY2:
+        if (calcStride)
+        {
+            Surface->stride = Surface->alignedW * 2;
+        }
+
         /*  WxH interleaved Y/U/Y/V plane. */
-        Surface->stride  =
         Surface->uStride =
-        Surface->vStride = Surface->alignedW * 2;
-        Surface->aStride
-            = Surface->alignedW;
+        Surface->vStride = Surface->stride;
+        Surface->aStride = Surface->stride / 2;
 
         Surface->uOffset = Surface->vOffset = 0;
-        Surface->aOffset =
-            Surface->stride * Surface->alignedH;
+        Surface->aOffset = Surface->stride * Surface->alignedH;
 
         Surface->sliceSize
             = Surface->stride * Surface->alignedH
@@ -1390,63 +1529,68 @@ _ComputeSurfacePlacement(
         break;
 
     case gcvSURF_INDEX1:    /* stride aligned by 8 bytes. */
-        Surface->stride
-            = gcmALIGN((Surface->alignedW / 8), 8);
-        Surface->uStride = Surface->vStride = 0;
+        if (calcStride)
+        {
+            Surface->stride = gcmALIGN((Surface->alignedW / 8), 8);
+        }
 
+        Surface->uStride = Surface->vStride = 0;
         Surface->uOffset = Surface->vOffset = 0;
 
-        Surface->sliceSize
-            = Surface->stride * Surface->alignedH;
+        Surface->sliceSize = Surface->stride * Surface->alignedH;
         break;
 
     case gcvSURF_INDEX2:    /* stride aligned by 8 bytes. */
-        Surface->stride
-            = gcmALIGN((Surface->alignedW / 4), 8);
-        Surface->uStride = Surface->vStride = 0;
+        if (calcStride)
+        {
+            Surface->stride = gcmALIGN((Surface->alignedW / 4), 8);
+        }
 
+        Surface->uStride = Surface->vStride = 0;
         Surface->uOffset = Surface->vOffset = 0;
 
-        Surface->sliceSize
-            = Surface->stride * Surface->alignedH;
+        Surface->sliceSize = Surface->stride * Surface->alignedH;
         break;
 
     case gcvSURF_INDEX4:    /* stride aligned by 8 bytes. */
-        Surface->stride
-            = gcmALIGN((Surface->alignedW / 2), 8);
-        Surface->uStride = Surface->vStride = 0;
+        if (calcStride)
+        {
+            Surface->stride = gcmALIGN((Surface->alignedW / 2), 8);
+        }
 
+        Surface->uStride = Surface->vStride = 0;
         Surface->uOffset = Surface->vOffset = 0;
 
-        Surface->sliceSize
-            = Surface->stride * Surface->alignedH;
+        Surface->sliceSize = Surface->stride * Surface->alignedH;
         break;
 
     case gcvSURF_INDEX8:    /* stride aligned by 8 bytes. */
-        Surface->stride
-            = gcmALIGN(Surface->alignedW, 16);
-        Surface->uStride = Surface->vStride = 0;
+        if (calcStride)
+        {
+            Surface->stride = gcmALIGN(Surface->alignedW, 16);
+        }
 
+        Surface->uStride = Surface->vStride = 0;
         Surface->uOffset = Surface->vOffset = 0;
 
-        Surface->sliceSize
-            = Surface->stride * Surface->alignedH;
+        Surface->sliceSize = Surface->stride * Surface->alignedH;
         break;
 #endif
 
     default:
-        Surface->stride
-            = (Surface->alignedW / formatInfo->blockWidth)
-            * blockSize / 8;
+        if (calcStride)
+        {
+            Surface->stride
+                = (Surface->alignedW / formatInfo->blockWidth)
+                * blockSize / 8;
+        }
 
         Surface->uStride = Surface->vStride = 0;
-
         Surface->uOffset = Surface->vOffset = 0;
 
         Surface->sliceSize
-            = (Surface->alignedW / formatInfo->blockWidth)
-            * (Surface->alignedH / formatInfo->blockHeight)
-            * blockSize / 8;
+            = Surface->stride
+            * (Surface->alignedH / formatInfo->blockHeight);
         break;
     }
 }
@@ -1558,7 +1702,7 @@ _AllocateSurface(
     {
         /* Init the node as the user allocated. */
         Surface->node.pool                    = gcvPOOL_USER;
-        Surface->node.u.wrapped.mappingInfo   = gcvNULL;
+        Surface->node.u.normal.node           = 0;
 
         /* Align the dimensions by the block size. */
         Surface->alignedW  = gcmALIGN_NP2(Surface->alignedW,
@@ -1570,7 +1714,7 @@ _AllocateSurface(
         gcmASSERT(layers == 1);
 
         /* Compute the surface placement parameters. */
-        _ComputeSurfacePlacement(Surface);
+        _ComputeSurfacePlacement(Surface, gcvTRUE);
 
         Surface->layerSize = Surface->sliceSize * Surface->requestD;
 
@@ -1691,12 +1835,13 @@ _AllocateSurface(
         }
 
         /* Compute the surface placement parameters. */
-        _ComputeSurfacePlacement(Surface);
+        _ComputeSurfacePlacement(Surface, gcvTRUE);
 
         /* Append bank offset bytes. */
         Surface->sliceSize += bankOffsetBytes;
 
-        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_128BTILE))
+        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_128BTILE) &&
+            (Surface->formatInfo.fmtClass != gcvFORMAT_CLASS_ASTC))
         {
             /* Align to 256B */
             Surface->sliceSize = gcmALIGN(Surface->sliceSize, 256);
@@ -1730,7 +1875,12 @@ _AllocateSurface(
             }
         }
 
-        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_128BTILE))
+        if (Surface->formatInfo.fmtClass == gcvFORMAT_CLASS_ASTC)
+        {
+            /* for ASTC format, the address should be 16 Byte aligned. */
+            alignment = 16;
+        }
+        else if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_128BTILE))
         {
             bytes = gcmALIGN(bytes,256);
 
@@ -1762,6 +1912,26 @@ _AllocateSurface(
         }
 
 #if gcdENABLE_2D
+        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION) == gcvTRUE)
+        {
+            if (Format == gcvSURF_NV12 ||
+                Format == gcvSURF_NV21)
+            {
+                alignment = alignment < 256 ? 256 : alignment;
+            }
+            else if (Format == gcvSURF_P010)
+            {
+                alignment = alignment < 512 ? 512 : alignment;
+            }
+        }
+        if (Format == gcvSURF_NV12_10BIT ||
+            Format == gcvSURF_NV21_10BIT ||
+            Format == gcvSURF_NV16_10BIT ||
+            Format == gcvSURF_NV61_10BIT)
+        {
+            alignment = alignment < 256 ? 256 : alignment;
+        }
+
         if ((Surface->type == gcvSURF_BITMAP)
 #if gcdENABLE_VG
         &&  (currentType != gcvHARDWARE_VG)
@@ -1805,6 +1975,13 @@ _AllocateSurface(
             gcmVERIFY_OK(gcoHAL_GetHardwareType(gcvNULL, &currentType));
             /* Change to the 2d hardware type */
             gcmVERIFY_OK(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_2D));
+
+            /* YUV420 memory size must be >= YUV422. */
+            if (formatInfo->fmtClass == gcvFORMAT_CLASS_YUV &&
+                formatInfo->bitsPerPixel < 16)
+            {
+                bytes += Surface->alignedW * Surface->alignedH / 2;
+            }
 
             if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_ALL_QUAD))
             {
@@ -1879,108 +2056,6 @@ OnError:
     _FreeSurface(Surface);
 
     /* Return the status. */
-    return status;
-}
-
-static gceSTATUS
-_UnmapUserBuffer(
-    IN gcoSURF Surface,
-    IN gctBOOL ForceUnmap
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-
-    gcmHEADER_ARG("Surface=0x%x ForceUnmap=%d", Surface, ForceUnmap);
-
-    /* Verify the arguments. */
-    gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
-
-    do
-    {
-        /* Cannot be negative. */
-        gcmASSERT(Surface->node.lockCount >= 0);
-
-        if (Surface->node.lockCount == 0)
-        {
-            /* Nothing to do. */
-            status = gcvSTATUS_OK;
-            break;
-        }
-
-        /* Make sure the reference counter is proper. */
-        if (Surface->node.lockCount > 1)
-        {
-            /* Forced unmap? */
-            if (ForceUnmap)
-            {
-                /* Invalid reference count. */
-                gcmASSERT(gcvFALSE);
-            }
-            else
-            {
-                /* Decrement. */
-                Surface->node.lockCount -= 1;
-
-                /* Done for now. */
-                status = gcvSTATUS_OK;
-                break;
-            }
-        }
-
-        /* Unmap the physical memory. */
-        if (Surface->node.u.wrapped.mappingInfo != gcvNULL)
-        {
-            gctUINT32 address;
-
-            gceHARDWARE_TYPE currentType = gcvHARDWARE_INVALID;
-
-            /* Save the current hardware type */
-            gcmVERIFY_OK(gcoHAL_GetHardwareType(gcvNULL, &currentType));
-
-            if (Surface->node.u.wrapped.mappingHardwareType != currentType)
-            {
-                /* Change to the mapping hardware type */
-                gcmVERIFY_OK(gcoHAL_SetHardwareType(gcvNULL,
-                                                    Surface->node.u.wrapped.mappingHardwareType));
-            }
-
-            gcmGETHARDWAREADDRESS(Surface->node, address);
-
-            gcmERR_BREAK(gcoHAL_ScheduleUnmapUserMemory(
-                gcvNULL,
-                Surface->node.u.wrapped.mappingInfo,
-                Surface->size,
-                address,
-                Surface->node.logical
-                ));
-
-            Surface->node.logical = gcvNULL;
-            Surface->node.u.wrapped.mappingInfo = gcvNULL;
-
-            if (Surface->node.u.wrapped.mappingHardwareType != currentType)
-            {
-                /* Restore the current hardware type */
-                gcmVERIFY_OK(gcoHAL_SetHardwareType(gcvNULL, currentType));
-            }
-        }
-
-#if gcdSECURE_USER
-        gcmERR_BREAK(gcoHAL_ScheduleUnmapUserMemory(
-            gcvNULL,
-            gcvNULL,
-            Surface->size,
-            0,
-            Surface->node.logical));
-#endif
-
-        /* Reset the surface. */
-        Surface->node.lockCount = 0;
-        Surface->node.valid = gcvFALSE;
-    }
-    while (gcvFALSE);
-
-    /* Return the status. */
-    gcmFOOTER();
     return status;
 }
 
@@ -2366,60 +2441,22 @@ gcoSURF_WrapSurface(
         /* Set new alignment. */
         if (Alignment != 0)
         {
-            /* Compute the unaligned stride. */
-            gctUINT32 stride;
-            gctUINT32 bytesPerPixel;
-            gcsSURF_FORMAT_INFO_PTR formatInfo = &Surface->formatInfo;
-
-            switch (Surface->format)
-            {
-            case gcvSURF_YV12:
-            case gcvSURF_I420:
-            case gcvSURF_NV12:
-            case gcvSURF_NV21:
-            case gcvSURF_NV16:
-            case gcvSURF_NV61:
-                bytesPerPixel = 1;
-                stride = Surface->alignedW;
-                break;
-
-            default:
-                bytesPerPixel = Surface->bitsPerPixel / 8;
-                stride = Surface->alignedW * Surface->bitsPerPixel / 8;
-                break;
-            }
+            /* Compute the HAL required stride */
+            _ComputeSurfacePlacement(Surface, gcvTRUE);
 
             /* Align the stride (Alignment can be not a power of number). */
-            if (gcoMATH_ModuloUInt(stride, Alignment) != 0)
-            {
-                stride = gcoMATH_DivideUInt(stride, Alignment)  * Alignment
-                       + Alignment;
+            Surface->stride = gcmALIGN_NP2(Surface->stride, Alignment);
 
-                Surface->alignedW = stride / bytesPerPixel;
-            }
-
-            /* Compute the new surface placement parameters. */
-            _ComputeSurfacePlacement(Surface);
-
-            if (stride != Surface->stride)
-            {
-                /*
-                 * Still not equal, which means user stride is not pixel aligned, ie,
-                 * stride != alignedWidth(user) * bytesPerPixel
-                 */
-                Surface->stride = stride;
-
-                /* Re-calculate slice size. */
-                Surface->sliceSize = stride * (Surface->alignedH / formatInfo->blockHeight);
-            }
+            /* Compute surface placement with user stride */
+            _ComputeSurfacePlacement(Surface, gcvFALSE);
 
             Surface->layerSize = Surface->sliceSize * Surface->requestD;
 
             /* We won't map multi-layer surface. */
-            gcmASSERT(formatInfo->layers == 1);
+            gcmASSERT(Surface->formatInfo.layers == 1);
 
             /* Compute the new size. */
-            Surface->size = Surface->layerSize * formatInfo->layers;
+            Surface->size = Surface->layerSize * Surface->formatInfo.layers;
         }
 
         /* Validate the surface. */
@@ -2429,13 +2466,13 @@ gcoSURF_WrapSurface(
         Surface->node.lockCount++;
 
         /* Set the node parameters. */
-        Surface->node.u.wrapped.mappingInfo   = gcvNULL;
+        Surface->node.u.normal.node = 0;
 
         Surface->node.logical                 = Logical;
         gcsSURF_NODE_SetHardwareAddress(&Surface->node, Physical);
         Surface->node.count                   = 1;
 
-        Surface->node.u.normal.node = 0;
+        /* TODO: Need to remove deprecated field here. */
         Surface->node.u.wrapped.physical = Physical;
     }
     while (gcvFALSE);
@@ -2483,10 +2520,7 @@ gcoSURF_MapUserSurface(
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    gctPOINTER mappingInfo = gcvNULL;
-
     gctPOINTER logical = gcvNULL;
-    gctUINT32 physical = 0;
 #if gcdENABLE_VG
     gceHARDWARE_TYPE currentType = gcvHARDWARE_INVALID;
 #endif
@@ -2537,60 +2571,22 @@ gcoSURF_MapUserSurface(
         /* Set new alignment. */
         if (Alignment != 0)
         {
-            /* Compute the unaligned stride. */
-            gctUINT32 stride;
-            gctUINT32 bytesPerPixel;
-            gcsSURF_FORMAT_INFO_PTR formatInfo = &Surface->formatInfo;
-
-            switch (Surface->format)
-            {
-            case gcvSURF_YV12:
-            case gcvSURF_I420:
-            case gcvSURF_NV12:
-            case gcvSURF_NV21:
-            case gcvSURF_NV16:
-            case gcvSURF_NV61:
-                bytesPerPixel = 1;
-                stride = Surface->alignedW;
-                break;
-
-            default:
-                bytesPerPixel = Surface->bitsPerPixel / 8;
-                stride = Surface->alignedW * Surface->bitsPerPixel / 8;
-                break;
-            }
+            /* Compute the HAL required stride */
+            _ComputeSurfacePlacement(Surface, gcvTRUE);
 
             /* Align the stride (Alignment can be not a power of number). */
-            if (gcoMATH_ModuloUInt(stride, Alignment) != 0)
-            {
-                stride = gcoMATH_DivideUInt(stride, Alignment)  * Alignment
-                       + Alignment;
+            Surface->stride = gcmALIGN_NP2(Surface->stride, Alignment);
 
-                Surface->alignedW = stride / bytesPerPixel;
-            }
-
-            /* Compute the new surface placement parameters. */
-            _ComputeSurfacePlacement(Surface);
-
-            if (stride != Surface->stride)
-            {
-                /*
-                 * Still not equal, which means user stride is not pixel aligned, ie,
-                 * stride != alignedWidth(user) * bytesPerPixel
-                 */
-                Surface->stride = stride;
-
-                /* Re-calculate slice size. */
-                Surface->sliceSize = stride * (Surface->alignedH / formatInfo->blockHeight);
-            }
+            /* Compute surface placement with user stride */
+            _ComputeSurfacePlacement(Surface, gcvFALSE);
 
             Surface->layerSize = Surface->sliceSize * Surface->requestD;
 
             /* We won't map multi-layer surface. */
-            gcmASSERT(formatInfo->layers == 1);
+            gcmASSERT(Surface->formatInfo.layers == 1);
 
             /* Compute the new size. */
-            Surface->size = Surface->layerSize * formatInfo->layers;
+            Surface->size = Surface->layerSize * Surface->formatInfo.layers;
         }
 
         /* Map logical pointer if not specified. */
@@ -2615,32 +2611,25 @@ gcoSURF_MapUserSurface(
             &Surface->node.u.normal.node
             ));
 
+        /* TODO: May need to remove deprecated field here. */
         Surface->node.u.wrapped.physical = Physical;
         Surface->node.logical = logical;
 
         /* Because _FreeSurface() is used to free user surface too, we need to
-        ** reference this node for current hardware here, like gcoSRUF_Construct() does.
-        */
-        gcmERR_BREAK(gcoHARDWARE_Lock(
-            &Surface->node,
-            gcvNULL,
-            gcvNULL
-            ));
+         * reference this node for current hardware here, like
+         * gcoSRUF_Construct() does.
+         */
+        gcmERR_BREAK(_Lock(Surface));
     }
     while (gcvFALSE);
 
     /* Roll back. */
     if (gcmIS_ERROR(status))
     {
-        if (mappingInfo != gcvNULL)
+        if (Surface->node.u.normal.node != 0)
         {
-            gcmVERIFY_OK(gcoOS_UnmapUserMemory(
-                gcvNULL,
-                logical,
-                Surface->size,
-                mappingInfo,
-                physical
-                ));
+            gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(Surface->node.u.normal.node));
+            Surface->node.u.normal.node = 0;
         }
     }
 
@@ -3921,6 +3910,10 @@ gcoSURF_Lock(
         case gcvSURF_YUV420_10_ST:
         case gcvSURF_YUV420_TILE_ST:
         case gcvSURF_YUV420_TILE_10_ST:
+        case gcvSURF_NV12_10BIT:
+        case gcvSURF_NV21_10BIT:
+        case gcvSURF_NV16_10BIT:
+        case gcvSURF_NV61_10BIT:
             Surface->node.count = 2;
 
             logical2 = Surface->node2.logical;
@@ -3990,6 +3983,10 @@ gcoSURF_Lock(
         case gcvSURF_YUV420_10_ST:
         case gcvSURF_YUV420_TILE_ST:
         case gcvSURF_YUV420_TILE_10_ST:
+        case gcvSURF_NV12_10BIT:
+        case gcvSURF_NV21_10BIT:
+        case gcvSURF_NV16_10BIT:
+        case gcvSURF_NV61_10BIT:
             Surface->node.count = 2;
 
             logical2 = Surface->node.logical
@@ -4982,6 +4979,24 @@ _ComputeClear(
              Surface->clearBitMask[LayerIndex] |= Surface->clearBitMask[LayerIndex] << 16;
              Surface->clearBitMaskUpper[LayerIndex] = Surface->clearBitMask[LayerIndex];
 
+             break;
+
+         case gcvSURF_B10G11R11F:
+         case gcvSURF_B10G11R11F_1_A8R8G8B8:
+             {
+             gctUINT16 r,g,b;
+             gcmASSERT(LayerIndex == 0);
+
+             r = (gctUINT16)gcoMATH_FloatToFloat11(ClearArgs->color.r.uintValue);
+             g = (gctUINT16)gcoMATH_FloatToFloat11(ClearArgs->color.g.uintValue);
+             b = (gctUINT16)gcoMATH_FloatToFloat10(ClearArgs->color.b.uintValue);
+
+             Surface->clearValue[0] = (b << 22) | (g << 11) | r;
+             Surface->clearValueUpper[0] = Surface->clearValue[0];
+             Surface->clearBitMask[LayerIndex] = clearBitMask32;
+             Surface->clearBitMask[LayerIndex] |= Surface->clearBitMask[LayerIndex] << 16;
+             Surface->clearBitMaskUpper[LayerIndex] = Surface->clearBitMask[LayerIndex];
+             }
              break;
 
          case gcvSURF_R16I:
@@ -7154,13 +7169,18 @@ gcoSURF_ResolveRect(
     gcoSURF dstSurf = DstView->surf;
     gcsPOINT_PTR srcOrigin, dstOrigin;
     gceSURF_FORMAT savedSrcFmt = gcvSURF_UNKNOWN;
-    gceFORMAT_DATATYPE savedSrcDataType = gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED;
+    gceSURF_COLOR_SPACE savedSrcColorSpace = gcvSURF_COLOR_SPACE_UNKNOWN;
+    gcsSURF_FORMAT_INFO savedSrcFmtInfo;
     gceSURF_FORMAT savedDstFmt = gcvSURF_UNKNOWN;
-    gceFORMAT_DATATYPE savedDstDataType = gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED;
+    gceSURF_COLOR_SPACE savedDstColorSpace = gcvSURF_COLOR_SPACE_UNKNOWN;
+    gcsSURF_FORMAT_INFO savedDstFmtInfo;
     gcsSURF_RESOLVE_ARGS fullSizeArgs = {0};
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("SrcView=0x%x DstView=0x%x Args=0x%x", SrcView, DstView, Args);
+
+    gcoOS_ZeroMemory(&savedDstFmtInfo, gcmSIZEOF(gcsSURF_FORMAT_INFO));
+    gcoOS_ZeroMemory(&savedSrcFmtInfo, gcmSIZEOF(gcsSURF_FORMAT_INFO));
 
     /* default full size resolve */
     if (!Args)
@@ -7177,7 +7197,10 @@ gcoSURF_ResolveRect(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    if (Args->uArgs.v2.directCopy && srcSurf->format != dstSurf->format)
+    if (Args->uArgs.v2.directCopy &&
+        srcSurf->format != dstSurf->format &&
+        !(Args->uArgs.v2.srcCompressed ||
+        Args->uArgs.v2.dstCompressed))
     {
         /* This direct Copy only works for bpp same format, so fake to same format.
         ** TODO, fake compressed format to RGBA format
@@ -7187,17 +7210,21 @@ gcoSURF_ResolveRect(
         {
             savedDstFmt = dstSurf->format;
             dstSurf->format = srcSurf->format;
+            savedDstColorSpace = dstSurf->colorSpace;
+            dstSurf->colorSpace = srcSurf->colorSpace;
 
-            savedDstDataType = dstSurf->formatInfo.fmtDataType;
-            dstSurf->formatInfo.fmtDataType = srcSurf->formatInfo.fmtDataType;
+            savedDstFmtInfo = dstSurf->formatInfo;
+            dstSurf->formatInfo = srcSurf->formatInfo;
         }
         else
         {
             savedSrcFmt = srcSurf->format;
             srcSurf->format = dstSurf->format;
+            savedSrcColorSpace = srcSurf->colorSpace;
+            srcSurf->colorSpace = dstSurf->colorSpace;
 
-            savedSrcDataType = srcSurf->formatInfo.fmtDataType;
-            srcSurf->formatInfo.fmtDataType = dstSurf->formatInfo.fmtDataType;
+            savedSrcFmtInfo = srcSurf->formatInfo;
+            srcSurf->formatInfo = dstSurf->formatInfo;
         }
     }
 
@@ -7236,7 +7263,9 @@ gcoSURF_ResolveRect(
                 status = gcvSTATUS_NOT_SUPPORTED;
             }
         }
-        else if (gcmIS_ERROR(gcoSURF_3DBlitBltRect(SrcView, DstView, Args)))
+        else if (Args->uArgs.v2.srcCompressed ||
+                 Args->uArgs.v2.dstCompressed ||
+                 gcmIS_ERROR(gcoSURF_3DBlitBltRect(SrcView, DstView, Args)))
         {
             if(!Args->uArgs.v2.gpuOnly && !(Args->uArgs.v2.srcSwizzle^Args->uArgs.v2.dstSwizzle))
             {
@@ -7433,13 +7462,15 @@ OnError:
     if (savedSrcFmt != gcvSURF_UNKNOWN)
     {
         srcSurf->format = savedSrcFmt;
-        srcSurf->formatInfo.fmtDataType = savedSrcDataType;
+        srcSurf->colorSpace = savedSrcColorSpace;
+        srcSurf->formatInfo = savedSrcFmtInfo;
     }
 
     if (savedDstFmt != gcvSURF_UNKNOWN)
     {
         dstSurf->format = savedDstFmt;
-        dstSurf->formatInfo.fmtDataType = savedDstDataType;
+        dstSurf->colorSpace = savedDstColorSpace;
+        dstSurf->formatInfo = savedDstFmtInfo;
     }
 
     /* Return the status. */
@@ -9691,17 +9722,44 @@ gcoSURF_CopyPixels(
         {
             rectSize.x = (gctINT)srcSurf->allocedW - srcOrigin->x;
         }
-        if (rectSize.x > (gctINT)dstSurf->allocedW - dstOrigin->x)
-        {
-            rectSize.x = (gctINT)dstSurf->allocedW - dstOrigin->x;
-        }
+
         if (rectSize.y > (gctINT)srcSurf->allocedH - srcOrigin->y)
         {
             rectSize.y = (gctINT)srcSurf->allocedH - srcOrigin->y;
         }
-        if (rectSize.y > (gctINT)dstSurf->allocedH - dstOrigin->y)
+
+        if (Args->uArgs.v2.srcCompressed && !Args->uArgs.v2.dstCompressed)
         {
-            rectSize.y = (gctINT)dstSurf->allocedH - dstOrigin->y;
+            if (rectSize.x > ((gctINT)dstSurf->allocedW - dstOrigin->x) * (gctINT)srcSurf->formatInfo.blockWidth)
+            {
+                rectSize.x = ((gctINT)dstSurf->allocedW - dstOrigin->x) * (gctINT)srcSurf->formatInfo.blockWidth;
+            }
+            if (rectSize.y > ((gctINT)dstSurf->allocedH - dstOrigin->y) * (gctINT)srcSurf->formatInfo.blockHeight)
+            {
+                rectSize.y = ((gctINT)dstSurf->allocedH - dstOrigin->y) * (gctINT)srcSurf->formatInfo.blockHeight;
+            }
+        }
+        else if (!Args->uArgs.v2.srcCompressed && Args->uArgs.v2.dstCompressed)
+        {
+            if (rectSize.x > ((gctINT)dstSurf->allocedW - dstOrigin->x) / (gctINT)dstSurf->formatInfo.blockWidth)
+            {
+                rectSize.x = ((gctINT)dstSurf->allocedW - dstOrigin->x) / (gctINT)dstSurf->formatInfo.blockWidth;
+            }
+            if (rectSize.y > ((gctINT)dstSurf->allocedH - dstOrigin->y) / (gctINT)dstSurf->formatInfo.blockHeight)
+            {
+                rectSize.y = ((gctINT)dstSurf->allocedH - dstOrigin->y) / (gctINT)dstSurf->formatInfo.blockHeight;
+            }
+        }
+        else
+        {
+            if (rectSize.x > (gctINT)dstSurf->allocedW - dstOrigin->x)
+            {
+                rectSize.x = (gctINT)dstSurf->allocedW - dstOrigin->x;
+            }
+            if (rectSize.y > (gctINT)dstSurf->allocedH - dstOrigin->y)
+            {
+                rectSize.y = (gctINT)dstSurf->allocedH - dstOrigin->y;
+            }
         }
 
         if (srcSurf->type == gcvSURF_BITMAP)
@@ -9740,11 +9798,12 @@ gcoSURF_CopyPixels(
         /* Only unsigned normalized data type and no space conversion needed go hardware copy pixels path.
         ** as this path can't handle other cases.
         */
-        if ((srcSurf->formatInfo.fmtDataType == gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED) &&
+        if (((srcSurf->formatInfo.fmtDataType == gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED) &&
             (dstSurf->formatInfo.fmtDataType == gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED) &&
             (!srcSurf->formatInfo.fakedFormat || (srcSurf->paddingFormat && !srcSurf->garbagePadded)) &&
             (!dstSurf->formatInfo.fakedFormat || dstSurf->paddingFormat) &&
-            (srcSurf->colorSpace == dstSurf->colorSpace))
+            (srcSurf->colorSpace == dstSurf->colorSpace)) ||
+            (Args->uArgs.v2.srcCompressed || Args->uArgs.v2.dstCompressed))
         {
             /* Read the pixel. */
             gcsSURF_RESOLVE_ARGS adjustArgs = {0};
@@ -9836,12 +9895,6 @@ gcoSURF_NODE_Cache(
 
     gcmHEADER_ARG("Node=0x%x, Operation=%d, Bytes=%u", Node, Operation, Bytes);
 
-    if (Node->pool == gcvPOOL_USER)
-    {
-        gcmFOOTER();
-        return gcvSTATUS_OK;
-    }
-
 #if !gcdPAGED_MEMORY_CACHEABLE
     if (Node->u.normal.cacheable == gcvFALSE)
     {
@@ -9849,6 +9902,17 @@ gcoSURF_NODE_Cache(
         return gcvSTATUS_OK;
     }
 #endif
+
+    if (Node->pool == gcvPOOL_USER)
+    {
+        static gctBOOL printed;
+
+        if (!printed)
+        {
+            gcmPRINT("NOTICE: Flush cache for USER_POOL memory!");
+            printed = gcvTRUE;
+        }
+    }
 
     switch (Operation)
     {
@@ -11113,8 +11177,8 @@ gcoSURF_SetBuffer(
         gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
 
-    /* Unmap the current buffer if any. */
-    gcmONERROR(_UnmapUserBuffer(Surface, gcvTRUE));
+    /* Cancel existed wrapping. */
+    gcmONERROR(_UnwrapUserMemory(Surface));
 
     /* Set surface parameters. */
     Surface->type   = (gceSURF_TYPE) ((gctUINT32) Type &  0xFF);
@@ -11231,16 +11295,10 @@ gcoSURF_SetWindow(
 {
     gceSTATUS status;
     gctUINT32 offset;
-    gctUINT   userStride;
-    gctUINT   halStride;
-    gctINT    bytesPerPixel;
-#if gcdSECURE_USER
-    gcsHAL_INTERFACE iface;
-#endif
+    gctUINT userStride;
 #if gcdENABLE_VG
     gceHARDWARE_TYPE currentHW = gcvHARDWARE_INVALID;
 #endif
-    gcsSURF_FORMAT_INFO_PTR formatInfo;
     gcsUSER_MEMORY_DESC desc;
 
     gcmHEADER_ARG("Surface=0x%x X=%u Y=%u Width=%u Height=%u",
@@ -11253,9 +11311,8 @@ gcoSURF_SetWindow(
     gcmGETCURRENTHARDWARE(currentHW);
 #endif
 
-    /* Unmap the current buffer if any. */
-    gcmONERROR(
-        _UnmapUserBuffer(Surface, gcvTRUE));
+    /* Cancel existed wrapping. */
+    gcmONERROR(_UnwrapUserMemory(Surface));
 
     /* Make sure at least one of the surface pointers is set. */
     if (Surface->userLogical == gcvNULL)
@@ -11321,82 +11378,35 @@ gcoSURF_SetWindow(
         }
     }
 
-#if gcdENABLE_VG
-    if (currentHW != gcvHARDWARE_VG)
-#endif
+    userStride = Surface->stride;
+
+    /* Compute the HAL required stride */
+    _ComputeSurfacePlacement(Surface, gcvTRUE);
+    if (Surface->type == gcvSURF_BITMAP)
     {
-        /* Get shortcut. */
-        formatInfo = &Surface->formatInfo;
-
-        /* bytes per pixel of first plane. */
-        switch (Surface->format)
+        /* For bitmap surface, user buffer stride may be larger than
+        ** least stride required in HAL.
+        */
+        if (userStride < Surface->stride)
         {
-        case gcvSURF_YV12:
-        case gcvSURF_I420:
-        case gcvSURF_NV12:
-        case gcvSURF_NV21:
-        case gcvSURF_NV16:
-        case gcvSURF_NV61:
-            bytesPerPixel = 1;
-            halStride = Surface->alignedW;
-            break;
-
-        default:
-            bytesPerPixel = Surface->bitsPerPixel / 8;
-            halStride = (Surface->alignedW / formatInfo->blockWidth)
-                      * (formatInfo->blockSize / formatInfo->layers) / 8;
-            break;
+            gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         }
-
-        /* Backup user stride. */
-        userStride = Surface->stride;
-
-        if (userStride != halStride)
-        {
-            if ((Surface->type != gcvSURF_BITMAP)
-            ||  (Surface->stride < Width * bytesPerPixel)
-            ||  (Surface->stride & (4 * bytesPerPixel - 1))
-            )
-            {
-                /*
-                 * 1. For Vivante internal surfaces types, user buffer placement
-                 * must be the same as what defined in HAL, otherwise the user
-                 * buffer is not compatible with HAL.
-                 * 2. For bitmap surface, user buffer stride may be larger than
-                 * least stride defined in HAL, and should be aligned.
-                 */
-                gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-            }
-
-            /* Calculte alignedWidth from user stride. */
-            Surface->alignedW = userStride / bytesPerPixel;
-        }
-
-        /* Compute the surface placement parameters. */
-        _ComputeSurfacePlacement(Surface);
-
+    }
+    else
+    {
+        /* For Vivante internal surfaces types, user buffer placement
+        ** must be the same as what defined in HAL, otherwise the user
+        ** buffer is not compatible with HAL.
+        */
         if (userStride != Surface->stride)
         {
-            /*
-             * Still not equal, which means user stride is not pixel aligned, ie,
-             * userStride != alignedWidth(user) * bytesPerPixel
-             */
-            Surface->stride = userStride;
-
-            /* Re-calculate slice size. */
-            Surface->sliceSize = userStride * (Surface->alignedH / formatInfo->blockHeight);
+            gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         }
-
-        /* Restore alignedWidth. */
-        Surface->alignedW = halStride / bytesPerPixel;
     }
 
-    offset = Y * Surface->stride + X * Surface->bitsPerPixel / 8;
-
-    /* Compute the surface sliceSize and size. */
-    Surface->sliceSize = (Surface->alignedW / Surface->formatInfo.blockWidth)
-                       * (Surface->alignedH / Surface->formatInfo.blockHeight)
-                       * Surface->formatInfo.blockSize / 8;
+    /* Compute surface placement with user stride */
+    Surface->stride = userStride;
+    _ComputeSurfacePlacement(Surface, gcvFALSE);
 
     Surface->layerSize = Surface->sliceSize * Surface->requestD;
 
@@ -11405,14 +11415,16 @@ gcoSURF_SetWindow(
 
     Surface->size = Surface->layerSize * Surface->formatInfo.layers;
 
+    offset = Y * Surface->stride + X * Surface->bitsPerPixel / 8;
+
     /* Set user pool node size. */
     Surface->node.size = Surface->size;
-
     /* Need to map logical pointer? */
     Surface->node.logical = (gctUINT8_PTR)Surface->userLogical + offset;
+    /* TODO: May need to remove deprecated field here. */
     Surface->node.u.wrapped.physical = Surface->userPhysical + offset;
 
-    gcmSAFECASTPHYSADDRT(desc.physical, Surface->node.u.wrapped.physical);
+    gcmSAFECASTPHYSADDRT(desc.physical, Surface->userPhysical + offset);
     desc.logical = gcmPTR_TO_UINT64(Surface->node.logical);
     desc.size = Surface->size;
     desc.flag = gcvALLOC_FLAG_USERMEMORY;
@@ -11421,11 +11433,10 @@ gcoSURF_SetWindow(
 
     Surface->pfGetAddr = gcoHARDWARE_GetProcCalcPixelAddr(gcvNULL, Surface);
 
-#if (gcdENABLE_3D==0) && (gcdENABLE_2D==0) && (gcdENABLE_VG==1)
-    Surface->node.u.wrapped.mappingInfo = gcvNULL;
-#endif
-
     Surface->node.lockCount = 1;
+
+    /* Initial lock. */
+    gcmONERROR(_Lock(Surface));
 
     /* Success. */
     gcmFOOTER_NO();
@@ -11473,15 +11484,9 @@ gcoSURF_SetImage(
     gceSTATUS status;
     gctUINT32 offset;
     gctUINT   userStride;
-    gctUINT   halStride;
-    gctINT    bytesPerPixel;
-#if gcdSECURE_USER
-    gcsHAL_INTERFACE iface;
-#endif
 #if gcdENABLE_VG
     gceHARDWARE_TYPE currentHW = gcvHARDWARE_INVALID;
 #endif
-    gcsSURF_FORMAT_INFO_PTR formatInfo;
     gcsUSER_MEMORY_DESC desc;
 
     gcmHEADER_ARG("Surface=0x%x X=%u Y=%u Width=%u Height=%u",
@@ -11494,9 +11499,8 @@ gcoSURF_SetImage(
     gcmGETCURRENTHARDWARE(currentHW);
 #endif
 
-    /* Unmap the current buffer if any. */
-    gcmONERROR(
-        _UnmapUserBuffer(Surface, gcvTRUE));
+    /* Cancel existed wrapping. */
+    gcmONERROR(_UnwrapUserMemory(Surface));
 
     /* Make sure at least one of the surface pointers is set. */
     if (Surface->userLogical == gcvNULL)
@@ -11562,99 +11566,52 @@ gcoSURF_SetImage(
         }
     }
 
-#if gcdENABLE_VG
-    if (currentHW != gcvHARDWARE_VG)
-#endif
+    userStride = Surface->stride;
+
+    /* Compute the HAL required stride */
+    _ComputeSurfacePlacement(Surface, gcvTRUE);
+    if (Surface->type == gcvSURF_BITMAP)
     {
-        /* Get shortcut. */
-        formatInfo = &Surface->formatInfo;
-
-        /* bytes per pixel of first plane. */
-        switch (Surface->format)
+        /* For bitmap surface, user buffer stride may be larger than
+        ** least stride required in HAL.
+        */
+        if (userStride < Surface->stride)
         {
-        case gcvSURF_YV12:
-        case gcvSURF_I420:
-        case gcvSURF_NV12:
-        case gcvSURF_NV21:
-        case gcvSURF_NV16:
-        case gcvSURF_NV61:
-            bytesPerPixel = 1;
-            halStride = Surface->alignedW;
-            break;
-
-        default:
-            bytesPerPixel = Surface->bitsPerPixel / 8;
-            halStride = (Surface->alignedW / formatInfo->blockWidth)
-                      * (formatInfo->blockSize / formatInfo->layers) / 8;
-            break;
+            gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         }
-
-        /* Backup user stride. */
-        userStride = Surface->stride;
-
-        if (userStride != halStride)
-        {
-            if ((Surface->type != gcvSURF_BITMAP)
-            ||  (Surface->stride < Width * bytesPerPixel)
-            ||  (Surface->stride & (4 * bytesPerPixel - 1))
-            )
-            {
-                /*
-                 * 1. For Vivante internal surfaces types, user buffer placement
-                 * must be the same as what defined in HAL, otherwise the user
-                 * buffer is not compatible with HAL.
-                 * 2. For bitmap surface, user buffer stride may be larger than
-                 * least stride defined in HAL, and should be aligned.
-                 */
-                gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-            }
-
-            /* Calculte alignedWidth from user stride. */
-            Surface->alignedW = userStride / bytesPerPixel;
-        }
-
-        /* Compute the surface placement parameters. */
-        _ComputeSurfacePlacement(Surface);
-
+    }
+    else
+    {
+        /* For Vivante internal surfaces types, user buffer placement
+        ** must be the same as what defined in HAL, otherwise the user
+        ** buffer is not compatible with HAL.
+        */
         if (userStride != Surface->stride)
         {
-            /*
-             * Still not equal, which means user stride is not pixel aligned, ie,
-             * userStride != alignedWidth(user) * bytesPerPixel
-             */
-            Surface->stride = userStride;
-
-            /* Re-calculate slice size. */
-            Surface->sliceSize = userStride * (Surface->alignedH / formatInfo->blockHeight);
+            gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         }
-
-        /* Restore alignedWidth. */
-        Surface->alignedW = halStride / bytesPerPixel;
     }
 
-    offset = Y * Surface->stride + X * Surface->bitsPerPixel / 8;
+    /* Compute surface placement with user stride */
+    Surface->stride = userStride;
+    _ComputeSurfacePlacement(Surface, gcvFALSE);
 
-    /* Compute the surface sliceSize and size. */
-    Surface->sliceSize = (Surface->alignedW / Surface->formatInfo.blockWidth)
-                            * (Surface->alignedH / Surface->formatInfo.blockHeight)
-                            * Surface->formatInfo.blockSize / 8;
-
-    Surface->layerSize = Surface->sliceSize
-                            * Surface->requestD;
+    Surface->layerSize = Surface->sliceSize * Surface->requestD;
 
     /* Always single layer for user surface */
     gcmASSERT(Surface->formatInfo.layers == 1);
 
-    Surface->size      = Surface->layerSize
-                            * Surface->formatInfo.layers;
+    Surface->size = Surface->layerSize * Surface->formatInfo.layers;
+
+    offset = Y * Surface->stride + X * Surface->bitsPerPixel / 8;
 
     /* Set user pool node size. */
     Surface->node.size = Surface->size;
-
     Surface->node.logical = (gctUINT8_PTR)Surface->userLogical + offset;
+    /* TODO: May need to remove deprecated field here. */
     Surface->node.u.wrapped.physical = Surface->userPhysical + offset;
 
-    gcmSAFECASTPHYSADDRT(desc.physical, Surface->node.u.wrapped.physical);
+    gcmSAFECASTPHYSADDRT(desc.physical, Surface->userPhysical + offset);
     desc.logical = gcmPTR_TO_UINT64(Surface->node.logical);
     desc.size = Surface->size;
     desc.flag = gcvALLOC_FLAG_USERMEMORY;
@@ -11664,6 +11621,9 @@ gcoSURF_SetImage(
     Surface->pfGetAddr = gcoHARDWARE_GetProcCalcPixelAddr(gcvNULL, Surface);
 
     Surface->node.lockCount = 1;
+
+    /* Initial lock. */
+    gcmONERROR(_Lock(Surface));
 
     /* Success. */
     gcmFOOTER_NO();
@@ -11960,6 +11920,16 @@ gcoSURF_BlitCPU(
     gctBOOL averagePixels = gcvTRUE;
     gcsSURF_FORMAT_INFO *srcFmtInfo, *dstFmtInfo;
 
+    if (!args || !args->srcSurface || !args->dstSurface)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    if (args->srcSurface == args->dstSurface)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
     gcoOS_MemCopy(&blitArgs, args, sizeof(gcsSURF_BLIT_ARGS));
 
     srcSurf = args->srcSurface;
@@ -11984,16 +11954,6 @@ gcoSURF_BlitCPU(
         blitArgs.scissor.left   *= dstSurf->sampleInfo.x;
         blitArgs.scissor.bottom  = scissorHeight * dstSurf->sampleInfo.y + blitArgs.scissor.top;
         blitArgs.scissor.right   = scissorWidth * dstSurf->sampleInfo.x + blitArgs.scissor.left;
-    }
-
-    if (!args || !args->srcSurface || !args->dstSurface)
-    {
-        return gcvSTATUS_INVALID_ARGUMENT;
-    }
-
-    if (args->srcSurface == args->dstSurface)
-    {
-        return gcvSTATUS_INVALID_ARGUMENT;
     }
 
     /* If either the src or dst rect are negative */
@@ -12861,7 +12821,7 @@ gcoSURF_ResetSurWH(
                           gcvNULL));
 
     /* Compute surface placement parameters. */
-    _ComputeSurfacePlacement(Surface);
+    _ComputeSurfacePlacement(Surface, gcvTRUE);
 
     Surface->layerSize = Surface->sliceSize * Surface->requestD;
 
@@ -13352,7 +13312,7 @@ gcsSURF_NODE_Destroy(
     }
 #endif
 
-    status = gcoHARDWARE_ScheduleVideoMemory(Node);
+    status = gcoHARDWARE_ScheduleVideoMemory(Node->u.normal.node);
 
     /* Reset the node. */
     Node->pool  = gcvPOOL_UNKNOWN;
@@ -13544,9 +13504,6 @@ gcoSURF_WrapUserMemory(
     gcoSURF surface = gcvNULL;
     gctUINT32 node;
     gceSURF_TYPE type;
-    gctUINT bytesPerPixel;
-    gctUINT halStride;
-    gcsSURF_FORMAT_INFO_PTR formatInfo;
     gcsUSER_MEMORY_DESC desc;
 
     gcmHEADER_ARG("Handle=%d, Flag=%d", Handle, Flag);
@@ -13557,68 +13514,33 @@ gcoSURF_WrapUserMemory(
     gcmONERROR(gcoSURF_Construct(
         gcvNULL, Width, Height, Depth, type, Format, gcvPOOL_VIRTUAL, &surface));
 
-    /* Get shortcut. */
-    formatInfo = &surface->formatInfo;
-
-    /* bytes per pixel of first plane. */
-    switch (surface->format)
+    /* Compute the HAL required stride */
+    _ComputeSurfacePlacement(surface, gcvTRUE);
+    if (surface->type == gcvSURF_BITMAP)
     {
-    case gcvSURF_YV12:
-    case gcvSURF_I420:
-    case gcvSURF_NV12:
-    case gcvSURF_NV21:
-    case gcvSURF_NV16:
-    case gcvSURF_NV61:
-        bytesPerPixel = 1;
-        halStride = surface->alignedW;
-        break;
-
-    default:
-        bytesPerPixel = surface->bitsPerPixel / 8;
-        halStride = (surface->alignedW / formatInfo->blockWidth)
-                  * (formatInfo->blockSize / formatInfo->layers) / 8;
-        break;
-    }
-
-    /* Apply user specified stride. */
-    if (Stride != halStride)
-    {
-        if ((surface->type != gcvSURF_BITMAP)
-        ||  (surface->stride < Width * bytesPerPixel)
-        ||  (surface->stride & (4 * bytesPerPixel - 1))
-        )
+        /* For bitmap surface, user buffer stride may be larger than
+        ** least stride required in HAL.
+        */
+        if (Stride < surface->stride)
         {
-            /*
-             * 1. For Vivante internal surfaces types, user buffer placement
-             * must be the same as what defined in HAL, otherwise the user
-             * buffer is not compatible with HAL.
-             * 2. For bitmap surface, user buffer stride may be larger than
-             * least stride defined in HAL, and should be aligned.
-             */
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         }
-
-        /* Calculte alignedWidth from user stride. */
-        surface->alignedW = Stride / bytesPerPixel;
     }
-
-    /* Compute the surface placement parameters. */
-    _ComputeSurfacePlacement(surface);
-
-    if (Stride != surface->stride)
+    else
     {
-        /*
-         * Still not equal, which means user stride is not pixel aligned, ie,
-         * Stride != alignedWidth(user) * bytesPerPixel
-         */
-        surface->stride = Stride;
-
-        /* Re-calculate slice size. */
-        surface->sliceSize = Stride * (surface->alignedH / formatInfo->blockHeight);
+        /* For Vivante internal surfaces types, user buffer placement
+        ** must be the same as what defined in HAL, otherwise the user
+        ** buffer is not compatible with HAL.
+        */
+        if (Stride != surface->stride)
+        {
+            gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+        }
     }
 
-    /* Restore alignedWidth. */
-    surface->alignedW = halStride / bytesPerPixel;
+    /* Compute surface placement with user stride */
+    surface->stride = Stride;
+    _ComputeSurfacePlacement(surface, gcvFALSE);
 
     surface->layerSize = surface->sliceSize * surface->requestD;
 
@@ -13637,6 +13559,9 @@ gcoSURF_WrapUserMemory(
     surface->node.u.normal.node = node;
     surface->node.pool          = gcvPOOL_VIRTUAL;
     surface->node.size          = surface->size;
+
+    /* Initial lock. */
+    gcmONERROR(_Lock(surface));
 
     /* Get a normal surface. */
     *Surface = surface;

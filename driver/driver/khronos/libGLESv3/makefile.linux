@@ -45,18 +45,7 @@ INCLUDE := -I$(AQROOT)/hal/inc \
            -I$(AQROOT)/sdk/inc \
            -I$(AQROOT)/compiler/libVSC/include
 
-ifeq ($(EGL_API_DFB), 1)
-  INCLUDE += -I$(DFB_DIR)/usr/include
-  INCLUDE += -I$(DFB_DIR)/include
-  INCLUDE += -I$(DFB_DIR)/include/directfb-internal
-  INCLUDE += -I$(DFB_DIR)/include/directfb
-endif
-
-ifeq ($(EGL_API_DRI), 1)
-  INCLUDE += -I$(X11_ARM_DIR)/include
-endif
-
-ifeq ($(EGL_API_X), 1)
+ifneq ($(filter 1,$(EGL_API_X) $(EGL_API_DRI)),)
   INCLUDE += -I$(X11_ARM_DIR)/include
 endif
 
@@ -73,20 +62,7 @@ CFLAGS += -I./include/glcore \
 # Add extra flags for object files.
 
 ifneq ($(USE_ARMCC), 1)
-  ifeq ($(EGL_API_DFB), 1)
-    CFLAGS  += -pipe -fPIC
-  else
-    #CFLAGS += -Werror -ansi
-    CFLAGS += -Werror
-  endif
-endif
-
-ifeq ($(EGL_API_DFB), 1)
-  CFLAGS  += -DPIC
-endif
-
-ifneq ($(USE_ARMCC), 1)
-  CFLAGS += -fPIC
+  CFLAGS += -fPIC -Werror
 endif
 
 CFLAGS += -D_LINUX_ -DGL_GLEXT_PROTOTYPES

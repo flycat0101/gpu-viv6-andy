@@ -97,31 +97,31 @@ static gctCONST_STRING s_CaseDescription =
 
 typedef struct _MultiSrc
 {
-    gcoSURF			srcSurf;
-	gceSURF_FORMAT	srcFormat;
-	gctUINT			srcWidth;
-	gctUINT			srcHeight;
-	gctINT			srcStride[3];
+    gcoSURF            srcSurf;
+    gceSURF_FORMAT    srcFormat;
+    gctUINT            srcWidth;
+    gctUINT            srcHeight;
+    gctINT            srcStride[3];
     gctINT          srcStrideNum;
     gctINT          srcAddressNum;
-	gctUINT32		srcPhyAddr[3];
-	gctPOINTER		srcLgcAddr[3];
+    gctUINT32        srcPhyAddr[3];
+    gctPOINTER        srcLgcAddr[3];
 } MultiSrc, *MultiSrcPTR;
 
 typedef struct Test2D {
     GalTest     base;
     GalRuntime  *runtime;
 
-	// destination surface
-    gcoSURF			dstSurf;
-	gceSURF_FORMAT	dstFormat;
-	gctUINT			dstWidth;
-	gctUINT			dstHeight;
-	gctINT			dstStride;
-	gctUINT32		dstPhyAddr;
-	gctPOINTER		dstLgcAddr;
+    // destination surface
+    gcoSURF            dstSurf;
+    gceSURF_FORMAT    dstFormat;
+    gctUINT            dstWidth;
+    gctUINT            dstHeight;
+    gctINT            dstStride;
+    gctUINT32        dstPhyAddr;
+    gctPOINTER        dstLgcAddr;
 
-	//source surface
+    //source surface
     MultiSrc multiSrc[8];
 
     gcsRECT         rect[8];
@@ -296,26 +296,26 @@ static void CDECL Destroy(Test2D *t2d)
         {
             GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock desSurf failed:%s\n", GalStatusString(status));
         }
-		t2d->dstLgcAddr = gcvNULL;
+        t2d->dstLgcAddr = gcvNULL;
     }
 
-	// destroy source surface
+    // destroy source surface
     for (i = 0; i < 8; i++)
     {
         MultiSrcPTR curSrc = &t2d->multiSrc[i];
 
-	    if (curSrc->srcSurf != gcvNULL)
+        if (curSrc->srcSurf != gcvNULL)
         {
-		    if (curSrc->srcLgcAddr[0])
-		    {
+            if (curSrc->srcLgcAddr[0])
+            {
                 status = gcoSURF_Unlock(curSrc->srcSurf, curSrc->srcLgcAddr);
-			    if (gcmIS_ERROR(status))
+                if (gcmIS_ERROR(status))
                 {
                     GalOutput(GalOutputType_Error | GalOutputType_Console,
                         "Unlock SrcSurface[%d] failed:%s(%d)\n", i, GalStatusString(status), status);
                 }
-			    curSrc->srcLgcAddr[0] = gcvNULL;
-		    }
+                curSrc->srcLgcAddr[0] = gcvNULL;
+            }
 
             status = gcoSURF_Destroy(curSrc->srcSurf);
             if (gcmIS_ERROR(status))

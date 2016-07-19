@@ -14,8 +14,13 @@
 #ifndef __gc_hal_user_linux_h_
 #define __gc_hal_user_linux_h_
 
-#define _ISOC99_SOURCE
-#define _XOPEN_SOURCE 501
+#ifndef _ISOC99_SOURCE
+#  define _ISOC99_SOURCE
+#endif
+
+#ifndef _XOPEN_SOURCE
+#  define _XOPEN_SOURCE 501
+#endif
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>

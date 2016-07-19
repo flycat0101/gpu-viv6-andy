@@ -51,6 +51,10 @@ LOCAL_SRC_FILES += \
     gc_hal_user_statistics.c \
     gc_hal_user_shader.c
 
+ifeq ($(USE_OPENCL),1)
+LOCAL_SRC_FILES += \
+    gc_hal_user_cl.c
+endif
 else
 ifeq ($(VIVANTE_ENABLE_VG),1)
 LOCAL_SRC_FILES += \

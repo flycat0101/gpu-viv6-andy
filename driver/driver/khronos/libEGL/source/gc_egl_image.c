@@ -17,25 +17,26 @@
 #define _GC_OBJ_ZONE    gcdZONE_EGL_IMAGE
 
 #if defined(ANDROID)
-#include <pixelflinger/format.h>
-#include <pixelflinger/pixelflinger.h>
+#  include <pixelflinger/format.h>
+#  include <pixelflinger/pixelflinger.h>
 
 #if ANDROID_SDK_VERSION >= 16
-#   include <ui/ANativeObjectBase.h>
-#else
-#   include <private/ui/android_natives_priv.h>
-#endif
+#    include <ui/ANativeObjectBase.h>
+#  else
+#    include <private/ui/android_natives_priv.h>
+#  endif
 
-#include "gc_gralloc_priv.h"
+#  include "gc_gralloc_priv.h"
 #endif
 
 #if defined(WL_EGL_PLATFORM)
-#include "wayland-server.h"
-#include "gc_wayland_protocol.h"
+#  include <gc_hal_eglplatform.h>
+#  include <wayland-server.h>
+#  include <gc_wayland_protocol.h>
 #endif
 
 #ifdef LINUX
-#   include <drm_fourcc.h>
+#  include <drm_fourcc.h>
 #endif
 
 static VEGLImage
@@ -108,6 +109,25 @@ _InitializeImage(
 }
 
 static void
+_FinalizeImage(
+    VEGLThreadData Thread,
+    VEGLDisplay Dpy,
+    VEGLImage Image
+    )
+{
+    /* Destroy reference atom. */
+    gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, Image->reference));
+    Image->reference = gcvNULL;
+
+    /* Delete the mutex. */
+    gcoOS_DeleteMutex(gcvNULL, Image->image.mutex);
+    Image->image.mutex = gcvNULL;
+
+    /* Free the eglImage structure. */
+    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Image));
+}
+
+static void
 _DestroyImage(
     VEGLThreadData Thread,
     VEGLDisplay Display,
@@ -115,121 +135,121 @@ _DestroyImage(
     EGLBoolean FromTerminate
     )
 {
-    /* Dereference surface if has. */
-    if (Image != gcvNULL)
+    if (Image->image.surface != gcvNULL)
     {
-        /* Destroy reference atom. */
-        gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, Image->reference));
-        Image->reference = gcvNULL;
-
-        if (Image->image.surface != gcvNULL)
+        if (Image->image.type == KHR_IMAGE_PIXMAP)
         {
-            if (Image->image.type == KHR_IMAGE_PIXMAP)
+            VEGLImageRef ref = gcvNULL, previous = gcvNULL;
+
+            /* Find the surface in the reference stack. */
+            for (ref = Display->imageRefStack;
+                 ref != gcvNULL;
+                 ref = ref->next)
             {
-                VEGLImageRef ref = gcvNULL, previous = gcvNULL;
-
-                /* Find the surface in the reference stack. */
-                for (ref = Display->imageRefStack;
-                     ref != gcvNULL;
-                     ref = ref->next)
+                /* See if the surface matches. */
+                if (ref->surface == Image->image.surface)
                 {
-                    /* See if the surface matches. */
-                    if (ref->surface == Image->image.surface)
-                    {
-                        break;
-                    }
-
-                    /* Save current pointer of the linked list. */
-                    previous = ref;
+                    break;
                 }
 
-                /*
-                 * TODO: Code and Comments are incorrect:
-                 *
-                 * It is impossible to depend on the reference count.
-                 *
-                 * If there's no other reference to the surface, the reference
-                 * count should be '2'. One is when gcoSURF object creation
-                 * (accurately, wrap), the second is the EGLImage itself (see
-                 * eglCreateImage function).
-                 *
-                 * What's more, it is very possible that the EGLImage targets a
-                 * texture but EGLImage is to be destroyed before the texture.
-                 */
-                /* If we have a valid reference and the reference count has
-                ** reached 1, we can remove the surface from the reference
-                ** stack. */
-                if (ref != gcvNULL)
+                /* Save current pointer of the linked list. */
+                previous = ref;
+            }
+
+            /*
+             * TODO: Code and Comments are incorrect:
+             *
+             * It is impossible to depend on the reference count.
+             *
+             * If there's no other reference to the surface, the reference
+             * count should be '2'. One is when gcoSURF object creation
+             * (accurately, wrap), the second is the EGLImage itself (see
+             * eglCreateImage function).
+             *
+             * What's more, it is very possible that the EGLImage targets a
+             * texture but EGLImage is to be destroyed before the texture.
+             */
+            /* If we have a valid reference and the reference count has
+            ** reached 1, we can remove the surface from the reference
+            ** stack. */
+            if (ref != gcvNULL)
+            {
+                /* Unlink the reference from the linked list. */
+                if (previous == gcvNULL)
                 {
-                    /* Unlink the reference from the linked list. */
-                    if (previous == gcvNULL)
-                    {
-                        Display->imageRefStack = ref->next;
-                    }
-                    else
-                    {
-                        if (previous->next != ref->next)
-                        {
-                            previous->next = ref->next;
-                        }
-                    }
-
-                    /* Free the structure. */
-                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, ref));
+                    Display->imageRefStack = ref->next;
                 }
-            }
+                else
+                {
+                    if (previous->next != ref->next)
+                    {
+                        previous->next = ref->next;
+                    }
+                }
 
-            if (Image->image.type == KHR_IMAGE_PIXMAP &&
-                Image->image.u.pixmap.nativePixmap)
-            {
-                NativePixmapType pixmap = Image->image.u.pixmap.nativePixmap;
-                VEGLPixmapInfo info =
-                        (VEGLPixmapInfo) Image->image.u.pixmap.pixInfo;
-
-                veglDisconnectPixmap(Display, pixmap, info);
-                Image->image.u.pixmap.nativePixmap = (NativePixmapType) gcvNULL;
-            }
-
-            /* Destroy the surface. */
-            gcoSURF_Destroy(Image->image.surface);
-            Image->image.surface = gcvNULL;
-
-            if (Image->image.srcSurface)
-            {
-                gcoSURF_Destroy(Image->image.srcSurface);
-                Image->image.srcSurface = gcvNULL;
-            }
-
-            if ((Image->image.type == KHR_IMAGE_TEXTURE_CUBE) &&
-                (Image->image.u.texture.shadowSurface))
-            {
-                gcoSURF_Destroy(Image->image.u.texture.shadowSurface);
-                Image->image.u.texture.shadowSurface = gcvNULL;
+                /* Free the structure. */
+                gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, ref));
             }
         }
 
-        /* Delete the mutex. */
-        gcoOS_DeleteMutex(gcvNULL, Image->image.mutex);
-        Image->image.mutex = gcvNULL;
+        if (Image->image.type == KHR_IMAGE_PIXMAP &&
+            Image->image.u.pixmap.nativePixmap)
+        {
+            void * pixmap = Image->image.u.pixmap.nativePixmap;
+            VEGLPixmapInfo info =
+                    (VEGLPixmapInfo) Image->image.u.pixmap.pixInfo;
+
+            Display->platform->disconnectPixmap(Display, (void *) pixmap, info);
+            Image->image.u.pixmap.nativePixmap = gcvNULL;
+        }
+
+        if (Image->image.type == KHR_IMAGE_LINUX_DMA_BUF)
+        {
+            /*
+             * Linux dma-buf image source is also the 'surface'.
+             * Need extra dereference here.
+             */
+            gcoSURF_Destroy(Image->image.surface);
+        }
+
+        /* Destroy the surface. */
+        gcoSURF_Destroy(Image->image.surface);
+        Image->image.surface = gcvNULL;
+
+        if (Image->image.srcSurface)
+        {
+            gcoSURF_Destroy(Image->image.srcSurface);
+            Image->image.srcSurface = gcvNULL;
+        }
+
+        if ((Image->image.type == KHR_IMAGE_TEXTURE_CUBE) &&
+            (Image->image.u.texture.shadowSurface))
+        {
+            gcoSURF_Destroy(Image->image.u.texture.shadowSurface);
+            Image->image.u.texture.shadowSurface = gcvNULL;
+        }
+    }
 
 #if defined(ANDROID)
-        /* Clean up android native eglImage. */
-        if ((Image->image.type == KHR_IMAGE_ANDROID_NATIVE_BUFFER) &&
-            (Image->image.u.ANativeBuffer.nativeBuffer != gcvNULL))
-        {
-            gctPOINTER buffer;
-            android_native_buffer_t * nativeBuffer;
+    /* Clean up android native eglImage. */
+    if ((Image->image.type == KHR_IMAGE_ANDROID_NATIVE_BUFFER) &&
+        (Image->image.u.ANativeBuffer.nativeBuffer != gcvNULL))
+    {
+        gctPOINTER buffer;
+        android_native_buffer_t * nativeBuffer;
 
-            /* Cast to android native buffer. */
-            buffer = Image->image.u.ANativeBuffer.nativeBuffer;
-            nativeBuffer = (android_native_buffer_t *) buffer;
+        /* Cast to android native buffer. */
+        buffer = Image->image.u.ANativeBuffer.nativeBuffer;
+        nativeBuffer = (android_native_buffer_t *) buffer;
 
-            /* Decrease native buffer reference count. */
-            nativeBuffer->common.decRef(&nativeBuffer->common);
-            Image->image.u.ANativeBuffer.nativeBuffer = gcvNULL;
-        }
-#endif
+        /* Decrease native buffer reference count. */
+        nativeBuffer->common.decRef(&nativeBuffer->common);
+        Image->image.u.ANativeBuffer.nativeBuffer = gcvNULL;
     }
+#endif
+
+    /* Finalize. */
+    _FinalizeImage(Thread, Display, Image);
 }
 
 void
@@ -250,9 +270,6 @@ veglDestroyImage(
         {
             /* Destroy image. */
             _DestroyImage(Thread, Display, Image, EGL_TRUE);
-
-            /* Free the eglImage structure. */
-            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Image));
         }
     }
 }
@@ -288,9 +305,6 @@ veglDereferenceImage(
     {
         /* Destroy image. */
         _DestroyImage(Thread, Display, Image, EGL_FALSE);
-
-        /* Free the eglImage structure. */
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Image));
     }
 }
 
@@ -415,7 +429,7 @@ _CreateImageTex2D(
     /* Clean up if error happen. */
     if (status != EGL_SUCCESS)
     {
-        gcmOS_SAFE_FREE(gcvNULL, image);
+        _FinalizeImage(Thread, Dpy, image);
 
         veglSetEGLerror(Thread, status);
         return EGL_NO_IMAGE;
@@ -534,7 +548,7 @@ _CreateImageTexCube(
     /* Clean up if error happen. */
     if (status != EGL_SUCCESS)
     {
-        gcmOS_SAFE_FREE(gcvNULL, image);
+        _FinalizeImage(Thread, Dpy, image);
 
         veglSetEGLerror(Thread, status);
         return EGL_NO_IMAGE;
@@ -553,10 +567,11 @@ _UpdatePixmap(
 
     if (Image->surface && Image->u.pixmap.nativePixmap)
     {
-        NativePixmapType pixmap =  Image->u.pixmap.nativePixmap;
+        VEGLImage image = (VEGLImage) Image;
+        void * pixmap =  Image->u.pixmap.nativePixmap;
         VEGLPixmapInfo info = (VEGLPixmapInfo) Image->u.pixmap.pixInfo;
 
-        veglSyncFromPixmap(pixmap, info);
+        image->display->platform->syncFromPixmap(pixmap, info);
     }
 
     /* Always changed. */
@@ -576,7 +591,7 @@ _CreateImagePixmap(
 {
 #if gcdENABLE_3D
     VEGLImage        image;
-    NativePixmapType pixmap;
+    void *           pixmap;
     VEGLPixmapInfo   info = gcvNULL;
     EGLint           width = 0, height = 0;
     gcoSURF          surface = gcvNULL;
@@ -628,7 +643,7 @@ _CreateImagePixmap(
     }
 
     /* Cast buffer to native pixmap type. */
-    pixmap = (NativePixmapType)(Buffer);
+    pixmap = (void *) Buffer;
 
     /* Check if has eglImage created from this pixmap. */
     for (ref = Dpy->imageRefStack; ref != gcvNULL; ref = ref->next)
@@ -665,20 +680,20 @@ _CreateImagePixmap(
     {
         gctPOINTER pointer;
 
-        if (!veglConnectPixmap(Dpy, pixmap, &info, &surface))
+        if (!Dpy->platform->connectPixmap(Dpy, pixmap, &info, &surface))
         {
             veglSetEGLerror(Thread,  EGL_BAD_ACCESS);
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
 
-        if (!veglGetPixmapSize(Dpy, pixmap, info, &width, &height))
+        if (!Dpy->platform->getPixmapSize(Dpy, pixmap, info, &width, &height))
         {
             veglSetEGLerror(Thread,  EGL_BAD_ACCESS);
             gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
         }
 
         /* Sync pixels. */
-        veglSyncFromPixmap(pixmap, info);
+        Dpy->platform->syncFromPixmap(pixmap, info);
 
         gcmONERROR(gcoOS_Allocate(gcvNULL,
                                   gcmSIZEOF(struct eglImageRef),
@@ -722,11 +737,11 @@ _CreateImagePixmap(
 OnError:
     if (info)
     {
-        veglDisconnectPixmap(Dpy, pixmap, info);
+        Dpy->platform->disconnectPixmap(Dpy, pixmap, info);
         info = gcvNULL;
     }
 
-    gcmOS_SAFE_FREE(gcvNULL, image);
+    _FinalizeImage(Thread, Dpy, image);
 
     return EGL_NO_IMAGE;
 #else
@@ -827,7 +842,7 @@ _CreateImageRenderBuffer(
     /* Clean up if error happen. */
     if (status != EGL_SUCCESS)
     {
-        gcmOS_SAFE_FREE(gcvNULL, image);
+        _FinalizeImage(Thread, Dpy, image);
 
         veglSetEGLerror(Thread, status);
         return EGL_NO_IMAGE;
@@ -1099,7 +1114,7 @@ _CreateImageVGParent(
     /* Clean up if error happen. */
     if (status != EGL_SUCCESS)
     {
-        gcmOS_SAFE_FREE(gcvNULL, image);
+        _FinalizeImage(Thread, Dpy, image);
 
         veglSetEGLerror(Thread, status);
         return EGL_NO_IMAGE;
@@ -2038,8 +2053,8 @@ struct wl_buffer *eglCreateWaylandBufferFromImageWL(EGLDisplay Dpy, EGLImageKHR 
                     ));
 
         gcmONERROR(
-                gcoHAL_NameVideoMemory((gctUINT32)egl_buffer->info.node,
-                                       (gctUINT32 *)&egl_buffer->info.node));
+                gcoHAL_NameVideoMemory(gcmPTR2INT(egl_buffer->info.node),
+                                       gcmINT2PTR(&egl_buffer->info.node)));
 
 
         gcoWL_CreateGhostBuffer(display, egl_buffer);

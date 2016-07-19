@@ -26,6 +26,7 @@
 *****************************************************************************/
 
 
+
 #if !defined(_WIN32)
 #include <stdbool.h>
 #endif
@@ -46,113 +47,113 @@ const char *kernel_code_initializers_scalar = "__kernel void initializers_scalar
 int
 verify_initializers_scalar(unsigned char *outptr, int n, const char *type)
 {
-	int i;
-	for(i=0 ; i<n; i++){
-		cl_uchar var = 66;
-		//printf("%c = %c \n", outptr[i], var);
-		if( outptr[i] != var )
-			return -1;
+    int i;
+    for(i=0 ; i<n; i++){
+        cl_uchar var = 66;
+        //printf("%c = %c \n", outptr[i], var);
+        if( outptr[i] != var )
+            return -1;
 
-	}
-	printf("initializers test - %s passed\n", type);
+    }
+    printf("initializers test - %s passed\n", type);
 
-	return 0;
+    return 0;
 }
 
 int initializers_scalar(cl_device_id device, cl_context context, cl_command_queue queue, int num_elements, int& fail, int& pass, int&total)
 {
-	cl_mem streams;
-	unsigned char *output_h;
-	cl_program program;
-	cl_kernel kernel;
-	size_t threads[1];
-	char kernel_code_int[512];
-	const char *constkernelint;
+    cl_mem streams;
+    unsigned char *output_h;
+    cl_program program;
+    cl_kernel kernel;
+    size_t threads[1];
+    char kernel_code_int[512];
+    const char *constkernelint;
 
-	int err;
+    int err;
 
-	const char    *types[] = {
-		"int", "uint", "char", "uchar", "short", "ushort", "float"
-	};
-
-
-	size_t length = sizeof(unsigned char) * num_elements;
-	output_h = (unsigned char*)malloc(length);
-
-	streams = clCreateBuffer(context, CL_MEM_READ_WRITE, length, NULL, NULL);
-	if (!streams)
-	{
-		printf("clCreateBuffer failed\n");
-		clReleaseMemObject(streams);
-		free(output_h);
-		fail++;
-		return -1;
-	}
+    const char    *types[] = {
+        "int", "uint", "char", "uchar", "short", "ushort", "float"
+    };
 
 
-	for(int t=0; t<7; t++)
-	{
+    size_t length = sizeof(unsigned char) * num_elements;
+    output_h = (unsigned char*)malloc(length);
 
-		sprintf(kernel_code_int, kernel_code_initializers_scalar, types[t]);
-		constkernelint = kernel_code_int;
-		err = create_kernel(context, &program, &kernel, 1, &constkernelint, "initializers_scalar" );
-		if (err){
-			clReleaseMemObject(streams);
-			clReleaseKernel(kernel);
-			clReleaseProgram(program);
-			free(output_h);
-			fail++;
-			return -1;
-		}
-		err  = clSetKernelArg(kernel, 0, sizeof streams, &streams);
-		if (err != CL_SUCCESS)
-		{
-			printf("clSetKernelArgs failed\n");
-			clReleaseMemObject(streams);
-			clReleaseKernel(kernel);
-			clReleaseProgram(program);
-			free(output_h);
-			fail++;
-			return -1;
-		}
-		threads[0] = (unsigned int)num_elements;
-		err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, threads, NULL, 0, NULL, NULL);
-		if (err != CL_SUCCESS)
-		{
-			printf("clEnqueueNDRangeKernel failed\n");
-			clReleaseMemObject(streams);
-			clReleaseKernel(kernel);
-			clReleaseProgram(program);
-			free(output_h);
-			fail++;
-			return -1;
-		}
-		err = clEnqueueReadBuffer(queue, streams, CL_TRUE, 0, length, output_h, 0, NULL, NULL);
-		if (err != CL_SUCCESS)
-		{
-			printf("clReadArray failed\n");
-			clReleaseMemObject(streams);
-			clReleaseKernel(kernel);
-			clReleaseProgram(program);
-			free(output_h);
-			fail++;
-			return -1;
-		}
-		err = verify_initializers_scalar(output_h, num_elements, types[t]);
-		if(!err)
-			pass++;
-		else fail++;
-	}
+    streams = clCreateBuffer(context, CL_MEM_READ_WRITE, length, NULL, NULL);
+    if (!streams)
+    {
+        printf("clCreateBuffer failed\n");
+        clReleaseMemObject(streams);
+        free(output_h);
+        fail++;
+        return -1;
+    }
 
 
+    for(int t=0; t<7; t++)
+    {
 
-	clReleaseMemObject(streams);
-	clReleaseKernel(kernel);
-	clReleaseProgram(program);
-	free(output_h);
-	memset((void*)&kernel_code_int, 0, sizeof(char)*512);
+        sprintf(kernel_code_int, kernel_code_initializers_scalar, types[t]);
+        constkernelint = kernel_code_int;
+        err = create_kernel(context, &program, &kernel, 1, &constkernelint, "initializers_scalar" );
+        if (err){
+            clReleaseMemObject(streams);
+            clReleaseKernel(kernel);
+            clReleaseProgram(program);
+            free(output_h);
+            fail++;
+            return -1;
+        }
+        err  = clSetKernelArg(kernel, 0, sizeof streams, &streams);
+        if (err != CL_SUCCESS)
+        {
+            printf("clSetKernelArgs failed\n");
+            clReleaseMemObject(streams);
+            clReleaseKernel(kernel);
+            clReleaseProgram(program);
+            free(output_h);
+            fail++;
+            return -1;
+        }
+        threads[0] = (unsigned int)num_elements;
+        err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, threads, NULL, 0, NULL, NULL);
+        if (err != CL_SUCCESS)
+        {
+            printf("clEnqueueNDRangeKernel failed\n");
+            clReleaseMemObject(streams);
+            clReleaseKernel(kernel);
+            clReleaseProgram(program);
+            free(output_h);
+            fail++;
+            return -1;
+        }
+        err = clEnqueueReadBuffer(queue, streams, CL_TRUE, 0, length, output_h, 0, NULL, NULL);
+        if (err != CL_SUCCESS)
+        {
+            printf("clReadArray failed\n");
+            clReleaseMemObject(streams);
+            clReleaseKernel(kernel);
+            clReleaseProgram(program);
+            free(output_h);
+            fail++;
+            return -1;
+        }
+        err = verify_initializers_scalar(output_h, num_elements, types[t]);
+        if(!err)
+            pass++;
+        else fail++;
+    }
 
-	return err;
+
+
+    clReleaseMemObject(streams);
+    clReleaseKernel(kernel);
+    clReleaseProgram(program);
+    free(output_h);
+    memset((void*)&kernel_code_int, 0, sizeof(char)*512);
+
+    return err;
 }
 
 

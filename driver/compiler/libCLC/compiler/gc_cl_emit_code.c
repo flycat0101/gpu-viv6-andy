@@ -4097,7 +4097,7 @@ _EmitBranchCode(
                                 clvDUMP_CODE_EMITTER,
                                 ">"));
 
-    if (Source0 && !codeGenerator->fulllySupportIntegerBranch)
+    if (Source0)
     {
         sourceType = Source0->dataType.elementType;
 
@@ -4110,7 +4110,7 @@ _EmitBranchCode(
             Source0->dataType.elementType = clvTYPE_UINT;
         }
     }
-    if (Source1 && !codeGenerator->fulllySupportIntegerBranch)
+    if (Source1)
     {
         sourceType = Source1->dataType.elementType;
 
@@ -6902,7 +6902,7 @@ _EmitVectorCompareCode(
                            Target);
     if (gcmIS_ERROR(status)) return status;
 
-    if (Source0 && !codeGenerator->fulllySupportIntegerBranch)
+    if (Source0)
     {
         sourceType = Source0->dataType.elementType;
 
@@ -6915,7 +6915,7 @@ _EmitVectorCompareCode(
             Source0->dataType.elementType = clvTYPE_UINT;
         }
     }
-    if (Source1 && !codeGenerator->fulllySupportIntegerBranch)
+    if (Source1)
     {
         sourceType = Source1->dataType.elementType;
 
@@ -7732,7 +7732,7 @@ _EmitCodeImpl2(
     }
     else
     {
-		gcSHADER binary;
+        gcSHADER binary;
 
         /* need to set the instruction modifiers first before emitting the instruction */
         if (clmIsOpcodeConv(Opcode) && Opcode != clvOPCODE_CONV) {

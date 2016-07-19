@@ -16,10 +16,22 @@ Files layout
     +---tiger
     |     gctiger.exe
     |
+    +---egl
+    |    |
+    |    \---WINCE
+    |        pixmapDIBTex.exe
+    |        pixmapDDBTex.exe
+    |        pixmapDIB.exe
+    |        pixmapDDB.exe
+    |        ddsOverlay.exe
+    |
     +---es20
     |    |
     |    +---vv_launcher
     |    |     es20_vv_launcher.exe
+    |    |
+    |    +---shareContext
+    |    |     shareContext_es20.exe
     |    |
     |    +---tutorials
     |    |     tutorial1.exe

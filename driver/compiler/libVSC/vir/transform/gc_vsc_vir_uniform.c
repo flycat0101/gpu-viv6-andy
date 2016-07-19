@@ -1201,7 +1201,6 @@ _VSC_UF_AUBO_PickUniforms(
     VSC_GlobalUniformTable* global_uniform_table = VSC_AllShaders_GetGlobalUniformTable(all_shaders);
     VSC_GlobalUniformTable_Iterator iter;
     VSC_GlobalUniformItem* item;
-    gctUINT fattest_shader;
     gctBOOL usbDUBO = VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetHeuristics(options), VSC_OPTN_UF_AUBO_Options_HEUR_USE_DUBO);
     gctBOOL usbCUBO = VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetHeuristics(options), VSC_OPTN_UF_AUBO_Options_HEUR_USE_CUBO);
 
@@ -1243,6 +1242,7 @@ _VSC_UF_AUBO_PickUniforms(
     }
     else
     {
+        gctUINT fattest_shader = VSC_MAX_LINKABLE_SHADER_STAGE_COUNT;
         while(!_VSC_UF_AUBO_DUBIsAffordable(aubo, &fattest_shader))
         {
             if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetHeuristics(options), VSC_OPTN_UF_AUBO_Options_HEUR_ORDERLY))

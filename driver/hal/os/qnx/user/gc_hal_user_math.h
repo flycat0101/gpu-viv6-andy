@@ -14,7 +14,9 @@
 #ifndef __gc_hal_user_math_h_
 #define __gc_hal_user_math_h_
 
-#define _ISOC99_SOURCE
+#ifndef _ISOC99_SOURCE
+#  define _ISOC99_SOURCE
+#endif
 
 #include <math.h>
 

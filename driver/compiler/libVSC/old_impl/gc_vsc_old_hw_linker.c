@@ -13729,11 +13729,11 @@ _GenerateFunction(
             {
                 _allocateRegForLiveVaraibles(Tree, CodeGen, codeBase + curInstIdx);
 
-	            if (CodeGen->isRegOutOfResource)
-	            {
-	                status = gcvSTATUS_OUT_OF_RESOURCES;
-	                break;
-	            }
+                if (CodeGen->isRegOutOfResource)
+                {
+                    status = gcvSTATUS_OUT_OF_RESOURCES;
+                    break;
+                }
             }
         }
 
@@ -14019,11 +14019,11 @@ _GenerateFunction(
 
                 skip = (status == gcvSTATUS_SKIP);
 
-	            if (CodeGen->isRegOutOfResource)
-	            {
-	                status = gcvSTATUS_OUT_OF_RESOURCES;
-	                break;
-	            }
+                if (CodeGen->isRegOutOfResource)
+                {
+                    status = gcvSTATUS_OUT_OF_RESOURCES;
+                    break;
+                }
 
             }
             else
@@ -16102,10 +16102,10 @@ _GenerateStates(
  5:0) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
  5:0))) |
                           ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 18:12) - (0 ? 18:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:12) - (0 ? 18:12) + 1))))))) << (0 ?
- 18:12))) | (((gctUINT32) ((gctUINT32) (maxThreads) & ((gctUINT32) ((((1 ?
- 18:12) - (0 ? 18:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 18:12) - (0 ? 18:12) + 1))))))) << (0 ?
- 18:12))) |
+ 19:12) - (0 ? 19:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:12) - (0 ? 19:12) + 1))))))) << (0 ?
+ 19:12))) | (((gctUINT32) ((gctUINT32) (maxThreads) & ((gctUINT32) ((((1 ?
+ 19:12) - (0 ? 19:12) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 19:12) - (0 ? 19:12) + 1))))))) << (0 ?
+ 19:12))) |
                           ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:20) - (0 ? 28:20) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 28:20) - (0 ? 28:20) + 1))))))) << (0 ?
  28:20))) | (((gctUINT32) ((gctUINT32) (resultSize) & ((gctUINT32) ((((1 ?

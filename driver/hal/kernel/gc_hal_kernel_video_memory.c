@@ -1694,7 +1694,8 @@ gckVIDMEM_Lock(
                                      node->Virtual.pageCount,
                                      node->Virtual.addresses[Kernel->core],
                                      node->Virtual.pageTables[Kernel->core],
-                                     gcvTRUE));
+                                     gcvTRUE,
+                                     node->Virtual.type));
                 }
 
 #if gcdENABLE_VG

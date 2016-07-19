@@ -84,7 +84,7 @@ typedef struct Test2D {
 
 static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 {
-	gceSTATUS status;
+    gceSTATUS status;
     gco2D egn2D = t2d->runtime->engine2d;
     gcsRECT srcRect = {30, 25, 300, 60};
     gcsRECT destRect = {60, 100, 260, 200};
@@ -182,10 +182,10 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     }
 
     gcmONERROR(gcoSURF_FilterBlit(t2d->srcSurf, t2d->tempSurf, &srcRect, &destRect, &destRect2));
-	if (status == gcvSTATUS_NOT_SUPPORT_DITHER)
-	{
-		GalOutput(GalOutputType_Log | GalOutputType_Console, "WARNING: not supported dithering\n");
-	}
+    if (status == gcvSTATUS_NOT_SUPPORT_DITHER)
+    {
+        GalOutput(GalOutputType_Log | GalOutputType_Console, "WARNING: not supported dithering\n");
+    }
 
     gcmONERROR(gcoSURF_SetRotation(t2d->tempSurf, gcvSURF_0_DEGREE));
 
@@ -209,18 +209,18 @@ OnError:
     GalOutput(GalOutputType_Error | GalOutputType_Console,
         "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
 
-	return gcvFALSE;
+    return gcvFALSE;
 }
 
 static void CDECL Destroy(Test2D *t2d)
 {
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
     if ((t2d->dstSurf != gcvNULL) && (t2d->dstLgcAddr != gcvNULL))
     {
         if (gcmIS_ERROR(gcoSURF_Unlock(t2d->dstSurf, t2d->dstLgcAddr)))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock dstSurf failed:%s\n", GalStatusString(status));
-		}
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock dstSurf failed:%s\n", GalStatusString(status));
+        }
         t2d->dstLgcAddr = gcvNULL;
     }
 
@@ -230,25 +230,25 @@ static void CDECL Destroy(Test2D *t2d)
         if (t2d->srcLgcAddr)
         {
             if (gcmIS_ERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcLgcAddr)))
-			{
-				GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock srcSurf failed:%s\n", GalStatusString(status));
-			}
+            {
+                GalOutput(GalOutputType_Error | GalOutputType_Console, "Unlock srcSurf failed:%s\n", GalStatusString(status));
+            }
             t2d->srcLgcAddr = 0;
         }
 
         if (gcmIS_ERROR(gcoSURF_Destroy(t2d->srcSurf)))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
-		}
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
+        }
     }
 
     // destroy source surface
     if (t2d->tempSurf != gcvNULL)
     {
         if (gcmIS_ERROR(gcoSURF_Destroy(t2d->tempSurf)))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
-		}
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
+        }
     }
 
     free(t2d);
@@ -261,7 +261,7 @@ const gceFEATURE FeatureList[]=
 
 static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 {
-	gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
     const char *sourcefile = "resource/smooth_YUY2_592X400_Linear.vimg";
 
     gctUINT32 k, listLen = sizeof(FeatureList)/sizeof(gctINT);

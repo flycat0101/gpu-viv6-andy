@@ -123,6 +123,9 @@ typedef enum {
     /* Force D32F to D24 to avoid shadow rendering for array types */
     __GL_CHIP_FMT_PATCH_D32F,
 
+    /* Force ASTC to RGBA8 when gcvFEATURE_TX_ASTC_MULTISLICE_FIX is false */
+    __GL_CHIP_FMT_PATCH_ASTC,
+
 } __GLchipFmtPatch;
 
 typedef struct __GLchipFmtMapInfoRec

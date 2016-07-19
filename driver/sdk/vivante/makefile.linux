@@ -66,6 +66,9 @@ endif
 ifeq ($(EGL_API_DRI),1)
 vpath %.c $(AQROOT)/driver/X/DRI/src
 endif
+ifeq ($(EGL_API_WL),1)
+vpath %.c $(AQROOT)/driver/wl
+endif
 
 # Set include directories.
 INC_DIR = \
@@ -74,12 +77,23 @@ INC_DIR = \
 	$(AQROOT)/hal/os/$(OS_DIR)/user \
 	$(AQROOT)/sdk/inc \
 	$(AQROOT)/hal/user/arch \
-	$(AQROOT)/hal/user/archvg \
 
+ifeq ($(VIVANTE_ENABLE_VG),1)
+INC_DIR += \
+	$(AQROOT)/hal/user/archvg
+endif
+
+ifeq ($(VIVANTE_ENABLE_2D),1)
+INC_DIR += \
+        $(AQROOT)/hal/user/arch/thirdparty_special
+endif
+
+ifeq ($(VIVANTE_ENABLE_3D),1)
 INC_DIR += \
     $(AQROOT)/driver/khronos/libGLESv3/include/chip \
     $(AQROOT)/driver/khronos/libGLESv3/include/glcore \
-    $(AQROOT)/driver/khronos/libGLESv3/src/glcore \
+    $(AQROOT)/driver/khronos/libGLESv3/src/glcore
+endif
 
 CFLAGS += -DGL_GLEXT_PROTOTYPES -D_LINUX_
 
@@ -95,44 +109,62 @@ endif
 
 ifeq ($(EGL_API_WL), 1)
 INC_DIR += \
-    $(WAYLAND_DIR)/include \
-    $(WAYLAND_DIR)/include/wayland-viv
+    $(AQROOT)/driver/wl \
+    $(WAYLAND_DIR)/include
 
-LIBS += -L$(WAYLAND_DIR)/lib -lwayland-client
-LIBS += -L$(WAYLAND_DIR)/lib -lgc_wayland_protocol -lwayland-server
+LIBS += \
+    -L$(WAYLAND_DIR)/lib \
+    -lwayland-client \
+
+# required for EGL server side
+LIBS += \
+    -lwayland-server \
+
+LIBS += \
+    -lwayland-cursor
 endif
 
 ifeq ($(EGL_API_DFB), 1)
-INC_DIR += $(DFB_DIR)/usr/include \
-    $(DFB_DIR)/include \
-    $(DFB_DIR)/include/directfb-internal \
-    $(DFB_DIR)/include/directfb
+  INC_DIR += $(DFB_DIR)/usr/include \
+      $(DFB_DIR)/include \
+      $(DFB_DIR)/include/directfb-internal \
+      $(DFB_DIR)/include/directfb
 
-    LIBS    += -L$(DFB_DIR)/lib -ldirectfb -ldirect -lz
+  LIBS += -L$(DFB_DIR)/lib -ldirectfb -ldirect
 endif
 
 ifeq ($(EGL_API_DRI),1)
-INC_DIR += \
-    $(X11_ARM_DIR)/include \
-    $(X11_ARM_DIR)/include/X11/extensions \
-    $(AQROOT)/driver/X/DRI/src
+  INC_DIR += \
+      $(X11_ARM_DIR)/include \
+      $(X11_ARM_DIR)/include/libdrm \
+      $(X11_ARM_DIR)/include/X11/extensions \
+      $(AQROOT)/driver/X/DRI/src
 
-LIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lX11 -ldrm
+  LIBS += -L$(X11_ARM_DIR)/lib -lX11 -lXext -ldrm
 endif
 
-ifeq ($(EGL_API_X), 1)
-INC_DIR += \
-    $(X11_ARM_DIR)/include
+ifeq ($(EGL_API_X),1)
+  INC_DIR += \
+      $(X11_ARM_DIR)/include
 
-LIBS += -L$(X11_ARM_DIR)/lib -lX11 -lXext
+  LIBS += -L$(X11_ARM_DIR)/lib -lX11
 endif
 
-ifeq ($(EGL_API_GBM), 1)
-CFLAGS += \
-    $(shell $(PKG_CONFIG) --cflags libdrm gbm)
+ifeq ($(EGL_API_GBM),1)
+  GBM_INCLUDE := $(shell $(PKG_CONFIG) --cflags gbm 2>/dev/null)
 
-LIBS += \
-    $(shell $(PKG_CONFIG) --libs libdrm gbm)
+  ifneq ($(GBM_INCLUDE),)
+    CFLAGS += $(GBM_INCLUDE)
+
+    LIBS += $(shell $(PKG_CONFIG) --libs gbm 2>/dev/null)
+  else
+    INC_DIR += \
+        $(AQROOT)/driver/gbm/main \
+        $(AQROOT)/driver/gbm/backends/viv
+
+    LIBS += \
+        -L$(SDK_DIR)/drivers -L$(AQROOT)/driver/gbm/main/$(OBJ_DIR) -lgbm
+  endif
 endif
 
 CFLAGS += $(addprefix -I,$(INC_DIR))
@@ -142,23 +174,26 @@ ifeq ($(VIVANTE_NO_VG), 1)
 endif
 
 ifneq ($(USE_ARMCC), 1)
-ifeq ($(EGL_API_DFB), 1)
-CFLAGS  += -pipe -fPIC
-else
-ifneq ($(EGL_API_WL), 1)
+  CFLAGS += -fPIC -Werror
+
+  # These header files don't follow ansi.
+  ifeq ($(filter 1,$(EGL_API_WL) $(EGL_API_DFB) $(EGL_API_GBM)),)
+    CFLAGS += -ansi
+  endif
+endif
+
 ifeq ($(EGL_API_DRI), 1)
-	CFLAGS += -fPIC -Werror
-else
-	CFLAGS += -fPIC -Werror -MD -ansi
+  CFLAGS += -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast
 endif
-endif
-endif
-endif
+
 ifeq ($(EGL_API_WL), 1)
-CFLAGS += -fPIC -Wno-deprecated-declarations -MD -ansi
+  CFLAGS += -Wno-deprecated-declarations
 endif
-ifeq ($(EGL_API_DFB), 1)
-CFLAGS  += -DPIC
+
+ifeq ($(EGL_API_DFB),1)
+  CFLAGS += -DDIRECTFB_MAJOR_VERSION=$(DIRECTFB_MAJOR_VERSION) \
+            -DDIRECTFB_MINOR_VERSION=$(DIRECTFB_MINOR_VERSION) \
+            -DDIRECTFB_MICRO_VERSION=$(DIRECTFB_MICRO_VERSION)
 endif
 
 # libGAL
@@ -168,6 +203,12 @@ libGAL_SOURCE := $(wildcard \
 					$(AQROOT)/hal/os/$(OS_DIR)/user/*.c \
 					$(AQROOT)/hal/os/$(OS_DIR)/user/$(PLATFORM_CALLBACK).c \
 					)
+
+ifeq ($(VIVANTE_ENABLE_2D),1)
+  libGAL_SOURCE += $(wildcard \
+					$(AQROOT)/hal/user/arch/thirdparty_special/*.c \
+					)
+endif
 
 OBJECTS += \
 	$(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(libGAL_SOURCE))))
@@ -191,12 +232,36 @@ endif
 
 ifeq ($(VIVANTE_ENABLE_3D),1)
 # libVDK
-libVDK_SOURCE = $(wildcard \
-					$(AQROOT)/sdk/vdk/*_egl.c \
-					$(AQROOT)/sdk/vdk/*_gl.c \
-					$(AQROOT)/sdk/vdk/gc_vdk.c \
-					$(AQROOT)/sdk/vdk/gc_vdk_hal.c \
-					)
+libVDK_SOURCE := $(AQROOT)/sdk/vdk/gc_vdk_egl.c \
+				 $(AQROOT)/sdk/vdk/gc_vdk_gl.c
+
+libVDK_API :=
+
+ifneq ($(filter 1,$(EGL_API_X) $(EGL_API_DRI)),)
+  libVDK_API := $(AQROOT)/sdk/vdk/gc_vdk_x11.c
+endif
+
+ifeq ($(EGL_API_NULLWS),1)
+  libVDK_API := $(AQROOT)/sdk/vdk/gc_vdk_nullws.c
+endif
+
+ifeq ($(EGL_API_FB),1)
+  libVDK_API := $(AQROOT)/sdk/vdk/gc_vdk_fbdev.c
+endif
+
+ifeq ($(EGL_API_DFB),1)
+  libVDK_API := $(AQROOT)/sdk/vdk/gc_vdk_dfb.c
+endif
+
+ifeq ($(EGL_API_GBM),1)
+  libVDK_API := $(AQROOT)/sdk/vdk/gc_vdk_gbm.c
+endif
+
+ifeq ($(EGL_API_WL),1)
+  libVDK_API := $(AQROOT)/sdk/vdk/gc_vdk_wayland.c
+endif
+
+libVDK_SOURCE += $(libVDK_API)
 
 ifeq ($(USE_VDK),1)
 OBJECTS += \
@@ -209,7 +274,31 @@ libEGL_SOURCE = $(wildcard \
 					$(AQROOT)/driver/khronos/libEGL/source/*.c \
 					$(AQROOT)/driver/khronos/libEGL/os/*_$(OS_DIR).c \
 					)
-libEGL_SOURCE += $(wildcard $(AQROOT)/driver/khronos/libEGL/api/*_platform.c)
+libEGL_SOURCE += $(AQROOT)/driver/khronos/libEGL/api/gc_egl_nullws.c \
+                 $(AQROOT)/driver/khronos/libEGL/api/gc_egl_fbdev.c
+
+ifeq ($(EGL_API_X),1)
+libEGL_SOURCE += $(AQROOT)/driver/khronos/libEGL/api/gc_egl_x11.c
+endif
+
+ifeq ($(EGL_API_DRI),1)
+libEGL_SOURCE += $(AQROOT)/driver/khronos/libEGL/api/gc_egl_dri.c
+endif
+
+ifeq ($(EGL_API_GBM),1)
+libEGL_SOURCE += $(AQROOT)/driver/khronos/libEGL/api/gc_egl_gbm.c
+endif
+
+ifeq ($(EGL_API_WL),1)
+libEGL_SOURCE += $(AQROOT)/driver/khronos/libEGL/api/gc_egl_wayland.c \
+                 $(AQROOT)/driver/wl/gc_wayland_protocol.c \
+                 $(AQROOT)/driver/wl/wayland-viv-protocol.c
+endif
+
+ifeq ($(EGL_API_DFB),1)
+libEGL_SOURCE += $(AQROOT)/driver/khronos/libEGL/api/gc_egl_dfb.c
+endif
+
 OBJECTS += \
 	$(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(libEGL_SOURCE))))
 
@@ -292,14 +381,17 @@ OBJECTS += $(AQROOT)/sdk/vivante/$(FIXED_ARCH_TYPE)/*.o
 endif
 endif
 
-ifneq ($(gcdSTATIC_LINK), 1)
 LIBS += -lm -pthread -ldl
-endif
-
 
 $(OBJ_DIR)/%.o: $(AQROOT)/hal/user/arch/%.c
 	@mkdir -p $(OBJ_DIR)
 	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+ifeq ($(VIVANTE_ENABLE_2D),1)
+$(OBJ_DIR)/%.o: $(AQROOT)/hal/user/arch/thirdparty_special/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+endif
 
 ifeq ($(VIVANTE_ENABLE_VG),1)
 $(OBJ_DIR)/%.o: $(AQROOT)/hal/user/archvg/%.c
@@ -396,7 +488,6 @@ $(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/vir/transform/%.c
 	@mkdir -p $(OBJ_DIR)
 	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
 endif
-
 include $(AQROOT)/common.target
 
 ifneq ($(wildcard $(OBJ_DIR)/*.d),)
@@ -409,22 +500,25 @@ install: $(TARGET_OUTPUT) extra_install
 extra_install: $(TARGET_OUTPUT)
 	@-mkdir -p $(INSTALL_DIR)
 ifeq ($(gcdSTATIC_LINK), 0)
+  ifeq ($(EGL_API_NULLWS),1)
+	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.nullws.so
+  endif # EGL_API_NULLWS
+  ifeq ($(EGL_API_X), 1)
+	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.x11.so
+  endif # EGL_API_X
+  ifeq ($(EGL_API_DRI), 1)
+	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.dri.so
+  endif # EGL_API_DRI
+  ifeq ($(EGL_API_GBM), 1)
+	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.gbm.so
+  endif # EGL_API_GBM
   ifeq ($(EGL_API_FB)_$(EGL_API_WL), 1_1)
 	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.wl.so
   endif # EGL_API_FB
   ifeq ($(EGL_API_FB)_$(EGL_API_WL), 1_0)
 	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.fb.so
   endif # EGL_API_WL
-  ifeq ($(EGL_API_DRI), 1)
-	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.dri.so
-  endif # EGL_API_DRI
-  ifeq ($(EGL_API_X), 1)
-	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.x11.so
-  endif # EGL_API_X
   ifeq ($(EGL_API_DFB), 1)
 	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.dfb.so
   endif # EGL_API_DFB
-  ifeq ($(EGL_API_GBM), 1)
-	@-cp -f $(TARGET_OUTPUT) $(INSTALL_DIR)/libVIVANTE.gbm.so
-  endif # EGL_API_GBM
 endif # gcdSTATIC_LINK

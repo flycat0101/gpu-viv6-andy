@@ -53,6 +53,9 @@ ifeq ($(EGL_API_X), 1)
 	INCLUDE += -I$(X11_ARM_DIR)/include
 endif
 
+ifeq ($(EGL_API_DFB), 1)
+	INCLUDE += -I$(DFB_DIR)/include/directfb
+endif
 CFLAGS += $(INCLUDE)
 
 ################################################################################
@@ -61,20 +64,20 @@ CFLAGS += $(INCLUDE)
 ifeq ($(gcdSTATIC_LINK), 1)
     LIBS += $(VIVANTE_SDK_LIB)/libVIVANTE.a
 else
-    LIBS += -L$(VIVANTE_SDK_LIB) -l GLESv1_CM -l VDK -l GAL -l EGL
+    LIBS += -L$(VIVANTE_SDK_LIB) -lGLESv1_CM -lVDK -lEGL
 endif
 
-LIBS += -l m
+LIBS += -lm
 
 ifneq ($(QNX), 1)
-  LIBS += -l pthread -l dl -lrt
+  LIBS += -l pthread -ldl -lrt
   ifeq ($(EGL_API_DRI), 1)
     LIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11
   endif
   ifeq ($(EGL_API_X), 1)
-    LIBS += -L$(X11_ARM_DIR)/lib -lXau -lXdmcp -lX11
+    LIBS += -L$(X11_ARM_DIR)/lib -Wl,-rpath-link,$(X11_ARM_DIR)/lib -lX11
   endif
-  ifeq ($(EGL_API_DFB),1)
+  ifeq ($(EGL_API_DFB), 1)
     LIBS += -Wl,-rpath $(DFB_DIR)/lib
   endif
 endif

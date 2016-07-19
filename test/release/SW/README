@@ -3,8 +3,6 @@ Files layout
 ============
 <AQROOT>/
     |
-    +---hal/os/ce                         : Test tree for WinCE
-    |
     +---sdk
     |    |
     |    +---source                       : libVivanteDK library
@@ -15,21 +13,19 @@ Files layout
     |         |
     |         +---hal
     |         |    |
-    |         |    +---tvui               : TV UI based on libVivanteDK library
-    |         |    |
-    |         |    +---clear              : A simple HAL test based on libVivanteDK library
-    |         |    |
-    |         |    \---virtual            : A simple HAL test based on libVivanteDK library
+    |         |    \---tvui               : TV UI based on libVivanteDK library
     |         |
     |         \---vdk
     |              |
     |              +---es11               : OpenGL ES 1.1 tutorials
     |              |
-    |              +---es20               : OpenGL ES 2.0 tutorials
-    |              |
-    |              \---vg                 : OpenVG 1.1 tiger
+    |              \---es20               : OpenGL ES 2.0 tutorials
     |
     +---test
+    |    |
+    |    +---egl
+    |    |    |
+    |    |    \---WINCE                   : EGL tests for WinCE
     |    |
     |    +---gfx
     |    |    |
@@ -49,6 +45,8 @@ Files layout
     |    |
     |    \---es20
     |         |
+    |         +---shareContext            : An OES20 share context test
+    |         |
     |         \---vv_launcher             : OpenGL ES 2.0 vv_launcher
     |
     +---release/SW                        : SDK release ReadMe files
@@ -59,3 +57,4 @@ How to build
 ============
 1. Build steps for Linux: $(AQROOT)/release/SW/ReadMe_Linux.txt
 2. Build steps for WinCE: $(AQROOT)/release/SW/ReadMe_WinCE.txt
+3. Build steps for Android: $(AQROOT)/release/SW/ReadMe_Android.txt

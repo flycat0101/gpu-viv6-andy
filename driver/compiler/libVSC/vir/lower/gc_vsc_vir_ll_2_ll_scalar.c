@@ -14,6 +14,20 @@
 #include "vir/lower/gc_vsc_vir_ml_2_ll.h"
 #include "vir/lower/gc_vsc_vir_lower_common_func.h"
 
+static gctBOOL
+_hasNotVecMod(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    /*
+    ** For INT_MOD, HW can only support component operantion, so we need to expand INT_MOD.
+    ** For FLOAT_MOD, HW can't support it directly, so we need to use DIV. But HW can only support component operation for DIV,
+    ** so we need to expand FLOAT_MOD too.
+    */
+    return gcvTRUE;
+}
+
 static VIR_PatternMatchInst _rcpSclPatInst0[] = {
     { VIR_OP_RCP, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
 };
@@ -118,6 +132,19 @@ static VIR_Pattern _divSclPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
+static VIR_PatternMatchInst _modSclPatInst0[] = {
+    { VIR_OP_MOD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasNotVecMod }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _modSclRepInst0[] = {
+    { VIR_OP_MOD, 0, 0, { 1, 2, 3, 0 }, { 0 } },
+};
+
+static VIR_Pattern _modSclPattern[] = {
+    { VIR_PATN_FLAG_EXPAND_COMPONENT_INLINE | VIR_PATN_FLAG_EXPAND_MODE_COMPONENT_O2O, CODEPATTERN(_modScl, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
 static VIR_Pattern*
 _GetLowerPatternPhaseScalar(
     IN VIR_PatternContext      *Context,
@@ -142,6 +169,8 @@ _GetLowerPatternPhaseScalar(
         return _cospiSclPattern;
     case VIR_OP_DIV:
         return _divSclPattern;
+    case VIR_OP_MOD:
+        return _modSclPattern;
     default:
         break;
     }

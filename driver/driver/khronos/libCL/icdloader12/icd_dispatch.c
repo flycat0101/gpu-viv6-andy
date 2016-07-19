@@ -1378,6 +1378,7 @@ clGetExtensionFunctionAddressForPlatform(cl_platform_id platform,
     /* return any ICD-aware extensions*/
     #define CL_COMMON_EXTENSION_ENTRYPOINT_ADD(name) if (!strcmp(function_name, #name) ) return (void *)&name
 
+#if gcdENABLE_CL_GL
     /* Are these core or ext?  This is unclear, but they appear to be*/
     /* independent from cl_khr_gl_sharing.*/
     CL_COMMON_EXTENSION_ENTRYPOINT_ADD(clCreateFromGLBuffer);
@@ -1395,6 +1396,7 @@ clGetExtensionFunctionAddressForPlatform(cl_platform_id platform,
 
     /* cl_khr_gl_event*/
     CL_COMMON_EXTENSION_ENTRYPOINT_ADD(clCreateEventFromGLsyncKHR);
+#endif
 
 #if defined(_WIN32)&& !defined(UNDER_CE)
     /* cl_khr_d3d10_sharing*/
@@ -1573,6 +1575,7 @@ clGetExtensionFunctionAddress(const char *function_name) CL_EXT_SUFFIX__VERSION_
     /* return any ICD-aware extensions*/
     #define CL_COMMON_EXTENSION_ENTRYPOINT_ADD(name) if (!strcmp(function_name, #name) ) return (void *)&name
 
+#if gcdENABLE_CL_GL
     /* Are these core or ext?  This is unclear, but they appear to be*/
     /* independent from cl_khr_gl_sharing.*/
     CL_COMMON_EXTENSION_ENTRYPOINT_ADD(clCreateFromGLBuffer);
@@ -1590,6 +1593,7 @@ clGetExtensionFunctionAddress(const char *function_name) CL_EXT_SUFFIX__VERSION_
 
     /* cl_khr_gl_event*/
     CL_COMMON_EXTENSION_ENTRYPOINT_ADD(clCreateEventFromGLsyncKHR);
+#endif
 
 #if defined(_WIN32)&& !defined(UNDER_CE)
     /* cl_khr_d3d10_sharing*/
@@ -1634,6 +1638,7 @@ clGetExtensionFunctionAddress(const char *function_name) CL_EXT_SUFFIX__VERSION_
     return NULL;
 }
 
+#if gcdENABLE_CL_GL
 /* GL and other APIs*/
 CL_API_ENTRY cl_mem CL_API_CALL clCreateFromGLBuffer(
     cl_context    context,
@@ -1816,6 +1821,7 @@ CL_API_ENTRY cl_event CL_API_CALL clCreateEventFromGLsyncKHR(
         sync,
         errcode_ret);
 }
+#endif
 
 #if defined(_WIN32)&& !defined(UNDER_CE)
 /*

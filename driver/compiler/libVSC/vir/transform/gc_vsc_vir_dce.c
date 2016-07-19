@@ -331,7 +331,7 @@ _VSC_DCE_MarkInstAll(
     VIR_Enable enable = VIR_ENABLE_XYZW;
     VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
 
-    if(VIR_Inst_GetDest(inst) &&
+    if(VIR_OPCODE_hasDest(opcode) &&
        !VIR_OPCODE_isVXOnly(opcode))
     {
         VIR_Operand        *dest  = VIR_Inst_GetDest(inst);

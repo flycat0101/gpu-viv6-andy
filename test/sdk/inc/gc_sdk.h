@@ -38,14 +38,14 @@ extern "C" {
 \******************************************************************************/
 
 #if defined(LINUX) || defined(__QNXNTO__)
-#	include <signal.h>
-#	include <unistd.h>
-#	include <string.h>
-#	include <time.h>
-#	include <sys/time.h>
+#    include <signal.h>
+#    include <unistd.h>
+#    include <string.h>
+#    include <time.h>
+#    include <sys/time.h>
 #elif defined _WIN32
-#	include <windows.h>
-#	include <tchar.h>
+#    include <windows.h>
+#    include <tchar.h>
 #endif
 
 #include <stdio.h>
@@ -62,73 +62,73 @@ extern "C" {
 ********************************* Definitions. ********************************
 \******************************************************************************/
 
-#define gcvLEFTBUTTON	(1 << 0)
-#define gcvMIDDLEBUTTON	(1 << 1)
-#define gcvRIGHTBUTTON	(1 << 2)
-#define gcvCTRL			(1 << 3)
-#define gcvALT			(1 << 4)
-#define gcvSHIFT		(1 << 5)
+#define gcvLEFTBUTTON    (1 << 0)
+#define gcvMIDDLEBUTTON    (1 << 1)
+#define gcvRIGHTBUTTON    (1 << 2)
+#define gcvCTRL            (1 << 3)
+#define gcvALT            (1 << 4)
+#define gcvSHIFT        (1 << 5)
 
 /******************************************************************************\
 ****************************** Type declarations. *****************************
 \******************************************************************************/
 
 /*
-	Window timer event function type.
+    Window timer event function type.
 */
 typedef gctBOOL (* gctTIMERFUNC) (
-	gctPOINTER Argument
-	);
+    gctPOINTER Argument
+    );
 
 /*
-	Keyboard key press event function type.
+    Keyboard key press event function type.
 */
 typedef gctBOOL (* gctKEYBOARDEVENT) (
-	gctPOINTER Argument,
-	gctUINT State,
-	gctUINT Code
-	);
+    gctPOINTER Argument,
+    gctUINT State,
+    gctUINT Code
+    );
 
 /*
-	Mouse button press event function type.
+    Mouse button press event function type.
 */
 typedef gctBOOL (* gctMOUSEPRESSEVENT) (
-	gctPOINTER Argument,
-	gctINT X,
-	gctINT Y,
-	gctUINT State,
-	gctUINT Code
-	);
+    gctPOINTER Argument,
+    gctINT X,
+    gctINT Y,
+    gctUINT State,
+    gctUINT Code
+    );
 
 /*
-	Mouse move event function type.
+    Mouse move event function type.
 */
 typedef gctBOOL (* gctMOUSEMOVEEVENT) (
-	gctPOINTER Argument,
-	gctINT X,
-	gctINT Y,
-	gctUINT State
-	);
+    gctPOINTER Argument,
+    gctINT X,
+    gctINT Y,
+    gctUINT State
+    );
 
 /*
-	Thread routine.
+    Thread routine.
 */
 typedef void (* gctTHREADROUTINE) (
-	gctPOINTER Argument
-	);
+    gctPOINTER Argument
+    );
 
 /*
-	Time structure.
+    Time structure.
 */
 struct _gcsTIME
 {
-	gctINT year;
-	gctINT month;
-	gctINT day;
-	gctINT weekday;
-	gctINT hour;
-	gctINT minute;
-	gctINT second;
+    gctINT year;
+    gctINT month;
+    gctINT day;
+    gctINT weekday;
+    gctINT hour;
+    gctINT minute;
+    gctINT second;
 };
 
 typedef struct _gcsTIME * gcsTIME_PTR;
@@ -139,13 +139,13 @@ typedef struct _gcsTIME * gcsTIME_PTR;
 
 int
 vdkAppEntry(
-	void
-	);
+    void
+    );
 
 void
 vdkGetCurrentTime(
-	gcsTIME_PTR CurrTime
-	);
+    gcsTIME_PTR CurrTime
+    );
 
 /******************************************************************************\
 ********************************** Visual API. ********************************
@@ -153,86 +153,86 @@ vdkGetCurrentTime(
 
 gctBOOL
 vdkInitVisual(
-	void
-	);
+    void
+    );
 
 void
 vdkCleanupVisual(
-	void
-	);
+    void
+    );
 
 void
 vdkGetDesktopSize(
-	IN OUT gctUINT* Width,
-	IN OUT gctUINT* Height
-	);
+    IN OUT gctUINT* Width,
+    IN OUT gctUINT* Height
+    );
 
 gctBOOL
 vdkCreateMainWindow(
-	IN gctINT X,
-	IN gctINT Y,
-	IN gctUINT Width,
-	IN gctUINT Height,
-	IN gctSTRING Title,
-	IN gctPOINTER EventArgument,
-	IN gctKEYBOARDEVENT KeyboardEvent,
-	IN gctMOUSEPRESSEVENT MousePressEvent,
-	IN gctMOUSEMOVEEVENT MouseMoveEvent,
-	IN gctTIMERFUNC TimerEvent,
-	IN gctUINT TimerDelay
-	);
+    IN gctINT X,
+    IN gctINT Y,
+    IN gctUINT Width,
+    IN gctUINT Height,
+    IN gctSTRING Title,
+    IN gctPOINTER EventArgument,
+    IN gctKEYBOARDEVENT KeyboardEvent,
+    IN gctMOUSEPRESSEVENT MousePressEvent,
+    IN gctMOUSEMOVEEVENT MouseMoveEvent,
+    IN gctTIMERFUNC TimerEvent,
+    IN gctUINT TimerDelay
+    );
 
 void
 vdkDestroyMainWindow(
-	void
-	);
+    void
+    );
 
 gctHANDLE
 vdkGetDisplayContext(
-	void
-	);
+    void
+    );
 
 void
 vdkReleaseDisplayContext(
-	gctHANDLE Context
-	);
+    gctHANDLE Context
+    );
 
 gctHANDLE
 vdkGetMainWindowHandle(
-	void
-	);
+    void
+    );
 
 void
 vdkGetMainWindowSize(
-	IN OUT gctUINT* Width,
-	IN OUT gctUINT* Height
-	);
+    IN OUT gctUINT* Width,
+    IN OUT gctUINT* Height
+    );
 
 void
 vdkGetMainWindowColorBits(
-	IN OUT gctUINT* RedCount,
-	IN OUT gctUINT* GreenCount,
-	IN OUT gctUINT* BlueCount
-	);
+    IN OUT gctUINT* RedCount,
+    IN OUT gctUINT* GreenCount,
+    IN OUT gctUINT* BlueCount
+    );
 
 void
 vdkSetMainWindowPostTitle(
-	gctSTRING PostTitle
-	);
+    gctSTRING PostTitle
+    );
 
 void
 vdkSetMainWindowImage(
-	IN gctUINT Width,
-	IN gctUINT Height,
-	IN gctUINT AlignedWidth,
-	IN gctUINT AlignedHeight,
-	IN gctPOINTER Image
-	);
+    IN gctUINT Width,
+    IN gctUINT Height,
+    IN gctUINT AlignedWidth,
+    IN gctUINT AlignedHeight,
+    IN gctPOINTER Image
+    );
 
 int
 vdkEnterMainWindowLoop(
-	void
-	);
+    void
+    );
 
 /******************************************************************************\
 *********************** Threading and Synchronization API. ********************
@@ -240,67 +240,67 @@ vdkEnterMainWindowLoop(
 
 void
 vdkSleep(
-	gctUINT Milliseconds
-	);
+    gctUINT Milliseconds
+    );
 
 gctHANDLE
 vdkCreateThread(
-	gctTHREADROUTINE ThreadRoutine,
-	gctPOINTER Argument
-	);
+    gctTHREADROUTINE ThreadRoutine,
+    gctPOINTER Argument
+    );
 
 void
 vdkCloseThread(
-	gctHANDLE ThreadHandle
-	);
+    gctHANDLE ThreadHandle
+    );
 
 gctHANDLE
 vdkCreateEvent(
-	gctBOOL ManualReset,
-	gctBOOL InitialState
-	);
+    gctBOOL ManualReset,
+    gctBOOL InitialState
+    );
 
 void
 vdkCloseEvent(
-	gctHANDLE EventHandle
-	);
+    gctHANDLE EventHandle
+    );
 
 void
 vdkSetEvent(
-	gctHANDLE EventHandle
-	);
+    gctHANDLE EventHandle
+    );
 
 void
 vdkResetEvent(
-	gctHANDLE EventHandle
-	);
+    gctHANDLE EventHandle
+    );
 
 void
 vdkWaitForEvent(
-	gctHANDLE EventHandle,
-	gctUINT Timeout
-	);
+    gctHANDLE EventHandle,
+    gctUINT Timeout
+    );
 
 gctHANDLE
 vdkCreateMutex(
-	void
-	);
+    void
+    );
 
 void
 vdkCloseMutex(
-	gctHANDLE MutexHandle
-	);
+    gctHANDLE MutexHandle
+    );
 
 void
 vdkAcquireMutex(
-	gctHANDLE MutexHandle,
-	gctUINT Timeout
-	);
+    gctHANDLE MutexHandle,
+    gctUINT Timeout
+    );
 
 void
 vdkReleaseMutex(
-	gctHANDLE MutexHandle
-	);
+    gctHANDLE MutexHandle
+    );
 
 #ifdef __cplusplus
 }

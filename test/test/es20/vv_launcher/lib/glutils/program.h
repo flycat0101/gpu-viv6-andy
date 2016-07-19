@@ -46,8 +46,8 @@ typedef struct _ShaderProgram ShaderProgram;
 
 struct _VertexShader
 {
-	GLuint shader;
-	const char* name;
+    GLuint shader;
+    const char* name;
 };
 
 VertexShader* VertexShaderConstruct(GLuint Sh, const char* Name);
@@ -59,8 +59,8 @@ VertexShader* LoadVertexShader(const char* rc);
 
 struct _FragmentShader
 {
-	GLuint shader;
-	const char* name;
+    GLuint shader;
+    const char* name;
 };
 
 FragmentShader* FragmentShaderConstruct(GLuint Sh, const char* Name);
@@ -72,10 +72,10 @@ FragmentShader* LoadFragmentShader(const char* rc);
 
 struct _ShaderProgram
 {
-	GLuint prog;
-	char* name;
-	VertexShader* vertex_shader;
-	FragmentShader* fragment_shader;
+    GLuint prog;
+    char* name;
+    VertexShader* vertex_shader;
+    FragmentShader* fragment_shader;
 };
 
 ShaderProgram* ShaderProgramConstruct(GLint p, VertexShader* Vs, FragmentShader* Fs);

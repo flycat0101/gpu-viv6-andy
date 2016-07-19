@@ -38,14 +38,13 @@ On the flip side, Wayland lacks basic framebuffer backend support that modern
 graphics stacks for embedded devices typically use. Thus Vivante has added this
 support to the Wayland stack.
 
-Only Wayland 1.4.0 / Weston 1.3.1 version has been validated to work.
+Only Wayland 1.9.0 / Weston 1.9.0 version has been validated to work.
 
 4. PREREQUISITIES
 
 The following is the software environment required:
 
-- Ycoto1.3 distribution.
-- Wayland1.4.0/Weston1.3.1: Wayland dependencies are listed in
+- Wayland1.9.0/Weston1.9.0: Wayland dependencies are listed in
   http://wayland.freedesktop.org/building.html.
 - Vivante patch for Weston.
 
@@ -53,15 +52,13 @@ The following is the software environment required:
 
 Note that Wayland depends on Vivante stack for rendering and Vivante stack
 itself depends on Wayland for window system interaction. Therefore there is
-an inherent circular dependency. To fix this, the build is performed
+an inherent circular dependency. To work around this, the build is performed
 in phases enabling enough functionality in the current phase to be able to
 build the next phase.
 
 The build procedure involves the following steps in the given order :
 
 - Building Wayland server and client libraries.
-- Building Vivante stack for Linux.
-- Building Vivante protocol extension for Wayland.
 - Building Vivante stack with Wayland support.
 - Building Weston and sample applications.
 
@@ -84,8 +81,8 @@ Also, create the 'share/aclocal' directory.
 
 mkdir -p $WLD/share/aclocal
 
-To build, download the wayland library v1.4.0 sources from
-http://wayland.freedesktop.org/releases/wayland-1.4.0.tar.xz and issue the
+To build, download the wayland library v1.9.0 sources from
+http://wayland.freedesktop.org/releases/wayland-1.9.0.tar.xz and issue the
 following commands:
 
     $ cd wayland
@@ -95,80 +92,52 @@ following commands:
 
 This will create and install libwayland-server.so and libwayland-client.so.
 
-5.2. BUILDING VIVANTE STACK FOR LINUX
+5.2. BUILDING VIVANTE STACK WITH WAYLAND SUPPORT
 
 This build is performed on the host PC.
 
-Please refer to instructions for building a Linux framebuffer based Vivante
-driver for your device (i.e. EGL_API_FB=1). Make sure it works before
-proceeding by running some simple apps.
+Please build vivante driver with the next:
+(No wayland option)
+export ROOTFS=<Set this to rootfs directory>
+export ROOTFS_USR=$ROOTFS/usr
+export ROOTFS_DIR=$ROOTFS/usr
+export EGL_API_FB=1
+export EGL_API_DRI=0
+export USE_VDK=0
+export VIVANTE_NO_VG=1
 
-This step produces driver binaries in the 'sdk' directory (normally at
-.../build/sdk).
+After finishing the building, do the next:
+The step above is only to generate libgal for building the next.
+Please go to <project_directory>/driver/wl
+please do the next at the same TERM as the one for building the driver above, otherwise there will lack environment variables
+make -f gcmakefile.linux
+make -f gcmakefile.linux install
 
-5.3. BUILDING VIVANTE PROTOCOL EXTENSION FOR WAYLAND
 
-This build is performed on the target device.
+Please build a directory named wayland-viv under $WLD/include
+and copy <project_directory>/driver/wl/gc_wayland_protocol.h and wayland-viv-client-protocol.h and wayland-viv-server-protocol.h   $WLD/include/wayland-viv
+and copy <project_directory>/build/sdk/drivers/libgc_wayland_protocol**   $WLD/lib
 
-Copy the sdk directory contents to the target at SDK_DIR. Add the following
-settings to the terminal window initialized earlier.
 
-export SDK_DIR=<Set this to Vivante SDK directory>
-export LD_LIBRARY_PATH=$WLD/lib:$SDK_DIR/drivers
-export CFLAGS="-I $SDK_DIR/include -I $SDK_DIR/include/HAL"
-#note: no space after '-L'
-export WAYLAND_CLIENT_LIBS="-L$SDK_DIR/drivers"
-
-Copy the .../drivers/wl directory to the target at WL_DIR, and run
-
-    $ cd $WL_DIR
-    $ ./autogen.sh --prefix=$WLD
-    $ make
-    $ make install
-
-This step produces the protocol extension libraries in WLD and headers in
-WLD/wayland-viv directory.
-
-5.4. BUILDING VIVANTE STACK WITH WAYLAND SUPPORT
-
-This build is performed on the host PC.
-
-We are assuming Vivante driver has already been built and works for linux
-(typically using a build script in the .../make directory).
-
-We will need the files produced by the previous step. So please copy
-the WLD directory to host and set it as WAYLAND_DIR below. Make sure that
-this directory includes the subdirectories - include, lib, etc.. Also copy
-the WLD/include/wayland-viv to the WAYLAND_DIR/include directory. Next make sure
-the following settings appear in your build script. Note that USE_VDK is
-commented out and the target is set to 'drivers'.
+Then rebuild vivante driver with the next:
+(The user should use this built driver to run weston and Apps)
 
 export ROOTFS=<Set this to rootfs directo>
 export ROOTFS_USR=$ROOTFS/usr
 export ROOTFS_DIR=$ROOTFS/usr
 export EGL_API_FB=1
-#export USE_VDK=1
+export EGL_API_DRI=0
+export USE_VDK=0
 export EGL_API_WL=1
-export WAYLAND_DIR=<Set this to wayland install directory on the host>
+export WL_EGL_PLATFORM=1
+export WAYLAND_DIR=$WLD
 export VIVANTE_NO_VG=1
-target=drivers
 
-With these settings run the build script to create driver binaries for Wayland.
-This step creates the Vivante 'sdk' directory as usual.
+With these settings run the build script to create driver binaries for Wayland-based driver.
 
-To get back to vanilla linux, settings can be changed as follows :
+After the building is done, please copy <project_directory>/build/sdk/drivers/libwayland-viv**  $WLD/lib
 
-export ROOTFS=<Set this to rootfs directo>
-export ROOTFS_USR=$ROOTFS/usr
-export ROOTFS_DIR=$ROOTFS/usr
-export EGL_API_FB=1
-export USE_VDK=1
-#export EGL_API_WL=1
-#export WAYLAND_DIR=<Set this to wayland install directory on the host>
-export VIVANTE_NO_VG=1
-target=vdktest
-
-5.5. BUILDING WESTON AND SAMPLE APPLICATIONS
+5.3. BUILDING WESTON AND SAMPLE APPLICATIONS
 
 This build is performed on the target device.
 
@@ -182,7 +151,7 @@ Weston and/or its clients depend on them. Please build these as explained in
 http://wayland.freedesktop.org/building.html. But note that, for now, we do not
 enable gl backend for Cairo, so the '--enable-gl --enable-xcb' flags must not be
 used when building Cairo. Also note that, when building libxkbcommon, the
-for-weston-1.3.1 branch must not be used as mentioned in the link above. Please
+for-weston-1.9.0 branch must not be used as mentioned in the link above. Please
 use the master branch.
 Now add the following environment settings in the terminal window.
 export WLD=<Set it according to your mount>
@@ -197,8 +166,8 @@ export FB_COMPOSITOR_LIBS="-L${WLD}/lib -lGLESv2 -lEGL -lwayland-server -lxkbcom
 export SIMPLE_EGL_CLIENT_CFLAGS="-DLINUX -DEGL_API_FB -DEGL_API_WL"
 
 
-Download Weston 1.3.1 version from http://wayland.freedesktop.org/releases/weston-1.3.1.tar.xz
-untar and apply the patch provided by Vivante, by simply using the 'git am' command.
+Download Weston 1.9.0 version from http://wayland.freedesktop.org/releases/weston-1.9.0.tar.xz
+untar and apply the patch provided by Vivante to weston 1.9.
 
 Weston and client applications can now be built using the following commands.
     $ cd weston
@@ -219,7 +188,7 @@ following environment variable in the terminal :
 # Assuming we are in 'weston' directory.
 export XDG_RUNTIME_DIR=`pwd`
 
-Now to run the compositor, execute 'src/weston --tty=2 --use-gl=1 --use-gal2d=0 &'. You should see a blue screen fading
+Now to run the compositor, execute 'src/weston --tty=2 --use-gl=1 &'. You should see a blue screen fading
 in. You should see a simple desktop. You can then enter
 'clients/simple-egl &' to see a 3D client in action. There are other client
 applications that can be run.

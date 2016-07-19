@@ -26,6 +26,8 @@
 *****************************************************************************/
 
 
+
+
 #ifndef __window_h_
 #define __window_h_
 
@@ -40,42 +42,42 @@ extern "C" {
 /* Draws a rectangluar border. */
 gceSTATUS
 DrawBorder(
-	IN gco2D Engine,
-	IN gcoSURF DestSurface,
-	IN gcsRECT_PTR DestRect,
-	IN gctUINT BorderWidth,
-	IN gctUINT CornerOffset,
-	IN gctUINT32 BorderColor
-	);
+    IN gco2D Engine,
+    IN gcoSURF DestSurface,
+    IN gcsRECT_PTR DestRect,
+    IN gctUINT BorderWidth,
+    IN gctUINT CornerOffset,
+    IN gctUINT32 BorderColor
+    );
 
 /* Draws a gradient base for a button or a window. */
 gceSTATUS
 DrawGradientBase(
-	IN gco2D Engine,
-	IN gcoSURF DestSurface,
-	IN gcsRECT_PTR DestRect,
-	IN gctUINT CornerRadius,
-	IN gctUINT BorderWidth,
-	IN gctUINT32 TopColor,
-	IN gctUINT32 BottomColor,
-	IN gctUINT32 BorderColor
-	);
+    IN gco2D Engine,
+    IN gcoSURF DestSurface,
+    IN gcsRECT_PTR DestRect,
+    IN gctUINT CornerRadius,
+    IN gctUINT BorderWidth,
+    IN gctUINT32 TopColor,
+    IN gctUINT32 BottomColor,
+    IN gctUINT32 BorderColor
+    );
 
 /* Draws a gradient button. */
 gceSTATUS
 DrawButton(
-	IN gco2D Engine,
-	IN gcoSURF DestSurface,
-	IN gcsRECT_PTR DestRect,
-	IN gctUINT CornerRadius,
-	IN gctUINT BorderWidth,
-	IN gctUINT32 TopColor,
-	IN gctUINT32 BottomColor,
-	IN gctUINT32 BorderColor,
-	IN gctUINT32 TextColor,
-	IN gctUINT FontSelect,
-	IN char * String
-	);
+    IN gco2D Engine,
+    IN gcoSURF DestSurface,
+    IN gcsRECT_PTR DestRect,
+    IN gctUINT CornerRadius,
+    IN gctUINT BorderWidth,
+    IN gctUINT32 TopColor,
+    IN gctUINT32 BottomColor,
+    IN gctUINT32 BorderColor,
+    IN gctUINT32 TextColor,
+    IN gctUINT FontSelect,
+    IN char * String
+    );
 
 #ifdef __cplusplus
 }

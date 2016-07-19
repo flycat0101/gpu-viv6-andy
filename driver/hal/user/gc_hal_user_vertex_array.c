@@ -1823,13 +1823,13 @@ _findStream(
     stream = gcvNULL;
     if (VertexPtr->enable)
     {
-        gctUINT32 attribOffset = gcmPTR2INT32(VertexPtr->pointer);
+        gctSIZE_T attribOffset = gcmPTR2INT(VertexPtr->pointer);
 
         for (stream = Streams; stream != gcvNULL; stream = stream->next)
         {
-            gctINT32 min;
-            gctINT32 max;
-            gctUINT32 relativeOffset;
+            gctSIZE_T min;
+            gctSIZE_T max;
+            gctSIZE_T relativeOffset;
 
             /* Assert that there is at least one attribute */
             gcmASSERT(stream->attributePtr != gcvNULL);
@@ -1854,8 +1854,8 @@ _findStream(
                     && (VertexPtr->stride == stream->stride)
                     && (VertexPtr->divisor == stream->divisor)
                     && (relativeOffset <= Vertex->maxAttribOffset)
-                    && (max >= (gctINT)attribOffset)
-                    && (min <= (gctINT)attribOffset)
+                    && (max >= attribOffset)
+                    && (min <= attribOffset)
                     )
                 {
                     /* found it */
@@ -1866,8 +1866,8 @@ _findStream(
             {
                 if ((VertexPtr->stride == stream->stride)
                     && (VertexPtr->divisor == stream->divisor)
-                    && (max >= (gctINT)attribOffset)
-                    && (min <= (gctINT)attribOffset)
+                    && (max >= attribOffset)
+                    && (min <= attribOffset)
                     )
                 {
                     /* found it */

@@ -1106,7 +1106,7 @@ gctINT32 TessellateStroke(
 
         /* Allocate the buffer. */
         OVG_MALLOC(context->os, streamPipe.stream, sizeof(_VGVector2) * streamPipe.numStreamPts);
-        OVG_MALLOC(context->os, streamPipe.indices, sizeof(_VGuint16) * streamPipe.numIndices);
+        OVG_MALLOC(context->os, streamPipe.indices, sizeof(_VGuint32) * streamPipe.numIndices);
 
         streamPipe.currIndex = streamPipe.currStreamPts = 0;
     }
@@ -1220,7 +1220,7 @@ END_PROFILE
 
 
     path->tessellateResult.strokeIndexBuffer.count = streamPipe.numIndices;
-    path->tessellateResult.strokeIndexBuffer.indexType = gcvINDEX_16;
+    path->tessellateResult.strokeIndexBuffer.indexType = gcvINDEX_32;
 
 #if SPECIAL_1PX_STROKE
     if (TESS_ABS(context->tessContext.strokeWidth * context->tessContext.strokeScale - 1.0f) < 0.1f)
@@ -1244,7 +1244,7 @@ END_PROFILE
     /* Index stream. */
     gcmASSERT(path->tessellateResult.strokeIndexBuffer.data.items == gcvNULL);
     path->tessellateResult.strokeIndexBuffer.data.items = (_VGubyte*)streamPipe.indices;
-    path->tessellateResult.strokeIndexBuffer.data.size = path->tessellateResult.strokeIndexBuffer.data.allocated = streamPipe.numIndices * sizeof(_VGuint16);
+    path->tessellateResult.strokeIndexBuffer.data.size = path->tessellateResult.strokeIndexBuffer.data.allocated = streamPipe.numIndices * sizeof(_VGuint32);
 
     numTotalPoints = streamPipe.numStreamPts;
 
@@ -5092,11 +5092,11 @@ void    _ConstructStartCap(
     _VGVector2        **stream;
     gctINT32        *currStreamPts;
     gctINT32        *numStreamPts;
-    _VGuint16        **indices;
+    _VGuint32        **indices;
     gctINT32        *currIndex;
     gctINT32        *numIndices;
     _VGVector2        *tempVert;
-    _VGuint16        *tempIndx;
+    _VGuint32        *tempIndx;
     int i;
 
     gcmHEADER_ARG("context=0x%x linePoints=0x%x streamPipe=0x%x",
@@ -5158,9 +5158,9 @@ void    _ConstructStartCap(
             /* Index buffer */
             for (i = 0; i < numPoints; i++)
             {
-                tempIndx[i * 3 + 0] = (_VGuint16)(*currStreamPts);
-                tempIndx[i * 3 + 1] = (_VGuint16)(*currStreamPts + i + 1);
-                tempIndx[i * 3 + 2] = (_VGuint16)(*currStreamPts + i + 2);
+                tempIndx[i * 3 + 0] = (_VGuint32)(*currStreamPts);
+                tempIndx[i * 3 + 1] = (_VGuint32)(*currStreamPts + i + 1);
+                tempIndx[i * 3 + 2] = (_VGuint32)(*currStreamPts + i + 2);
             }
 
             /* Update Counter. */
@@ -5199,15 +5199,15 @@ void    _ConstructStartCap(
             tempVert[1].y = p1.y - tempVar;
 
             /* Index buffer. */
-            tempIndx[0] = (_VGuint16)(*currStreamPts + 3);
-            tempIndx[1] = (_VGuint16)(*currStreamPts + 2);
-            tempIndx[2] = (_VGuint16)(*currStreamPts);
-            tempIndx[3] = (_VGuint16)(*currStreamPts + 3);
-            tempIndx[4] = (_VGuint16)(*currStreamPts);
-            tempIndx[5] = (_VGuint16)(*currStreamPts + 1);
-            tempIndx[6] = (_VGuint16)(*currStreamPts + 3);
-            tempIndx[7] = (_VGuint16)(*currStreamPts + 1);
-            tempIndx[8] = (_VGuint16)(*currStreamPts + 4);
+            tempIndx[0] = (_VGuint32)(*currStreamPts + 3);
+            tempIndx[1] = (_VGuint32)(*currStreamPts + 2);
+            tempIndx[2] = (_VGuint32)(*currStreamPts);
+            tempIndx[3] = (_VGuint32)(*currStreamPts + 3);
+            tempIndx[4] = (_VGuint32)(*currStreamPts);
+            tempIndx[5] = (_VGuint32)(*currStreamPts + 1);
+            tempIndx[6] = (_VGuint32)(*currStreamPts + 3);
+            tempIndx[7] = (_VGuint32)(*currStreamPts + 1);
+            tempIndx[8] = (_VGuint32)(*currStreamPts + 4);
 
             /* Update counter. */
             *currStreamPts += 5;
@@ -5234,7 +5234,7 @@ void    _ConstructStrokeBody(
 
     gctINT32    sizeVert, sizeIndx;
     _VGVector2    *tempVert = gcvNULL;
-    _VGuint16    *tempIndx  = gcvNULL;
+    _VGuint32    *tempIndx  = gcvNULL;
 
     gcmHEADER_ARG("context=0x%x strokeWidth=%f linePoints=0x%x streamPipe=0x%x",
         context, strokeWidth, linePoints, streamPipe);
@@ -5270,7 +5270,7 @@ void    _ConstructStrokeBody(
     tempVert[5].x = tempVert[4].x + tempVert[4].x - tempVert[3].x;
     tempVert[5].y = tempVert[4].y + tempVert[4].y - tempVert[3].y;
 
-    tempIndx[11]= (_VGuint16)streamPipe->currStreamPts;
+    tempIndx[11]= (_VGuint32)streamPipe->currStreamPts;
     tempIndx[0] = tempIndx[3] = tempIndx[6] = tempIndx[9] = tempIndx[11] + 1;
     tempIndx[1] = tempIndx[11] + 2;
     tempIndx[2] = tempIndx[4] = tempIndx[11] + 5;
@@ -5302,11 +5302,11 @@ void    _ConstructEndCap(
     _VGVector2        **stream;
     gctINT32        *currStreamPts;
     gctINT32        *numStreamPts;
-    _VGuint16        **indices;
+    _VGuint32        **indices;
     gctINT32        *currIndex;
     gctINT32        *numIndices;
     _VGVector2        *tempVert;
-    _VGuint16        *tempIndx;
+    _VGuint32        *tempIndx;
     int i;
 
     gcmHEADER_ARG("context=0x%x linePoints=0x%x streamPipe=0x%x", context, linePoints, streamPipe);
@@ -5361,9 +5361,9 @@ void    _ConstructEndCap(
 
             for (i = 0; i < numPoints; i++)
             {
-                tempIndx[i * 3 + 0] = (_VGuint16)(*currStreamPts);
-                tempIndx[i * 3 + 1] = (_VGuint16)(*currStreamPts + i + 1);
-                tempIndx[i * 3 + 2] = (_VGuint16)(*currStreamPts + i + 2);
+                tempIndx[i * 3 + 0] = (_VGuint32)(*currStreamPts);
+                tempIndx[i * 3 + 1] = (_VGuint32)(*currStreamPts + i + 1);
+                tempIndx[i * 3 + 2] = (_VGuint32)(*currStreamPts + i + 2);
             }
 
             *currStreamPts += numPoints + 2;
@@ -5399,17 +5399,17 @@ void    _ConstructEndCap(
             tempVert[3].y = p1.y + tempVar;
             tempVert[4].y = p0.y + tempVar;
 
-            tempIndx[0] = (_VGuint16)(*currStreamPts + 1);
-            tempIndx[1] = (_VGuint16)(*currStreamPts + 3);
-            tempIndx[2] = (_VGuint16)(*currStreamPts);
+            tempIndx[0] = (_VGuint32)(*currStreamPts + 1);
+            tempIndx[1] = (_VGuint32)(*currStreamPts + 3);
+            tempIndx[2] = (_VGuint32)(*currStreamPts);
 
-            tempIndx[3] = (_VGuint16)(*currStreamPts + 1);
-            tempIndx[4] = (_VGuint16)(*currStreamPts + 4);
-            tempIndx[5] = (_VGuint16)(*currStreamPts + 3);
+            tempIndx[3] = (_VGuint32)(*currStreamPts + 1);
+            tempIndx[4] = (_VGuint32)(*currStreamPts + 4);
+            tempIndx[5] = (_VGuint32)(*currStreamPts + 3);
 
-            tempIndx[6] = (_VGuint16)(*currStreamPts + 1);
-            tempIndx[7] = (_VGuint16)(*currStreamPts + 2);
-            tempIndx[8] = (_VGuint16)(*currStreamPts + 4);
+            tempIndx[6] = (_VGuint32)(*currStreamPts + 1);
+            tempIndx[7] = (_VGuint32)(*currStreamPts + 2);
+            tempIndx[8] = (_VGuint32)(*currStreamPts + 4);
 
             *currStreamPts += 5;
             *currIndex += 9;
@@ -5442,7 +5442,7 @@ void    _ConstructStrokeJoin(
     _VGTesstype        strokeWidth;
 
     _VGVector2        *tempVert = gcvNULL;
-    _VGuint16        *tempIndx  = gcvNULL;
+    _VGuint32        *tempIndx  = gcvNULL;
     gctINT32        sizeVert, sizeIndx;
     gctINT32        step;
     gctINT32        angle0, angle1;
@@ -5520,14 +5520,14 @@ void    _ConstructStrokeJoin(
                 numPoints = (numPoints - 1) * 2 - 1;
                 for (i = 0; i < numPoints; i++)
                 {
-                    *tempIndx++ = (_VGuint16)streamPipe->currStreamPts;
-                    *tempIndx++ = (_VGuint16)(streamPipe->currStreamPts + i + 1);
-                    *tempIndx++ = (_VGuint16)(streamPipe->currStreamPts + i + 2);
+                    *tempIndx++ = (_VGuint32)streamPipe->currStreamPts;
+                    *tempIndx++ = (_VGuint32)(streamPipe->currStreamPts + i + 1);
+                    *tempIndx++ = (_VGuint32)(streamPipe->currStreamPts + i + 2);
                 }
 
-                tempIndx[0] = (_VGuint16)streamPipe->currStreamPts;
-                tempIndx[1] = (_VGuint16)(streamPipe->currStreamPts + i + 1);
-                tempIndx[2] = (_VGuint16)(streamPipe->currStreamPts + 1);
+                tempIndx[0] = (_VGuint32)streamPipe->currStreamPts;
+                tempIndx[1] = (_VGuint32)(streamPipe->currStreamPts + i + 1);
+                tempIndx[2] = (_VGuint32)(streamPipe->currStreamPts + 1);
 
                 streamPipe->currStreamPts = sizeVert;
                 streamPipe->currIndex = sizeIndx;
@@ -5594,42 +5594,42 @@ void    _ConstructStrokeJoin(
                 tempVert++;
             }
 
-            tempIndx[0] = tempIndx[3] = tempIndx[6] = tempIndx[9] = (_VGuint16)(streamPipe->currStreamPts - 2);
+            tempIndx[0] = tempIndx[3] = tempIndx[6] = tempIndx[9] = (_VGuint32)(streamPipe->currStreamPts - 2);
             if (prod > 0)    /* Left turn */
             {
                 /* The four triangles on the edges. */
-                tempIndx[1] = (_VGuint16)(streamPipe->currStreamPts - 3);
-                tempIndx[2] = (_VGuint16)(streamPipe->currStreamPts);
-                tempIndx[4] = (_VGuint16)(streamPipe->currStreamPts + numPoints - 1);
-                tempIndx[5] = (_VGuint16)(streamPipe->currStreamPts + numPoints + numPoints);
-                tempIndx[7] = (_VGuint16)(streamPipe->currStreamPts - 1);
-                tempIndx[8] = (_VGuint16)(streamPipe->currStreamPts + numPoints);
-                tempIndx[10] = (_VGuint16)(streamPipe->currStreamPts + numPoints + numPoints - 1);
-                tempIndx[11] = (_VGuint16)(streamPipe->currStreamPts + numPoints + numPoints + 2);
+                tempIndx[1] = (_VGuint32)(streamPipe->currStreamPts - 3);
+                tempIndx[2] = (_VGuint32)(streamPipe->currStreamPts);
+                tempIndx[4] = (_VGuint32)(streamPipe->currStreamPts + numPoints - 1);
+                tempIndx[5] = (_VGuint32)(streamPipe->currStreamPts + numPoints + numPoints);
+                tempIndx[7] = (_VGuint32)(streamPipe->currStreamPts - 1);
+                tempIndx[8] = (_VGuint32)(streamPipe->currStreamPts + numPoints);
+                tempIndx[10] = (_VGuint32)(streamPipe->currStreamPts + numPoints + numPoints - 1);
+                tempIndx[11] = (_VGuint32)(streamPipe->currStreamPts + numPoints + numPoints + 2);
             }
             else
             {
                 /* The four triangles on the edges. */
-                tempIndx[1] = (_VGuint16)(streamPipe->currStreamPts + numPoints + numPoints);
-                tempIndx[2] = (_VGuint16)(streamPipe->currStreamPts);
-                tempIndx[4] = (_VGuint16)(streamPipe->currStreamPts + numPoints - 1);
-                tempIndx[5] = (_VGuint16)(streamPipe->currStreamPts - 3);
-                tempIndx[7] = (_VGuint16)(streamPipe->currStreamPts + numPoints + numPoints + 2);
-                tempIndx[8] = (_VGuint16)(streamPipe->currStreamPts + numPoints);
-                tempIndx[10] = (_VGuint16)(streamPipe->currStreamPts + numPoints + numPoints - 1);
-                tempIndx[11] = (_VGuint16)(streamPipe->currStreamPts - 1);
+                tempIndx[1] = (_VGuint32)(streamPipe->currStreamPts + numPoints + numPoints);
+                tempIndx[2] = (_VGuint32)(streamPipe->currStreamPts);
+                tempIndx[4] = (_VGuint32)(streamPipe->currStreamPts + numPoints - 1);
+                tempIndx[5] = (_VGuint32)(streamPipe->currStreamPts - 3);
+                tempIndx[7] = (_VGuint32)(streamPipe->currStreamPts + numPoints + numPoints + 2);
+                tempIndx[8] = (_VGuint32)(streamPipe->currStreamPts + numPoints);
+                tempIndx[10] = (_VGuint32)(streamPipe->currStreamPts + numPoints + numPoints - 1);
+                tempIndx[11] = (_VGuint32)(streamPipe->currStreamPts - 1);
             }
             tempIndx += 12;
 
             step = numPoints * 3 - 3;
             for (i = 0; i < numPoints - 1; i++)
             {
-                *(tempIndx + step) = *tempIndx = (_VGuint16)(streamPipe->currStreamPts - 2);
+                *(tempIndx + step) = *tempIndx = (_VGuint32)(streamPipe->currStreamPts - 2);
                 tempIndx++;
-                *(tempIndx + step) = (_VGuint16)(streamPipe->currStreamPts + numPoints + i);
-                *tempIndx++ = (_VGuint16)(streamPipe->currStreamPts + i);
-                *(tempIndx + step) = (_VGuint16)(streamPipe->currStreamPts + numPoints + i + 1);
-                *tempIndx++ = (_VGuint16)(streamPipe->currStreamPts + i + 1);
+                *(tempIndx + step) = (_VGuint32)(streamPipe->currStreamPts + numPoints + i);
+                *tempIndx++ = (_VGuint32)(streamPipe->currStreamPts + i);
+                *(tempIndx + step) = (_VGuint32)(streamPipe->currStreamPts + numPoints + i + 1);
+                *tempIndx++ = (_VGuint32)(streamPipe->currStreamPts + i + 1);
             }
 
             streamPipe->currStreamPts = sizeVert;
@@ -5655,7 +5655,7 @@ void    _ConstructStrokeJoin(
             tempVert[4].x = p2.x + p2.x - p1.x;
             tempVert[4].y = p2.y + p2.y - p1.y;
 
-            tempIndx[0] = tempIndx[3] = (_VGuint16)streamPipe->currStreamPts;
+            tempIndx[0] = tempIndx[3] = (_VGuint32)streamPipe->currStreamPts;
             tempIndx[1] = tempIndx[0] + 1;
             tempIndx[2] = tempIndx[0] + 2;
             tempIndx[4] = tempIndx[0] + 4;
@@ -5710,9 +5710,9 @@ void    _ConstructStrokeJoin(
 
                     for (i = 1; i < numPoints; i++)
                     {
-                        tempIndx[0] = (_VGuint16)streamPipe->currStreamPts;
-                        tempIndx[1] = (_VGuint16) (tempIndx[0] + i);
-                        tempIndx[2] = (_VGuint16) (tempIndx[1] + 1);
+                        tempIndx[0] = (_VGuint32)streamPipe->currStreamPts;
+                        tempIndx[1] = (_VGuint32) (tempIndx[0] + i);
+                        tempIndx[2] = (_VGuint32) (tempIndx[1] + 1);
                         tempIndx += 3;
                     }
 
@@ -5736,7 +5736,7 @@ void    _ConstructStrokeJoin(
                     tempVert[1] = p0;
                     tempVert[2] = p1;
 
-                    tempIndx[0] = (_VGuint16)streamPipe->currStreamPts;
+                    tempIndx[0] = (_VGuint32)streamPipe->currStreamPts;
                     tempIndx[1] = tempIndx[0] + 1;
                     tempIndx[2] = tempIndx[0] + 2;
 
@@ -5780,9 +5780,9 @@ void    _ConstructStrokeJoin(
 
                     for (i = 1; i < numPoints; i++)
                     {
-                        tempIndx[0] = (_VGuint16)streamPipe->currStreamPts;
-                        tempIndx[1] = (_VGuint16) (tempIndx[0] + i);
-                        tempIndx[2] = (_VGuint16) (tempIndx[1] + 1);
+                        tempIndx[0] = (_VGuint32)streamPipe->currStreamPts;
+                        tempIndx[1] = (_VGuint32) (tempIndx[0] + i);
+                        tempIndx[2] = (_VGuint32) (tempIndx[1] + 1);
                         tempIndx += 3;
                     }
 
@@ -5805,7 +5805,7 @@ void    _ConstructStrokeJoin(
                     tempVert[1] = p1;
                     tempVert[2] = p0;
 
-                    tempIndx[0] = (_VGuint16)streamPipe->currStreamPts;
+                    tempIndx[0] = (_VGuint32)streamPipe->currStreamPts;
                     tempIndx[1] = tempIndx[0] + 1;
                     tempIndx[2] = tempIndx[0] + 2;
 
@@ -5877,12 +5877,12 @@ void    _ConstructStrokeJoin(
                     tempVert[2] = p1;
                     tempVert[3] = p2;
 
-                    tempIndx[0] = (_VGuint16)streamPipe->currStreamPts;
-                    tempIndx[1] = (_VGuint16)(streamPipe->currStreamPts + 1);
-                    tempIndx[2] = (_VGuint16)(streamPipe->currStreamPts + 2);
-                    tempIndx[3] = (_VGuint16)streamPipe->currStreamPts;
-                    tempIndx[4] = (_VGuint16)(streamPipe->currStreamPts + 2);
-                    tempIndx[5] = (_VGuint16)(streamPipe->currStreamPts + 3);
+                    tempIndx[0] = (_VGuint32)streamPipe->currStreamPts;
+                    tempIndx[1] = (_VGuint32)(streamPipe->currStreamPts + 1);
+                    tempIndx[2] = (_VGuint32)(streamPipe->currStreamPts + 2);
+                    tempIndx[3] = (_VGuint32)streamPipe->currStreamPts;
+                    tempIndx[4] = (_VGuint32)(streamPipe->currStreamPts + 2);
+                    tempIndx[5] = (_VGuint32)(streamPipe->currStreamPts + 3);
 
                     streamPipe->currStreamPts = sizeVert;
                     streamPipe->currIndex = sizeIndx;
@@ -5914,12 +5914,12 @@ void    _ConstructStrokeJoin(
                     tempVert[2] = p2;
                     tempVert[3] = p3;
 
-                    tempIndx[0] = (_VGuint16)streamPipe->currStreamPts;
-                    tempIndx[1] = (_VGuint16)(streamPipe->currStreamPts + 1);
-                    tempIndx[2] = (_VGuint16)(streamPipe->currStreamPts + 2);
-                    tempIndx[3] = (_VGuint16)streamPipe->currStreamPts;
-                    tempIndx[4] = (_VGuint16)(streamPipe->currStreamPts + 2);
-                    tempIndx[5] = (_VGuint16)(streamPipe->currStreamPts + 3);
+                    tempIndx[0] = (_VGuint32)streamPipe->currStreamPts;
+                    tempIndx[1] = (_VGuint32)(streamPipe->currStreamPts + 1);
+                    tempIndx[2] = (_VGuint32)(streamPipe->currStreamPts + 2);
+                    tempIndx[3] = (_VGuint32)streamPipe->currStreamPts;
+                    tempIndx[4] = (_VGuint32)(streamPipe->currStreamPts + 2);
+                    tempIndx[5] = (_VGuint32)(streamPipe->currStreamPts + 3);
 
                     streamPipe->currStreamPts = sizeVert;
                     streamPipe->currIndex = sizeIndx;
@@ -5950,9 +5950,9 @@ void    _ConstructStrokeJoin(
                 tempVert[2].x = currLinePoints[0].coord.x + radius * vDLine0.x;
                 tempVert[2].y = currLinePoints[0].coord.y + radius * vDLine0.y;
 
-                tempIndx[0] = (_VGuint16)streamPipe->currStreamPts;
-                tempIndx[1] = (_VGuint16)streamPipe->currStreamPts + 1;
-                tempIndx[2] = (_VGuint16)streamPipe->currStreamPts + 2;
+                tempIndx[0] = (_VGuint32)streamPipe->currStreamPts;
+                tempIndx[1] = (_VGuint32)streamPipe->currStreamPts + 1;
+                tempIndx[2] = (_VGuint32)streamPipe->currStreamPts + 2;
 
                 streamPipe->currStreamPts = sizeVert;
                 streamPipe->currIndex = sizeIndx;
@@ -5975,9 +5975,9 @@ void    _ConstructStrokeJoin(
                 tempVert[2].x = currLinePoints[0].coord.x - radius * vDLine1.x;
                 tempVert[2].y = currLinePoints[0].coord.y - radius * vDLine1.y;
 
-                tempIndx[0] = (_VGuint16)streamPipe->currStreamPts;
-                tempIndx[1] = (_VGuint16)(streamPipe->currStreamPts + 1);
-                tempIndx[2] = (_VGuint16)(streamPipe->currStreamPts + 2);
+                tempIndx[0] = (_VGuint32)streamPipe->currStreamPts;
+                tempIndx[1] = (_VGuint32)(streamPipe->currStreamPts + 1);
+                tempIndx[2] = (_VGuint32)(streamPipe->currStreamPts + 2);
 
                 streamPipe->currStreamPts = sizeVert;
                 streamPipe->currIndex = sizeIndx;
@@ -6013,7 +6013,7 @@ void    _ConstructStroke(
     _VGVector2        **stream     = gcvNULL;
     gctINT32        *currStreamPts = gcvNULL;
     gctINT32        *numStreamPts  = gcvNULL;
-    _VGuint16        **indices     = gcvNULL;
+    _VGuint32        **indices     = gcvNULL;
     gctINT32        *currIndex     = gcvNULL;
     gctINT32        *numIndices    = gcvNULL;
 
@@ -6099,7 +6099,7 @@ void    _ConstructStroke(
             {
                 /* Handle zero dash length here. */
                 _VGVector2        *tempVert;
-                _VGuint16        *tempIndx;
+                _VGuint32        *tempIndx;
                 _VGVector2        tp0;
 
                 tp0.x = points[0].coord.x + radius;
@@ -6122,14 +6122,14 @@ void    _ConstructStroke(
 
                 for (i = 0; i < numPoints - 1; i++)
                 {
-                    tempIndx[i * 3] = (_VGuint16)(*currStreamPts);
-                    tempIndx[i * 3 + 1] = (_VGuint16)(*currStreamPts + i + 1);
-                    tempIndx[i * 3 + 2] = (_VGuint16)(*currStreamPts + i + 2);
+                    tempIndx[i * 3] = (_VGuint32)(*currStreamPts);
+                    tempIndx[i * 3 + 1] = (_VGuint32)(*currStreamPts + i + 1);
+                    tempIndx[i * 3 + 2] = (_VGuint32)(*currStreamPts + i + 2);
                 }
                 /* The last triangle. */
-                tempIndx[i * 3] = (_VGuint16)(*currStreamPts);
-                tempIndx[i * 3 + 1] = (_VGuint16)(*currStreamPts + i + 1);
-                tempIndx[i * 3 + 2] = (_VGuint16)(*currStreamPts + 1);
+                tempIndx[i * 3] = (_VGuint32)(*currStreamPts);
+                tempIndx[i * 3 + 1] = (_VGuint32)(*currStreamPts + i + 1);
+                tempIndx[i * 3 + 2] = (_VGuint32)(*currStreamPts + 1);
 
                 *currStreamPts += numPoints + 1;
                 *currIndex += numPoints * 3;
@@ -10602,13 +10602,13 @@ void    _ExpandPipe(
 
     if (indexMin >= pipe->numIndices)
     {
-        OVG_MALLOC(context->os, temp, sizeof(_VGuint16) * sizeInd);
+        OVG_MALLOC(context->os, temp, sizeof(_VGuint32) * sizeInd);
         if (pipe->currIndex > 0)
         {
-            OVG_MEMCOPY(temp, pipe->indices, sizeof(_VGuint16) * pipe->currIndex);
+            OVG_MEMCOPY(temp, pipe->indices, sizeof(_VGuint32) * pipe->currIndex);
         }
         OVG_SAFE_FREE(context->os, pipe->indices);
-        pipe->indices = (_VGuint16*)temp;
+        pipe->indices = (_VGuint32*)temp;
         pipe->numIndices = sizeInd;
     }
 

@@ -2695,7 +2695,7 @@ struct _VIR_INSTRUCTION
     VIR_OpCode              _opcode     : 10;
     gctINT                  id_         : 20; /* the id of the instruction */
     gctUINT                 _isPrecise  : 1;  /* the inst is precise */
-    gctBOOL                 _patched    : 1;  /* some hardware opcodes have bug, we need patch to avoid the bug. */
+    gctUINT                 _patched    : 1;  /* some hardware opcodes have bug, we need patch to avoid the bug. */
 
     VIR_TypeId              _instType   : 8; /* HW supported type */
     gctUINT                 _condOp     : 5;

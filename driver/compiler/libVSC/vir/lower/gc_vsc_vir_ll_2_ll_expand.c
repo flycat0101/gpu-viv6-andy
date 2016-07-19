@@ -2452,6 +2452,15 @@ supportCMP(
 }
 
 static gctBOOL
+supportCONV(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return ((VIR_PatternLowerContext *)Context)->hwCfg->hwFeatureFlags.hasHalti4;
+}
+
+static gctBOOL
 jmp_2_succ3(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -4263,6 +4272,14 @@ static VIR_PatternReplaceInst _convRepInst17[] = {
     { VIR_OP_RSHIFT, 0, 0, {  1, -1, 0, 0 }, { int_value_type0_const_16 } },
 };
 
+static VIR_PatternMatchInst _convPatInst18[] = {
+    { VIR_OP_CONV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { supportCONV }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _convRepInst18[] = {
+    { VIR_OP_CONV, -1, 0, { 1, 2, 0, 0 }, { 0 } },
+};
+
     /*
     { 1, gcSL_CONV, 1, 2, 0, 0, 0, USE_WITH_VIR(_isF16_2_F32_hasCMP_NotFullNewLinker) },
         { -12, 0x5D, gcSL_CG_TEMP1, 2, 0, gcSL_CG_CONSTANT, 0, float16_exp },
@@ -4278,11 +4295,11 @@ static VIR_PatternReplaceInst _convRepInst17[] = {
         { -2, 0x59, gcSL_CG_TEMP2, gcSL_CG_TEMP2, 0, gcSL_CG_CONSTANT, 0, float16_man_bits },
         { -1, 0x5C, 1, gcSL_CG_TEMP1, 0, gcSL_CG_TEMP2, 0, value_types_32 },
     */
-static VIR_PatternMatchInst _convPatInst18[] = {
+static VIR_PatternMatchInst _convPatInst19[] = {
     { VIR_OP_CONV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isF16_2_F32_hasCMP_NotFullNewLinker }, VIR_PATN_MATCH_FLAG_OR },
 };
 
-static VIR_PatternReplaceInst _convRepInst18[] = {
+static VIR_PatternReplaceInst _convRepInst19[] = {
     { VIR_OP_AND_BITWISE, 0, 0, { -1, 2, 0, 0 }, { float16_exp } },
     { VIR_OP_LSHIFT, 0, 0, { -1, -1, 0, 0 }, { float16_man_bits } },
     { VIR_OP_CMP, VIR_COP_EQUAL, 0, { -2, -1, 0, 0 }, { 0, 0, VIR_Lower_SetIntZero } },
@@ -4314,11 +4331,11 @@ static VIR_PatternReplaceInst _convRepInst18[] = {
         { -2, 0x5A, gcSL_CG_TEMP2, gcSL_CG_TEMP2, 0, gcSL_CG_CONSTANT, 0, float32_man_bits },
         { -1, 0x5C, 1, gcSL_CG_TEMP1, 0, gcSL_CG_TEMP2, 0, value_types_16 },
     */
-static VIR_PatternMatchInst _convPatInst19[] = {
+static VIR_PatternMatchInst _convPatInst20[] = {
     { VIR_OP_CONV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isF32_2_F16_hasCMP_NotFullNewLinker }, VIR_PATN_MATCH_FLAG_OR },
 };
 
-static VIR_PatternReplaceInst _convRepInst19[] = {
+static VIR_PatternReplaceInst _convRepInst20[] = {
     { VIR_OP_AND_BITWISE, 0, 0, { -1, 2, 0, 0 }, { float32_exp } },
     { VIR_OP_CMP, VIR_COP_EQUAL, 0, { -2, -1, 0, 0 }, { _setOperandUINT, 0, VIR_Lower_SetIntZero } },
     { VIR_OP_SELECT, VIR_COP_NOT_ZERO, 0, { -2, -2, 0, 0 }, { float16_exp_iszero } },
@@ -4335,11 +4352,11 @@ static VIR_PatternReplaceInst _convRepInst19[] = {
     { VIR_OP_OR_BITWISE, 0, 0, {  1, -1, -2, 0 }, { value_types_16 } },
 };
 
-static VIR_PatternMatchInst _convPatInst20[] = {
+static VIR_PatternMatchInst _convPatInst21[] = {
     { VIR_OP_CONV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isF16_2_F32_hasCMP_FullNewLinker }, VIR_PATN_MATCH_FLAG_OR },
 };
 
-static VIR_PatternReplaceInst _convRepInst20[] = {
+static VIR_PatternReplaceInst _convRepInst21[] = {
     { VIR_OP_AND_BITWISE, 0, 0, { -1, 2, 0, 0 }, { float16_exp } },
     { VIR_OP_LSHIFT, 0, 0, { -1, -1, 0, 0 }, { float16_man_bits } },
     { VIR_OP_CMP, VIR_COP_EQUAL, 0, { -2, -1, 0, 0 }, { _setBooleanType, 0, VIR_Lower_SetIntZero } },
@@ -4356,11 +4373,11 @@ static VIR_PatternReplaceInst _convRepInst20[] = {
     { VIR_OP_OR_BITWISE, 0, 0, {  1, -1, -2, 0 }, { value_types_32 } },
 };
 
-static VIR_PatternMatchInst _convPatInst21[] = {
+static VIR_PatternMatchInst _convPatInst22[] = {
     { VIR_OP_CONV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isF32_2_F16_hasCMP_FullNewLinker }, VIR_PATN_MATCH_FLAG_OR },
 };
 
-static VIR_PatternReplaceInst _convRepInst21[] = {
+static VIR_PatternReplaceInst _convRepInst22[] = {
     { VIR_OP_AND_BITWISE, 0, 0, { -1, 2, 0, 0 }, { float32_exp } },
     { VIR_OP_CMP, VIR_COP_EQUAL, 0, { -2, -1, 0, 0 }, { _setBooleanType, 0, VIR_Lower_SetIntZero } },
     { VIR_OP_SELECT, VIR_COP_NOT_ZERO, 0, { -2, -2, 0, 0 }, { float16_exp_iszero } },
@@ -4400,6 +4417,7 @@ static VIR_Pattern _convPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_conv, 19) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_conv, 20) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_conv, 21) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_conv, 22) },
     { VIR_PATN_FLAG_NONE }
 };
 

@@ -40,15 +40,15 @@ extern "C" {
 
 struct _gcsAPPLICATION
 {
-	/* Handle to the current instance of the application. */
-	HINSTANCE instance;
+    /* Handle to the current instance of the application. */
+    HINSTANCE instance;
 
-	/* Pointer to a null-terminated string specifying the command line
-	   for the application, excluding the program name. */
-	LPTSTR commandLine;
+    /* Pointer to a null-terminated string specifying the command line
+       for the application, excluding the program name. */
+    LPTSTR commandLine;
 
-	/* Specifies how the window is to be shown. */
-	gctINT windowShow;
+    /* Specifies how the window is to be shown. */
+    gctINT windowShow;
 };
 
 

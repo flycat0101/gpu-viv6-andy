@@ -33,19 +33,19 @@
 
 class Test3DUShort16: public MultiDimensionalArraysTest3D {
 public:
-	Test3DUShort16(const size_t sizeX, const size_t sizeY, const size_t sizeZ);
-	~Test3DUShort16();
+    Test3DUShort16(const size_t sizeX, const size_t sizeY, const size_t sizeZ);
+    ~Test3DUShort16();
 
 protected:
-	cl_ushort16* inputAHost;
-	cl_ushort16* inputBHost;
-	cl_ushort16* resultHost;
+    cl_ushort16* inputAHost;
+    cl_ushort16* inputBHost;
+    cl_ushort16* resultHost;
 
-	const int getMemSize() const;
-	void generateInput(const unsigned int &kernelIndex);
-	void* getInputAElement(const unsigned int &index) const;
-	void* getInputBElement(const unsigned int &index) const;
-	void* getResultElement(const unsigned int &index) const;
+    const int getMemSize() const;
+    void generateInput(const unsigned int &kernelIndex);
+    void* getInputAElement(const unsigned int &index) const;
+    void* getInputBElement(const unsigned int &index) const;
+    void* getResultElement(const unsigned int &index) const;
 };
 
 #endif /*_test3dushort16_h*/

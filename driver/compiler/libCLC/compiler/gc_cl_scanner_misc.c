@@ -59,6 +59,7 @@ static clsKEYWORD KeywordTable[] =
     {"break",                T_BREAK,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"case",                 T_CASE,                 0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"const",                T_CONST,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"__const",              T_CONST,                1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"constant",             T_CONSTANT,             0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"continue",             T_CONTINUE,             0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"default",              T_DEFAULT,              0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
@@ -189,7 +190,8 @@ static clsKEYWORD KeywordTable[] =
     {"__read_only",          T_READ_ONLY,            0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"__write_only",         T_WRITE_ONLY,           0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"__read_write",         T_RESERVED_KEYWORD,     1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
-    {"__restrict",           T_RESTRICT,             0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"__restrict",           T_RESTRICT,             1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"__volatile",           T_VOLATILE,             1,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"_viv_bool_packed",     T_BOOL_PACKED,         0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"_viv_bool2_packed",    T_BOOL2_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"_viv_bool3_packed",    T_BOOL3_PACKED,        0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
@@ -705,8 +707,8 @@ OUT clsLexToken * Token
       }
    }
    else {
-      gcmASSERT(0);
-      return T_EOF;
+      gcmASSERT(gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, "unsigned")));
+      Token->type = T_UINT;
    }
 
    gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,

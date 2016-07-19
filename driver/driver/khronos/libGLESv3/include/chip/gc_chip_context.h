@@ -907,6 +907,19 @@ gcChipDecompress_EAC_11bitToR16F(
     OUT gctSIZE_T *pRowStride
     );
 
+extern GLvoid*
+gcChipDecompressASTC(
+    IN  __GLcontext *gc,
+    IN  gctSIZE_T Width,
+    IN  gctSIZE_T Height,
+    IN  gctSIZE_T numSlices,
+    IN  gctSIZE_T compressedSize,
+    IN  const void * Data,
+    IN  __GLformatInfo *formatInfo,
+    OUT gceSURF_FORMAT *Format,
+    OUT gctSIZE_T *pRowStride
+    );
+
 /* chip_shader.c */
 extern gceSTATUS
 gcChipLTCReleaseResultArray(

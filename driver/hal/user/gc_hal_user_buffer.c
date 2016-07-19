@@ -44,9 +44,6 @@ struct _gcoBUFFER
     /* Flag to indicate thread default or not */
     gctBOOL                     threadDefault;
 
-    /* Handle of gckCONTEXT object. */
-    gctUINT32                   context;
-
     /* Requested command buffer size. */
     gctSIZE_T                   bytes;
 
@@ -77,12 +74,15 @@ struct _gcoBUFFER
     struct _gcsTEMPCMDBUF       tempCMDBUF;
 
 #if gcdENABLE_3D
+    gctBOOL                     tfbPaused;
+    gctUINT32                   tfbResumeBytes;
     gctBOOL                     queryPaused[gcvQUERY_MAX_NUM];
-    gctBOOL                     xfbPaused;
+    gctUINT32                   queryResumeBytes[gcvQUERY_MAX_NUM];
 #endif
 
     gctBOOL                     inRerserved;
 
+    gctUINT32                   mirrorCount;
 };
 
 /******************************************************************************\
@@ -191,6 +191,55 @@ OnError:
 }
 
 static gceSTATUS
+_ConstructMirrorCommandBuffer(
+    IN gcoHARDWARE Hardware,
+    IN gcoBUFFER Buffer,
+    IN gcoCMDBUF CommandBuffer
+    )
+{
+    gceSTATUS status;
+    gctUINT32 i;
+
+    gcmHEADER();
+
+    /* Get mirror count from gcoBUFFER. */
+    CommandBuffer->mirrorCount = Buffer->mirrorCount;
+
+    if (CommandBuffer->mirrorCount)
+    {
+        /* Allocate mirror of command buffer. */
+        gcmONERROR(gcoOS_Allocate(
+            gcvNULL,
+            gcmSIZEOF(gcoCMDBUF *) * CommandBuffer->mirrorCount,
+            (gctPOINTER *)&CommandBuffer->mirrors
+            ));
+
+        for (i = 0; i < CommandBuffer->mirrorCount; i++)
+        {
+            gcmONERROR(gcoCMDBUF_Construct(
+                gcvNULL,
+                Buffer->hardware,
+                CommandBuffer->bytes,
+                (gcsCOMMAND_INFO_PTR) &Buffer->info,
+                &CommandBuffer->mirrors[i]));
+
+            if (CommandBuffer->bytes != CommandBuffer->mirrors[i]->bytes)
+            {
+                gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+            }
+        }
+    }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    /* gcoCMDBUF_Construct() will handle error and release the whole gcoBUFFER. */
+    gcmFOOTER();
+    return status;
+}
+
+static gceSTATUS
 gcoBUFFER_GetCMDBUF(
     IN gcoBUFFER Buffer
     )
@@ -249,6 +298,12 @@ gcoBUFFER_GetCMDBUF(
                           Buffer->count);
 
             commandBuffer = temp;
+
+            gcmONERROR(_ConstructMirrorCommandBuffer(
+                Buffer->hardware,
+                Buffer,
+                commandBuffer
+                ));
         }
 
         /* Wait for buffer to become available. */
@@ -324,59 +379,6 @@ _DestroyMirrorCommandBuffer(
     return gcvSTATUS_OK;
 }
 
-static gceSTATUS
-_ConstructMirrorCommandBuffer(
-    IN gcoHARDWARE Hardware,
-    IN gcoBUFFER Buffer,
-    IN gcoCMDBUF CommandBuffer
-    )
-{
-    gceSTATUS status;
-
-    gcmHEADER();
-
-    if (!gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_CHIPENABLE_LINK))
-    {
-        gctUINT32 coreCount, i;
-
-        gcoHARDWARE_Query3DCoreCount(Hardware, &coreCount);
-
-        if (coreCount > 1)
-        {
-            CommandBuffer->mirrorCount = coreCount - 1;
-
-            /* Allocate mirror of command buffer. */
-            gcmONERROR(gcoOS_Allocate(
-                gcvNULL,
-                gcmSIZEOF(gcoCMDBUF *) * CommandBuffer->mirrorCount,
-                (gctPOINTER *)&CommandBuffer->mirrors
-                ));
-
-            for (i = 0; i < CommandBuffer->mirrorCount; i++)
-            {
-                gcmONERROR(gcoCMDBUF_Construct(
-                    gcvNULL,
-                    Buffer->hardware,
-                    CommandBuffer->bytes,
-                    (gcsCOMMAND_INFO_PTR) &Buffer->info,
-                    &CommandBuffer->mirrors[i]));
-
-                if (CommandBuffer->bytes != CommandBuffer->mirrors[i]->bytes)
-                {
-                    gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-                }
-            }
-        }
-    }
-
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
-
-OnError:
-    /* gcoCMDBUF_Construct() will handle error and release the whole gcoBUFFER. */
-    gcmFOOTER();
-    return status;
-}
 
 /******************************************************************************\
 ***************************** gcoCMDBUF Object Code *****************************
@@ -648,9 +650,6 @@ OnError:
 **      gcoHARDWARE Hardware
 **          Pointer to a gcoHARDWARE object.
 **
-**      gctUINT32 Context
-**          Handle of a gckCONTEXT object.
-**
 **      gctSIZE_T MaxSize
 **          Maximum size of buffer.
 **
@@ -668,7 +667,6 @@ gcoBUFFER_Construct(
     IN gcoHAL Hal,
     IN gcoHARDWARE Hardware,
     IN gceENGINE Engine,
-    IN gctUINT32 Context,
     IN gctSIZE_T MaxSize,
     IN gctBOOL ThreadDefault,
     OUT gcoBUFFER * Buffer
@@ -678,10 +676,11 @@ gcoBUFFER_Construct(
     gcoBUFFER buffer = gcvNULL;
     gctPOINTER pointer = gcvNULL;
     gcoCMDBUF commandBuffer;
+    gctUINT32 mGpuModeSwitchBytes = 0;
     gctUINT i = 0;
 
-    gcmHEADER_ARG("Hal=0x%x Hardware=0x%x Context=0x%x MaxSize=%lu",
-                  Hal, Hardware, Context, MaxSize);
+    gcmHEADER_ARG("Hal=0x%x Hardware=0x%x MaxSize=%lu",
+                  Hal, Hardware, MaxSize);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hal, gcvOBJ_HAL);
@@ -702,7 +701,6 @@ gcoBUFFER_Construct(
     /* Initialize the gcoBUFFER object. */
     buffer->object.type = gcvOBJ_BUFFER;
     buffer->hal         = Hal;
-    buffer->context     = Context;
     buffer->threadDefault = ThreadDefault;
 
     /* Zero the command buffers. */
@@ -732,7 +730,6 @@ gcoBUFFER_Construct(
     /***************************************************************************
     ** Query alignment.
     */
-
     gcmONERROR(gcoHARDWARE_QueryCommandBuffer(
         buffer->hardware,
         buffer->engine,
@@ -740,8 +737,16 @@ gcoBUFFER_Construct(
         &buffer->info.reservedHead,
         &buffer->info.reservedTail,
         &buffer->info.reservedUser,
-        &buffer->info.source
+        &buffer->info.source,
+        &mGpuModeSwitchBytes
         ));
+
+#if gcdENABLE_3D
+    buffer->tfbResumeBytes                            = mGpuModeSwitchBytes + gcdRESUME_XFB_LENGH;
+    buffer->queryResumeBytes[gcvQUERY_OCCLUSION]      = mGpuModeSwitchBytes + gcdRESUME_OQ_LENGTH;
+    buffer->queryResumeBytes[gcvQUERY_XFB_WRITTEN]    = mGpuModeSwitchBytes + gcdRESUME_XFBWRITTEN_QUERY_LENGTH;
+    buffer->queryResumeBytes[gcvQUERY_PRIM_GENERATED] = mGpuModeSwitchBytes + gcdRESUME_PRIMGEN_QUERY_LENGTH;
+#endif
 
     buffer->totalReserved
         = buffer->info.reservedHead
@@ -749,6 +754,13 @@ gcoBUFFER_Construct(
         + buffer->info.reservedUser
         + buffer->info.alignment;
 
+    if (!gcoHARDWARE_IsFeatureAvailable(Hardware, gcvFEATURE_CHIPENABLE_LINK))
+    {
+        /* NOTE: This function only valid before gcoHARDWARE_Construct() exits. */
+        gcoHARDWARE_Query3DCoreCount(Hardware, &buffer->mirrorCount);
+
+        buffer->mirrorCount -= 1;
+    }
 
     /***************************************************************************
     ** Initialize the command buffers.
@@ -834,15 +846,6 @@ _GetPatchList(
     return patchList;
 }
 
-#if gcdENABLE_3D
-static gctUINT32 resumeSizeInBytes[gcvQUERY_MAX_NUM] =
-    {
-        gcdRESUME_OQ_LENGTH,
-        gcdRESUME_XFBWRITTEN_QUERY_LENGTH,
-        gcdRESUME_PRIMGEN_QUERY_LENGTH,
-    };
-#endif
-
 static gctUINT32
 _GetResumeCommandLength(
     IN gcoBUFFER Buffer
@@ -858,13 +861,13 @@ _GetResumeCommandLength(
     {
         if (Buffer->queryPaused[type])
         {
-            sizeInBytes += resumeSizeInBytes[type];
+            sizeInBytes += Buffer->queryResumeBytes[type];
         }
     }
 
-    if (Buffer->xfbPaused)
+    if (Buffer->tfbPaused)
     {
-        sizeInBytes += gcdRESUME_XFB_LENGH;
+        sizeInBytes += Buffer->tfbResumeBytes;
     }
 #endif
 
@@ -1274,22 +1277,22 @@ gcoBUFFER_Reserve(
                                  queryType,
                                  gcvQUERYCMD_RESUME,
                                  (gctPOINTER *)&resumeCommand);
-            gcmASSERT((resumeCommand - resumeCommandSaved) == resumeSizeInBytes[queryType]);
+            gcmASSERT((resumeCommand - resumeCommandSaved) == Buffer->queryResumeBytes[queryType]);
             commandBuffer->lastReserve = resumeCommand;
             commandBuffer->lastOffset += (gctUINT32)(resumeCommand - resumeCommandSaved);
             Buffer->queryPaused[queryType] = gcvFALSE;
         }
     }
 
-    if (Buffer->xfbPaused)
+    if (Buffer->tfbPaused)
     {
         gctUINT64 resumeCommand, resumeCommandSaved;
         resumeCommand = resumeCommandSaved = commandBuffer->lastReserve;
         gcoHARDWARE_SetXfbCmd(Buffer->hardware, gcvXFBCMD_RESUME_INCOMMIT, (gctPOINTER *)&resumeCommand);
-        gcmASSERT((resumeCommand - resumeCommandSaved) == gcdRESUME_XFB_LENGH);
+        gcmASSERT((resumeCommand - resumeCommandSaved) == Buffer->tfbResumeBytes);
         commandBuffer->lastReserve = resumeCommand;
         commandBuffer->lastOffset += (gctUINT32)(resumeCommand - resumeCommandSaved);
-        Buffer->xfbPaused = gcvFALSE;
+        Buffer->tfbPaused = gcvFALSE;
     }
 #endif
 
@@ -1348,6 +1351,7 @@ gcoBUFFER_Commit(
     IN gcePIPE_SELECT CurrentPipe,
     IN gcsSTATE_DELTA_PTR StateDelta,
     IN gcsSTATE_DELTA_PTR *StateDeltas,
+    IN gctUINT32 Context,
     IN gctUINT32_PTR Contexts,
     IN gcoQUEUE Queue,
     OUT gctPOINTER *DumpLogical,
@@ -1449,16 +1453,19 @@ gcoBUFFER_Commit(
                 if (pauseXfbCommand - pauseXfbCommandsaved > 0)
                 {
                     tailCommandBuffer->offset += (gctUINT32)(pauseXfbCommand - pauseXfbCommandsaved);
-                    Buffer->xfbPaused = gcvTRUE;
+                    Buffer->tfbPaused = gcvTRUE;
                 }
             }
 
-#if !gcdENABLE_VG && gcdSYNC
+#if gcdSYNC
             {
+                gceHARDWARE_TYPE currentHW = gcvHARDWARE_INVALID;
                 gctBOOL fenceEnable;
+
+                gcmGETCURRENTHARDWARE(currentHW);
                 gcoHARDWARE_GetFenceEnabled(gcvNULL, &fenceEnable);
 
-                if (fenceEnable)
+                if (currentHW != gcvHARDWARE_VG && fenceEnable)
                 {
                     gctUINT64 fenceCommand, fenceCommandSaved;
                     alignedBytes = gcmALIGN(tailCommandBuffer->offset, Buffer->info.alignment) - tailCommandBuffer->offset;
@@ -1486,11 +1493,13 @@ gcoBUFFER_Commit(
             syncCommandLogical =  (gctUINT32_PTR)((gctUINT8_PTR) gcmUINT64_TO_PTR(tailCommandBuffer->logical)
                                + tailCommandBuffer->offset + alignedBytes);
 
-            gcoHARDWARE_QueryMultiGPUSyncLength(gcvNULL, &bytes);
+            gcoHARDWARE_MultiGPUCacheFlush(gcvNULL, &syncCommandLogical);
 
             gcoHARDWARE_MultiGPUSync(gcvNULL, &syncCommandLogical);
-
+            gcoHARDWARE_QueryMultiGPUSyncLength(gcvNULL, &bytes);
             tailCommandBuffer->offset += bytes + alignedBytes;
+            gcoHARDWARE_QueryMultiGPUCacheFlushLength(gcvNULL, &bytes);
+            tailCommandBuffer->offset += bytes;
         }
 
 #endif
@@ -1523,7 +1532,7 @@ gcoBUFFER_Commit(
         /* Send command and context buffer to hardware. */
 #if gcdENABLE_3D
         iface.u.Commit.context = (commandBuffer->using2D && !commandBuffer->using3D)
-                               ? 0 : Buffer->context;
+                               ? 0 : Context;
 #else
         iface.u.Commit.context = 0;
 #endif
@@ -1555,18 +1564,28 @@ gcoBUFFER_Commit(
             {
                 gctUINT32 coreIndex;
 
+                /* Convert core index in this hardware to global core index. */
+                gcmONERROR(gcoHARDWARE_QueryCoreIndex(gcvNULL, i, &coreIndex));
+
                 iface.u.Commit.queue = 0;
+
                 if (StateDeltas)
                 {
-                    iface.u.Commit.delta = gcmPTR_TO_UINT64(StateDeltas[i]);
+                    /* Get State Deltas of the GPU. */
+                    iface.u.Commit.delta = gcmPTR_TO_UINT64(StateDeltas[coreIndex]);
                 }
 
                 if (Contexts)
                 {
-                    iface.u.Commit.context = Contexts[i];
+                    /* Get Context of the GPU. */
+                    iface.u.Commit.context = Contexts[coreIndex];
                 }
+
                 if (commandBufferMirrors)
                 {
+                    /* It is not needed to index commandBufferMirrors with real coreIndex,
+                    *  because content in mirrors always keeps same as command buffer, no
+                    *  matter what its index is. */
                     _DuplicateCommandBuffer(commandBufferMirrors[i - 1], commandBuffer);
                     iface.u.Commit.commandBuffer = gcmPTR_TO_UINT64(commandBufferMirrors[i - 1]);
                 }
@@ -1574,9 +1593,6 @@ gcoBUFFER_Commit(
                 {
                     iface.u.Commit.index = i;
                 }
-
-                /* Convert coreID in this hardware to global core index. */
-                gcmONERROR(gcoHARDWARE_QueryCoreIndex(gcvNULL, i, &coreIndex));
 
                 /* Set it to TLS to find correct command queue. */
                 gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, coreIndex));

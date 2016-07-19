@@ -48,4 +48,4 @@ INCLUDES=\
 	$(AQROOT)\test\es20\vv_launcher\lib; \
 	$(AQROOT)\test\es20\vv_launcher\lib\glutils; \
 	$(_SYSGENSDKROOT)\inc; \
-	$(INCLUDES);$(VIVANTE_SDK_INC);$(VIVANTE_SDK_INC)/HAL;$(AQROOT)/sdk/inc; \
+	$(INCLUDES);$(VIVANTE_SDK_INC); \

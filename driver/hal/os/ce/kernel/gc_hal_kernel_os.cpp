@@ -2362,7 +2362,8 @@ gckOS_MapPagesEx(
     IN gctSIZE_T PageCount,
     IN gctUINT32 Address,
     IN gctPOINTER PageTable,
-    IN gctBOOL Writable
+    IN gctBOOL Writable,
+    IN gceSURF_TYPE Type
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -5393,7 +5394,7 @@ gckOS_CreateUserVirtualMapping(
     OUT gctSIZE_T * PageCount
     )
 {
-	return gckOS_LockPages(Os, Physical, Bytes, gcvFALSE, Logical, PageCount);
+    return gckOS_LockPages(Os, Physical, Bytes, gcvFALSE, Logical, PageCount);
 }
 
 gceSTATUS
@@ -5404,7 +5405,7 @@ gckOS_DestroyUserVirtualMapping(
     IN gctPOINTER Logical
     )
 {
-	return gckOS_UnlockPages(Os, Physical, Bytes, Logical);
+    return gckOS_UnlockPages(Os, Physical, Bytes, Logical);
 }
 
 void
@@ -5646,3 +5647,14 @@ OnError:
     gcmkFOOTER();
     return status;
 }
+gceSTATUS
+gckOS_GetPolicyID(
+    IN gckOS Os,
+    IN gceSURF_TYPE Type,
+    OUT gctUINT32_PTR PolicyID,
+    OUT gctUINT32_PTR AXIConfig
+    )
+{
+    return gcvSTATUS_NOT_SUPPORTED;
+}
+

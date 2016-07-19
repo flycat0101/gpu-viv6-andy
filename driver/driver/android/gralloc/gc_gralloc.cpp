@@ -1390,6 +1390,8 @@ gc_gralloc_unregister_buffer(
 
         gcmONERROR(gcoSURF_Destroy(surface));
 
+        handle->surface = 0;
+
         LOGV("Unregister buffe=%p", hnd);
     }
 

@@ -33,40 +33,40 @@
 
 Test2DFloat::Test2DFloat(const size_t sizeX, const size_t sizeY):
 MultiDimensionalArraysTest2D("float", sizeX, sizeY) {
-	inputAHost = new cl_float[size];
-	inputBHost = new cl_float[size];
-	resultHost = new cl_float[size];
-	inputA = inputAHost;
-	inputB = inputBHost;
-	result = resultHost;
+    inputAHost = new cl_float[size];
+    inputBHost = new cl_float[size];
+    resultHost = new cl_float[size];
+    inputA = inputAHost;
+    inputB = inputBHost;
+    result = resultHost;
 }
 
 Test2DFloat::~Test2DFloat() {
-	delete[] inputAHost;
-	delete[] inputBHost;
-	delete[] resultHost;
+    delete[] inputAHost;
+    delete[] inputBHost;
+    delete[] resultHost;
 }
 
 const int Test2DFloat::getMemSize() const {
-	return sizeof(cl_float)*size;
+    return sizeof(cl_float)*size;
 }
 
 void Test2DFloat::generateInput(const unsigned int &kernelIndex) {
-	for (unsigned int k=0; k<size; k++) {
-		inputAHost[k] = randFloat();
-		if (getKernelInputArgNum(kernelIndex) == 2)
-			inputBHost[k] = randFloat();
-	}
+    for (unsigned int k=0; k<size; k++) {
+        inputAHost[k] = randFloat();
+        if (getKernelInputArgNum(kernelIndex) == 2)
+            inputBHost[k] = randFloat();
+    }
 }
 
 void* Test2DFloat::getInputAElement(const unsigned int &index) const {
-	return &inputAHost[index];
+    return &inputAHost[index];
 }
 
 void* Test2DFloat::getInputBElement(const unsigned int &index) const {
-	return &inputBHost[index];
+    return &inputBHost[index];
 }
 
 void* Test2DFloat::getResultElement(const unsigned int &index) const {
-	return &resultHost[index];
+    return &resultHost[index];
 }

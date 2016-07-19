@@ -14,7 +14,10 @@
 #ifndef __gc_hal_user_math_h_
 #define __gc_hal_user_math_h_
 
-#define _ISOC99_SOURCE
+#ifndef _ISOC99_SOURCE
+#  define _ISOC99_SOURCE
+#endif
+
 #if (defined _ISOC99_SOURCE || defined _ISOC9X_SOURCE\
 || (defined __STDC_VERSION__&&__STDC_VERSION__ >= 199901L))
 #define __USE_ISOC99 1

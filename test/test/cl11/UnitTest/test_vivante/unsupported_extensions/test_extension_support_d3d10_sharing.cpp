@@ -33,33 +33,33 @@
 
 int test_d3d10(cl_device_id device, cl_context context, cl_command_queue queue, int num_elements, int &total,  int &passed, int &fail)
 {
-	/*
-	cl_mem streams;
-	cl_program program;
-	cl_kernel kernel;
-	size_t threads[1];
-	char kernel_code_int[512];
-	const char *constkernelint;
-	cl_uchar *output_h;
-	*/
+    /*
+    cl_mem streams;
+    cl_program program;
+    cl_kernel kernel;
+    size_t threads[1];
+    char kernel_code_int[512];
+    const char *constkernelint;
+    cl_uchar *output_h;
+    */
 
-	if(is_extension_available(device, "cl_khr_d3d10_sharing"))
-	{
-		/* Create GL Buffers and etc. */
-		/* Not necessary since the device has no support. */
-		printf("!!extension cl_khr_d3d10_sharing is SUPPORTED!!\n");
-		printf("!!TEST cl_khr_gl_sharing FAILED!!\n");
-		fail++;
-	}
-	else
-	{
-		printf("!!extension cl_khr_d3d10_sharing not supported!!\n");
-		printf("!!TEST cl_khr_gl_sharing PASSED!!\n");
-		passed++;
-	}
+    if(is_extension_available(device, "cl_khr_d3d10_sharing"))
+    {
+        /* Create GL Buffers and etc. */
+        /* Not necessary since the device has no support. */
+        printf("!!extension cl_khr_d3d10_sharing is SUPPORTED!!\n");
+        printf("!!TEST cl_khr_gl_sharing FAILED!!\n");
+        fail++;
+    }
+    else
+    {
+        printf("!!extension cl_khr_d3d10_sharing not supported!!\n");
+        printf("!!TEST cl_khr_gl_sharing PASSED!!\n");
+        passed++;
+    }
 
-	total++;
+    total++;
 
 
-	return 0;
+    return 0;
 }

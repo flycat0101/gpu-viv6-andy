@@ -824,20 +824,20 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     return gcvTRUE;
 
 OnError:
-	if (t2d->srcSurf)
-	{
-		if (t2d->srcVirtAddr)
-		{
-			gcmONERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcVirtAddr));
-			t2d->srcVirtAddr = gcvNULL;
-		}
+    if (t2d->srcSurf)
+    {
+        if (t2d->srcVirtAddr)
+        {
+            gcmONERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcVirtAddr));
+            t2d->srcVirtAddr = gcvNULL;
+        }
 
-		if (gcmIS_ERROR(gcoSURF_Destroy(t2d->srcSurf)))
-		{
-			GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
-		}
-		t2d->srcSurf = gcvNULL;
-	}
+        if (gcmIS_ERROR(gcoSURF_Destroy(t2d->srcSurf)))
+        {
+            GalOutput(GalOutputType_Error | GalOutputType_Console, "Destroy Surf failed:%s\n", GalStatusString(status));
+        }
+        t2d->srcSurf = gcvNULL;
+    }
 
     GalOutput(GalOutputType_Error | GalOutputType_Console,
         "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));

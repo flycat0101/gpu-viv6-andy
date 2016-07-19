@@ -39,7 +39,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define _XF86DRI_H_
 
 #include <X11/Xfuncproto.h>
-#include "xf86drm.h"
+#include "drmgl.h"
 #include "glxclient.h"
 
 #define X_XF86DRIQueryVersion                   0

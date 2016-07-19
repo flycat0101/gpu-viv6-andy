@@ -44,6 +44,12 @@ SOURCELIBS= \
     $(GCLIB_PATH)\arch.user.lib \
     $(GCLIB_PATH)\hal.user.lib \
 
+!IF "$(VIVANTE_ENABLE_2D)" == "1"
+SOURCELIBS= \
+    $(SOURCELIBS) \
+    $(GCLIB_PATH)\arch.user.tpc.lib \
+
+!ENDIF
 
 !IF "$(VIVANTE_ENABLE_VG)" == "1"
 SOURCELIBS= \

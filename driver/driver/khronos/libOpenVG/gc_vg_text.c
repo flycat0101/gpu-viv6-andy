@@ -1387,6 +1387,9 @@ VG_API_CALL void VG_API_ENTRY vgDrawGlyphs(
                     Context,
                     &Context->targetImage,
                     glyph->image
+#if gcdMOVG
+                    , Context->tsWidth, Context->tsHeight
+#endif
                     );
             }
 

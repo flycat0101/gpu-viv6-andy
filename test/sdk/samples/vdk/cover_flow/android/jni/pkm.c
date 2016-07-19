@@ -34,87 +34,87 @@
 #pragma pack(1)
 struct PKM_HEADER
 {
-	unsigned char Magic[4];
-	unsigned char Version[2];
-	unsigned char Type[2];
-	unsigned char Width[2];
-	unsigned char Height[2];
-	unsigned char ActiveWidth[2];
-	unsigned char ActiveHeight[2];
+    unsigned char Magic[4];
+    unsigned char Version[2];
+    unsigned char Type[2];
+    unsigned char Width[2];
+    unsigned char Height[2];
+    unsigned char ActiveWidth[2];
+    unsigned char ActiveHeight[2];
 };
 #pragma pack()
 
 void *
 LoadPKM(
-	FILE * File,
-	GLenum * Format,
-	GLsizei * Width,
-	GLsizei * Height,
-	GLsizei * Bytes
-	)
+    FILE * File,
+    GLenum * Format,
+    GLsizei * Width,
+    GLsizei * Height,
+    GLsizei * Bytes
+    )
 {
-	struct PKM_HEADER pkm;
-	size_t bytes;
-	unsigned char * bits;
-	unsigned short type;
-	unsigned short width, height;
-	unsigned short activeWidth, activeHeight;
+    struct PKM_HEADER pkm;
+    size_t bytes;
+    unsigned char * bits;
+    unsigned short type;
+    unsigned short width, height;
+    unsigned short activeWidth, activeHeight;
 
-	/* Read the PKM file header. */
-	if (fread(&pkm, sizeof(pkm), 1, File) != 1)
-	{
-		return NULL;
-	}
+    /* Read the PKM file header. */
+    if (fread(&pkm, sizeof(pkm), 1, File) != 1)
+    {
+        return NULL;
+    }
 
-	/* Validate magic data. */
-	if ((pkm.Magic[0] != 'P')
-	||  (pkm.Magic[1] != 'K')
-	||  (pkm.Magic[2] != 'M')
-	||  (pkm.Magic[3] != ' ')
-	)
-	{
-		return NULL;
-	}
+    /* Validate magic data. */
+    if ((pkm.Magic[0] != 'P')
+    ||  (pkm.Magic[1] != 'K')
+    ||  (pkm.Magic[2] != 'M')
+    ||  (pkm.Magic[3] != ' ')
+    )
+    {
+        return NULL;
+    }
 
-	/* Convert from big endian to numbers. */
-	type         = (pkm.Type[0]         << 8) | pkm.Type[1];
-	width        = (pkm.Width[0]        << 8) | pkm.Width[1];
-	height       = (pkm.Height[0]       << 8) | pkm.Height[1];
-	activeWidth  = (pkm.ActiveWidth[0]  << 8) | pkm.ActiveWidth[1];
-	activeHeight = (pkm.ActiveHeight[0] << 8) | pkm.ActiveHeight[1];
+    /* Convert from big endian to numbers. */
+    type         = (pkm.Type[0]         << 8) | pkm.Type[1];
+    width        = (pkm.Width[0]        << 8) | pkm.Width[1];
+    height       = (pkm.Height[0]       << 8) | pkm.Height[1];
+    activeWidth  = (pkm.ActiveWidth[0]  << 8) | pkm.ActiveWidth[1];
+    activeHeight = (pkm.ActiveHeight[0] << 8) | pkm.ActiveHeight[1];
 
-	/* For now we only support ETC1_RGB_NO_MIPMAPS. */
-	if (type != 0)
-	{
-		return NULL;
-	}
+    /* For now we only support ETC1_RGB_NO_MIPMAPS. */
+    if (type != 0)
+    {
+        return NULL;
+    }
 
-	/* ETC1 RGB texture format. */
-	*Format = GL_ETC1_RGB8_OES;
+    /* ETC1 RGB texture format. */
+    *Format = GL_ETC1_RGB8_OES;
 
-	/* Return texture dimension. */
-	*Width  = activeWidth;
-	*Height = activeHeight;
+    /* Return texture dimension. */
+    *Width  = activeWidth;
+    *Height = activeHeight;
 
-	/* Compute number of bytes. */
-	bytes = ((width + 3)/ 4) * ((height + 3) / 4) * 8;
+    /* Compute number of bytes. */
+    bytes = ((width + 3)/ 4) * ((height + 3) / 4) * 8;
 
-	*Bytes = bytes;
+    *Bytes = bytes;
 
-	/* Allocate the bits. */
-	bits = (unsigned char *) malloc(bytes);
+    /* Allocate the bits. */
+    bits = (unsigned char *) malloc(bytes);
 
-	if (bits != NULL)
-	{
-		/* Read the bits from the PKM file. */
-		if (fread(bits, 1, bytes, File) != bytes)
-		{
-			/* Error reading bits. */
-			free(bits);
-			bits = NULL;
-		}
-	}
+    if (bits != NULL)
+    {
+        /* Read the bits from the PKM file. */
+        if (fread(bits, 1, bytes, File) != bytes)
+        {
+            /* Error reading bits. */
+            free(bits);
+            bits = NULL;
+        }
+    }
 
-	/* Return the bits. */
-	return bits;
+    /* Return the bits. */
+    return bits;
 }

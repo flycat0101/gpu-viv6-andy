@@ -3798,12 +3798,14 @@ IN slsSLINK_LIST *PtrDscr
    switch(Decl->dataType->addrSpaceQualifier) {
    case clvQUALIFIER_LOCAL:
      if(NameSpace->scopeName == gcvNULL) {
-        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                        LineNo,
-                                        StringNo,
-                                        clvREPORT_ERROR,
-                                        "local variable not in kernel function scope"));
-        return gcvSTATUS_INVALID_ARGUMENT;
+        if(!gcmOPT_oclOcvLocalAddressSpace()) {
+            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                            LineNo,
+                                            StringNo,
+                                            clvREPORT_ERROR,
+                                            "local variable not in kernel function scope"));
+            return gcvSTATUS_INVALID_ARGUMENT;
+        }
      }
      else if(NameSpace->scopeName->type != clvKERNEL_FUNC_NAME) {
         return gcvSTATUS_INVALID_ARGUMENT;

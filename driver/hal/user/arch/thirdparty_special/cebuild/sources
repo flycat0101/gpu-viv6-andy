@@ -1,0 +1,54 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+!IF "$(VIVANTE_ENABLE_2D)" != "1"
+SKIPBUILD=1
+!ENDIF
+
+DOSYSGEN=1
+SYNCHRONIZE_DRAIN=1
+
+TARGETNAME = arch.user.tpc
+TARGETTYPE = LIBRARY
+
+SOURCES = \
+    ../gc_hal_user_hardware_thirdparty.c \
+    ../gc_hal_user_hardware_thirdparty_v10.c \
+    ../gc_hal_user_hardware_thirdparty_v11.c \
+
+INCLUDES = \
+    $(INCLUDES); \
+    $(AQROOT)\hal\user; \
+    $(AQROOT)\hal\os\ce\user; \
+    $(AQROOT)\hal\user\arch; \
+
+!IF "$(VIVANTE_ENABLE_3D)" == "1"
+INCLUDES = \
+    $(INCLUDES); \
+    $(AQROOT)\compiler\libVSC\include;
+
+!ENDIF
+
+!IF "$(VIVANTE_ENABLE_2D)" == "1"
+INCLUDES = \
+    $(INCLUDES); \
+    $(AQROOT)\hal\user\arch\thirdparty_special;
+
+!ENDIF
+
+!IF "$(VIVANTE_ENABLE_VG)" == "1"
+INCLUDES = \
+    $(INCLUDES); \
+    $(AQROOT)\hal\user\archvg;
+
+!ENDIF

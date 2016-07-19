@@ -31,6 +31,7 @@
 
 #include <gc_hal.h>
 #include <gc_hal_raster.h>
+#include <gc_hal_priv.h>
 
 #if GAL_SURFACE_POOL
 #include "gc_dfb_pool.h"
@@ -168,6 +169,7 @@ typedef struct _GalDeviceData {
     bool             hw_2d_full_dfb;    /**< 2D core for DFB */
 
     bool             hw_2d_multi_src;   /**< 2D multi-source blit */
+    bool             hw_2d_compression; /**< 2D compression */
 
     /* Pending primitives. */
     int              max_pending_num;   /**< the maximum pending number */
@@ -238,6 +240,12 @@ typedef struct _GalDriverData {
     gceSURF_FORMAT                   src_native_format;          /**< source surface format in native format */
     gceSURF_ROTATION                 src_rotation;               /**< source rotation */
     bool                             use_source;                 /**< source is in use. */
+    gceTILING                        src_tiling;                 /**< source tiling format. */
+    gce2D_TILE_STATUS_CONFIG         src_tile_status;            /**< source tile statue. */
+    unsigned int                     src_tile_status_addr;       /**< the physical address(es) of the source tile status buffer */
+    unsigned int                     src_clear_value;            /**< source tile status clear value. */
+    unsigned int                     src_tile_status_size;
+    void*                            src_tile_status_logical;
 
     /* Source surface2. */
     unsigned int                     src2_phys_addr[3];          /**< the physical address(es) of the source surface2 */
@@ -265,6 +273,12 @@ typedef struct _GalDriverData {
     DFBSurfacePixelFormat            dst_format;                 /**< dest surface format in DFB format */
     gceSURF_FORMAT                   dst_native_format;          /**< dest surface format in navtive format */
     gceSURF_ROTATION                 dst_rotation;               /**< dest rotation */
+    gceTILING                        dst_tiling;                 /**< dest tiling format. */
+    gce2D_TILE_STATUS_CONFIG         dst_tile_status;            /**< dest tile statue. */
+    unsigned int                     dst_tile_status_addr;       /**< dest physical address(es) of the source tile status buffer */
+    unsigned int                     dst_clear_value;            /**< dest tile status clear value. */
+    unsigned int                     dst_tile_status_size;
+    void*                            dst_tile_status_logical;
 
     /* Color. */
     unsigned int                     brush_color;                /**< the color of the brush */
@@ -364,6 +378,28 @@ typedef struct _GalDriverData {
     gce2D_GLOBAL_COLOR_MULTIPLY_MODE src_pmp_glb_mode;           /**< source premultiply with global color */
     gce2D_PIXEL_COLOR_MULTIPLY_MODE  dst_dmp_dst_alpha;          /**< dest demultiply with dest alpha */
 
+#if GAL_SURFACE_COMPRESSED
+    gctUINT8 backup_src_global_alpha_value;
+    gctUINT8 backup_dst_global_alpha_value;
+    gceSURF_PIXEL_ALPHA_MODE backup_src_alpha_mode;
+    gceSURF_PIXEL_ALPHA_MODE backup_dst_alpha_mode;
+    gceSURF_GLOBAL_ALPHA_MODE backup_src_global_alpha_mode;
+    gceSURF_GLOBAL_ALPHA_MODE backup_dst_global_alpha_mode;
+    gceSURF_BLEND_FACTOR_MODE backup_drc_factor_mode;
+    gceSURF_BLEND_FACTOR_MODE backup_dst_factor_mode;
+    gceSURF_PIXEL_COLOR_MODE backup_src_color_mode;
+    gceSURF_PIXEL_COLOR_MODE backup_dst_color_mode;
+    gctBOOL backup_blended;
+
+    gce2D_PIXEL_COLOR_MULTIPLY_MODE  backup_src_premultiply_src_alpha;
+    gce2D_PIXEL_COLOR_MULTIPLY_MODE  backup_dst_premultiply_dst_alpha;
+    gce2D_GLOBAL_COLOR_MULTIPLY_MODE backup_src_premultiply_global_mode;
+    gce2D_PIXEL_COLOR_MULTIPLY_MODE  backup_dst_demultiply_dst_alpha;
+
+    gctBOOL backup_hor_mirror;
+    gctBOOL backup_ver_mirror;
+#endif
+
     /* Pending primitives. */
     int                              pending_num;                /**< pending numbers */
     GALPendingType                   pending_type;               /**< primitive type of pending list */
@@ -396,6 +432,9 @@ typedef struct _GalDriverData {
     /* Dirty flag. */
     bool                             dirty;                      /**< need synchronization */
 
+    bool                             flush;
+    bool                             per_process_compression;
+
     /* Device data. */
     GalDeviceData                   *vdev;
 
@@ -420,6 +459,15 @@ typedef struct {
 
     /* GAL native surface. */
     gcoSURF surf;
+
+#if GAL_SURFACE_COMPRESSED
+    /* For 2D Compression */
+    unsigned int tsnode;
+    unsigned int tssize;
+    unsigned int tsphysical;
+    void* tslogical;
+#endif
+
 } GalAllocationData;
 
 #endif /* __gc_dfb_h_ */
