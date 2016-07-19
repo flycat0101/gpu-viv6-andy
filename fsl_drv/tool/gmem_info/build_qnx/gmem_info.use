@@ -1,0 +1,4 @@
+gmem_info prints video-memory information for running processes.
+
+Usage: 
+gmem_info
