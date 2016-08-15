@@ -1880,6 +1880,9 @@ veglCreatePlatformWindowSurface(
     EGLint type = EGL_WINDOW_BIT;
     VEGLConfig eglConfig;
     gceSTATUS status;
+#if defined(__QNXNTO__)
+    gctSTRING ignoreSubBuf = gcvNULL;
+#endif
 
     /* Get thread data. */
     thread = veglGetThreadData();
@@ -1967,6 +1970,19 @@ veglCreatePlatformWindowSurface(
                     protectedContent = EGL_TRUE;
                 }
                 break;
+
+#if defined(__QNXNTO__)
+            case EGL_POST_SUB_BUFFER_SUPPORTED_NV:
+                if (gcmIS_SUCCESS(gcoOS_GetEnv(NULL, "IGNORE_EGL_POST_SUB_BUFFER_ATTRIB", &ignoreSubBuf)))
+                {
+                  if (ignoreSubBuf != gcvNULL)
+                  {
+                    break;
+                  }
+                }
+                /* fall through to report error if EGL_POST_SUB_BUFFER_SUPPORTED_NV is not ignored */
+#endif
+
             default:
                 veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
                 gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
