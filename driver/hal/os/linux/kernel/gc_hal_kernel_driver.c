@@ -178,7 +178,7 @@ static ulong physSize = 0;
 module_param(physSize, ulong, 0644);
 MODULE_PARM_DESC(physSize, "Obsolete");
 
-static uint recovery = 1;
+static uint recovery = 0;
 module_param(recovery, uint, 0644);
 MODULE_PARM_DESC(recovery, "Recover GPU from stuck (1: Enable, 0: Disable)");
 
