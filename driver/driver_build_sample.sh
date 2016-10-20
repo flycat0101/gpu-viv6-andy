@@ -89,6 +89,22 @@ arm-yocto-sdk*)
     export MAKEFLAGS+="USE_ARM_YOCTO_SDK=1"
 ;;
 
+arm64)
+    ARCH=arm64
+    export ARCH_TYPE=$ARCH
+    export CPU_TYPE=cortex-a53
+    export CPU_ARCH=armv8-a
+
+    export KERNEL_DIR=${KERNEL_DIR-/homedir/b47569/treerunner/linux}
+    export TOOLCHAIN=${TOOLCHAIN-/homedir/b47569/toolchain/gcc-linaro-4.9-2014.11-x86_64_aarch64-linux-gnu}
+    export PATH=$TOOLCHAIN/bin:$PATH
+    export CROSS_COMPILE=aarch64-linux-gnu-
+    export BUILD_HARD_VFP=1
+    export CFLAGS="-D__ARM_PCS_VFP"
+
+    export BUILD_OPTION_USE_OPENCL=1
+;;
+
 arm64-yocto)
     export ARCH=arm64
     export ARCH_TYPE=$ARCH
@@ -101,7 +117,6 @@ arm64-yocto)
     BUILD_OPTION_USE_OPENVX=1
     BUILD_OPTION_MXC_FBDEV=1
     BUILD_OPTION_VIVANTE_ENABLE_2D=0
-
 ;;
 
 IMX8_Alpha)
